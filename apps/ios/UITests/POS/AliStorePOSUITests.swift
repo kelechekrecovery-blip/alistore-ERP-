@@ -47,6 +47,11 @@ final class AliStorePOSUITests: XCTestCase {
         split.typeText("10000")
         app.swipeUp()
 
+        // Разбивка видна до отправки: внесено 10 000 наличными, остаток 99 900
+        // закроет карта. Ровно эти суммы и уйдут в оплату (cash=10000, card=99900).
+        XCTAssertEqual(app.staticTexts["pos-split-cash"].label, "10\u{00A0}000\u{00A0}сом")
+        XCTAssertEqual(app.staticTexts["pos-split-remaining"].label, "99\u{00A0}900\u{00A0}сом")
+
         app.buttons["pos-sale-submit"].tap()
 
         // Сумма форматируется через Money.som (ru_KG, неразрывные пробелы).

@@ -74,4 +74,40 @@ final class POSMoneyTests: XCTestCase {
         XCTAssertEqual(POSMoney.total(gross: 1000, discountPct: -10), 1000)
         XCTAssertEqual(POSMoney.total(gross: 1000, discountPct: 300), 0)
     }
+
+    // MARK: - Разбивка «Внесено / Осталось»
+
+    func testSplitShowsCashAndRemainder() {
+        // Внесли часть наличными — остаток закрывается вторым способом.
+        let split = POSMoney.split(total: 10_000, cashEntered: 4_000)
+        XCTAssertEqual(split, POSMoney.Split(cash: 4_000, remaining: 6_000))
+    }
+
+    func testSplitFullCashLeavesNothing() {
+        let split = POSMoney.split(total: 10_000, cashEntered: 10_000)
+        XCTAssertEqual(split.remaining, 0)
+    }
+
+    func testSplitClampsOvercashToTotal() {
+        // Ввели больше итога — касса не должна показывать отрицательный остаток
+        // или «сдачу» как второй способ: сумма оплат по видам не превышает чек.
+        let split = POSMoney.split(total: 10_000, cashEntered: 15_000)
+        XCTAssertEqual(split, POSMoney.Split(cash: 10_000, remaining: 0))
+    }
+
+    func testSplitNoCashLeavesWholeRemainder() {
+        let split = POSMoney.split(total: 10_000, cashEntered: 0)
+        XCTAssertEqual(split, POSMoney.Split(cash: 0, remaining: 10_000))
+    }
+
+    func testSplitMatchesSubmitAllocation() {
+        // Та же арифметика, что в `submit`: cash = min(total, max(0, entered)),
+        // second = total - cash. Если разойдутся, касса покажет одно, проведёт другое.
+        for (total, entered) in [(10_000, 3_000), (10_000, 0), (10_000, 12_000), (0, 500)] {
+            let split = POSMoney.split(total: total, cashEntered: entered)
+            let submitCash = min(max(0, total), max(0, entered))
+            XCTAssertEqual(split.cash, submitCash)
+            XCTAssertEqual(split.cash + split.remaining, max(0, total))
+        }
+    }
 }

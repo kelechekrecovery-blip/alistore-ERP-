@@ -37,6 +37,18 @@ struct POSSaleView: View {
     // Формула сервера, одной копией в `POSMoney`. Целочисленный вариант
     // `gross - gross * pct / 100` отбрасывал дробь скидки и завышал чек.
     private var total: Int { POSMoney.total(gross: gross, discountPct: discountPct) }
+    /// Наличные, введённые в поле split, до применения к чеку.
+    private var enteredCash: Int { max(0, Int(splitCash) ?? 0) }
+    /// Второй способ оплаты, когда часть внесена наличными. При выбранных
+    /// «Наличные» вторым идёт карта — как и в `submit`.
+    private var secondMethodLabel: String {
+        switch paymentMethod {
+        case "cash", "card": return "Карта"
+        case "qr_mbank": return "MBank"
+        case "qr_odengi": return "О!Деньги"
+        default: return "Карта"
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -172,6 +184,24 @@ struct POSSaleView: View {
             .pickerStyle(.segmented)
             TextField("Наличные в split (необязательно)", text: $splitCash)
                 .keyboardType(.numberPad).textFieldStyle(.roundedBorder)
+            if enteredCash > 0 {
+                // Показываем ту же разбивку, что уйдёт в submit: сколько внесено
+                // наличными и сколько закроет второй способ. Кассир видит цифры до
+                // нажатия, а не узнаёт их из чека постфактум.
+                let split = POSMoney.split(total: total, cashEntered: enteredCash)
+                HStack {
+                    Text("Внесено наличными").font(.caption).foregroundStyle(POSPalette.muted)
+                    Spacer()
+                    Text(Money.som(split.cash)).font(.caption.weight(.semibold)).foregroundStyle(.white)
+                        .accessibilityIdentifier("pos-split-cash")
+                }
+                HStack {
+                    Text("Осталось · \(secondMethodLabel)").font(.caption).foregroundStyle(POSPalette.muted)
+                    Spacer()
+                    Text(Money.som(split.remaining)).font(.caption.weight(.semibold)).foregroundStyle(POSPalette.lime)
+                        .accessibilityIdentifier("pos-split-remaining")
+                }
+            }
             if let approvalId {
                 Text("Approval #\(approvalId.suffix(8)). После одобрения повторите оплату.")
                     .font(.caption).foregroundStyle(POSPalette.coral)
@@ -268,7 +298,9 @@ struct POSSaleView: View {
         isBusy = true
         errorMessage = nil
         defer { isBusy = false }
-        let cash = min(total, max(0, Int(splitCash) ?? 0))
+        // Та же разбивка, что показана в UI выше: касса не должна проводить
+        // сумму, отличную от той, что видел кассир.
+        let cash = POSMoney.split(total: total, cashEntered: enteredCash).cash
         let payments: [POSTender]
         if cash > 0 && cash == total {
             // Раньше эта сумма проваливалась в общую ветку и уходила методом
