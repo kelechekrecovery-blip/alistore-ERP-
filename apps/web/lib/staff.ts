@@ -104,3 +104,37 @@ export async function closeShift(
   }
   return value as ClosedShift;
 }
+
+export interface HandoverTarget {
+  id: string;
+  username: string;
+  role: string;
+}
+
+/** Active colleagues at the caller's point who can receive the drawer. */
+export async function fetchHandoverTargets(accessToken: string): Promise<HandoverTarget[]> {
+  const res = await fetch(`${API_BASE}/shifts/handover-targets`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`handover targets ${res.status}`);
+  return (await res.json()) as HandoverTarget[];
+}
+
+export async function handoverShift(
+  id: string,
+  input: { toStaffId: string; countedCash: number; reason?: string },
+  accessToken: string,
+  idempotencyKey: string,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/shifts/${id}/handover`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${accessToken}`,
+      'idempotency-key': idempotencyKey,
+    },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`handover shift ${res.status}`);
+}

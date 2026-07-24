@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent, HTMLAttributes } from 'react';
 import { closeShift, currentShift, openShift, type Shift } from '@/lib/staff';
+import { ShiftHandoverPanel } from '@/components/staff/ShiftHandoverPanel';
 import {
   createCustomer,
   createTradeIn,
@@ -620,6 +621,11 @@ export default function StaffPage() {
                   <p className="mt-3 text-[11px] leading-4 text-[#8A7F76]">
                     Ожидаемая сумма скрыта до отправки. Пересчитайте наличные самостоятельно.
                   </p>
+                  {session && (
+                    <div className="mt-3">
+                      <ShiftHandoverPanel shiftId={shift.id} accessToken={session.accessToken} onDone={() => void loadShift()} />
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>

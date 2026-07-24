@@ -58,6 +58,15 @@ export class ShiftsController {
     return this.shifts.openShifts(point, staff.id, staff.role, staff.point);
   }
 
+  @ApiOperation({ summary: 'Active colleagues at the caller point a drawer can be handed to' })
+  @ApiOkResponse({ description: 'Active staff at the caller point (excluding self): id, username, role.' })
+  @Get('handover-targets')
+  @RequirePermission('shift', 'handover')
+  async handoverTargets(@CurrentUser() user: AuthPrincipal) {
+    const staff = await this.staffAuth.me(await requireActiveStaff(user, this.staffAuth));
+    return this.staffAuth.handoverTargets(staff.point, staff.id);
+  }
+
   @ApiOperation({ summary: 'Get a cash shift; the caller’s own open drawer is redacted' })
   @ApiParam({ name: 'id', description: 'Cash shift id' })
   @ApiOkResponse({ description: 'Shift found.' })

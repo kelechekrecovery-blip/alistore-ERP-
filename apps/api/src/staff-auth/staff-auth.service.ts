@@ -386,6 +386,20 @@ export class StaffAuthService {
     return staff;
   }
 
+  /**
+   * Active colleagues at a point a cash drawer can be handed to — minus the
+   * caller. Deliberately narrow (one point, id/username/role only) so shift
+   * handover doesn't need the owner-only `staff:manage` roster: a cashier can
+   * pick the receiver without seeing the whole company.
+   */
+  async handoverTargets(point: string, excludeStaffId: string) {
+    return this.prisma.staffUser.findMany({
+      where: { point, active: true, id: { not: excludeStaffId } },
+      select: { id: true, username: true, role: true },
+      orderBy: { username: 'asc' },
+    });
+  }
+
   /** Step-up gate for approving dangerous actions. Rejecting remains fast. */
   async verifyStepUp(staffId: string, token?: string) {
     const staff = await this.getActiveStaff(staffId);
