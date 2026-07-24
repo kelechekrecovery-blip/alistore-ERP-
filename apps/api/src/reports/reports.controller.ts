@@ -98,6 +98,15 @@ export class ReportsController {
     return this.reports.ledger({ type, ref });
   }
 
+  @ApiOperation({ summary: 'Z-report — daily till summary (shifts, sales by method, variance)' })
+  @ApiQuery({ name: 'date', required: true, example: '2026-07-24' })
+  @ApiOkResponse({ description: '{ date, shifts[], totals }.' })
+  @ApiUnprocessableEntityResponse({ description: 'Invalid date.' })
+  @Get('z-report')
+  zReport(@Query('date') date: string) {
+    return this.reports.zReport(date);
+  }
+
   @ApiOperation({ summary: 'Storefront funnel — views → carts → checkouts for a period' })
   @ApiQuery({ name: 'from', required: false, description: 'ISO datetime; default 30 days ago' })
   @ApiQuery({ name: 'to', required: false, description: 'ISO datetime; default now' })

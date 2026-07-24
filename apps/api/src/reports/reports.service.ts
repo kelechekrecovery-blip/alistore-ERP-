@@ -337,6 +337,62 @@ export class ReportsService {
     return { from: fromIso, to: toIso, days: spanDays, total, buckets, trend };
   }
 
+  /**
+   * Z-report — the daily till summary for one business day (UTC): every cash
+   * shift closed that day, its opening/closing cash and variance, sales split by
+   * payment method, and cash collected (incassation). This is an informational
+   * till summary, not the fiscal Z-report — that arrives with a certified OFD.
+   */
+  async zReport(dateIso: string) {
+    const dayMs = parseUtcDay(dateIso);
+    if (dayMs === null) {
+      throw new ValidationError('invalid_date', 'Дата должна быть в формате YYYY-MM-DD');
+    }
+    const DAY = 24 * 60 * 60 * 1000;
+    const start = new Date(dayMs);
+    const end = new Date(dayMs + DAY);
+
+    const shifts = await this.prisma.cashShift.findMany({
+      where: { closedAt: { gte: start, lt: end } },
+      orderBy: { closedAt: 'asc' },
+      select: {
+        id: true, point: true, staffId: true,
+        openCash: true, closeCash: true, diff: true, openedAt: true, closedAt: true,
+      },
+    });
+    const shiftIds = shifts.map((shift) => shift.id);
+
+    const [byMethod, incassation] = await Promise.all([
+      shiftIds.length
+        ? this.prisma.payment.groupBy({
+            by: ['method'],
+            where: { shiftId: { in: shiftIds }, amount: { gt: 0 }, status: { in: ['received', 'reconciled'] } },
+            _sum: { amount: true },
+          })
+        : Promise.resolve([] as { method: string; _sum: { amount: number | null } }[]),
+      shiftIds.length
+        ? this.prisma.cashIncassation.aggregate({ _sum: { amount: true }, where: { shiftId: { in: shiftIds } } })
+        : Promise.resolve({ _sum: { amount: null } }),
+    ]);
+
+    const salesByMethod = Object.fromEntries(byMethod.map((row) => [row.method, row._sum.amount ?? 0]));
+    const salesTotal = byMethod.reduce((sum, row) => sum + (row._sum.amount ?? 0), 0);
+
+    return {
+      date: dateIso,
+      shifts,
+      totals: {
+        shifts: shifts.length,
+        salesByMethod,
+        salesTotal,
+        incassationTotal: incassation._sum.amount ?? 0,
+        openCashTotal: shifts.reduce((sum, shift) => sum + shift.openCash, 0),
+        closeCashTotal: shifts.reduce((sum, shift) => sum + (shift.closeCash ?? 0), 0),
+        varianceTotal: shifts.reduce((sum, shift) => sum + (shift.diff ?? 0), 0),
+      },
+    };
+  }
+
   /** Aggregated KPIs: money, orders, stock, ops, 7-day revenue. */
   async dashboard(staffId?: string) {
     const now = new Date();

@@ -41,6 +41,35 @@ async function get<T>(path: string, accessToken: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+export interface ZReportShift {
+  id: string;
+  point: string;
+  staffId: string;
+  openCash: number;
+  closeCash: number | null;
+  diff: number | null;
+  openedAt: string;
+  closedAt: string | null;
+}
+
+export interface ZReport {
+  date: string;
+  shifts: ZReportShift[];
+  totals: {
+    shifts: number;
+    salesByMethod: Record<string, number>;
+    salesTotal: number;
+    incassationTotal: number;
+    openCashTotal: number;
+    closeCashTotal: number;
+    varianceTotal: number;
+  };
+}
+
+export function fetchZReport(date: string, accessToken: string): Promise<ZReport> {
+  return get<ZReport>(`/reports/z-report?date=${encodeURIComponent(date)}`, accessToken);
+}
+
 export interface Kpi {
   revenue: number;
   cogs: number;

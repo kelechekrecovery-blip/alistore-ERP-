@@ -26,6 +26,7 @@ import type { Dashboard } from '@/lib/reports';
 import { Card } from './Card';
 import { FinanceSettlementWorkspace } from './FinanceSettlementWorkspace';
 import { FinanceControlsPanel } from './FinanceControlsPanel';
+import { ZReportPanel } from './ZReportPanel';
 
 const CATEGORIES: Record<string, string> = {
   rent: 'Аренда', payroll: 'Зарплата', logistics: 'Логистика', marketing: 'Маркетинг',
@@ -331,6 +332,7 @@ export function FinanceView({ d, accessToken }: { d: Dashboard | null; accessTok
           </button>
         ))}
       </nav>
+      <ZReportPanel accessToken={accessToken} />
       <section id="finance-cash" aria-label="Касса" className="scroll-mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
           { label: 'В кассе сейчас', value: cashAmount ? som(cashAmount) : '—', tone: 'text-white' },
