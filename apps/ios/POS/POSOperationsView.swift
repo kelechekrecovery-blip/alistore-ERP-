@@ -11,14 +11,20 @@ struct POSOfflineView: View {
     @State private var message: String?
     private let api = APIClient(baseURL: AppEnvironment.live().apiBaseURL)
 
+    /// Только свои и legacy-записи: чужую офлайн-продажу нельзя ни показать, ни
+    /// отправить под своим токеном (сервер берёт кассира из токена звонящего).
+    private var ownedMutations: [PendingMutation] {
+        OfflinePOSQueue.owned(mutations, by: session.staffId)
+    }
+
     var body: some View {
         NavigationStack {
             List {
-                if mutations.isEmpty {
+                if ownedMutations.isEmpty {
                     ContentUnavailableView("Очередь пуста", systemImage: "checkmark.circle", description: Text("Офлайн-продажи синхронизированы"))
                         .listRowBackground(POSPalette.ink)
                 }
-                ForEach(mutations) { mutation in
+                ForEach(ownedMutations) { mutation in
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text(stateLabel(mutation.state)).font(.headline)
@@ -51,7 +57,7 @@ struct POSOfflineView: View {
                 Button { Task { await replayAll() } } label: {
                     if isSyncing { ProgressView() } else { Image(systemName: "arrow.triangle.2.circlepath") }
                 }
-                .disabled(isSyncing || mutations.isEmpty)
+                .disabled(isSyncing || ownedMutations.isEmpty)
                 .accessibilityLabel("Синхронизировать")
             }
         }
@@ -60,7 +66,7 @@ struct POSOfflineView: View {
     @MainActor private func replayAll() async {
         isSyncing = true
         defer { isSyncing = false }
-        for mutation in mutations where mutation.state != "conflict" {
+        for mutation in ownedMutations where mutation.state != "conflict" {
             await OfflinePOSQueue.replay(mutation, api: api, token: session.accessToken, context: modelContext)
         }
     }

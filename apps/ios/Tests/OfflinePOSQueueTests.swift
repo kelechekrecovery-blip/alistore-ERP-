@@ -139,4 +139,41 @@ final class OfflinePOSQueueTests: XCTestCase {
 
         XCTAssertTrue(OfflinePOSQueue.replayable(try queued(context), owner: "cashier-a").isEmpty)
     }
+
+    // MARK: - Ручная вкладка «Офлайн»: видно и переотправляемо только своё
+
+    /// Регрессия финансовой атрибуции: ручная вкладка показывала и давала
+    /// «Синхронизировать» продажи ЛЮБОГО кассира. После пересменки B мог отправить
+    /// продажу A под своим токеном → выручка на B. Показываем/чиним только своё
+    /// и legacy без владельца.
+    @MainActor
+    func testOwnedShowsOnlyOwnAndLegacySales() throws {
+        let context = try makeContext()
+        try OfflinePOSQueue.enqueue(sale(id: "a-1", qty: 1), context: context, owner: "cashier-a")
+        try OfflinePOSQueue.enqueue(sale(id: "b-1", qty: 1), context: context, owner: "cashier-b")
+        try OfflinePOSQueue.enqueue(sale(id: "legacy-1", qty: 1), context: context) // без владельца
+
+        let forB = OfflinePOSQueue.owned(try queued(context), by: "cashier-b")
+
+        XCTAssertEqual(forB.count, 2, "B видит только свою и legacy, но не продажу A")
+        XCTAssertFalse(forB.contains { $0.owner == "cashier-a" })
+        XCTAssertTrue(forB.contains { $0.owner == "cashier-b" })
+        XCTAssertTrue(forB.contains { $0.owner == nil })
+    }
+
+    /// В отличие от replayable(_:owner:), ручной фильтр НЕ сужает по состоянию:
+    /// свои failed/conflict кассир обязан видеть и вручную переотправлять.
+    @MainActor
+    func testOwnedKeepsOwnFailedAndConflictUnlikeReplayable() throws {
+        let context = try makeContext()
+        try OfflinePOSQueue.enqueue(sale(id: "a-1", qty: 1), context: context, owner: "cashier-a")
+        let mutation = try XCTUnwrap(try queued(context).first)
+        mutation.state = "failed"
+        try context.save()
+
+        // Авто-путь такую запись не трогает…
+        XCTAssertTrue(OfflinePOSQueue.replayable(try queued(context), owner: "cashier-a").isEmpty)
+        // …а ручная вкладка обязана показать её владельцу.
+        XCTAssertEqual(OfflinePOSQueue.owned(try queued(context), by: "cashier-a").count, 1)
+    }
 }

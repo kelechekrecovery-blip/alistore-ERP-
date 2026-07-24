@@ -285,6 +285,19 @@ public enum OfflinePOSQueue {
         }
     }
 
+    /// Мутации, которые текущий кассир волен видеть и вручную переотправлять:
+    /// свои и legacy-записи без владельца. В отличие от `replayable(_:owner:)`
+    /// НЕ сужает по состоянию — ручная вкладка «Офлайн» чинит и `failed`, и
+    /// `conflict`, и «по одобрению», но только СВОИ. Иначе после пересменки
+    /// кассир B видел бы очередь кассира A и мог отправить его продажу под своим
+    /// токеном: сервер берёт staffId из токена звонящего, и выручка легла бы на B.
+    public static func owned(_ all: [PendingMutation], by owner: String?) -> [PendingMutation] {
+        all.filter { mutation in
+            guard let mutationOwner = mutation.owner else { return true }
+            return mutationOwner == owner
+        }
+    }
+
     @MainActor
     public static func replay(
         _ mutation: PendingMutation,
