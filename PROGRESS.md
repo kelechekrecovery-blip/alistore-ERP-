@@ -36,6 +36,17 @@ nonce; обязательная причина списания триммила
 читает). Auth-пути и «на одобрении»-UI подтверждены чистыми. Core 122/122, all-targets build
 зелёный.
 
+**Третий ревью — POS-деньги (pre-existing код) — `f444836e`.** Тот же лens по
+`POSSaleView`/`POSOperationsView`/`POSMoney`/`Money`/`OfflineQueue`/`POSReturnFlow`. Мат
+сплита, округление, идемпотентность очереди — чисто; нашёл HIGH финансовой атрибуции:
+ручная вкладка «Офлайн» показывала и давала «Синхронизировать» офлайн-продажи **любого**
+кассира. Авто-путь фильтрует по владельцу (`replayable(_:owner:)`), ручной — нет: после
+пересменки B мог отправить продажу A под своим токеном, и сервер (берёт staffId из токена)
+записал бы выручку на смену B. Добавлен `OfflinePOSQueue.owned(_:by:)` (свои+legacy, без
+сужения по состоянию — вкладка чинит и failed/conflict), `POSOfflineView` работает только с
+`ownedMutations`. OfflinePOSQueueTests 9/9, all-targets build зелёный. Урок повторился:
+«починено» в авто-пути ≠ починено в ручном UI — проверять оба.
+
 **Состояние релиза iOS (сборка 3).** В App Store Connect загружены Staff, Courier, POS
 (iPhone-only). Client НЕ загружен — жёсткий блокер владельца: профиль
 `AliStore Client App Store` не содержит `com.apple.developer.applesignin` (перепроверено
