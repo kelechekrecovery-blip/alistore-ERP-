@@ -116,6 +116,12 @@ private enum ClientTheme {
     }
 }
 
+/// Колонки товарной сетки. Фиксированные две колонки растягивали карточку во всю
+/// половину экрана на iPad — товар выглядел как плакат. Адаптивный минимум даёт
+/// две колонки на телефоне и четыре-пять на 13″ iPad, тем же приёмом, что уже
+/// работает в кассе (`POSSaleView` → `.adaptive(minimum: 155)`).
+private let productGridColumns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
+
 private struct ClientProductImage: View {
     let product: Product
     let cornerRadius: CGFloat
@@ -2440,7 +2446,7 @@ private struct ClientOrderStatusView: View {
                     .padding(18)
                     .glass(radius: 16)
                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 8)], spacing: 8) {
                         NavigationLink {
                             ClientReceiptView(environment: environment, auth: auth, order: order)
                         } label: {
@@ -4027,7 +4033,7 @@ private struct AccountView: View {
                 .foregroundStyle(ClientTheme.muted)
                 .padding(.top, 2)
 
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 10)], spacing: 10) {
                 AccountMenuTile(title: "Мои заказы", detail: "1 активный", symbol: "shippingbox.fill", badge: "1 активный") {
                     OrdersView(environment: environment, auth: auth, refreshRevision: orderRefreshRevision, products: products, cart: $cart)
                 }
@@ -6071,7 +6077,7 @@ private struct CatalogView: View {
                         } else if visibleProducts.isEmpty {
                             EmptyStateView(title: "Ничего не найдено", detail: "Попробуйте изменить фильтры.", symbol: "magnifyingglass")
                         } else {
-                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                            LazyVGrid(columns: productGridColumns, spacing: 12) {
                                 ForEach(visibleProducts) { product in
                                     NavigationLink {
                                         ProductDetail(environment: environment, product: product, cart: $cart, favorites: $favorites)
@@ -6253,7 +6259,7 @@ private struct ClientHomeView: View {
                     } else if products.isEmpty {
                         Text("Каталог скоро наполнится").foregroundStyle(ClientTheme.muted).frame(maxWidth: .infinity).padding(30).glass(radius: 16)
                     } else {
-                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                        LazyVGrid(columns: productGridColumns, spacing: 12) {
                             ForEach(products.prefix(6)) { product in
                                 NavigationLink {
                                     ProductDetail(environment: environment, product: product, cart: $cart, favorites: $favorites)
@@ -6294,7 +6300,7 @@ private struct FavoritesView: View {
                     ContentUnavailableView("Нет избранного", systemImage: "heart", description: Text("Сохраняйте товары, чтобы быстро вернуться к ним."))
                 } else {
                     ScrollView {
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                        LazyVGrid(columns: productGridColumns, spacing: 12) {
                             ForEach(items) { product in
                                 NavigationLink {
                                     ProductDetail(environment: environment, product: product, cart: $cart, favorites: $favorites)
@@ -6449,7 +6455,7 @@ private struct ProductDetail: View {
                     } else if let detailError {
                         ClientDataErrorView(message: detailError, retry: { Task { await loadDetail() } })
                     }
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
                         ProductTrustCell(symbol: "shield.checkered", text: "Гарантия 12 мес")
                         ProductTrustCell(symbol: "bolt.fill", text: "Доставка 1–2 ч")
                         ProductTrustCell(symbol: "building.2.fill", text: "Самовывоз сегодня")

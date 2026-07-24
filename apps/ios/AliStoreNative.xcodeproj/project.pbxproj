@@ -1199,7 +1199,7 @@
 				PRODUCT_NAME = AliStoreCourier;
 				PROVISIONING_PROFILE_SPECIFIER = "AliStore Courier App Store";
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -1309,7 +1309,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.courier;
 				PRODUCT_NAME = AliStoreCourier;
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -1471,7 +1471,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.staff;
 				PRODUCT_NAME = AliStoreStaff;
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -1510,7 +1510,7 @@
 				PRODUCT_NAME = AliStoreStaff;
 				PROVISIONING_PROFILE_SPECIFIER = "AliStore Staff App Store";
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -1530,7 +1530,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = kg.alistore.pos;
 				PRODUCT_NAME = AliStorePOS;
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -1552,7 +1552,7 @@
 				PRODUCT_NAME = AliStorePOS;
 				PROVISIONING_PROFILE_SPECIFIER = "AliStore POS App Store";
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
