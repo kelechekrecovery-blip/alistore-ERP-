@@ -462,7 +462,12 @@ private struct CourierDeliveryCard: View {
     private func execute<Body: Encodable & Sendable>(endpoint: String, body: Body) async {
         isBusy = true
         do {
-            statusMessage = await submit(endpoint, try JSONEncoder().encode(body), UUID().uuidString)
+            // Ключ от endpoint+содержимого, а не случайный (как уже сделано для
+            // сдачи COD): случайный ключ на каждый тап плодил две записи на одну
+            // команду при двойном тапе. Тот же заказ+действие+тело → тот же ключ →
+            // очередь и сервер дедуплицируют. Исправление суммы даёт другой ключ.
+            let key = "\(endpoint)-\(try IdempotencyKeys.fingerprint(body))"
+            statusMessage = await submit(endpoint, try JSONEncoder().encode(body), key)
         } catch {
             statusMessage = error.localizedDescription
         }
