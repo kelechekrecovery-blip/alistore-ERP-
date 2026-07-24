@@ -125,10 +125,11 @@ public enum OfflineCourierQueue {
         endpoint: String,
         body: Body,
         idempotencyKey: String,
-        context: ModelContext
+        context: ModelContext,
+        owner: String? = nil
     ) throws {
         let encoded = try OfflineQueueCoding.encode(body)
-        try enqueueEncoded(endpoint: endpoint, body: encoded, idempotencyKey: idempotencyKey, context: context)
+        try enqueueEncoded(endpoint: endpoint, body: encoded, idempotencyKey: idempotencyKey, context: context, owner: owner)
     }
 
     @MainActor
@@ -136,7 +137,8 @@ public enum OfflineCourierQueue {
         endpoint: String,
         body rawBody: Data,
         idempotencyKey: String,
-        context: ModelContext
+        context: ModelContext,
+        owner: String? = nil
     ) throws {
         // Тело могло прийти от произвольного кодировщика — приводим к канону,
         // иначе сравнение с уже сохранённым бессмысленно.
@@ -154,9 +156,22 @@ public enum OfflineCourierQueue {
             endpoint: endpoint,
             method: "POST",
             body: body,
-            idempotencyKey: idempotencyKey
+            idempotencyKey: idempotencyKey,
+            owner: owner
         ))
         try context.save()
+    }
+
+    /// Мутации, которые волен видеть и переотправлять текущий курьер: свои и legacy
+    /// без владельца. Сервер и так отклоняет чужую команду 403 (`assertAssignedCourier`),
+    /// поэтому денег это не теряет — но без фильтра после пересменки B видел бы очередь A,
+    /// упирался в 403 и ронял чужую команду в `failed`, а собранный A COD висел бы
+    /// невидимым для сверки. Тот же паттерн, что `OfflinePOSQueue.owned`.
+    public static func owned(_ all: [PendingMutation], by owner: String?) -> [PendingMutation] {
+        all.filter { mutation in
+            guard let mutationOwner = mutation.owner else { return true }
+            return mutationOwner == owner
+        }
     }
 
     @MainActor

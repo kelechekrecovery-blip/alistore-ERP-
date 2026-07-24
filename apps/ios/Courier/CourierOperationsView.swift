@@ -31,6 +31,13 @@ struct CourierRootView: View {
     private let environment = AppEnvironment.live()
     private var api: APIClient { APIClient(baseURL: environment.apiBaseURL) }
 
+    /// Только свои и legacy-команды: после пересменки на общем устройстве курьер не
+    /// должен видеть и переотправлять чужую офлайн-очередь (сервер её всё равно
+    /// отклонит 403, но чужая команда падала бы в `failed` и висела невидимой).
+    private var ownedPending: [PendingMutation] {
+        OfflineCourierQueue.owned(pending, by: session.staffId)
+    }
+
     var body: some View {
         TabView(selection: $tab) {
             NavigationStack {
@@ -48,7 +55,7 @@ struct CourierRootView: View {
             .tag(CourierTab.route)
 
             NavigationStack {
-                CourierCODView(deliveries: deliveries, pending: pending, session: session, refresh: load)
+                CourierCODView(deliveries: deliveries, pending: ownedPending, session: session, refresh: load)
             }
             .tabItem { Label("COD", systemImage: "banknote") }
             .tag(CourierTab.cod)
@@ -56,7 +63,7 @@ struct CourierRootView: View {
             NavigationStack {
                 CourierProfileView(
                     session: session,
-                    pending: pending,
+                    pending: ownedPending,
                     pushStatus: pushStatus,
                     isReplaying: isReplaying,
                     enablePush: enablePush,
@@ -133,7 +140,8 @@ struct CourierRootView: View {
                     endpoint: endpoint,
                     body: body,
                     idempotencyKey: key,
-                    context: modelContext
+                    context: modelContext,
+                    owner: session.staffId
                 )
                 return "Сохранено офлайн"
             } catch {
@@ -145,7 +153,7 @@ struct CourierRootView: View {
     @MainActor
     private func replay(includeConflicts: Bool) async {
         guard !isReplaying else { return }
-        let commands = pending.filter { mutation in
+        let commands = ownedPending.filter { mutation in
             mutation.state == "queued" || mutation.state == "failed" || (includeConflicts && mutation.state == "conflict")
         }
         guard !commands.isEmpty else { return }
@@ -610,7 +618,8 @@ private struct CourierRunCard: View {
                         endpoint: "courier/handover",
                         body: request,
                         idempotencyKey: key,
-                        context: modelContext
+                        context: modelContext,
+                        owner: session.staffId
                     )
                     message = "Сдача COD сохранена офлайн"
                 } catch {

@@ -73,6 +73,7 @@
 		95EB1A7C0A189F0D3F35FF3C /* NativeShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04AAB6220384C05861A21153 /* NativeShell.swift */; };
 		973D1A2779C11D55E3836920 /* GolosText-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 739B68D254BC1DE9AB4F5022 /* GolosText-Bold.ttf */; };
 		98235E7E7D8DF4F3815F95C0 /* SystemStatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6383E95E61180D3B14C31526 /* SystemStatesView.swift */; };
+		9E03C2C31B9975A91A502C0D /* OfflineCourierOwnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11EBD420D0E26E3A14076911 /* OfflineCourierOwnerTests.swift */; };
 		A029546AF725851820AF60E9 /* IdempotencyKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA9EA567F2F2F017261AF06 /* IdempotencyKeys.swift */; };
 		A032872D6346B1EC5ED635BF /* Manrope-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A1F688B97A87EDB7D63096C5 /* Manrope-Bold.ttf */; };
 		A2EEF23C6113ACFAA8CAEDEE /* GolosText-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2962E44FB9BB3C792A4757AC /* GolosText-Regular.ttf */; };
@@ -252,6 +253,7 @@
 		04AAB6220384C05861A21153 /* NativeShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeShell.swift; sourceTree = "<group>"; };
 		0D52D0200FC74225D8DA7907 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0FFDF7F662EF941D9F666C6E /* StaffInventoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffInventoryView.swift; sourceTree = "<group>"; };
+		11EBD420D0E26E3A14076911 /* OfflineCourierOwnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineCourierOwnerTests.swift; sourceTree = "<group>"; };
 		11F23ACBE05CF3A0E1499E0B /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		13A9A1766E34065A9DE2EE32 /* Courier.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Courier.entitlements; sourceTree = "<group>"; };
 		13DAD8839BC2E93CE723B455 /* OrderTimelineContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrderTimelineContractTests.swift; sourceTree = "<group>"; };
@@ -643,6 +645,7 @@
 				C5F763DA7D4DDCF8C3BF9C52 /* GiftCardPaymentTests.swift */,
 				20075A636D86A0A09A4E63B4 /* IdempotencyKeysTests.swift */,
 				5ADA4F6602AA2F3A5B46C08A /* MoneyTests.swift */,
+				11EBD420D0E26E3A14076911 /* OfflineCourierOwnerTests.swift */,
 				7C6C3A8587ECD07B89B84B15 /* OfflineOrderReplayTests.swift */,
 				9B0BAEBFAF767B6B133B548E /* OfflinePOSQueueTests.swift */,
 				B87D9DA92BB28BB65036EFAB /* OfflineQueueCodingTests.swift */,
@@ -1079,6 +1082,7 @@
 				06BB39FA85F8F29F1A63ADB0 /* GiftCardPaymentTests.swift in Sources */,
 				5534D8E321985F5649E82E83 /* IdempotencyKeysTests.swift in Sources */,
 				5037E16A0F70A56273F0E75B /* MoneyTests.swift in Sources */,
+				9E03C2C31B9975A91A502C0D /* OfflineCourierOwnerTests.swift in Sources */,
 				FF8C74F64D5C6EA9ABA0AFAC /* OfflineOrderReplayTests.swift in Sources */,
 				DC66825077F7278C6C1C9AB2 /* OfflinePOSQueueTests.swift in Sources */,
 				842D606BF346F6C247AA6DF7 /* OfflineQueueCodingTests.swift in Sources */,
