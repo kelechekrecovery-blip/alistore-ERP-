@@ -187,7 +187,9 @@ export class AuthService implements OnModuleInit {
     try {
       await this.prisma.customer.update({
         where: { id: customerId },
-        data: { email: normalized },
+        // Ownership was just proven by consumeEmailOtp above, so stamp the email
+        // as verified in the same write — email is never set any other way.
+        data: { email: normalized, emailVerifiedAt: new Date() },
       });
     } catch (error) {
       if (isUniqueViolation(error)) {

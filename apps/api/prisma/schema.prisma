@@ -478,6 +478,7 @@ model Customer {
   // первичным идентификатором (доставка и COD без него не работают). Хранится
   // нормализованным в нижнем регистре, поэтому @unique ловит и Ivan@… и ivan@….
   email                String?               @unique // PII — маскировать младшим ролям
+  emailVerifiedAt      DateTime? // set when the OTP attach flow confirms ownership
   name                 String
   consent              Boolean               @default(false) // маркетинг только при true
   segments             String[]

@@ -217,7 +217,10 @@ describe('Auth: email + OTP → JWT (integration)', () => {
       expect((await prisma.customer.findUnique({ where: { id: customer.id } }))?.email).toBeNull();
 
       await auth.confirmEmailAttach(customer.id, email, devCode as string);
-      expect((await prisma.customer.findUnique({ where: { id: customer.id } }))?.email).toBe(email);
+      const attached = await prisma.customer.findUnique({ where: { id: customer.id } });
+      expect(attached?.email).toBe(email);
+      // Подтверждение владения помечает адрес верифицированным в той же записи.
+      expect(attached?.emailVerifiedAt).toBeInstanceOf(Date);
 
       // И сразу же по нему можно войти.
       const login = await auth.requestEmailOtp(email);

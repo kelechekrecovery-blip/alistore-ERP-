@@ -125,6 +125,7 @@ export class CustomersService {
       id: customer.id,
       phone: customer.phone,
       email: customer.email,
+      emailVerified: customer.emailVerifiedAt !== null,
       name: customer.name,
       consent: customer.consent,
       ...preferenceValues(preferences),

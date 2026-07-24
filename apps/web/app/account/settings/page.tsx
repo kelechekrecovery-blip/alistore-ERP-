@@ -168,7 +168,12 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between text-muted">
             <span>Вход по почте</span>
             {settings?.email ? (
-              <span className="font-mono text-[12px] text-lime">{settings.email}</span>
+              <span className="flex items-center gap-1.5">
+                <span className="font-mono text-[12px] text-lime">{settings.email}</span>
+                {settings.emailVerified && (
+                  <span title="Адрес подтверждён" className="rounded-chip bg-lime/15 px-1.5 py-0.5 text-[10px] font-bold text-lime">✓ подтверждён</span>
+                )}
+              </span>
             ) : (
               <span className="text-faint">не привязан</span>
             )}

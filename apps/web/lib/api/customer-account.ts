@@ -22,6 +22,8 @@ export interface CustomerSettings {
   phone: string;
   /** Second login channel into the same account; null when none is attached. */
   email: string | null;
+  /** True once ownership was confirmed via the email OTP attach flow. */
+  emailVerified: boolean;
   name: string;
   consent: boolean;
   push: boolean;
