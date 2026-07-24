@@ -334,6 +334,13 @@ private struct StaffHomeView: View {
                 actionTile("Заказы", subtitle: "3 новых", icon: "shippingbox.fill", tint: coral, identifier: "staff-home-orders", action: openOrders)
                 actionTile("Скупка Б/У", subtitle: "оценка", icon: "iphone.gen3", tint: Design3.blue, identifier: "staff-home-buyback", action: openBuyback)
                 actionTile("Задачи и KPI", subtitle: "2 активных", icon: "chart.bar.fill", tint: Design3.gold, identifier: "staff-home-kpi", action: openTasks)
+                NavigationLink {
+                    StaffInventoryView(session: session, environment: AppEnvironment.live())
+                } label: {
+                    inventoryTileLabel
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("staff-home-inventory")
             }
         }
     }
@@ -372,6 +379,29 @@ private struct StaffHomeView: View {
                 toolPill("Evidence", icon: "photo.stack", identifier: "staff-home-evidence", action: openEvidence)
             }
         }
+    }
+
+    // Отдельная плитка-ссылка: инвентаризация ведёт на свой экран, а не
+    // переключает вкладку, как остальные быстрые действия.
+    private var inventoryTileLabel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: "shippingbox.and.arrow.backward.fill")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(lime)
+                .frame(width: 32, height: 32)
+                .background(lime.opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            Text("Инвентаризация")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(primaryText)
+                .lineLimit(2)
+                .minimumScaleFactor(0.82)
+            Text("пересчёт остатка")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(lime)
+        }
+        .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
+        .padding(13)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private func actionTile(_ title: String, subtitle: String, icon: String, tint: Color, identifier: String, action: @escaping () -> Void) -> some View {

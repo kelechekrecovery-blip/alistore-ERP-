@@ -36,6 +36,7 @@ final class AliStoreStaffUITests: XCTestCase {
         XCTAssertTrue(app.buttons["staff-home-orders"].exists)
         XCTAssertTrue(app.buttons["staff-home-buyback"].exists)
         XCTAssertTrue(app.buttons["staff-home-kpi"].exists)
+        XCTAssertTrue(app.buttons["staff-home-inventory"].exists)
         XCTAssertTrue(app.staticTexts["ЗАДАЧА ОТ AI"].exists)
         XCTAssertTrue(app.tabBars.buttons["Главная"].exists)
         XCTAssertTrue(app.tabBars.buttons["Заказы"].exists)
@@ -85,6 +86,24 @@ final class AliStoreStaffUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Смена закрыта"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Ожидалось' AND label CONTAINS '6' AND label CONTAINS '200'")).firstMatch.exists)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Расхождение' AND label CONTAINS '100'")).firstMatch.exists)
+    }
+
+    func testInventoryScreenOpensFromHome() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in"]
+        app.launch()
+
+        let tile = app.buttons["staff-home-inventory"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 10))
+        tile.tap()
+
+        // Экран пересчёта: товар, точка, количество и кнопка записи.
+        XCTAssertTrue(app.navigationBars["Инвентаризация"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["staff-inventory-location"].exists)
+        XCTAssertTrue(app.textFields["staff-inventory-counted"].exists)
+        XCTAssertTrue(app.buttons["staff-inventory-submit"].exists)
+        // Без выбранного товара и количества запись недоступна.
+        XCTAssertFalse(app.buttons["staff-inventory-submit"].isEnabled)
     }
 
     func testSignedInStaffTasksMatchesPrototypeShell() {
