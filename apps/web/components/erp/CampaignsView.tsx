@@ -10,6 +10,7 @@ import {
   fetchCampaigns,
   pauseCampaign,
   previewCampaign,
+  recordCampaignSpend,
   submitCampaign,
   type CampaignPreview,
   type CampaignRoi,
@@ -116,6 +117,28 @@ export function CampaignsView() {
       await load();
     } catch (err) {
       setNotice(err instanceof Error ? err.message : 'Кампания не создана');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runSpend(
+    campaignId: string,
+    input: { provider: string; externalRef: string; amount: number; occurredAt: string },
+  ) {
+    if (!session) return;
+    setBusy(`spend:${campaignId}`);
+    setNotice('');
+    try {
+      await recordCampaignSpend(
+        campaignId,
+        { idempotencyKey: crypto.randomUUID(), ...input },
+        session.accessToken,
+      );
+      setNotice('Расход по кампании записан.');
+      await load();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Не удалось записать расход');
     } finally {
       setBusy(null);
     }
@@ -248,6 +271,7 @@ export function CampaignsView() {
 
       <section className="grid gap-4">
         <PreviewPanel preview={preview} />
+        <CampaignSpendForm campaigns={campaigns} busy={busy} onSubmit={runSpend} />
         <CampaignList campaigns={campaigns} busy={busy} onAction={runAction} />
       </section>
     </div>
@@ -284,6 +308,58 @@ function PreviewPanel({ preview }: { preview: CampaignPreview | null }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/**
+ * Reconcile ad spend against a campaign. Spend is money reported by the ad
+ * provider (Meta, etc.) with an invoice reference, not something derived — so it
+ * is entered by hand until certified provider imports exist (MKT-008). The
+ * idempotency key is minted per submit by the parent.
+ */
+function CampaignSpendForm({ campaigns, busy, onSubmit }: {
+  campaigns: CampaignRoi[];
+  busy: string | null;
+  onSubmit: (campaignId: string, input: { provider: string; externalRef: string; amount: number; occurredAt: string }) => void;
+}) {
+  const reconcilable = campaigns.filter((item) => ['approved', 'active', 'paused', 'completed'].includes(item.campaign.status));
+  const [campaignId, setCampaignId] = useState('');
+  const [provider, setProvider] = useState('');
+  const [externalRef, setExternalRef] = useState('');
+  const [amount, setAmount] = useState('');
+  const [localError, setLocalError] = useState('');
+  const inputClass = 'h-10 w-full rounded-[8px] border border-surface-3 bg-surface px-3 text-sm text-white outline-none focus:border-faint';
+
+  if (reconcilable.length === 0) return null;
+
+  const submit = () => {
+    const value = Number(amount);
+    if (!campaignId) return setLocalError('Выберите кампанию');
+    if (!provider.trim() || !externalRef.trim()) return setLocalError('Укажите провайдера и ссылку на инвойс');
+    if (!Number.isInteger(value) || value < 1) return setLocalError('Сумма расхода — целое число ≥ 1');
+    setLocalError('');
+    onSubmit(campaignId, { provider: provider.trim(), externalRef: externalRef.trim(), amount: value, occurredAt: new Date().toISOString() });
+    setAmount('');
+    setExternalRef('');
+  };
+
+  return (
+    <div className="rounded-[16px] border border-surface-3 bg-surface p-5">
+      <div className="mb-3 font-display text-[15px] font-bold">Записать расход по кампании</div>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        <select aria-label="Кампания для расхода" value={campaignId} onChange={(e) => setCampaignId(e.target.value)} className={inputClass}>
+          <option value="">Кампания…</option>
+          {reconcilable.map((item) => <option key={item.campaign.id} value={item.campaign.id}>{item.campaign.name}</option>)}
+        </select>
+        <input aria-label="Провайдер" placeholder="Провайдер (meta_ads)" value={provider} onChange={(e) => setProvider(e.target.value)} className={inputClass} />
+        <input aria-label="Ссылка на инвойс" placeholder="Инвойс / ссылка" value={externalRef} onChange={(e) => setExternalRef(e.target.value)} className={inputClass} />
+        <input aria-label="Сумма расхода, сом" inputMode="numeric" placeholder="Сумма, сом" value={amount} onChange={(e) => setAmount(e.target.value)} className={inputClass} />
+        <button type="button" disabled={busy?.startsWith('spend:')} onClick={submit} className="rounded-btn bg-lime px-4 py-2 text-sm font-extrabold text-lime-ink disabled:opacity-50">
+          Записать
+        </button>
+      </div>
+      {localError && <p className="mt-2 text-sm text-warn">{localError}</p>}
     </div>
   );
 }

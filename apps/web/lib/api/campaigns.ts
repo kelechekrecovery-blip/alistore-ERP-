@@ -122,3 +122,16 @@ export function completeCampaign(id: string, accessToken: string): Promise<Campa
 export function recordCampaignConversion(campaignId: string, orderId: string, accessToken: string): Promise<CampaignRoi> {
   return postAuthJson(`/campaigns/${campaignId}/conversions`, { orderId }, accessToken);
 }
+
+/** Ad spend reconciled against a campaign — mirrors RecordCampaignSpendDto. */
+export interface RecordCampaignSpendInput {
+  idempotencyKey: string;
+  provider: string;
+  externalRef: string;
+  amount: number;
+  occurredAt: string;
+}
+
+export function recordCampaignSpend(id: string, input: RecordCampaignSpendInput, accessToken: string): Promise<CampaignRoi> {
+  return postAuthJson(`/campaigns/${id}/spend`, input, accessToken);
+}
