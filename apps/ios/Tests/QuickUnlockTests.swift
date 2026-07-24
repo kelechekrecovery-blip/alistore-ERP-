@@ -108,4 +108,51 @@ final class QuickUnlockTests: XCTestCase {
         }
         XCTAssertTrue(store.matches(pin: "111111"))
     }
+
+    // MARK: - Лок-аут внутри стора, фейл-закрыто
+
+    /// `verify(pin:)` применяет лок-аут ВНУТРИ стора. Раньше лимит попыток сторожил
+    /// только вью — прямой вызов `matches` его обходил. Теперь даже верный PIN
+    /// отклоняется, пока идёт лок-аут.
+    func testVerifyEnforcesLockoutInsideTheStore() throws {
+        let store = try configuredStore(pin: "111111")
+
+        for _ in 0..<5 {
+            guard case .rejected = store.verify(pin: "000000") else {
+                return XCTFail("неверный PIN обязан отклоняться")
+            }
+        }
+
+        // Пять промахов → лок-аут. Верный PIN тоже обязан быть отклонён.
+        guard case .rejected(let status) = store.verify(pin: "111111") else {
+            return XCTFail("во время лок-аута verify обязан отклонять даже верный PIN")
+        }
+        XCTAssertFalse(status.allowed)
+    }
+
+    /// Если счётчик неудач не удаётся записать в Keychain, лок-аут обязан фейлиться
+    /// ЗАКРЫТО (запереть), а не открыто — иначе `try?` оставлял бы PIN без лимита.
+    func testLockoutFailsClosedWhenCounterCannotPersist() throws {
+        let storage = FailingAttemptsStorage()
+        let store = LocalPINStore(storage: storage)
+        try store.setInitialPIN("111111")
+
+        guard case .rejected(let status) = store.verify(pin: "222222") else {
+            return XCTFail("неверный PIN обязан отклоняться")
+        }
+        XCTAssertFalse(status.allowed, "не записали счётчик → фейлимся закрыто, а не даём безлимитный подбор")
+    }
+
+    /// Хранилище, которое пишет PIN, но не может записать счётчик попыток —
+    /// имитирует сбой Keychain ровно на этой записи.
+    private final class FailingAttemptsStorage: QuickUnlockStorage, @unchecked Sendable {
+        private var items: [String: String] = [:]
+        struct WriteFailed: Error {}
+        func save(_ value: String, account: String) throws {
+            if account == "quick-unlock-pin-attempts" { throw WriteFailed() }
+            items[account] = value
+        }
+        func read(account: String) throws -> String? { items[account] }
+        func clear(account: String) throws { items[account] = nil }
+    }
 }

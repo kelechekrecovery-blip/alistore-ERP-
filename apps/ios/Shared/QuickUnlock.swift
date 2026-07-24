@@ -47,6 +47,13 @@ public struct PINAttemptStatus: Sendable, Equatable {
     }
 }
 
+/// Исход `verify(pin:)`. Разблокировка и отказ различимы явно, чтобы вью не гадал
+/// по `allowed` (при верном PIN статус тоже `allowed`).
+public enum PINUnlockResult: Sendable, Equatable {
+    case unlocked
+    case rejected(PINAttemptStatus)
+}
+
 /// Хранилище секрета быстрого входа. В бою это Keychain (`SecureTokenStore`),
 /// в тестах — реализация в памяти: `AliStoreCoreTests` собирается без подписи,
 /// а неподписанному бандлу Keychain отвечает `errSecMissingEntitlement`.
@@ -131,6 +138,10 @@ public struct LocalPINStore: Sendable {
         try tokens.clear(account: Self.attemptsAccount)
     }
 
+    /// Чистый предикат: совпадает ли PIN с хэшом. Лок-аут НЕ применяет — это нужно
+    /// для смены PIN (`changePIN` сам сторожит `attemptStatus.allowed`) и тестов.
+    /// Для разблокировки зови `verify(pin:)`, а не `matches` напрямую, иначе обойдёшь
+    /// лимит попыток.
     public func matches(pin: String) -> Bool {
         guard let stored = read(account: Self.pinAccount), stored.hasPrefix("v1:") else { return false }
         let parts = stored.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
@@ -141,13 +152,39 @@ public struct LocalPINStore: Sendable {
         return expected == actual
     }
 
+    /// Каноничная проверка PIN для разблокировки: лок-аут применяется ВНУТРИ стора,
+    /// а не в вызывающем вью. Раньше лимит попыток сторожил только `unlockPIN()` во
+    /// вью — новый вызыватель (другой экран, рефактор) мог позвать `matches` напрямую
+    /// и получить безлимитный оракул подбора. Теперь инвариант в сторе.
+    public func verify(pin: String) -> PINUnlockResult {
+        let status = attemptStatus
+        guard status.allowed else { return .rejected(status) }
+        guard matches(pin: pin) else { return .rejected(registerFailure()) }
+        registerSuccess()
+        return .unlocked
+    }
+
     @discardableResult
     public func registerFailure() -> PINAttemptStatus {
         let current = attemptStatus
         guard current.allowed else { return current }
         let nextFailures = current.failures + 1
-        let lockedUntil = nextFailures >= Self.maximumFailures ? Self.nowMillis + Self.lockoutMillis : 0
-        try? tokens.save("\(nextFailures >= Self.maximumFailures ? 0 : nextFailures):\(lockedUntil)", account: Self.attemptsAccount)
+        let reachedLimit = nextFailures >= Self.maximumFailures
+        let lockedUntil = reachedLimit ? Self.nowMillis + Self.lockoutMillis : 0
+        do {
+            try tokens.save("\(reachedLimit ? 0 : nextFailures):\(lockedUntil)", account: Self.attemptsAccount)
+        } catch {
+            // Счётчик не записался — фейлимся ЗАКРЫТО: запираем на окно, а не даём
+            // безлимитный подбор. `try?` здесь оставлял бы лок-аут открытым при
+            // любом сбое записи в Keychain (contention/disk/`errSecInteractionNotAllowed`).
+            let lockUntil = Self.nowMillis + Self.lockoutMillis
+            return PINAttemptStatus(
+                allowed: false,
+                retryAfterSeconds: Int((Self.lockoutMillis + 999) / 1000),
+                failures: nextFailures,
+                lockedUntilMillis: lockUntil,
+            )
+        }
         return attemptStatus
     }
 
@@ -500,14 +537,13 @@ public struct QuickUnlockView: View {
     }
 
     private func unlockPIN() {
-        guard pinStatus.allowed else { pinStatus = pinStore.attemptStatus; return }
-        guard pinStore.matches(pin: pin) else {
-            pinStatus = pinStore.registerFailure()
-            message = pinStatus.allowed ? "Неверный PIN" : "Слишком много попыток"
-            return
+        switch pinStore.verify(pin: pin) {
+        case .unlocked:
+            onUnlocked()
+        case .rejected(let status):
+            pinStatus = status
+            message = status.allowed ? "Неверный PIN" : "Слишком много попыток"
         }
-        pinStore.registerSuccess()
-        onUnlocked()
     }
 
     private func logout() {
