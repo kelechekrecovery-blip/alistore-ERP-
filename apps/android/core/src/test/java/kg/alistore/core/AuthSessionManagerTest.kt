@@ -67,6 +67,47 @@ class AuthSessionManagerTest {
   }
 
   @Test
+  fun emailLoginNormalizesAddressAndPersistsTokens() = runTest {
+    val store = FakeStore()
+    val api = FakeAuthGateway()
+    val manager = AuthSessionManager(api, store)
+
+    manager.requestEmailOtp("  User@Example.COM ")
+    val state = manager.verifyEmail(" User@Example.COM ", " 123456 ")
+
+    assertTrue(state is AuthState.SignedIn)
+    assertEquals("user@example.com", api.requestedEmail)
+    assertEquals("user@example.com" to "123456", api.verifiedEmail)
+    assertEquals(api.verifiedTokens, store.tokens)
+  }
+
+  @Test
+  fun emailLoginSurfacesServerCodeAsRussianText() = runTest {
+    val store = FakeStore()
+    val api = FakeAuthGateway().apply { verifyEmailFailure = ApiException(422, "Аккаунт не найден", "customer_not_found") }
+
+    val state = AuthSessionManager(api, store).verifyEmail("user@example.com", "123456")
+
+    assertEquals(
+      "Аккаунт с такой почтой не найден. Войдите по телефону и привяжите адрес",
+      (state as AuthState.Failed).message,
+    )
+    assertNull(store.tokens)
+  }
+
+  @Test
+  fun emailAttachNormalizesAddressAndPassesAccessToken() = runTest {
+    val api = FakeAuthGateway()
+    val manager = AuthSessionManager(api, FakeStore(AuthTokens("access", "refresh")))
+
+    manager.requestEmailAttach(" User@Example.COM ", "access")
+    manager.confirmEmailAttach(" User@Example.COM ", " 123456 ", "access")
+
+    assertEquals("user@example.com" to "access", api.attachRequested)
+    assertEquals(Triple("user@example.com", "123456", "access"), api.attachConfirmed)
+  }
+
+  @Test
   fun logoutClearsLocalSessionEvenWhenServerUnavailable() = runTest {
     val store = FakeStore(AuthTokens("access", "refresh"))
     val api = FakeAuthGateway().apply { logoutFailure = ApiException(503, "offline") }
@@ -113,10 +154,35 @@ private class FakeAuthGateway : AuthGateway {
   var logoutFailure: Throwable? = null
   var requestedPhone: String? = null
   var verified: Pair<String, String>? = null
+  var requestedEmail: String? = null
+  var verifiedEmail: Pair<String, String>? = null
+  var verifyEmailFailure: Throwable? = null
+  var attachRequested: Pair<String, String>? = null
+  var attachConfirmed: Triple<String, String, String>? = null
 
   override suspend fun requestOtp(phone: String): OtpChallenge {
     requestedPhone = phone
     return OtpChallenge("123456")
+  }
+
+  override suspend fun requestEmailOtp(email: String): EmailOtpChallenge {
+    requestedEmail = email
+    return EmailOtpChallenge("challenge-1", "123456")
+  }
+
+  override suspend fun verifyEmailOtp(email: String, code: String): AuthTokens {
+    verifyEmailFailure?.let { throw it }
+    verifiedEmail = email to code
+    return verifiedTokens
+  }
+
+  override suspend fun requestEmailAttach(email: String, accessToken: String): EmailOtpChallenge {
+    attachRequested = email to accessToken
+    return EmailOtpChallenge("challenge-2", "654321")
+  }
+
+  override suspend fun confirmEmailAttach(email: String, code: String, accessToken: String) {
+    attachConfirmed = Triple(email, code, accessToken)
   }
 
   override suspend fun verifyOtp(phone: String, code: String): AuthTokens {

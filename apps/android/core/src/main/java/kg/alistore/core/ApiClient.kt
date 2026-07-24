@@ -62,6 +62,25 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
   override suspend fun verifyOtp(phone: String, code: String): AuthTokens =
     request("auth/otp/verify", "POST", JSONObject().put("phone", phone).put("code", code)).tokens()
 
+  override suspend fun requestEmailOtp(email: String): EmailOtpChallenge =
+    request("auth/email/request", "POST", JSONObject().put("email", email)).emailChallenge()
+
+  override suspend fun verifyEmailOtp(email: String, code: String): AuthTokens =
+    request("auth/email/verify", "POST", JSONObject().put("email", email).put("code", code)).tokens()
+
+  override suspend fun requestEmailAttach(email: String, accessToken: String): EmailOtpChallenge =
+    request("auth/email/attach/request", "POST", JSONObject().put("email", email), token = accessToken).emailChallenge()
+
+  override suspend fun confirmEmailAttach(email: String, code: String, accessToken: String) {
+    request(
+      "auth/email/attach/confirm",
+      "POST",
+      JSONObject().put("email", email).put("code", code),
+      token = accessToken,
+      allowEmpty = true,
+    )
+  }
+
   override suspend fun refresh(refreshToken: String): AuthTokens =
     request("auth/refresh", "POST", JSONObject().put("refreshToken", refreshToken)).tokens()
 
@@ -482,8 +501,9 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
       val stream = if (status in 200..299) connection.inputStream else connection.errorStream
       val payload = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
       if (status !in 200..299) {
-        val message = runCatching { JSONObject(payload).optString("message") }.getOrNull().orEmpty()
-        throw ApiException(status, message.ifBlank { "Ошибка сервера $status" })
+        val error = runCatching { JSONObject(payload) }.getOrNull()
+        val message = error?.optString("message").orEmpty()
+        throw ApiException(status, message.ifBlank { "Ошибка сервера $status" }, error?.optString("code")?.takeIf(String::isNotBlank))
       }
       if (payload.isBlank() && allowEmpty) JSONObject() else JSONObject(payload)
     } finally {
@@ -583,6 +603,11 @@ internal fun JSONObject.promotionQuote() = PromotionQuote(
 )
 
 private fun JSONObject.tokens() = AuthTokens(getString("accessToken"), getString("refreshToken"))
+
+private fun JSONObject.emailChallenge() = EmailOtpChallenge(
+  challengeId = optString("challengeId"),
+  devCode = optString("devCode").takeIf(String::isNotBlank),
+)
 
 private fun JSONObject.product(): Product {
   val attrs = optJSONObject("attrs")
@@ -910,4 +935,9 @@ private fun JSONObject.customerSettings() = CustomerSettings(
 private fun JSONObject.nullableString(key: String): String? =
   if (isNull(key)) null else optString(key).takeIf(String::isNotBlank)
 
-class ApiException(val status: Int, override val message: String) : Exception(message)
+/**
+ * `code` — машинный код домена (`DomainError.code` на сервере). Он есть далеко
+ * не у всех ответов, поэтому по умолчанию null, а текст для человека собирается
+ * уже в UI-слое (см. [emailAuthMessage]).
+ */
+class ApiException(val status: Int, override val message: String, val code: String? = null) : Exception(message)

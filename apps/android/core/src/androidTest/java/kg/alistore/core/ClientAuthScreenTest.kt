@@ -46,6 +46,54 @@ class ClientAuthScreenTest {
   }
 
   @Test
+  fun guestSwitchesToEmailChannelAndSignsInWithMailedCode() {
+    val api = UiAuthGateway()
+    val manager = AuthSessionManager(api, UiSessionStore())
+    var signedIn: AuthState? = null
+    compose.setContent {
+      MaterialTheme {
+        ClientAccount(AuthState.Guest, manager, { signedIn = it }, 0, 0)
+      }
+    }
+
+    compose.onNodeWithTag("auth-channel-email").performClick()
+    compose.onNodeWithTag("auth-email").performTextReplacement("User@Example.com")
+    compose.onNodeWithTag("auth-email-action").assertIsEnabled().performClick()
+    compose.waitUntil(5_000) {
+      runCatching { compose.onNodeWithTag("auth-email-code").fetchSemanticsNode() }.isSuccess
+    }
+    compose.onNodeWithTag("auth-email-code").assertTextContains("123456")
+    compose.onNodeWithTag("auth-email-action").assertIsEnabled().performClick()
+    compose.waitUntil(5_000) { signedIn is AuthState.SignedIn }
+
+    assertEquals(listOf("user@example.com"), api.emailRequests)
+    assertEquals(listOf("user@example.com" to "123456"), api.emailVerifications)
+  }
+
+  @Test
+  fun signedInCustomerAttachesEmailAfterConfirmingMailedCode() {
+    val tokens = AuthTokens("access", "refresh")
+    val api = UiAuthGateway()
+    val state = AuthState.SignedIn(AuthUser("customer-1", "+996700123456", "customer"), tokens)
+    compose.setContent {
+      MaterialTheme {
+        ClientEmailAttachScreen(state, AuthSessionManager(api, UiSessionStore(tokens)), {})
+      }
+    }
+
+    compose.onNodeWithTag("email-attach-input").performTextReplacement("User@Example.com")
+    compose.onNodeWithTag("email-attach-action").assertIsEnabled().performClick()
+    compose.waitUntil(5_000) {
+      runCatching { compose.onNodeWithTag("email-attach-code").fetchSemanticsNode() }.isSuccess
+    }
+    compose.onNodeWithTag("email-attach-action").performClick()
+    compose.waitUntil(5_000) { api.emailAttachConfirms.isNotEmpty() }
+
+    assertEquals(listOf("user@example.com"), api.emailAttachRequests)
+    assertEquals(listOf("user@example.com" to "654321"), api.emailAttachConfirms)
+  }
+
+  @Test
   fun signedInAccountShowsIdentityAndLogout() {
     val tokens = AuthTokens("access", "refresh")
     val state = AuthState.SignedIn(AuthUser("customer-1", "+996700123456", "customer"), tokens)
@@ -307,8 +355,33 @@ private class UiSessionStore(private var tokens: AuthTokens? = null) : SessionSt
 }
 
 private class UiAuthGateway : AuthGateway {
+  val emailRequests = mutableListOf<String>()
+  val emailVerifications = mutableListOf<Pair<String, String>>()
+  val emailAttachRequests = mutableListOf<String>()
+  val emailAttachConfirms = mutableListOf<Pair<String, String>>()
+
   override suspend fun requestOtp(phone: String) = OtpChallenge("123456")
   override suspend fun verifyOtp(phone: String, code: String) = AuthTokens("access", "refresh")
+
+  override suspend fun requestEmailOtp(email: String): EmailOtpChallenge {
+    emailRequests += email
+    return EmailOtpChallenge("challenge-1", "123456")
+  }
+
+  override suspend fun verifyEmailOtp(email: String, code: String): AuthTokens {
+    emailVerifications += email to code
+    return AuthTokens("access", "refresh")
+  }
+
+  override suspend fun requestEmailAttach(email: String, accessToken: String): EmailOtpChallenge {
+    emailAttachRequests += email
+    return EmailOtpChallenge("challenge-2", "654321")
+  }
+
+  override suspend fun confirmEmailAttach(email: String, code: String, accessToken: String) {
+    emailAttachConfirms += email to code
+  }
+
   override suspend fun refresh(refreshToken: String) = AuthTokens("access", "refresh")
   override suspend fun me(accessToken: String) = AuthUser("customer-1", "+996700123456", "customer")
   override suspend fun logout(refreshToken: String) = Unit

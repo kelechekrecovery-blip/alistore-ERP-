@@ -348,6 +348,24 @@ isolated `storefront-motion.spec.ts` на этом контуре прошёл *
   gate нужно повторить.
 
 Следующий шаг: повторить полный `npm run e2e`, затем единый `mvp:verify`.
+## 2026-07-23 — Android Client: вход по почте вторым каналом
+
+Экран входа получил переключатель **Телефон / Почта** и шаг ввода кода из письма
+(`auth/email/request` → `auth/email/verify`), а кабинет — пункт «Почта для входа»
+с привязкой адреса (`auth/email/attach/request` → `.../confirm`, с одним повтором
+по свежему токену, как в остальных экранах кабинета).
+
+Модель повторяет серверную: почта — **второй вход в тот же аккаунт**, а не вторая
+личность. Аккаунт по адресу не создаётся, поэтому `customer_not_found` переведён
+как «войдите по телефону и привяжите адрес».
+
+Логика шагов вынесена из Compose в неизменяемый `EmailAuthForm` (`EmailAuth.kt`) —
+проверяется юнит-тестами без устройства. `ApiException` теперь несёт машинный
+`code` из `DomainError`, а `emailAuthMessage` переводит его в человеческий русский
+(`email_invalid`, `otp_not_found`, `otp_invalid`, `otp_locked`, `email_taken`,
+`customer_not_found`, `email_transport_unavailable` + 400/429).
+
+Гейты: `npm run android:build` и `npm run android:test` зелёные.
 
 ## 2026-07-22 — ФИНАЛ КОД-ПЕРИМЕТРА: a11y, витрина, гейты + пойманный launch-краш
 

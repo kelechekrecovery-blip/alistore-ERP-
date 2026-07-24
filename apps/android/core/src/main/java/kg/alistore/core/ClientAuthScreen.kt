@@ -75,6 +75,117 @@ internal fun ClientAccount(
 
 @Composable
 private fun OtpLogin(state: AuthState, manager: AuthSessionManager, onState: (AuthState) -> Unit, modifier: Modifier) {
+  var channel by remember { mutableStateOf(AuthChannel.Phone) }
+  LazyColumn(modifier.fillMaxSize().background(AuthInk).padding(20.dp), verticalArrangement = Arrangement.Center) {
+    item {
+      Text("Вход в AliStore", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Black)
+      Text(
+        if (channel == AuthChannel.Phone) "Заказы, гарантия и бонусы привязаны к номеру телефона"
+        else "Почта — второй вход в тот же аккаунт: код придёт на привязанный адрес",
+        color = AuthMuted,
+        fontSize = 13.sp,
+        modifier = Modifier.padding(top = 7.dp, bottom = 14.dp),
+      )
+      AuthChannelSwitch(channel) { channel = it }
+      when (channel) {
+        AuthChannel.Phone -> PhoneOtpLogin(state, manager, onState)
+        AuthChannel.Email -> EmailOtpLogin(manager, onState)
+      }
+    }
+  }
+}
+
+@Composable
+private fun AuthChannelSwitch(channel: AuthChannel, onChannel: (AuthChannel) -> Unit) {
+  Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    AuthChannelTab("Телефон", "auth-channel-phone", channel == AuthChannel.Phone, Modifier.weight(1f)) { onChannel(AuthChannel.Phone) }
+    AuthChannelTab("Почта", "auth-channel-email", channel == AuthChannel.Email, Modifier.weight(1f)) { onChannel(AuthChannel.Email) }
+  }
+}
+
+@Composable
+private fun AuthChannelTab(label: String, tag: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+  Text(
+    label,
+    color = if (selected) AuthInk else Color.White,
+    fontSize = 13.sp,
+    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+    modifier = modifier
+      .background(if (selected) AuthLime else AuthSurface, RoundedCornerShape(8.dp))
+      .clickable(onClick = onClick)
+      .padding(vertical = 11.dp, horizontal = 14.dp)
+      .testTag(tag),
+  )
+}
+
+/**
+ * Вход по почте. Экран знает только два шага — адрес и код; вся логика переходов
+ * живёт в [EmailAuthForm], поэтому она проверяется юнит-тестами без Compose.
+ */
+@Composable
+private fun EmailOtpLogin(manager: AuthSessionManager, onState: (AuthState) -> Unit) {
+  val scope = rememberCoroutineScope()
+  var form by remember { mutableStateOf(EmailAuthForm()) }
+
+  OutlinedTextField(
+    value = form.email,
+    onValueChange = { form = form.withEmail(it) },
+    enabled = !form.busy && !form.codeSent,
+    label = { Text("Почта") },
+    placeholder = { Text("you@example.com") },
+    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+    singleLine = true,
+    modifier = Modifier.fillMaxWidth().testTag("auth-email"),
+    colors = authFieldColors(),
+  )
+  if (form.codeSent) {
+    OutlinedTextField(
+      value = form.code,
+      onValueChange = { form = form.withCode(it) },
+      enabled = !form.busy,
+      label = { Text("Код из письма") },
+      keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+      singleLine = true,
+      modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("auth-email-code"),
+      colors = authFieldColors(),
+    )
+  }
+  form.error?.let { Text(it, color = AuthCoral, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp).testTag("auth-email-error")) }
+  form.hint?.let { Text(it, color = AuthMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp).testTag("auth-email-hint")) }
+  Button(
+    onClick = {
+      val current = form
+      form = current.submitting()
+      scope.launch {
+        form = if (!current.codeSent) {
+          runCatching { manager.requestEmailOtp(current.email) }
+            .fold(onSuccess = { form.challengeIssued(it) }, onFailure = { form.failed(it) })
+        } else {
+          when (val next = manager.verifyEmail(current.email, current.code)) {
+            is AuthState.SignedIn -> { onState(next); form.confirmed("Вход выполнен") }
+            else -> form.copy(busy = false, hint = null, error = (next as AuthState.Failed).message)
+          }
+        }
+      }
+    },
+    enabled = form.canSubmit,
+    modifier = Modifier.fillMaxWidth().padding(top = 14.dp).testTag("auth-email-action"),
+    colors = ButtonDefaults.buttonColors(containerColor = AuthLime, contentColor = AuthInk),
+    shape = RoundedCornerShape(8.dp),
+  ) { Text(if (form.busy) "Подождите…" else if (form.codeSent) "Войти" else "Получить код", fontWeight = FontWeight.Bold) }
+  if (form.codeSent) {
+    Button(
+      onClick = { form = form.restart() },
+      enabled = !form.busy,
+      modifier = Modifier.fillMaxWidth().padding(top = 6.dp).testTag("auth-email-restart"),
+      colors = ButtonDefaults.buttonColors(containerColor = AuthSurface, contentColor = Color.White),
+      shape = RoundedCornerShape(8.dp),
+    ) { Text("Изменить адрес") }
+  }
+}
+
+@Composable
+private fun PhoneOtpLogin(state: AuthState, manager: AuthSessionManager, onState: (AuthState) -> Unit) {
   val scope = rememberCoroutineScope()
   var phone by remember { mutableStateOf("+996") }
   var code by remember { mutableStateOf("") }
@@ -84,63 +195,57 @@ private fun OtpLogin(state: AuthState, manager: AuthSessionManager, onState: (Au
   val validPhone = phone.filter(Char::isDigit).length == 12
   val validCode = code.length == 6 && code.all(Char::isDigit)
 
-  LazyColumn(modifier.fillMaxSize().background(AuthInk).padding(20.dp), verticalArrangement = Arrangement.Center) {
-    item {
-      Text("Вход в AliStore", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Black)
-      Text("Заказы, гарантия и бонусы привязаны к номеру телефона", color = AuthMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 7.dp, bottom = 20.dp))
-      OutlinedTextField(
-        value = phone,
-        onValueChange = { phone = it.take(18); message = null },
-        enabled = !busy && !codeRequested,
-        label = { Text("Телефон") },
-        placeholder = { Text("+996 700 12 34 56") },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth().testTag("auth-phone"),
-        colors = authFieldColors(),
-      )
-      if (codeRequested) {
-        OutlinedTextField(
-          value = code,
-          onValueChange = { code = it.filter(Char::isDigit).take(6); message = null },
-          label = { Text("Код из SMS") },
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-          singleLine = true,
-          modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("auth-code"),
-          colors = authFieldColors(),
-        )
+  OutlinedTextField(
+    value = phone,
+    onValueChange = { phone = it.take(18); message = null },
+    enabled = !busy && !codeRequested,
+    label = { Text("Телефон") },
+    placeholder = { Text("+996 700 12 34 56") },
+    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+    singleLine = true,
+    modifier = Modifier.fillMaxWidth().testTag("auth-phone"),
+    colors = authFieldColors(),
+  )
+  if (codeRequested) {
+    OutlinedTextField(
+      value = code,
+      onValueChange = { code = it.filter(Char::isDigit).take(6); message = null },
+      label = { Text("Код из SMS") },
+      keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+      singleLine = true,
+      modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("auth-code"),
+      colors = authFieldColors(),
+    )
+  }
+  if (!message.isNullOrBlank()) Text(message!!, color = AuthCoral, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+  Button(
+    onClick = {
+      scope.launch {
+        busy = true
+        if (!codeRequested) {
+          runCatching { manager.requestOtp(phone) }
+            .onSuccess { challenge -> codeRequested = true; challenge.devCode?.let { code = it }; message = "Код отправлен" }
+            .onFailure { message = it.message ?: "Не удалось отправить код" }
+        } else {
+          val next = manager.verify(phone, code)
+          if (next is AuthState.SignedIn) onState(next) else message = (next as AuthState.Failed).message
+        }
+        busy = false
       }
-      if (!message.isNullOrBlank()) Text(message!!, color = AuthCoral, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
-      Button(
-        onClick = {
-          scope.launch {
-            busy = true
-            if (!codeRequested) {
-              runCatching { manager.requestOtp(phone) }
-                .onSuccess { challenge -> codeRequested = true; challenge.devCode?.let { code = it }; message = "Код отправлен" }
-                .onFailure { message = it.message ?: "Не удалось отправить код" }
-            } else {
-              val next = manager.verify(phone, code)
-              if (next is AuthState.SignedIn) onState(next) else message = (next as AuthState.Failed).message
-            }
-            busy = false
-          }
-        },
-        enabled = !busy && if (codeRequested) validCode else validPhone,
-        modifier = Modifier.fillMaxWidth().padding(top = 14.dp).testTag("auth-action"),
-        colors = ButtonDefaults.buttonColors(containerColor = AuthLime, contentColor = AuthInk),
-        shape = RoundedCornerShape(8.dp),
-      ) { Text(if (busy) "Подождите…" else if (codeRequested) "Войти" else "Получить код", fontWeight = FontWeight.Bold) }
-      if (codeRequested) {
-        Button(
-          onClick = { codeRequested = false; code = ""; message = null },
-          enabled = !busy,
-          modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-          colors = ButtonDefaults.buttonColors(containerColor = AuthSurface, contentColor = Color.White),
-          shape = RoundedCornerShape(8.dp),
-        ) { Text("Изменить номер") }
-      }
-    }
+    },
+    enabled = !busy && if (codeRequested) validCode else validPhone,
+    modifier = Modifier.fillMaxWidth().padding(top = 14.dp).testTag("auth-action"),
+    colors = ButtonDefaults.buttonColors(containerColor = AuthLime, contentColor = AuthInk),
+    shape = RoundedCornerShape(8.dp),
+  ) { Text(if (busy) "Подождите…" else if (codeRequested) "Войти" else "Получить код", fontWeight = FontWeight.Bold) }
+  if (codeRequested) {
+    Button(
+      onClick = { codeRequested = false; code = ""; message = null },
+      enabled = !busy,
+      modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+      colors = ButtonDefaults.buttonColors(containerColor = AuthSurface, contentColor = Color.White),
+      shape = RoundedCornerShape(8.dp),
+    ) { Text("Изменить номер") }
   }
 }
 
@@ -187,6 +292,10 @@ private fun SignedInAccount(
     ClientAddressesScreen(apiBaseUrl, state, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
     return
   }
+  if (route == "email") {
+    ClientEmailAttachScreen(state, manager, { onRoute(null) }, onState, modifier)
+    return
+  }
   if (route == "settings") {
     ClientSettingsScreen(apiBaseUrl, state, { onRoute(null) }, modifier, authManager = manager, onAuthState = onState)
     return
@@ -230,7 +339,7 @@ private fun SignedInAccount(
       Text("Кабинет", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black, modifier = Modifier.testTag("account-title"))
       Text(state.user.phone ?: "Профиль AliStore", color = AuthLime, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
     }
-    items(listOf("Мои заказы", "Бонусы", "Мои устройства", "Гарантия", "Возвраты", "Trade-in", "Адреса", "Поддержка", "Настройки")) { title ->
+    items(listOf("Мои заказы", "Бонусы", "Мои устройства", "Гарантия", "Возвраты", "Trade-in", "Адреса", "Почта для входа", "Поддержка", "Настройки")) { title ->
       Text(
         title,
         color = Color.White,
@@ -243,6 +352,7 @@ private fun SignedInAccount(
               "Поддержка" -> "support"
               "Бонусы" -> "bonuses"
               "Адреса" -> "addresses"
+              "Почта для входа" -> "email"
               "Настройки" -> "settings"
               else -> "devices"
             })

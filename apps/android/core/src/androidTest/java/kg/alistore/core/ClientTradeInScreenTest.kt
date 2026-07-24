@@ -101,6 +101,10 @@ private class TradeInSessionStore(private var tokens: AuthTokens?) : SessionStor
 private class TradeInAuthGateway : AuthGateway {
   override suspend fun requestOtp(phone: String) = OtpChallenge(null)
   override suspend fun verifyOtp(phone: String, code: String) = AuthTokens("access", "refresh")
+  override suspend fun requestEmailOtp(email: String) = EmailOtpChallenge("challenge-1", null)
+  override suspend fun verifyEmailOtp(email: String, code: String) = AuthTokens("access", "refresh")
+  override suspend fun requestEmailAttach(email: String, accessToken: String) = EmailOtpChallenge("challenge-1", null)
+  override suspend fun confirmEmailAttach(email: String, code: String, accessToken: String) = Unit
   override suspend fun refresh(refreshToken: String) = AuthTokens("access-refreshed", "refresh-refreshed")
   override suspend fun me(accessToken: String) = AuthUser("customer-1", "+996700123456", "customer")
   override suspend fun logout(refreshToken: String) = Unit

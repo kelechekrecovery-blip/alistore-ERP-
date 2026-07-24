@@ -7,6 +7,12 @@ import androidx.compose.runtime.setValue
 interface AuthGateway {
   suspend fun requestOtp(phone: String): OtpChallenge
   suspend fun verifyOtp(phone: String, code: String): AuthTokens
+  /** Код на почту, уже привязанную к аккаунту (вход вторым каналом). */
+  suspend fun requestEmailOtp(email: String): EmailOtpChallenge
+  suspend fun verifyEmailOtp(email: String, code: String): AuthTokens
+  /** Код на адрес, который вошедший клиент хочет привязать к своему аккаунту. */
+  suspend fun requestEmailAttach(email: String, accessToken: String): EmailOtpChallenge
+  suspend fun confirmEmailAttach(email: String, code: String, accessToken: String)
   suspend fun refresh(refreshToken: String): AuthTokens
   suspend fun me(accessToken: String): AuthUser
   suspend fun logout(refreshToken: String)
@@ -57,6 +63,25 @@ class AuthSessionManager(
     requiresQuickUnlock = false
     signedIn(tokens)
   }.getOrElse { AuthState.Failed(it.userMessage()) }
+
+  suspend fun requestEmailOtp(email: String): EmailOtpChallenge = api.requestEmailOtp(email.normalizedEmail())
+
+  /**
+   * Вход по почте. Аккаунт здесь никогда не создаётся: адрес без телефона не
+   * может быть клиентом, поэтому неизвестная почта возвращает `customer_not_found`.
+   */
+  suspend fun verifyEmail(email: String, code: String): AuthState = runCatching {
+    val tokens = api.verifyEmailOtp(email.normalizedEmail(), code.trim())
+    store.saveSession(tokens)
+    requiresQuickUnlock = false
+    signedIn(tokens)
+  }.getOrElse { AuthState.Failed(emailAuthMessage(it)) }
+
+  suspend fun requestEmailAttach(email: String, accessToken: String): EmailOtpChallenge =
+    api.requestEmailAttach(email.normalizedEmail(), accessToken)
+
+  suspend fun confirmEmailAttach(email: String, code: String, accessToken: String) =
+    api.confirmEmailAttach(email.normalizedEmail(), code.trim(), accessToken)
 
   suspend fun logout(state: AuthState.SignedIn): AuthState {
     runCatching { api.logout(state.tokens.refreshToken) }
