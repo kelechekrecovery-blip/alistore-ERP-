@@ -13,9 +13,9 @@ settings:
     SWIFT_VERSION: "6.0"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
-    # Номер сборки для App Store Connect. 2 уже загружена — следующая заливка
-    # обязана быть 3, иначе ASC отклонит бинарь как дубликат.
-    CURRENT_PROJECT_VERSION: 3
+    # Номер сборки для App Store Connect. 3 уже загружена (Staff/Courier/POS) —
+    # следующая заливка обязана быть 4, иначе ASC отклонит бинарь как дубликат.
+    CURRENT_PROJECT_VERSION: 4
     MARKETING_VERSION: 1.0.0
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     # Отдельно от developmentLanguage: build-переменная, на которую ссылается
