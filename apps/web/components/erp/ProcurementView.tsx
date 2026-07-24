@@ -7,11 +7,14 @@ import {
   createPurchaseOrder,
   fetchAdminProducts,
   fetchPurchaseOrders,
+  fetchSupplierScorecard,
   fetchSuppliers,
+  formatResolutionRate,
   receivePurchaseOrder,
   sendPurchaseOrder,
   type AdminProduct,
   type PurchaseOrder,
+  type SupplierScore,
   type SupplierSummary,
 } from '@/lib/api';
 import { som } from '@/lib/format';
@@ -33,6 +36,7 @@ const inputClass = 'h-10 w-full rounded-[8px] border border-surface-3 bg-ink-dar
 export function ProcurementView({ accessToken }: { accessToken: string }) {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierSummary[]>([]);
+  const [scorecard, setScorecard] = useState<SupplierScore[]>([]);
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [form, setForm] = useState({ idempotencyKey: requestKey('erp-po'), supplierId: '', location: 'BISHKEK-1', note: '', items: [emptyLine()] });
   const [receive, setReceive] = useState({ idempotencyKey: requestKey('erp-receipt'), orderId: '', itemId: '', grade: 'A' as 'A' | 'B' | 'C', imeis: '' });
@@ -41,15 +45,17 @@ export function ProcurementView({ accessToken }: { accessToken: string }) {
   const [error, setError] = useState('');
 
   const refresh = useCallback(async () => {
-    const [nextOrders, nextSuppliers, nextProducts] = await Promise.allSettled([
+    const [nextOrders, nextSuppliers, nextProducts, nextScorecard] = await Promise.allSettled([
       fetchPurchaseOrders(accessToken),
       fetchSuppliers(accessToken),
       fetchAdminProducts({ limit: 100 }, accessToken),
+      fetchSupplierScorecard(accessToken),
     ]);
     if (nextOrders.status === 'rejected') throw nextOrders.reason;
     const supplierRows = nextSuppliers.status === 'fulfilled' ? nextSuppliers.value : [];
     setOrders(nextOrders.value);
     setSuppliers(supplierRows);
+    setScorecard(nextScorecard.status === 'fulfilled' ? nextScorecard.value : []);
     setProducts(nextProducts.status === 'fulfilled' ? nextProducts.value.items : []);
     setForm((current) => ({ ...current, supplierId: current.supplierId || supplierRows[0]?.id || '' }));
   }, [accessToken]);
@@ -140,6 +146,41 @@ export function ProcurementView({ accessToken }: { accessToken: string }) {
         <div className={`rounded-[8px] border px-3 py-2 text-sm ${error ? 'border-danger-soft/40 bg-danger-soft/10 text-danger-soft' : 'border-lime/30 bg-lime/10 text-lime'}`}>
           {error || message}
         </div>
+      )}
+
+      {scorecard.length > 0 && (
+        <section className="overflow-hidden border border-surface-3 bg-surface">
+          <div className="border-b border-surface-3 px-4 py-3">
+            <h3 className="font-display text-sm font-bold">Оценка поставщиков (RMA)</h3>
+            <p className="mt-0.5 text-xs text-subtle">Объём возвратов, открытый бэклог и доля закрытых случаев</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-faint">
+                  <th className="px-4 py-2 font-medium">Поставщик</th>
+                  <th className="px-4 py-2 font-medium text-right">Всего</th>
+                  <th className="px-4 py-2 font-medium text-right">Открыто</th>
+                  <th className="px-4 py-2 font-medium text-right">Закрыто</th>
+                  <th className="px-4 py-2 font-medium text-right">Отклонено</th>
+                  <th className="px-4 py-2 font-medium text-right">Доля решений</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scorecard.map((row) => (
+                  <tr key={row.supplierId} className="border-t border-surface-3">
+                    <td className="px-4 py-2 text-white">{row.supplier}</td>
+                    <td className="px-4 py-2 text-right text-muted">{row.total}</td>
+                    <td className={`px-4 py-2 text-right ${row.open > 0 ? 'text-danger-soft' : 'text-muted'}`}>{row.open}</td>
+                    <td className="px-4 py-2 text-right text-muted">{row.resolved}</td>
+                    <td className="px-4 py-2 text-right text-muted">{row.rejected}</td>
+                    <td className="px-4 py-2 text-right text-white">{formatResolutionRate(row.resolutionRate)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
       {canCreate && <section className="border border-surface-3 bg-surface p-4">

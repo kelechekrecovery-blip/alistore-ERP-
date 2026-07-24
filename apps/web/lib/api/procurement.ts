@@ -61,3 +61,26 @@ export const receivePurchaseOrder = (
   input: { idempotencyKey: string; lines: { itemId: string; imeis: string[]; grade?: 'A' | 'B' | 'C' }[] },
   accessToken: string,
 ) => postAuthJson<PurchaseOrder>(`/procurement/purchase-orders/${encodeURIComponent(id)}/receive`, input, accessToken);
+
+/** Supplier RMA scorecard row (mirrors apps/api/src/suppliers/scorecard.ts). */
+export interface SupplierScore {
+  supplierId: string;
+  supplier: string;
+  total: number;
+  open: number;
+  resolved: number;
+  rejected: number;
+  resolutionRate: number | null;
+}
+
+export const fetchSupplierScorecard = (accessToken: string) =>
+  getJson<SupplierScore[]>('/suppliers/scorecard', accessToken);
+
+/**
+ * Resolution rate for display. `null` means no closed cases yet — shown as «—»,
+ * not 0%, so a supplier with only open RMAs doesn't read as a failing one.
+ */
+export function formatResolutionRate(rate: number | null): string {
+  if (rate === null) return '—';
+  return `${Math.round(rate * 100)}%`;
+}
