@@ -569,12 +569,12 @@ private struct CourierRunCard: View {
             } else {
                 TextField("Сумма сдачи", text: $amount).keyboardType(.numberPad).textFieldStyle(.roundedBorder)
                     .onAppear { if amount.isEmpty { amount = String(run.collectedTotal) } }
-                if Int(amount) != run.codTotal {
+                if CODHandover.needsReason(amount: Int(amount) ?? run.collectedTotal, collectedTotal: run.collectedTotal, codTotal: run.codTotal) {
                     TextField("Причина расхождения", text: $reason, axis: .vertical).textFieldStyle(.roundedBorder)
                 }
                 Button("Сдать COD", systemImage: "banknote") { Task { await handover() } }
                     .buttonStyle(.borderedProminent).tint(courierLime).foregroundStyle(courierInk)
-                    .disabled(isBusy || run.collectedTotal != run.codTotal || Int(amount) == nil || (Int(amount) != run.codTotal && reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+                    .disabled(!CODHandover.canSubmit(amount: Int(amount), collectedTotal: run.collectedTotal, codTotal: run.codTotal, reason: reason, isBusy: isBusy))
             }
             if let message { Text(message).font(.caption).foregroundStyle(courierCoral) }
         }
