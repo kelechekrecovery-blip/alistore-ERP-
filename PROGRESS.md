@@ -27,6 +27,15 @@ surfaced-ошибка при неоплаченном заказе теперь 
 Урок: не утверждай поведение shared-логики, не прочитав её, — я предположил, что экран
 уже различает этот случай, и ошибся.
 
+**Второй ревью — auth/money-изменения сессии — `822ff9a7`.** Тот же адверсариальный
+лens по `CustomerAuthStore`/`AppleSignInNonce`/`StaffInventoryStore`: CRITICAL нет,
+две находки починены (nonce игнорировал статус `SecRandomCopyBytes` → тихий предсказуемый
+nonce; обязательная причина списания триммилась `.whitespaces`, пропуская переводы строки),
+одна заведена в бэкенд-зону (`INV-WRITEOFF-IDEMPOTENCY-001`: `POST /inventory/movements`
+и `/count` не идемпотентны на сервере — клиентский ключ был бы косметикой, сервер его не
+читает). Auth-пути и «на одобрении»-UI подтверждены чистыми. Core 122/122, all-targets build
+зелёный.
+
 **Состояние релиза iOS (сборка 3).** В App Store Connect загружены Staff, Courier, POS
 (iPhone-only). Client НЕ загружен — жёсткий блокер владельца: профиль
 `AliStore Client App Store` не содержит `com.apple.developer.applesignin` (перепроверено
