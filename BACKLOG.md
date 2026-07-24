@@ -1,5 +1,15 @@
 # BACKLOG
 
+## OFFLINE-ORDER-DEDUP-003 — покупательская офлайн-очередь без дедупа по ключу (LOW, не воспроизведён)
+- **Найдено (24.07, ревью покупательского пути):** `OfflineOrderQueue.enqueue`
+  (`apps/ios/Shared/OfflineQueue.swift`) вставляет `PendingMutation` безусловно, без проверки
+  существующей записи по `idempotencyKey`/телу (в отличие от `OfflinePOSQueue`/`OfflineCourierQueue`).
+- **Не воспроизведён:** `checkout()` генерит свежий `UUID` на вызов и `isSubmitting` синхронно
+  гасит кнопку до первого `await`; конкретного реентранси-триггера двойного `checkout()` в коде
+  не нашлось. Дедуп по ключу и не поймал бы описанный сценарий (ключи разные) — реальная защита
+  уже есть (`isSubmitting`). Оставлено как defense-in-depth.
+- **Нужно (iOS, P3):** для единообразия добавить в `enqueue` ту же проверку существующего ключа.
+
 ## COURIER-OFFLINE-OWNER-001 — офлайн-очередь курьера без владельца (робастность, деньги защищены сервером)
 - **Найдено (24.07, адверсариальный ревью курьерских денег):** `OfflineCourierQueue.enqueue`/
   `enqueueEncoded` (`apps/ios/Shared/OfflineQueue.swift:107-145`) НЕ пишут `owner` (в отличие от
