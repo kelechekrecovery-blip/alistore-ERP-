@@ -3,11 +3,10 @@ plugins {
   alias(libs.plugins.compose.compiler)
 }
 
-val releaseApiBaseUrl = providers.gradleProperty("ALISTORE_API_BASE_URL").orElse("").get()
+// Версии, подпись, R8 и требование HTTPS для release заданы в apps/android/build.gradle.kts.
 val releaseRequested = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) || it == "build" }
 val firebaseConfigured = file("google-services.json").isFile
 if (firebaseConfigured) apply(plugin = "com.google.gms.google-services")
-require(!releaseRequested || releaseApiBaseUrl.startsWith("https://")) { "Release requires -PALISTORE_API_BASE_URL=https://..." }
 require(!releaseRequested || firebaseConfigured) { "Client Release requires apps/android/app/google-services.json" }
 
 android {
@@ -17,22 +16,14 @@ android {
         applicationId = "kg.alistore.client"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        manifestPlaceholders["usesCleartextTraffic"] = "true"
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4000/api\"")
         buildConfigField("String", "PAYMENT_RETURN_URL", "\"alistore://payment-return\"")
         buildConfigField("boolean", "FCM_CONFIGURED", firebaseConfigured.toString())
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            manifestPlaceholders["usesCleartextTraffic"] = "false"
-            buildConfigField("String", "API_BASE_URL", "\"$releaseApiBaseUrl\"")
             buildConfigField("String", "PAYMENT_RETURN_URL", "\"https://ali.kg/payment-return\"")
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
     compileOptions {

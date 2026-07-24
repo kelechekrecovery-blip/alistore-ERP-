@@ -10,15 +10,86 @@ shared Android core:
 - `:core` — typed API/auth, Android Keystore session encryption, SQLite offline queue,
   WorkManager replay and shared role-aware Compose shell.
 
-Debug builds use `http://10.0.2.2:4000/api`. Release builds fail before compilation
-unless the release pipeline injects an HTTPS endpoint through
-`-PALISTORE_API_BASE_URL=https://api.example.com/api`.
+## Debug builds
+
+Debug builds use `http://10.0.2.2:4000/api` and need no secrets.
 
 ```bash
 cd apps/android
 ./gradlew :app:assembleDebug :staff:assembleDebug :courier:assembleDebug :pos:assembleDebug
 ./gradlew :core:connectedDebugAndroidTest
 ```
+
+## Release builds
+
+All four applications share one release convention declared once in
+`apps/android/build.gradle.kts` — versions, signing, R8 and the HTTPS requirement.
+Module build files only carry what is genuinely module-specific (namespace,
+`applicationId`, Firebase presence, `PAYMENT_RETURN_URL`).
+
+- `versionName` is `1.0.0` for `:app`, `:staff`, `:courier` and `:pos` — the same
+  marketing number the iOS targets use.
+- `versionCode` is a single counter shared by all four APKs; bump it per store upload
+  with `-PALISTORE_VERSION_CODE=<n>` (defaults to `1`).
+- Release runs R8 (`isMinifyEnabled`) plus resource shrinking. Shared keep rules live in
+  `apps/android/gradle/proguard-alistore.pro`; each module adds its own
+  `proguard-rules.pro` on top.
+- Release forbids cleartext traffic and requires an HTTPS API endpoint.
+
+### Required build inputs
+
+Every value below is read from a Gradle property (`-P<name>=…`) **or** an environment
+variable of the same name. Nothing is stored in the repository.
+
+| Name | Meaning |
+|---|---|
+| `ALISTORE_API_BASE_URL` | Release API endpoint, must start with `https://` |
+| `ALISTORE_KEYSTORE_FILE` | Path to the release `.jks` (absolute, or relative to `apps/android`) |
+| `ALISTORE_KEYSTORE_PASSWORD` | Keystore password |
+| `ALISTORE_KEY_ALIAS` | Key alias inside the keystore |
+| `ALISTORE_KEY_PASSWORD` | Key password |
+| `ALISTORE_VERSION_CODE` | Optional shared version code, default `1` |
+
+If any of them is missing, a release task fails during configuration with an explicit
+message and no artifact is produced. Debug tasks are unaffected and keep working
+without any of these values.
+
+Keep the keystore and its passwords **outside** the repository — in
+`~/.gradle/gradle.properties` for local release builds, or in CI secrets. `*.jks`,
+`*.keystore`, `keystore.properties` and `apps/android/local.properties` are
+git-ignored; never commit them and never paste passwords into a build file.
+
+```bash
+cd apps/android
+./gradlew :app:assembleRelease :staff:assembleRelease \
+          :courier:assembleRelease :pos:assembleRelease \
+  -PALISTORE_API_BASE_URL=https://api.ali.kg/api \
+  -PALISTORE_VERSION_CODE=2 \
+  -PALISTORE_KEYSTORE_FILE=/secure/path/alistore-release.jks \
+  -PALISTORE_KEYSTORE_PASSWORD=… \
+  -PALISTORE_KEY_ALIAS=alistore \
+  -PALISTORE_KEY_PASSWORD=…
+```
+
+### Owner-supplied `google-services.json` (blocking)
+
+`:app`, `:staff` and `:courier` use Firebase Cloud Messaging and refuse to build a
+release without the real Firebase config from the project owner:
+
+- `apps/android/app/google-services.json`
+- `apps/android/staff/google-services.json`
+- `apps/android/courier/google-services.json`
+
+These files are git-ignored and are **not** present in the repository. They must be
+downloaded from the Firebase console for the production project (package names
+`kg.alistore.client`, `kg.alistore.staff`, `kg.alistore.courier`) and dropped in by the
+owner or injected by CI. Placeholder files are not acceptable — FCM registration would
+silently target the wrong project. `:pos` has no Firebase dependency and builds a
+release without one.
+
+Also owner-owned and still outstanding for the store release: the release keystore
+itself (generate once, back it up — losing it means losing the ability to update the
+listing) and Play Console app signing enrollment.
 
 The Client authenticates through phone OTP, stores the access/refresh pair encrypted
 with Android Keystore, refreshes an expired access token during process restore, and

@@ -33,6 +33,11 @@ GoogleService-Info.plist
 apps/mobile/credentials.json
 apps/mobile/*.keystore
 apps/mobile/*.jks
+# Релизная подпись Android: keystore и пароли живут вне репозитория
+*.keystore
+*.jks
+keystore.properties
+apps/android/local.properties
 apps/ios/**/xcuserdata/
 apps/ios/**/*.xcuserstate
 apps/ios/*.xcarchive/
