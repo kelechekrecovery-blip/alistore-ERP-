@@ -40,6 +40,7 @@
 		4AF63F6ACD7F8CD061DD765F /* OrderTimelineContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13DAD8839BC2E93CE723B455 /* OrderTimelineContractTests.swift */; };
 		4BAE338D9CD95F760DDA2C50 /* UITestBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF6D9D9A15F0C3427BE89C36 /* UITestBootstrap.swift */; };
 		5037E16A0F70A56273F0E75B /* MoneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ADA4F6602AA2F3A5B46C08A /* MoneyTests.swift */; };
+		5101B25E90778CEECC211D8E /* PaymentResultStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDB80647390A5B052E79F0F9 /* PaymentResultStateTests.swift */; };
 		53285FF6D8C6D246506563B5 /* POSMoney.swift in Sources */ = {isa = PBXBuildFile; fileRef = F52F3009B428C385457F9163 /* POSMoney.swift */; };
 		5534D8E321985F5649E82E83 /* IdempotencyKeysTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20075A636D86A0A09A4E63B4 /* IdempotencyKeysTests.swift */; };
 		563AE96AB62412BDC8FBF5BE /* POSReturnFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A77B6766DDA30B601B2B75 /* POSReturnFlowTests.swift */; };
@@ -111,6 +112,7 @@
 		EC2F8F3F837B4F9154CB3637 /* QuickUnlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1835E8741DBB19503E6334A1 /* QuickUnlock.swift */; };
 		ECF0126BBFB5ACBBB4C9EEE2 /* POSMoneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41E1AAF7478E1B91443AA042 /* POSMoneyTests.swift */; };
 		F02017A9DEDB594FB4F87FF2 /* alistore-icon.svg in Resources */ = {isa = PBXBuildFile; fileRef = 6B1D32FCA09B1D185D612CA7 /* alistore-icon.svg */; };
+		F498D72C2ACB9DB92E0C5BF3 /* PaymentResultState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B6D92DD6B05F6674C296C21 /* PaymentResultState.swift */; };
 		F5420D98BEB7F7E63A8AFCAE /* AliStoreCourierApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F15BD6DCDD697F081C7D6AF3 /* AliStoreCourierApp.swift */; };
 		F7A028D6B8F54E1E0D6756EF /* WaitlistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4996F20715B374377C19415D /* WaitlistView.swift */; };
 		FA0AB9B3D7316B9DA3538939 /* AliStoreCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -264,6 +266,7 @@
 		2962E44FB9BB3C792A4757AC /* GolosText-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GolosText-Regular.ttf"; sourceTree = "<group>"; };
 		2984688119D5255CF5B06009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2A617D85C85DD435B687E350 /* StaffLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffLoginView.swift; sourceTree = "<group>"; };
+		2B6D92DD6B05F6674C296C21 /* PaymentResultState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentResultState.swift; sourceTree = "<group>"; };
 		2BEAEC396827506007C9829E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2CD07CA19B272D575A7C4E3D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2D17FA3900F6A16DD7BA9C62 /* JetBrainsMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-Regular.ttf"; sourceTree = "<group>"; };
@@ -332,6 +335,7 @@
 		B1E18DBDC8F966E6FE986281 /* OfflineStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineStoreTests.swift; sourceTree = "<group>"; };
 		B71555FF8DD0A3CC48463326 /* AliStoreStaffUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliStoreStaffUITests.swift; sourceTree = "<group>"; };
 		B87D9DA92BB28BB65036EFAB /* OfflineQueueCodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineQueueCodingTests.swift; sourceTree = "<group>"; };
+		BDB80647390A5B052E79F0F9 /* PaymentResultStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentResultStateTests.swift; sourceTree = "<group>"; };
 		C348479F602D4264A6697DC8 /* SmartSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSearch.swift; sourceTree = "<group>"; };
 		C3F7212CC5C320036F7B6C43 /* AliStoreClient.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AliStoreClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C40689F8A18A4D0BF0BB49DD /* QuickUnlockGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickUnlockGateTests.swift; sourceTree = "<group>"; };
@@ -411,6 +415,7 @@
 				1C9F2C58B4D976EACEB28F85 /* Money.swift */,
 				04AAB6220384C05861A21153 /* NativeShell.swift */,
 				8A5A549F226050ACB113FF4E /* OfflineQueue.swift */,
+				2B6D92DD6B05F6674C296C21 /* PaymentResultState.swift */,
 				F52F3009B428C385457F9163 /* POSMoney.swift */,
 				CD7187EA0C9EF4F8DA4016FE /* POSReturnFlow.swift */,
 				2840B95D664B9ABE46B5943B /* PrivacyCover.swift */,
@@ -634,6 +639,7 @@
 				B87D9DA92BB28BB65036EFAB /* OfflineQueueCodingTests.swift */,
 				B1E18DBDC8F966E6FE986281 /* OfflineStoreTests.swift */,
 				13DAD8839BC2E93CE723B455 /* OrderTimelineContractTests.swift */,
+				BDB80647390A5B052E79F0F9 /* PaymentResultStateTests.swift */,
 				41E1AAF7478E1B91443AA042 /* POSMoneyTests.swift */,
 				23A77B6766DDA30B601B2B75 /* POSReturnFlowTests.swift */,
 				C40689F8A18A4D0BF0BB49DD /* QuickUnlockGateTests.swift */,
@@ -1069,6 +1075,7 @@
 				4AF63F6ACD7F8CD061DD765F /* OrderTimelineContractTests.swift in Sources */,
 				ECF0126BBFB5ACBBB4C9EEE2 /* POSMoneyTests.swift in Sources */,
 				563AE96AB62412BDC8FBF5BE /* POSReturnFlowTests.swift in Sources */,
+				5101B25E90778CEECC211D8E /* PaymentResultStateTests.swift in Sources */,
 				32154A3AF73F33A8B2BEB3E0 /* QuickUnlockGateTests.swift in Sources */,
 				D3267E880FEF79B442F04BD0 /* QuickUnlockTests.swift in Sources */,
 				14DE80EE9BA069A1FFB40CD6 /* StaffInventoryCountTests.swift in Sources */,
@@ -1092,6 +1099,7 @@
 				03444F4B218B5510473414A3 /* OfflineQueue.swift in Sources */,
 				53285FF6D8C6D246506563B5 /* POSMoney.swift in Sources */,
 				801111550678A8B136CA7459 /* POSReturnFlow.swift in Sources */,
+				F498D72C2ACB9DB92E0C5BF3 /* PaymentResultState.swift in Sources */,
 				E492836AD4DB2FBCFC313991 /* PrivacyCover.swift in Sources */,
 				EC2F8F3F837B4F9154CB3637 /* QuickUnlock.swift in Sources */,
 				DC79480D6ECD50E8398446DD /* SecureTokenStore.swift in Sources */,

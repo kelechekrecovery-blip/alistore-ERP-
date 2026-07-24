@@ -2305,21 +2305,18 @@ private struct ClientPaymentResultView: View {
     let onSupport: () -> Void
     let onReset: () -> Void
 
-    private enum ResultState: Equatable {
-        case success, pending, failed
-    }
-
-    private var resultState: ResultState {
-        if forceFailure { return .failed }
-        guard let paymentIntent else { return .success }
-        let status = paymentIntent.status.lowercased()
-        if ["failed", "declined", "expired", "cancelled", "canceled", "rejected"].contains(status) {
-            return .failed
-        }
-        if ["succeeded", "success", "paid", "captured", "completed"].contains(status) || paymentIntent.orderStatus.lowercased() == "paid" {
-            return .success
-        }
-        return .pending
+    // Состояние экрана вынесено в чистую функцию paymentResultState (Shared,
+    // покрыта PaymentResultStateTests): при `nil` интенте + surfaced-ошибке экран
+    // обязан показать провал, а не «Заказ оформлен». Раньше эта проверка
+    // отсутствовала, и неоплаченный заказ (провал онлайн-интента или отказ
+    // подарочной карты) показывался успехом.
+    private var resultState: PaymentResultState {
+        paymentResultState(
+            forceFailure: forceFailure,
+            paymentStatus: paymentIntent?.status,
+            orderStatus: paymentIntent?.orderStatus,
+            hasRetryError: retryErrorMessage != nil
+        )
     }
 
     private var title: String {
