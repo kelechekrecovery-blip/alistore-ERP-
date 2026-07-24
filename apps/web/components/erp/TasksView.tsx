@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { fetchStaffTaskBoard, type StaffTaskWithAssignee } from '@/lib/api/staff-tasks';
+import { createStaffTask, fetchStaffTaskBoard, type StaffTaskWithAssignee } from '@/lib/api/staff-tasks';
+import { fetchStaffAccounts, type StaffAccountRow } from '@/lib/api/staff-auth';
 import { AsyncPanel } from './AsyncPanel';
 import { Card } from './Card';
 
@@ -40,6 +41,10 @@ function dueLabel(dueAt: string | null): string | null {
 export function TasksView({ accessToken }: { accessToken: string }) {
   const [tasks, setTasks] = useState<StaffTaskWithAssignee[] | null>(null);
   const [error, setError] = useState('');
+  const [roster, setRoster] = useState<StaffAccountRow[]>([]);
+  const [draft, setDraft] = useState({ title: '', assigneeId: '', priority: 'normal' as StaffTaskWithAssignee['priority'] });
+  const [creating, setCreating] = useState(false);
+  const [createMsg, setCreateMsg] = useState('');
 
   const load = useCallback(async () => {
     setError('');
@@ -53,8 +58,64 @@ export function TasksView({ accessToken }: { accessToken: string }) {
 
   useEffect(() => { void load(); }, [load]);
 
+  // The assignee roster needs staff:manage. An admin with only staff_tasks:manage
+  // gets an empty list — the form then explains that assigning is owner-only,
+  // rather than failing the whole board.
+  useEffect(() => {
+    void fetchStaffAccounts(accessToken).then(setRoster).catch(() => setRoster([]));
+  }, [accessToken]);
+
+  async function submitTask() {
+    const title = draft.title.trim();
+    if (!title || !draft.assigneeId) { setCreateMsg('Укажите заголовок и исполнителя'); return; }
+    setCreating(true);
+    setCreateMsg('');
+    try {
+      await createStaffTask({ title, assigneeId: draft.assigneeId, priority: draft.priority }, accessToken);
+      setDraft({ title: '', assigneeId: '', priority: 'normal' });
+      setCreateMsg('Задача создана.');
+      await load();
+    } catch (cause) {
+      setCreateMsg(cause instanceof Error ? cause.message : 'Не удалось создать задачу');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  const inputClass = 'h-10 w-full rounded-[8px] border border-surface-3 bg-surface px-3 text-sm text-white outline-none focus:border-faint';
+
   return (
-    <AsyncPanel data={tasks} error={error} onRetry={() => void load()} loadingText="Загружаем задачи команды…">
+    <div className="grid gap-3.5">
+      <div className="rounded-[16px] border border-surface-3 bg-surface p-5">
+        <div className="mb-3 font-display text-[15px] font-bold">Поставить задачу</div>
+        {roster.length === 0 ? (
+          <p className="text-sm text-subtle">Назначение задач доступно владельцу (нужен доступ к списку сотрудников).</p>
+        ) : (
+          <>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <input aria-label="Заголовок задачи" placeholder="Что нужно сделать" value={draft.title} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} className={`${inputClass} xl:col-span-2`} />
+              <select aria-label="Исполнитель" value={draft.assigneeId} onChange={(e) => setDraft((d) => ({ ...d, assigneeId: e.target.value }))} className={inputClass}>
+                <option value="">Исполнитель…</option>
+                {roster.map((s) => <option key={s.id} value={s.id}>{s.username} · {s.role}</option>)}
+              </select>
+              <select aria-label="Приоритет" value={draft.priority} onChange={(e) => setDraft((d) => ({ ...d, priority: e.target.value as StaffTaskWithAssignee['priority'] }))} className={inputClass}>
+                <option value="low">низкий</option>
+                <option value="normal">обычный</option>
+                <option value="high">высокий</option>
+                <option value="urgent">срочно</option>
+              </select>
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <button type="button" disabled={creating} onClick={() => void submitTask()} className="rounded-btn bg-lime px-4 py-2 text-sm font-extrabold text-lime-ink disabled:opacity-50">
+                Создать задачу
+              </button>
+              {createMsg && <span className="text-sm text-warn">{createMsg}</span>}
+            </div>
+          </>
+        )}
+      </div>
+
+      <AsyncPanel data={tasks} error={error} onRetry={() => void load()} loadingText="Загружаем задачи команды…">
       {(list) => (
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-3">
           {COLUMNS.map((column) => {
@@ -90,6 +151,7 @@ export function TasksView({ accessToken }: { accessToken: string }) {
           })}
         </div>
       )}
-    </AsyncPanel>
+      </AsyncPanel>
+    </div>
   );
 }

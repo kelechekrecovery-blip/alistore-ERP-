@@ -1,4 +1,4 @@
-import { getJson, patchAuthJson } from './http';
+import { getJson, patchAuthJson, postAuthJson } from './http';
 
 export interface StaffTask {
   id: string;
@@ -24,6 +24,19 @@ export function updateMyStaffTask(
   accessToken: string,
 ): Promise<StaffTask> {
   return patchAuthJson(`/staff-tasks/mine/${encodeURIComponent(id)}`, { status }, accessToken);
+}
+
+/** Assign a task to a staff member — mirrors CreateStaffTaskDto. */
+export interface CreateStaffTaskInput {
+  title: string;
+  assigneeId: string;
+  description?: string;
+  priority?: StaffTask['priority'];
+  dueAt?: string;
+}
+
+export function createStaffTask(input: CreateStaffTaskInput, accessToken: string): Promise<StaffTask> {
+  return postAuthJson('/staff-tasks', input, accessToken);
 }
 
 /** Элемент доски команды: сервер отдаёт исполнителя раскрытым, а не UUID. */
