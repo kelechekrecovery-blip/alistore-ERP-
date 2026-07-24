@@ -3098,6 +3098,24 @@ model MediaCleanupTask {
   @@index([completedAt, nextAttemptAt, uploadLeaseUntil, claimedAt])
 }
 
+// ---------- ANALYTICS ----------
+// First-party storefront funnel. Deliberately separate from AuditEvent: the
+// ledger is the money/stock/status spine (Invariant #10) that reports read as
+// truth, and high-volume marketing telemetry must not bloat it. Still the owner's
+// data — a private table, not an external tracker.
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  type       String
+  sessionId  String
+  customerId String?
+  productId  String?
+  payload    Json     @default("{}")
+  ts         DateTime @default(now())
+
+  @@index([type, ts])
+  @@index([productId])
+}
+
 // ---------- STAFF AUTH ----------
 // Staff login carries a role in the JWT so dangerous actions are authorized on
 // the server (Role Permission Matrix), not trusted from the request body.

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useCart } from '@/lib/cart';
+import { track } from '@/lib/analytics';
 
 interface AddToCartButtonProps {
   product: { id: string; sku: string; name: string; price: number; stockLimit: number };
@@ -15,6 +16,7 @@ export function AddToCartButton({ product, disabled, full }: AddToCartButtonProp
 
   const onClick = () => {
     add(product);
+    track('add_to_cart', { productId: product.id });
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1200);
   };

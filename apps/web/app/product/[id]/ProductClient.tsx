@@ -23,6 +23,7 @@ import {
   type CatalogProduct,
   type ProductReviews,
 } from "@/lib/api";
+import { track } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { useCompare } from "@/lib/compare";
@@ -58,6 +59,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           setReviews(null);
           return;
         }
+        track('product_view', { productId: detail.product.id });
         const nextReviews = await fetchProductReviews(detail.product.id).catch(() => null);
         if (active) setReviews(nextReviews);
       })

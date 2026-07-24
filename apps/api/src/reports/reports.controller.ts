@@ -17,6 +17,10 @@ import type { AuthPrincipal } from '../auth/jwt.strategy';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { requireActiveStaff } from '../auth/staff-principal';
 import { BlindCashReadGuard } from '../auth/blind-cash-read.guard';
+import { AnalyticsService } from '../analytics/analytics.service';
+import { ValidationError } from '../common/errors';
+
+const FUNNEL_DEFAULT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 @ApiTags('reports')
 @ApiBearerAuth()
@@ -27,6 +31,7 @@ export class ReportsController {
   constructor(
     private readonly reports: ReportsService,
     private readonly staffAuth: StaffAuthService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   @ApiOperation({ summary: 'Owner dashboard KPIs (money, orders, stock, ops)' })
@@ -91,5 +96,20 @@ export class ReportsController {
   @Get('ledger')
   ledger(@Query('type') type?: string, @Query('ref') ref?: string) {
     return this.reports.ledger({ type, ref });
+  }
+
+  @ApiOperation({ summary: 'Storefront funnel — views → carts → checkouts for a period' })
+  @ApiQuery({ name: 'from', required: false, description: 'ISO datetime; default 30 days ago' })
+  @ApiQuery({ name: 'to', required: false, description: 'ISO datetime; default now' })
+  @ApiOkResponse({ description: '{ from, to, productViews, addToCarts, checkoutsStarted }.' })
+  @ApiUnprocessableEntityResponse({ description: 'Invalid date/range.' })
+  @Get('funnel')
+  funnel(@Query('from') from?: string, @Query('to') to?: string) {
+    const toDate = to ? new Date(to) : new Date();
+    const fromDate = from ? new Date(from) : new Date(toDate.getTime() - FUNNEL_DEFAULT_WINDOW_MS);
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime()) || fromDate > toDate) {
+      throw new ValidationError('invalid_date_range', 'Некорректный диапазон дат воронки');
+    }
+    return this.analytics.funnel(fromDate, toDate);
   }
 }
