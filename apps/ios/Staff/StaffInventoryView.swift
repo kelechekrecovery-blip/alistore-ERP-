@@ -10,11 +10,22 @@ struct StaffInventoryView: View {
     let session: StaffSession
     let environment: AppEnvironment
 
+    /// Два режима на одном экране: пересчёт приводит остаток к фактическому сразу,
+    /// списание уходит на одобрение. Разделены явно, чтобы кассир не списал товар,
+    /// думая, что просто пересчитывает.
+    private enum Mode: String, CaseIterable {
+        case count
+        case writeOff
+        var title: String { self == .count ? "Пересчёт" : "Списание" }
+    }
+
     @State private var store: StaffInventoryStore
     @State private var products: [Product] = []
+    @State private var mode: Mode = .count
     @State private var selectedProductId = ""
     @State private var location = "BISHKEK-1"
     @State private var countedText = ""
+    @State private var reasonText = ""
     @State private var isLoadingCatalog = false
     @State private var catalogError: String?
 
@@ -30,14 +41,27 @@ struct StaffInventoryView: View {
         return value
     }
 
+    private var writeOffQty: Int? {
+        let trimmed = countedText.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, let value = Int(trimmed), value >= 1 else { return nil }
+        return value
+    }
+
     private var canSubmit: Bool {
-        !selectedProductId.isEmpty && counted != nil && !store.isSubmitting
+        guard !selectedProductId.isEmpty, !store.isSubmitting else { return false }
+        switch mode {
+        case .count: return counted != nil
+        case .writeOff:
+            return writeOffQty != nil && !reasonText.trimmingCharacters(in: .whitespaces).isEmpty
+        }
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Пересчитайте фактический остаток — сервер сравнит его с учётным и запишет расхождение в Event Ledger.")
+                Text(mode == .count
+                    ? "Пересчитайте фактический остаток — сервер сравнит его с учётным и запишет расхождение в Event Ledger."
+                    : "Списание уходит на одобрение: сток уменьшится только после того, как ответственный подтвердит заявку.")
                     .font(.caption)
                     .foregroundStyle(Design3.textMuted)
 
@@ -48,14 +72,19 @@ struct StaffInventoryView: View {
                     Button("Повторить") { Task { await loadCatalog() } }
                         .buttonStyle(.bordered)
                 } else {
+                    modeSwitcher
                     productPicker
                     locationField
                     countedField
+                    if mode == .writeOff { reasonField }
                     submitButton
                 }
 
-                if let result = store.lastResult {
+                if mode == .count, let result = store.lastResult {
                     resultCard(result)
+                }
+                if mode == .writeOff, let approval = store.lastApproval {
+                    approvalCard(approval)
                 }
                 if let error = store.errorMessage {
                     StaffInventoryNotice(text: error, isError: true)
@@ -67,6 +96,25 @@ struct StaffInventoryView: View {
         .navigationTitle("Инвентаризация")
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadCatalog() }
+    }
+
+    private var modeSwitcher: some View {
+        Picker("Режим", selection: $mode) {
+            ForEach(Mode.allCases, id: \.self) { Text($0.title).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .accessibilityIdentifier("staff-inventory-mode")
+    }
+
+    private var reasonField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Причина").font(.caption.weight(.semibold)).foregroundStyle(Design3.textMuted)
+            TextField("бой, брак, недостача…", text: $reasonText, axis: .vertical)
+                .padding(12)
+                .background(Design3.surface, in: RoundedRectangle(cornerRadius: 10))
+                .foregroundStyle(Design3.textBright)
+                .accessibilityIdentifier("staff-inventory-reason")
+        }
     }
 
     private var productPicker: some View {
@@ -99,7 +147,8 @@ struct StaffInventoryView: View {
 
     private var countedField: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Фактически посчитано").font(.caption.weight(.semibold)).foregroundStyle(Design3.textMuted)
+            Text(mode == .count ? "Фактически посчитано" : "Сколько списать")
+                .font(.caption.weight(.semibold)).foregroundStyle(Design3.textMuted)
             TextField("0", text: $countedText)
                 .keyboardType(.numberPad)
                 .padding(12)
@@ -110,13 +159,14 @@ struct StaffInventoryView: View {
     }
 
     private var submitButton: some View {
-        Button {
-            guard let counted else { return }
-            Task { await store.count(productId: selectedProductId, location: location.trimmingCharacters(in: .whitespaces), counted: counted) }
-        } label: {
+        Button { submit() } label: {
             HStack {
                 Spacer()
-                if store.isSubmitting { ProgressView().tint(.black) } else { Text("Записать пересчёт") }
+                if store.isSubmitting {
+                    ProgressView().tint(.black)
+                } else {
+                    Text(mode == .count ? "Записать пересчёт" : "Отправить на одобрение")
+                }
                 Spacer()
             }
             .font(.subheadline.weight(.bold))
@@ -127,6 +177,34 @@ struct StaffInventoryView: View {
         .buttonStyle(.plain)
         .disabled(!canSubmit)
         .accessibilityIdentifier("staff-inventory-submit")
+    }
+
+    private func submit() {
+        let point = location.trimmingCharacters(in: .whitespaces)
+        switch mode {
+        case .count:
+            guard let counted else { return }
+            Task { await store.count(productId: selectedProductId, location: point, counted: counted) }
+        case .writeOff:
+            guard let qty = writeOffQty else { return }
+            let reason = reasonText.trimmingCharacters(in: .whitespaces)
+            Task { await store.writeOff(productId: selectedProductId, location: point, qty: qty, reason: reason) }
+        }
+    }
+
+    private func approvalCard(_ approval: InventoryApproval) -> some View {
+        // Списание не применилось, а встало в очередь — говорим это прямо, чтобы
+        // кассир не считал товар уже списанным.
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Отправлено на одобрение", systemImage: "clock.badge.checkmark")
+                .font(.subheadline.weight(.bold)).foregroundStyle(Design3.gold)
+            Text("Заявка №\(approval.approvalId.suffix(8)). Сток уменьшится после подтверждения ответственным.")
+                .font(.caption).foregroundStyle(Design3.textMuted)
+                .accessibilityIdentifier("staff-inventory-approval")
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Design3.surface, in: RoundedRectangle(cornerRadius: 12))
     }
 
     private func resultCard(_ result: InventoryCountResult) -> some View {

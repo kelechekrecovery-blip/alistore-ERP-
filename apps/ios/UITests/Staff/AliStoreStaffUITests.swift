@@ -104,6 +104,11 @@ final class AliStoreStaffUITests: XCTestCase {
         XCTAssertTrue(app.buttons["staff-inventory-submit"].exists)
         // Без выбранного товара и количества запись недоступна.
         XCTAssertFalse(app.buttons["staff-inventory-submit"].isEnabled)
+
+        // Переключение в списание открывает поле причины — оно обязательно.
+        app.buttons["Списание"].tap()
+        XCTAssertTrue(app.textFields["staff-inventory-reason"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["staff-inventory-submit"].isEnabled)
     }
 
     func testSignedInStaffTasksMatchesPrototypeShell() {

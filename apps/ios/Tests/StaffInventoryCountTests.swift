@@ -49,6 +49,48 @@ final class StaffInventoryCountTests: XCTestCase {
         XCTAssertNotNil(store.errorMessage)
     }
 
+    func testWriteOffPostsQuantityLocationReasonAndSurfacesApproval() async {
+        // Списание всегда идёт через одобрение: сервер отвечает 202 { approvalId,
+        // status: requested }, а не «списано». UI обязан показать «на одобрении».
+        InventoryMockURLProtocol.stub(path: "/api/inventory/movements", status: 202, body: """
+        {"approvalId":"appr-1","status":"requested"}
+        """)
+        let store = makeStore(token: "staff-token")
+
+        let approval = await store.writeOff(
+            productId: "p-1",
+            location: "BISHKEK-1",
+            qty: 3,
+            reason: "бой при транспортировке"
+        )
+
+        let request = InventoryMockURLProtocol.request(for: "/api/inventory/movements")
+        XCTAssertEqual(request?.httpMethod, "POST")
+        XCTAssertEqual(request?.value(forHTTPHeaderField: "Authorization"), "Bearer staff-token")
+        let body = InventoryMockURLProtocol.jsonBody(for: "/api/inventory/movements")
+        XCTAssertEqual(body?["productId"] as? String, "p-1")
+        XCTAssertEqual(body?["qty"] as? Int, 3)
+        XCTAssertEqual(body?["type"] as? String, "write_off")
+        XCTAssertEqual(body?["location"] as? String, "BISHKEK-1")
+        XCTAssertEqual(body?["reason"] as? String, "бой при транспортировке")
+
+        XCTAssertEqual(approval?.approvalId, "appr-1")
+        XCTAssertEqual(approval?.status, "requested")
+        XCTAssertNil(store.errorMessage)
+    }
+
+    func testWriteOffKeepsServerError() async {
+        InventoryMockURLProtocol.stub(path: "/api/inventory/movements", status: 422, body: """
+        {"message":"Для серийного товара укажите конкретный IMEI"}
+        """)
+        let store = makeStore(token: "staff-token")
+
+        let approval = await store.writeOff(productId: "p-serial", location: "BISHKEK-1", qty: 1, reason: "тест")
+
+        XCTAssertNil(approval)
+        XCTAssertNotNil(store.errorMessage)
+    }
+
     private func makeStore(token: String) -> StaffInventoryStore {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [InventoryMockURLProtocol.self]
