@@ -1,15 +1,26 @@
 # BACKLOG
 
-## UI-010-REMAINDER — оставшиеся экраны §3.3 требуют бэкенда, не «UI на готовом»
+## UI-010-REMAINDER — статус §3.3 (почти закрыт)
 - **Закрыто UI (готовый бэкенд, 2026-07-24):** supplier RMA scorecard (`d02230e4`),
   campaign spend (`37e24de3`), staff-tasks create (`c6bfe1c3`).
-- **Требуют бэкенда (P2, не брать как чистый UI):**
-  - **Z-отчёт** — суточного итога кассы эндпоинта нет (`shifts` даёт только
-    current/open/:id/close/handover; в `reports` дневной кассы нет). Нужен
-    `GET /reports/z-report?date=` или аналог на данных смен/леджера.
-  - **Waitlist** — бэкенда нет вовсе (0 совпадений `waitlist` в `apps/api/src`).
-    Нужны модель, эндпоинты подписки/уведомления, только потом UI.
-  - **Передача смены** — см. `UI-SHIFT-HANDOVER-001` ниже (резолв получателя).
+- **Закрыто бэкенд+UI (2026-07-24):** **Z-отчёт** — `GET /reports/z-report?date=`
+  (агрегат смен/платежей/инкассаций) + `ZReportPanel` в FinanceView (`2af8c047`);
+  **передача смены** — `GET /shifts/handover-targets` + `ShiftHandoverPanel`
+  (`54269a77`, закрывает `UI-SHIFT-HANDOVER-001`).
+- **Осталось (P2):** **Waitlist** — бэкенда нет вовсе (0 совпадений `waitlist` в
+  `apps/api/src`); нужны модель, эндпоинты подписки/уведомления, потом UI.
+
+## RUN-2026-07-24B — что закрыто заходом «полностью закончите проект» (код-часть)
+- **Честный гейт фискализации** (`62f1c27e`): `launch:check` больше не проходит
+  зелёным без ОФД (`external-readiness.ts` → blocking `fiscal_provider`).
+- **Z-отчёт**, **передача смены** (см. UI-010-REMAINDER).
+- **App Store review-login** (`e7dc3b46`, `3f1126d8`): opt-in env-gated вход
+  ревьюера + auto-expiry, ledger-security-ревью без CRITICAL/HIGH.
+- Полный изолированный прогон после захода: **217/217 сьютов, 1295/1295 тестов**.
+- **НЕ взято (обоснованно):** брошенные заказы (send-path — классификация
+  transactional/consent за владельцем); nonce-CSP (риск сломать сайт, нужен
+  прогон по страницам); i18n (нужно подтверждение библиотеки под Next 16);
+  нативные фичи (симулятор-объём); флаки (не сходятся быстро).
 
 ## UI-SHIFT-HANDOVER-001 — передача смены упирается в резолв получателя (не чистый UI)
 - **Найдено при §3.3:** эндпоинт `POST /shifts/:id/handover` (`HandoverShiftDto{toStaffId,countedCash,reason?}`)
