@@ -32,10 +32,12 @@ while [[ $# -gt 0 ]]; do
       cat <<'USAGE'
 Usage: apps/ios/scripts/store-preflight.sh [--env-file path] [--strict-asc] [--strict-signing]
 
-Validates the native iOS Client release configuration without printing secrets.
+Validates the release configuration of all four native iOS apps
+(kg.alistore.client, .staff, .courier, .pos) without printing secrets.
 If --env-file is omitted and apps/ios/.env.production exists, that file is loaded.
 Use --strict-asc to verify the App Store Connect API key against Apple's API.
-Use --strict-signing to verify Apple Distribution signing material is available.
+Use --strict-signing to verify an Apple Distribution identity plus an App Store
+provisioning profile for each of the four bundle ids.
 USAGE
       exit 0
       ;;
@@ -121,7 +123,11 @@ if [[ "$strict_signing" == "1" ]]; then
     fail "Apple Distribution signing identity for team $team_id is required"
   fi
 
-  profile_match="0"
+  # Раньше здесь проверялся ровно один bundle id (kg.alistore.client), а печаталось
+  # «Apple Distribution signing material verified» — переоценка на три приложения.
+  # Теперь собираем все App Store профили команды один раз и сверяем каждый из
+  # четырёх bundle id отдельно, называя в ошибке недостающий профиль поимённо.
+  available_profile_ids=""
   profile_dirs=(
     "$HOME/Library/MobileDevice/Provisioning Profiles"
     "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
@@ -131,21 +137,39 @@ if [[ "$strict_signing" == "1" ]]; then
     while IFS= read -r profile; do
       profile_plist="$(security cms -D -i "$profile" 2>/dev/null || true)"
       [[ -n "$profile_plist" ]] || continue
-      application_id="$(printf '%s' "$profile_plist" | plutil -extract Entitlements.application-identifier raw -o - - 2>/dev/null || true)"
       profile_team="$(printf '%s' "$profile_plist" | plutil -extract TeamIdentifier.0 raw -o - - 2>/dev/null || true)"
       [[ "$profile_team" == "$team_id" ]] || continue
-      case "$application_id" in
-        "$team_id.kg.alistore.client"|"$team_id.*")
-          profile_match="1"
-          break
-          ;;
-      esac
+      application_id="$(printf '%s' "$profile_plist" | plutil -extract Entitlements.application-identifier raw -o - - 2>/dev/null || true)"
+      [[ -n "$application_id" ]] || continue
+      # App Store distribution: get-task-allow=false и нет списка устройств.
+      # Development и Ad Hoc профили сюда попадать не должны — иначе preflight
+      # снова «зеленел» бы на материале, которым App Store архив не подписать.
+      get_task_allow="$(printf '%s' "$profile_plist" | plutil -extract Entitlements.get-task-allow raw -o - - 2>/dev/null || true)"
+      [[ "$get_task_allow" == "false" ]] || continue
+      if printf '%s' "$profile_plist" | plutil -extract ProvisionedDevices raw -o - - >/dev/null 2>&1; then
+        continue
+      fi
+      available_profile_ids="$available_profile_ids$application_id"$'\n'
     done < <(find "$profile_dir" -maxdepth 1 -type f -name '*.mobileprovision' -print)
-    [[ "$profile_match" == "1" ]] && break
   done
 
-  if [[ "$profile_match" != "1" && "${IOS_ALLOW_PROVISIONING_UPDATE:-}" != "true" ]]; then
-    fail 'App Store provisioning profile for kg.alistore.client is required in MobileDevice or Xcode UserData profiles, or set IOS_ALLOW_PROVISIONING_UPDATE=true for an authenticated Xcode account'
+  missing_profiles=""
+  for bundle_id in kg.alistore.client kg.alistore.staff kg.alistore.courier kg.alistore.pos; do
+    if printf '%s' "$available_profile_ids" | grep -qxF "$team_id.$bundle_id"; then
+      continue
+    fi
+    if printf '%s' "$available_profile_ids" | grep -qxF "$team_id.*"; then
+      continue
+    fi
+    missing_profiles="$missing_profiles $bundle_id"
+  done
+
+  if [[ -n "$missing_profiles" ]]; then
+    if [[ "${IOS_ALLOW_PROVISIONING_UPDATE:-}" != "true" ]]; then
+      fail "App Store provisioning profile missing for:${missing_profiles} — install the profile(s) for team $team_id into ~/Library/MobileDevice/Provisioning Profiles or ~/Library/Developer/Xcode/UserData/Provisioning Profiles, or set IOS_ALLOW_PROVISIONING_UPDATE=true on a release machine signed in to the Apple Developer account"
+    fi
+    printf 'store-preflight: no local App Store profile for:%s — relying on Xcode automatic signing (IOS_ALLOW_PROVISIONING_UPDATE=true)\n' \
+      "$missing_profiles"
   fi
 fi
 
@@ -198,7 +222,12 @@ if [[ "$strict_asc" == "1" ]]; then
   printf 'store-preflight: App Store Connect API credentials verified\n'
 fi
 if [[ "$strict_signing" == "1" ]]; then
-  printf 'store-preflight: Apple Distribution signing material verified\n'
+  if [[ -n "$missing_profiles" ]]; then
+    printf 'store-preflight: Apple Distribution identity verified; App Store profiles present for kg.alistore.{client,staff,courier,pos} except:%s\n' \
+      "$missing_profiles"
+  else
+    printf 'store-preflight: Apple Distribution identity and App Store provisioning profiles verified for kg.alistore.client, kg.alistore.staff, kg.alistore.courier, kg.alistore.pos\n'
+  fi
 fi
 if [[ "$strict_asc" != "1" && "$strict_signing" != "1" ]]; then
   printf 'store-preflight: Apple credentials skipped in non-strict mode\n'

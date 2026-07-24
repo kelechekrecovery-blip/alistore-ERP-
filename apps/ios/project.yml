@@ -13,10 +13,8 @@ settings:
     SWIFT_VERSION: "6.0"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
-    # Сборка 2 уже загружена в App Store Connect, а код с тех пор менялся
-    # существенно: формат денег, локализация ru-KG, safe area кассы, единый
-    # вход в поиск каталога. Отправлять надо новый билд, а не тот, что лежит
-    # в ASC, — отсюда 3.
+    # Номер сборки для App Store Connect. 2 уже загружена — следующая заливка
+    # обязана быть 3, иначе ASC отклонит бинарь как дубликат.
     CURRENT_PROJECT_VERSION: 3
     MARKETING_VERSION: 1.0.0
     ENABLE_USER_SCRIPT_SANDBOXING: YES

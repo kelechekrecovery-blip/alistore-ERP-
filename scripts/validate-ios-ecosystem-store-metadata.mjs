@@ -89,6 +89,15 @@ for (const [file, expectedName, expectedBundleId] of expectedApps) {
   if (/password|парол|token|secret|sk-|cfat_/iu.test(notes)) {
     fail(file, 'review.notes must not contain credentials');
   }
+  // Дословный текст для App Review Information > Notes: держим в репозитории и
+  // фильтруем так же, как notes — заметки ревьюеру самое частое место утечки.
+  const appReviewNotes = text(file, metadata.review?.appReviewNotes, 'review.appReviewNotes', {
+    min: 200,
+    max: 4000,
+  });
+  if (/password|парол|token|secret|sk-|cfat_/iu.test(appReviewNotes)) {
+    fail(file, 'review.appReviewNotes must not contain credentials');
+  }
 
   const screenshots = metadata.screenshots;
   if (!Array.isArray(screenshots?.requiredStates) || screenshots.requiredStates.length === 0) {

@@ -71,6 +71,17 @@ assertString(metadata.review?.notes, 'review.notes', { min: 80, max: 4000 });
 if (/password|парол|token|secret|sk-|cfat_/iu.test(metadata.review.notes)) {
   fail('review.notes must not contain secrets or credentials');
 }
+// Текст, который дословно уходит в App Review Information > Notes. Держим его в
+// репозитории, чтобы формулировка не пересобиралась заново на каждой заливке,
+// и проверяем тем же фильтром: заметки для ревьюера — самое частое место утечки
+// живой учётки.
+const appReviewNotes = assertString(metadata.review?.appReviewNotes, 'review.appReviewNotes', {
+  min: 200,
+  max: 4000,
+});
+if (/password|парол|token|secret|sk-|cfat_/iu.test(appReviewNotes)) {
+  fail('review.appReviewNotes must not contain secrets or credentials');
+}
 
 if (metadata.screenshots?.requiredPngCount !== 17) fail('screenshots.requiredPngCount must be 17');
 const screenshotDevices = metadata.screenshots?.devices;
