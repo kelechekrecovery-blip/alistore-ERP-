@@ -17,6 +17,9 @@ export class TrackEventDto {
   @ApiPropertyOptional({ example: 'prod_123' })
   @IsOptional() @IsString() @MaxLength(120) productId?: string;
 
+  @ApiPropertyOptional({ example: 'meta', description: 'Last-touch attribution source (utm_source)' })
+  @IsOptional() @IsString() @MaxLength(80) source?: string;
+
   @ApiPropertyOptional({ description: 'Small, non-PII context bag' })
   @IsOptional() @IsObject() props?: Record<string, unknown>;
 }

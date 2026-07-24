@@ -56,4 +56,34 @@ describe('analytics.track', () => {
     track('checkout_started');
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  it('attaches the last-touch attribution source when one is stored', () => {
+    const store = new Map<string, string>();
+    store.set(
+      'alistore.marketing-attribution.v1',
+      JSON.stringify({
+        journeyId: 'j1',
+        first: { source: 'google' },
+        last: { source: 'meta' },
+        firstCapturedAt: new Date().toISOString(),
+        lastCapturedAt: new Date().toISOString(),
+      }),
+    );
+    const fetchSpy = vi.fn(async (_url: string, _init: RequestInit) => new Response('{}', { status: 201 }));
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => store.set(key, value),
+        removeItem: (key: string) => store.delete(key),
+      },
+    });
+    vi.stubGlobal('navigator', { doNotTrack: null });
+    vi.stubGlobal('crypto', { randomUUID: () => 'sess-x' });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    track('product_view', { productId: 'p-1' });
+
+    const body = JSON.parse(fetchSpy.mock.calls[0][1].body as string);
+    expect(body.source).toBe('meta');
+  });
 });

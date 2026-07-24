@@ -62,17 +62,18 @@ describe('Analytics funnel (integration)', () => {
       .send({ type, sessionId: session, ...extra });
   }
 
-  it('records public funnel events without a staff token', async () => {
-    await track('product_view', { productId: 'p-1' }).expect(201);
-    await track('product_view', { productId: 'p-2' }).expect(201);
-    await track('add_to_cart', { productId: 'p-1' }).expect(201);
-    await track('checkout_started').expect(201);
+  it('records public funnel events with their attribution source, without a staff token', async () => {
+    await track('product_view', { productId: 'p-1', source: 'meta' }).expect(201);
+    await track('product_view', { productId: 'p-2', source: 'meta' }).expect(201);
+    await track('add_to_cart', { productId: 'p-1', source: 'meta' }).expect(201);
+    await track('checkout_started').expect(201); // no source → «(direct)» in the funnel
 
     const rows = await prisma.analyticsEvent.findMany({ where: { sessionId: session } });
     expect(rows).toHaveLength(4);
     expect(new Set(rows.map((r) => r.type))).toEqual(
       new Set(['product_view', 'add_to_cart', 'checkout_started']),
     );
+    expect(rows.filter((r) => r.source === 'meta')).toHaveLength(3);
   });
 
   it('rejects an unknown event type before writing anything', async () => {
@@ -92,6 +93,9 @@ describe('Analytics funnel (integration)', () => {
     expect(res.body.productViews).toBe(2);
     expect(res.body.addToCarts).toBe(1);
     expect(res.body.checkoutsStarted).toBe(1);
+    // Per-source breakdown: the campaign drove the views/cart, the checkout was direct.
+    expect(res.body.bySource.meta).toMatchObject({ productViews: 2, addToCarts: 1, checkoutsStarted: 0 });
+    expect(res.body.bySource['(direct)']).toMatchObject({ checkoutsStarted: 1 });
   });
 
   it('refuses the funnel to a request without a token', async () => {

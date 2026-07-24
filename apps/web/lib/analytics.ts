@@ -1,4 +1,5 @@
 import { API_BASE } from './api/http';
+import { loadAttribution } from './attribution';
 
 /**
  * First-party storefront funnel client.
@@ -43,6 +44,9 @@ export function track(type: FunnelEvent, options: TrackOptions = {}): void {
     type,
     sessionId: sessionId(),
     productId: options.productId,
+    // Last-touch campaign source, so the funnel can be attributed to the campaign
+    // that drove this session. Absent → the server records it as «(direct)».
+    source: loadAttribution()?.last.source,
     props: options.props,
   });
   // keepalive lets the beacon survive a navigation (e.g. add-to-cart → cart);

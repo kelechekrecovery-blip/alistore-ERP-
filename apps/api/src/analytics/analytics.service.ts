@@ -8,12 +8,16 @@ import { ANALYTICS_EVENT_TYPES, isAnalyticsEventType } from './analytics-events'
 /** Cap on the serialised context bag — telemetry, not a document store. */
 const MAX_PROPS_BYTES = 4000;
 
-export interface FunnelCounts {
-  from: string;
-  to: string;
+export interface FunnelStage {
   productViews: number;
   addToCarts: number;
   checkoutsStarted: number;
+}
+
+export interface FunnelCounts extends FunnelStage {
+  from: string;
+  to: string;
+  bySource: Record<string, FunnelStage>;
 }
 
 @Injectable()
@@ -37,27 +41,41 @@ export class AnalyticsService {
         type: dto.type,
         sessionId: dto.sessionId,
         productId: dto.productId ?? null,
+        source: dto.source ?? null,
         payload: props as Prisma.InputJsonValue,
       },
     });
   }
 
-  /** Funnel counts per event type over an inclusive [from, to] window. */
+  /**
+   * Funnel counts per event type over an inclusive [from, to] window, plus a
+   * per-source breakdown (last-touch utm_source, «(direct)» when absent) so
+   * campaign ROI can be read against real view→cart→checkout conversions.
+   */
   async funnel(from: Date, to: Date): Promise<FunnelCounts> {
     const grouped = await this.prisma.analyticsEvent.groupBy({
-      by: ['type'],
+      by: ['type', 'source'],
       where: { ts: { gte: from, lte: to } },
       _count: { _all: true },
     });
-    const count = (type: string) =>
-      grouped.find((row) => row.type === type)?._count._all ?? 0;
-    return {
-      from: from.toISOString(),
-      to: to.toISOString(),
-      productViews: count('product_view'),
-      addToCarts: count('add_to_cart'),
-      checkoutsStarted: count('checkout_started'),
+
+    const stage = (): FunnelStage => ({ productViews: 0, addToCarts: 0, checkoutsStarted: 0 });
+    const add = (bucket: FunnelStage, type: string, n: number) => {
+      if (type === 'product_view') bucket.productViews += n;
+      else if (type === 'add_to_cart') bucket.addToCarts += n;
+      else if (type === 'checkout_started') bucket.checkoutsStarted += n;
     };
+
+    const overall = stage();
+    const bySource: Record<string, FunnelStage> = {};
+    for (const row of grouped) {
+      const n = row._count._all;
+      add(overall, row.type, n);
+      const key = row.source ?? '(direct)';
+      add((bySource[key] ??= stage()), row.type, n);
+    }
+
+    return { from: from.toISOString(), to: to.toISOString(), ...overall, bySource };
   }
 
   /** Exposed for callers that want the closed event vocabulary. */

@@ -3109,11 +3109,13 @@ model AnalyticsEvent {
   sessionId  String
   customerId String?
   productId  String?
+  source     String? // last-touch attribution (utm_source), for campaign ROI breakdown
   payload    Json     @default("{}")
   ts         DateTime @default(now())
 
   @@index([type, ts])
   @@index([productId])
+  @@index([source, ts])
 }
 
 // ---------- STAFF AUTH ----------
