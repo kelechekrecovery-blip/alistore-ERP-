@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Card } from './Card';
 import { AsyncPanel } from './AsyncPanel';
+import { FunnelPanel } from './FunnelPanel';
 import { som } from '@/lib/format';
 import { fetchPayroll, type Kpi, type Payroll } from '@/lib/reports';
 
@@ -38,6 +39,7 @@ export function KpiView({ kpi, accessToken }: { kpi: Kpi | null; accessToken: st
         <h1 className="font-display text-2xl font-extrabold tracking-tight text-white">KPI и зарплаты</h1>
         <p className="mt-1 text-xs leading-5 text-subtle">Выручка, маржа и расчёт по продавцам — из Event Ledger.</p>
       </header>
+      <FunnelPanel accessToken={accessToken} />
 
       <Card className="p-5">
         <div className="mb-3.5 font-display text-[15px] font-bold text-white">Показатели</div>

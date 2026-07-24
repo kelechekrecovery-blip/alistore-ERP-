@@ -70,6 +70,22 @@ export function fetchZReport(date: string, accessToken: string): Promise<ZReport
   return get<ZReport>(`/reports/z-report?date=${encodeURIComponent(date)}`, accessToken);
 }
 
+export interface FunnelStage {
+  productViews: number;
+  addToCarts: number;
+  checkoutsStarted: number;
+}
+
+export interface Funnel extends FunnelStage {
+  from: string;
+  to: string;
+  bySource: Record<string, FunnelStage>;
+}
+
+export function fetchFunnel(from: string, to: string, accessToken: string): Promise<Funnel> {
+  return get<Funnel>(`/reports/funnel?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, accessToken);
+}
+
 export interface Kpi {
   revenue: number;
   cogs: number;
