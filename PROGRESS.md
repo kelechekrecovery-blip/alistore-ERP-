@@ -1,5 +1,41 @@
 # PROGRESS
 
+## 2026-07-23 — магазинные скриншоты iOS: неверный класс устройства ловится тестом
+
+**Дефект.** Наборы в `apps/ios/build/AppStoreScreenshots/ru-KG/` были `1206x2622`
+(класс 6.3") и `1668x2420`. Apple базовыми принимает 6.9" `1320x2868` и 13" iPad
+`2064x2752` и масштабирует из них остальные классы, так что листинг молча деградировал.
+Причина одна: `scripts/prepare-ios-store-screenshots.mjs` записывал `width`/`height`
+в манифест, но **ни с чем не сверял**.
+
+**Тест до фикса.** `scripts/__tests__/prepare-ios-store-screenshots.test.mjs`
+(`node --test`, без симулятора, фикстура-репозиторий во временной папке) — на старом
+упаковщике красный `3/3`, в т.ч. «packaged 2 screenshots» на PNG `1206x2622`.
+
+**Фикс.** `expectedDimensions` на устройство в четырёх `apps/ios/store/*-metadata.json`;
+упаковщик сверяет каждый PNG и падает сообщением вида
+`courier/ipad screenshot for courier-cod is 1668x2420, expected the 2064x2752 device class`.
+Захват (`apps/ios/scripts/visual-capture.sh`) и упаковщик обобщены с одного
+`client-metadata.json` на все четыре приложения; отсутствующий симулятор теперь
+**создаётся** из свежего доступного iOS-рантайма, а не роняет прогон; `simctl`
+вызывается по абсолютному пути из `DEVELOPER_DIR` (на машине `xcode-select` смотрит
+в CommandLineTools). Дублирующие `scripts/prepare-ios-ecosystem-store-screenshots.mjs`
+и `apps/ios/scripts/ecosystem-visual-capture.sh` удалены — их роль забрали обобщённые
+скрипты. Наборы staff/courier/pos расширены с 4/3/3 до 6/5/6 значимых экранов.
+
+**Проверено:** `node --test …` зелёный `3/3` (и добавлен в CI как
+`ios:store-screenshots:test` — симулятор не нужен); `bash -n visual-capture.sh`;
+оба валидатора метаданных зелёные; `xcodebuild build-for-testing` (AliStoreUITests) —
+`TEST BUILD SUCCEEDED`. Реальный захват прошёл на обоих базовых классах:
+client `17/17`, staff `6/6`, courier `5/5`, pos `6/6` на `iPhone 17 Pro Max` и
+на `iPad Pro 13-inch (M5)`. `npm run ios:store-screenshots` упаковал все восемь
+наборов; независимый обход PNG-заголовков: **68 файлов, 0 вне базового класса**.
+Путь создания симулятора проверен отдельно (`simctl create` → повторный resolve
+находит устройство, зонд удалён).
+
+**Осталось внешним:** owner pixel sign-off, физический смоук, подписи и загрузка
+в App Store Connect.
+
 ## 2026-07-22 — ФИНАЛ КОД-ПЕРИМЕТРА: a11y, витрина, гейты + пойманный launch-краш
 
 Автономный проход «закончить проект». Волны 4/5/6/7 добиты, плюс критический

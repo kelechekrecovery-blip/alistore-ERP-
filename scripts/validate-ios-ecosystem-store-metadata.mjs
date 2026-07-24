@@ -108,9 +108,10 @@ for (const [file, expectedName, expectedBundleId] of expectedApps) {
     fail(file, 'screenshots.requiredStates must not contain duplicates');
   }
 
-  for (const [device, simulator, outputSlug] of [
-    ['iphone', 'iPhone 17 Pro', 'iphone-17-pro'],
-    ['ipad', 'iPad Pro 11-inch (M5)', 'ipad-pro-11'],
+  // Apple scales every other class from these two base uploads.
+  for (const [device, simulator, outputSlug, width, height] of [
+    ['iphone', 'iPhone 17 Pro Max', 'iphone-6-9', 1320, 2868],
+    ['ipad', 'iPad Pro 13-inch (M5)', 'ipad-13', 2064, 2752],
   ]) {
     const config = screenshots?.devices?.[device];
     text(file, config?.source, `screenshots.devices.${device}.source`, { min: 10, max: 200 });
@@ -119,6 +120,12 @@ for (const [file, expectedName, expectedBundleId] of expectedApps) {
     }
     if (config?.outputSlug !== outputSlug) {
       fail(file, `screenshots.devices.${device}.outputSlug must be ${outputSlug}`);
+    }
+    if (
+      config?.expectedDimensions?.width !== width ||
+      config?.expectedDimensions?.height !== height
+    ) {
+      fail(file, `screenshots.devices.${device}.expectedDimensions must be ${width}x${height}`);
     }
   }
 

@@ -35,21 +35,32 @@
     }
   },
   "screenshots": {
-    "requiredPngCount": 3,
+    "requiredPngCount": 6,
     "devices": {
       "iphone": {
         "source": "apps/ios/build/AliStorePOSVisual-iphone-attachments",
-        "simulator": "iPhone 17 Pro",
-        "outputSlug": "iphone-17-pro"
+        "simulator": "iPhone 17 Pro Max",
+        "outputSlug": "iphone-6-9",
+        "expectedDimensions": {
+          "width": 1320,
+          "height": 2868
+        }
       },
       "ipad": {
         "source": "apps/ios/build/AliStorePOSVisual-ipad-attachments",
-        "simulator": "iPad Pro 11-inch (M5)",
-        "outputSlug": "ipad-pro-11"
+        "simulator": "iPad Pro 13-inch (M5)",
+        "outputSlug": "ipad-13",
+        "expectedDimensions": {
+          "width": 2064,
+          "height": 2752
+        }
       }
     },
     "requiredStates": [
       "pos-sale",
+      "pos-cart",
+      "pos-receipt",
+      "pos-offline",
       "pos-shift",
       "pos-operations"
     ]

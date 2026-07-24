@@ -107,12 +107,28 @@ npm run ios:visual
 npm run ios:store-screenshots
 ```
 
-`ios:visual` runs the deterministic Client screenshot gate on the iPhone 17 Pro
-Simulator and exports 17 retained PNG attachments: home, catalog, product detail,
-favorites, compare, cart, checkout, order status, account, devices, warranty,
-returns, support, Trade-in, loyalty, addresses and search. These are review
-evidence only; they do not replace owner pixel approval or physical-device
-release smoke.
+`ios:visual` runs the deterministic screenshot gate for all four iOS apps
+(`client`, `staff`, `courier`, `pos`) on the two Apple **base** device classes:
+the 6.9" iPhone (iPhone 17 Pro Max, 1320x2868) and the 13" iPad
+(iPad Pro 13-inch (M5), 2064x2752). Apple scales every smaller class from those
+uploads, so capturing on a 6.3" or 11" simulator silently degrades the listing.
+If a required simulator is not installed, the script creates it from the newest
+available iOS runtime instead of failing.
+
+Scope it while iterating:
+
+```bash
+npm run ios:visual                    # all four apps, both device classes
+npm run ios:visual:client             # Client only
+npm run ios:visual:ecosystem          # Staff + Courier + POS
+IOS_VISUAL_DEVICES=iphone npm run ios:visual -- staff
+```
+
+The Client set is 17 states (home, catalog, product detail, favorites, compare,
+cart, checkout, order status, account, devices, warranty, returns, support,
+Trade-in, loyalty, addresses, search); Staff 6, Courier 5 and POS 6 — the exact
+lists live in `apps/ios/store/<app>-metadata.json`. These are review evidence
+only; they do not replace owner pixel approval or physical-device release smoke.
 
 `ios:store-screenshots` reads `apps/ios/store/client-metadata.json`, verifies all
 17 required states in the Xcode attachment manifest, checks PNG dimensions and
@@ -127,18 +143,25 @@ are produced by the ecosystem capture pipeline, not by `ios:visual`.
 ## 3. Archive
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer npm run ios:archive
+npm run ios:store-screenshots                  # all four apps
+npm run ios:store-screenshots -- --app staff   # one app
 ```
 
-`ios:archive` (`apps/ios/scripts/archive.sh`) regenerates the Xcode project with
-`xcodegen`, then archives all four schemes into
+The command reads every `apps/ios/store/<app>-metadata.json`, verifies each
+required state is present in the Xcode attachment manifest, **fails when a PNG
+is not the `expectedDimensions` device class declared for that simulator**,
+records SHA-256 hashes and writes
+`apps/ios/build/AppStoreScreenshots/ru-KG/<app>/{iphone-6-9,ipad-13}/`.
+Upload those generated files to App Store Connect in numeric order.
 
-```
-apps/ios/build/AliStoreClient.xcarchive
-apps/ios/build/AliStoreStaff.xcarchive
-apps/ios/build/AliStoreCourier.xcarchive
-apps/ios/build/AliStorePOS.xcarchive
-```
+The dimension guard itself is covered by
+`npm run ios:store-screenshots:test` (no simulator required).
+
+The archive must be signed with an Apple Distribution identity and a
+provisioning profile for `kg.alistore.client`. If the archive fails because no
+profile is available, create/download the profile in the Apple Developer
+portal or let Xcode update signing with the protected account; do not weaken
+the release to use local API URLs.
 
 Each archive is built `-configuration Release` for `generic/platform=iOS` with
 `DEVELOPMENT_TEAM` and `ALISTORE_API_BASE_URL` passed on the command line, so a

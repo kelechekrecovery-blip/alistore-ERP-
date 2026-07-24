@@ -233,6 +233,18 @@ final class AliStoreStaffUITests: XCTestCase {
         XCTAssertTrue(kpi.staticTexts["Задачи и KPI"].waitForExistence(timeout: 5))
         capture(kpi, named: "staff-kpi")
 
+        let buyback = launchSignedInStaff()
+        buyback.buttons["staff-home-buyback"].tap()
+        XCTAssertTrue(buyback.staticTexts["Скупка Б/У"].waitForExistence(timeout: 5))
+        capture(buyback, named: "staff-buyback")
+
+        let support = launchSignedInStaff()
+        support.buttons["staff-home-orders"].tap()
+        XCTAssertTrue(support.staticTexts["Заказы"].waitForExistence(timeout: 5))
+        support.buttons["Поддержка"].tap()
+        XCTAssertTrue(support.staticTexts["Support inbox"].waitForExistence(timeout: 5))
+        capture(support, named: "staff-support")
+
         let customer = launchSignedInStaff()
         customer.buttons["staff-home-customer360"].tap()
         XCTAssertTrue(customer.staticTexts["Customer 360"].waitForExistence(timeout: 5))

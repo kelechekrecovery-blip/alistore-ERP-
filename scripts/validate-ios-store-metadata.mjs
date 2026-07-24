@@ -88,9 +88,18 @@ const screenshotDevices = metadata.screenshots?.devices;
 if (!screenshotDevices || typeof screenshotDevices !== 'object') {
   fail('screenshots.devices must define iPhone and iPad screenshot sets');
 }
+// Apple scales every other class from these two base uploads.
 const requiredScreenshotDevices = {
-  iphone: { simulator: 'iPhone 17 Pro', outputSlug: 'iphone-17-pro' },
-  ipad: { simulator: 'iPad Pro 11-inch (M5)', outputSlug: 'ipad-pro-11' },
+  iphone: {
+    simulator: 'iPhone 17 Pro Max',
+    outputSlug: 'iphone-6-9',
+    expectedDimensions: { width: 1320, height: 2868 },
+  },
+  ipad: {
+    simulator: 'iPad Pro 13-inch (M5)',
+    outputSlug: 'ipad-13',
+    expectedDimensions: { width: 2064, height: 2752 },
+  },
 };
 for (const [device, expected] of Object.entries(requiredScreenshotDevices)) {
   const config = screenshotDevices[device];
@@ -101,6 +110,15 @@ for (const [device, expected] of Object.entries(requiredScreenshotDevices)) {
   }
   if (config.outputSlug !== expected.outputSlug) {
     fail(`screenshots.devices.${device}.outputSlug must be ${expected.outputSlug}`);
+  }
+  if (
+    config.expectedDimensions?.width !== expected.expectedDimensions.width ||
+    config.expectedDimensions?.height !== expected.expectedDimensions.height
+  ) {
+    fail(
+      `screenshots.devices.${device}.expectedDimensions must be ` +
+        `${expected.expectedDimensions.width}x${expected.expectedDimensions.height}`,
+    );
   }
 }
 const requiredStates = metadata.screenshots?.requiredStates;

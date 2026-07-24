@@ -46,6 +46,13 @@ final class AliStoreCourierUITests: XCTestCase {
     }
 
     func testPublicStoreVisualEvidence() {
+        let login = XCUIApplication()
+        login.launchArguments = ["--ui-testing-signed-out", "--ui-testing-visual-evidence"]
+        login.launch()
+        XCTAssertTrue(login.staticTexts["AliStore Courier"].waitForExistence(timeout: 10))
+        capture(login, named: "courier-login")
+        login.terminate()
+
         let app = XCUIApplication()
         app.launchArguments = [
             "--ui-testing-signed-in",
@@ -56,6 +63,11 @@ final class AliStoreCourierUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Мой маршрут"].waitForExistence(timeout: 10))
         capture(app, named: "courier-route")
+
+        // Evidence-фото — обязательное условие закрытия доставки, отдельный экран истории.
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["Evidence доставки"].waitForExistence(timeout: 5))
+        capture(app, named: "courier-evidence")
 
         app.buttons["COD"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Сверка COD"].waitForExistence(timeout: 5))

@@ -118,6 +118,20 @@ final class AliStorePOSUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["POS · Касса"].waitForExistence(timeout: 10))
         capture(app, named: "pos-sale")
 
+        app.buttons["pos-qty-plus-iphone-15-128"].tap()
+        XCTAssertTrue(app.staticTexts["1 поз."].waitForExistence(timeout: 5))
+        capture(app, named: "pos-cart")
+
+        app.swipeUp()
+        XCTAssertTrue(app.buttons["pos-sale-submit"].waitForExistence(timeout: 5))
+        app.buttons["pos-sale-submit"].tap()
+        XCTAssertTrue(app.staticTexts["Чек с сервера"].waitForExistence(timeout: 10))
+        capture(app, named: "pos-receipt")
+
+        app.buttons["Офлайн"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Офлайн-очередь"].waitForExistence(timeout: 5))
+        capture(app, named: "pos-offline")
+
         app.buttons["Смена"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Смена"].waitForExistence(timeout: 5))
         capture(app, named: "pos-shift")

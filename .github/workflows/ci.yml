@@ -64,6 +64,8 @@ jobs:
 
       - run: npm ci
       - run: npm run native:deeplink-preflight
+      # Guards the App Store screenshot device class; needs no simulator.
+      - run: npm run ios:store-screenshots:test
       - run: npm run prisma:generate -w @alistore/api
       - run: npm run test:refund-migration-upgrade -w @alistore/api
       - run: npm run db:deploy -w @alistore/api
