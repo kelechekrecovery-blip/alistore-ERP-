@@ -1,4 +1,4 @@
-import { Inject, Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, type OnModuleInit } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes, randomInt } from 'node:crypto';
@@ -42,7 +42,9 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * Event Ledger entry — the ledger stays reserved for those (see AuditService).
  */
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -52,6 +54,19 @@ export class AuthService {
     @Inject(EMAIL_OTP_SENDER)
     private readonly emailOtpSender: EmailOtpSender = new NoopEmailOtpSender(),
   ) {}
+
+  /**
+   * The App Store review login is a deliberate, fixed-code entry into one account.
+   * If it is configured at boot, shout — so it can never be left on silently past
+   * a review window.
+   */
+  onModuleInit(): void {
+    if (this.config.get<string>('AUTH_REVIEW_PHONE')?.trim()) {
+      this.logger.warn(
+        'AUTH_REVIEW_PHONE is set — App Store review login is ACTIVE. Use a throwaway number and clear AUTH_REVIEW_PHONE/AUTH_REVIEW_OTP after review.',
+      );
+    }
+  }
 
   /** Verify a short-lived access token for non-HTTP transports (for example Socket.IO). */
   async verifyAccessToken(token: string): Promise<AuthPrincipal> {
@@ -322,6 +337,13 @@ export class AuthService {
     const reviewPhone = this.config.get<string>('AUTH_REVIEW_PHONE')?.trim();
     const reviewOtp = this.config.get<string>('AUTH_REVIEW_OTP')?.trim();
     if (!reviewPhone || !reviewOtp) return false;
+    // Optional auto-expiry: a review window that closes itself even if the owner
+    // forgets to clear the env. An unparseable or past timestamp fails closed.
+    const until = this.config.get<string>('AUTH_REVIEW_UNTIL')?.trim();
+    if (until) {
+      const expiry = new Date(until).getTime();
+      if (Number.isNaN(expiry) || Date.now() > expiry) return false;
+    }
     return phone === reviewPhone && code === reviewOtp;
   }
 
