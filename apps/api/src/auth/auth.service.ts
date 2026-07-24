@@ -298,13 +298,31 @@ export class AuthService {
    * consumed or expired challenge cannot be reused.
    */
   async verifyOtp(phone: string, code: string): Promise<AuthTokens> {
-    await this.consumeOtp(phone, code);
+    // App Store / Play review login: the reviewer cannot receive an SMS, so one
+    // pre-agreed phone accepts one fixed code — only when both env vars are set,
+    // and only for an exact phone+code match. Any other phone, any other code, or
+    // a missing env var falls through to the normal challenge check below.
+    if (!this.isReviewLogin(phone, code)) {
+      await this.consumeOtp(phone, code);
+    }
     const customer = await this.prisma.customer.upsert({
       where: { phone },
       update: {},
       create: { phone, name: '' },
     });
     return this.issueTokens(customer.id, customer.phone);
+  }
+
+  /**
+   * True only when a review account is configured (both AUTH_REVIEW_PHONE and
+   * AUTH_REVIEW_OTP) and the request matches it exactly. Absent either env var the
+   * method is inert, so production without these variables has no bypass at all.
+   */
+  private isReviewLogin(phone: string, code: string): boolean {
+    const reviewPhone = this.config.get<string>('AUTH_REVIEW_PHONE')?.trim();
+    const reviewOtp = this.config.get<string>('AUTH_REVIEW_OTP')?.trim();
+    if (!reviewPhone || !reviewOtp) return false;
+    return phone === reviewPhone && code === reviewOtp;
   }
 
   /**
