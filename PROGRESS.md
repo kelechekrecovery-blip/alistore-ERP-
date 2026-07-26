@@ -47,6 +47,24 @@ a single electronics retail company in Bishkek… not a consumer app» — эт�
 `CODE_SIGNING_ALLOWED=NO` и такие вещи не ловят; оба валидатора метаданных зелёные;
 `ali.kg/`, `/privacy`, `/support`, `api.ali.kg/api/health` → `200`.
 
+**Гейт против повтора (`ea600e7a`).** Применить значения один раз — лечение симптома;
+причина была в том, что ASC никто не сверял с `*-metadata.json`. Теперь
+`store-preflight --strict-asc` гоняет `apply-ios-store-metadata.mjs --check`, который
+выходит с ненулевым кодом и называет разошедшееся поле. Проверено инъекцией дрейфа
+(`staff` category → `PRODUCTIVITY`): check выдал поле и `exit 1`, после отката строгий
+preflight снова зелёный. Плюс npm-скрипты `ios:store-metadata{,:apply,:test}` и таймаут
+30с на запросы к Apple — незакрытый `fetch` в релизном гейте вешает релиз вместо того,
+чтобы его завалить, и это не гипотетика: ASC один раз завис прямо во время работы.
+В `mvp:verify` намеренно не вносил — тот гейт сознательно без нативных шагов.
+
+**Доуточнено по ASC.** Цена: base territory `USA`, ручных цен нет — бесплатно, как и
+задумано; `releaseType = AFTER_APPROVAL` у всех четырёх. **App Privacy через API
+недоступен в принципе** — у ресурса `apps` нет ни одной privacy/data-usage связи
+(проверено интроспекцией списка relationships), только веб. **Доступность по
+территориям — единственное обязательное поле, которое так и не подтверждено**:
+`appAvailabilityV2` отдаёт 404 на этом ключе; помечено в `SUBMISSION-STATUS.md` как
+непроверенное, чтобы не читалось как закрытое.
+
 **Осталось за владельцем — без этого Submit невозможен.** Контакт ревью (`contactEmail` и
 остальные `null` у всех четырёх) и демо-аккаунты (`demoAccountRequired=true`, значения
 пустые): для Client — env `AUTH_REVIEW_PHONE`/`AUTH_REVIEW_OTP` (механизм customer-scope,
