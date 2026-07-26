@@ -47,7 +47,8 @@ open is App Store Connect metadata or owner input, not binary content.
 | Content rights | Client `USES_THIRD_PARTY_CONTENT`; Staff, Courier and POS `DOES_NOT_USE_THIRD_PARTY_CONTENT` — applied in the same run |
 | Drift guard | `store-preflight --strict-asc` now runs `apply-ios-store-metadata.mjs --check` and fails if App Store Connect stops matching the metadata files |
 | Age rating | `FOUR_PLUS` for all four; `ageRatingDeclaration` present |
-| Pricing | `appPriceSchedule` exists for all four |
+| Pricing | `appPriceSchedule` exists for all four with base territory `USA` and no manual price rows — i.e. free, as intended |
+| Release type | `AFTER_APPROVAL` for all four versions |
 | Localization | `ru` version localization for all four with description, keywords, support URL `https://ali.kg/support` and marketing URL `https://ali.kg` |
 | App info | Name, subtitle and `privacyPolicyUrl = https://ali.kg/privacy` set for all four |
 | Screenshots | Uploaded and `COMPLETE`: Client 10+10+10, Staff 4+4+4, Courier 3+3+3, POS 3+3+3 |
@@ -106,7 +107,10 @@ real employee accounts in the ERP, one per role — staff, courier, cashier — 
 1. **App Review Information** → Sign-In required with the demo values above, plus
    contact first name, last name, email and phone.
 2. **App Privacy** → answer and publish, using the privacy manifest as the basis.
-3. **Pricing** → confirm and save the intended "Free" tier.
+3. **Pricing and availability** → the price schedule already reads as free; confirm
+   it, and check the territory list. Territory availability could not be read with
+   this API key (`appAvailabilityV2` returns 404), so it is the one required field
+   nobody has verified from outside the web interface — look at it explicitly.
 4. **Add for Review → Submit to App Review.**
 
 App Review Notes for all four are prepared in the `*-metadata.json` files in this
