@@ -24,11 +24,21 @@ export function ShiftHandoverPanel({
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [loadError, setLoadError] = useState('');
 
+  // A failed request used to land in the same empty list as "no colleagues on
+  // shift", so the panel told a cashier holding a drawer that there was nobody
+  // to hand it to. Those are different situations and only one of them is the
+  // cashier's problem to solve.
   const loadTargets = useCallback(() => {
+    setLoadError('');
     fetchHandoverTargets(accessToken)
       .then(setTargets)
-      .catch(() => setTargets([]));
+      .catch((error: unknown) => {
+        setTargets([]);
+        const detail = error instanceof Error ? error.message : '';
+        setLoadError(detail ? `Не удалось загрузить список: ${detail}` : 'Не удалось загрузить список получателей');
+      });
   }, [accessToken]);
 
   useEffect(() => { loadTargets(); }, [loadTargets]);
@@ -54,6 +64,21 @@ export function ShiftHandoverPanel({
   }
 
   const inputClass = 'h-11 w-full rounded-[10px] border border-white/10 bg-white/[.05] px-3 text-sm text-white outline-none focus:border-white/25';
+
+  if (loadError) {
+    return (
+      <div className="rounded-[14px] border border-white/10 bg-white/[.03] p-4">
+        <p className="text-sm text-white/70">{loadError}</p>
+        <button
+          type="button"
+          onClick={loadTargets}
+          className="mt-3 rounded-[10px] border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:border-white/30"
+        >
+          Повторить
+        </button>
+      </div>
+    );
+  }
 
   if (targets.length === 0) {
     return (

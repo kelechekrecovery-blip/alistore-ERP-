@@ -4,11 +4,10 @@
  * Preference order:
  *  1. `NEXT_PUBLIC_API_BASE` when configured at build time (the intended path).
  *  2. Browser self-heal: if the bundle was deployed WITHOUT that env var to a
- *     real (non-localhost) host, derive `https://api.<apex>/api` from the current
- *     origin instead of silently falling back to the dev localhost API. This
+ *     real (non-localhost) host, use same-origin `/api`. This
  *     prevents a prod deploy that forgot the env var from calling
  *     `http://localhost:4000` (which is CORS-blocked from an https origin and
- *     leaves the storefront with no data).
+ *     also keeps web and native clients on the canonical ali.kg contract).
  *  3. Local dev default.
  */
 function resolveApiBase(): string {
@@ -20,12 +19,7 @@ function resolveApiBase(): string {
     const isLocalHost =
       hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0';
     if (!isLocalHost) {
-      // Derive the registrable apex from the last two labels so ANY subdomain
-      // (www.ali.kg, admin.ali.kg, …) resolves to the single provisioned API host
-      // api.ali.kg — not api.<subdomain>.ali.kg, which isn't a real DNS record.
-      const labels = hostname.split('.');
-      const apex = labels.length > 2 ? labels.slice(-2).join('.') : hostname;
-      return `${protocol}//api.${apex}/api`;
+      return `${protocol}//${window.location.host}/api`;
     }
   }
 
@@ -39,6 +33,21 @@ export class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
   }
+}
+
+/**
+ * True only when the caller genuinely lacks the permission for an optional
+ * surface, so rendering it empty is the honest outcome.
+ *
+ * Optional panels (an assignee roster the viewer may not read, a widget behind
+ * a narrower scope) legitimately degrade to empty. The trap is a catch handler
+ * that resets the list to empty for every rejection alike: a timeout, a 500 and
+ * a genuine 403 then produce the same silent empty state, and the surface
+ * reports a broken backend as "you have no data". Swallow only what this
+ * returns true for; surface the rest.
+ */
+export function isPermissionDenied(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403);
 }
 
 /**

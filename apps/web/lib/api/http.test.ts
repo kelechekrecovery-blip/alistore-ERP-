@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, postJson } from './http';
+import { ApiError, isPermissionDenied, postJson } from './http';
 
 /**
  * Regression: server domain errors carry a machine-readable `code` alongside
@@ -31,5 +31,27 @@ describe('postJson error handling', () => {
     const error = await postJson('/x', {}).catch((value: unknown) => value);
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).code).toBeUndefined();
+  });
+});
+
+/**
+ * Regression: optional panels degraded to an empty list on ANY failure, so a
+ * timeout or a 500 was rendered as "you have no data" — a broken cash-drawer
+ * handover screen told the cashier there was nobody to hand the drawer to.
+ * Only a real permission refusal may be swallowed.
+ */
+describe('isPermissionDenied', () => {
+  it('is true only for a genuine permission refusal', () => {
+    expect(isPermissionDenied(new ApiError(403, 'forbidden'))).toBe(true);
+    expect(isPermissionDenied(new ApiError(401, 'unauthorized'))).toBe(true);
+  });
+
+  it('is false for failures that must reach the user', () => {
+    expect(isPermissionDenied(new ApiError(500, 'boom'))).toBe(false);
+    expect(isPermissionDenied(new ApiError(404, 'missing'))).toBe(false);
+    expect(isPermissionDenied(new ApiError(422, 'invalid'))).toBe(false);
+    expect(isPermissionDenied(new TypeError('Failed to fetch'))).toBe(false);
+    expect(isPermissionDenied(undefined)).toBe(false);
+    expect(isPermissionDenied('403')).toBe(false);
   });
 });

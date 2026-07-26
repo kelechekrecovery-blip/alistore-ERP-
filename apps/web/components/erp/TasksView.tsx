@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createStaffTask, fetchStaffTaskBoard, type StaffTaskWithAssignee } from '@/lib/api/staff-tasks';
 import { fetchStaffAccounts, type StaffAccountRow } from '@/lib/api/staff-auth';
+import { isPermissionDenied } from '@/lib/api/http';
 import { AsyncPanel } from './AsyncPanel';
 import { Card } from './Card';
 
@@ -45,6 +46,7 @@ export function TasksView({ accessToken }: { accessToken: string }) {
   const [draft, setDraft] = useState({ title: '', assigneeId: '', priority: 'normal' as StaffTaskWithAssignee['priority'] });
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState('');
+  const [rosterError, setRosterError] = useState('');
 
   const load = useCallback(async () => {
     setError('');
@@ -60,9 +62,18 @@ export function TasksView({ accessToken }: { accessToken: string }) {
 
   // The assignee roster needs staff:manage. An admin with only staff_tasks:manage
   // gets an empty list — the form then explains that assigning is owner-only,
-  // rather than failing the whole board.
+  // rather than failing the whole board. Only that case is swallowed: a network
+  // or server failure used to look identical to "you may not see the roster",
+  // which quietly turned a broken board into a permissions story.
   useEffect(() => {
-    void fetchStaffAccounts(accessToken).then(setRoster).catch(() => setRoster([]));
+    void fetchStaffAccounts(accessToken)
+      .then(setRoster)
+      .catch((error: unknown) => {
+        setRoster([]);
+        if (isPermissionDenied(error)) return;
+        const detail = error instanceof Error ? error.message : '';
+        setRosterError(detail ? `Не удалось загрузить исполнителей: ${detail}` : 'Не удалось загрузить исполнителей');
+      });
   }, [accessToken]);
 
   async function submitTask() {
@@ -110,6 +121,7 @@ export function TasksView({ accessToken }: { accessToken: string }) {
                 Создать задачу
               </button>
               {createMsg && <span className="text-sm text-warn">{createMsg}</span>}
+              {rosterError && <span className="text-sm text-warn">{rosterError}</span>}
             </div>
           </>
         )}
