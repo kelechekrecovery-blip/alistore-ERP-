@@ -105,7 +105,15 @@ export function assertWritableTarget({ apiBase, confirmed }) {
 
 const isMain = process.argv[1]
   && (await import('node:path')).resolve(process.argv[1]) === (await import('node:url')).fileURLToPath(import.meta.url);
-if (isMain) await main();
+if (isMain) {
+  // An operator running this against production should get a sentence, not a
+  // Node stack trace, when the API is unreachable or refuses the request.
+  try {
+    await main();
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
+  }
+}
 
 async function main() {
   const args = process.argv.slice(2);
@@ -128,7 +136,24 @@ async function main() {
   }
 
   const call = async (method, path, { body, token } = {}) => {
-    const response = await fetch(`${apiBase}${path}`, {
+    let response;
+    try {
+      response = await request(method, path, { body, token });
+    } catch (error) {
+      // Node's bare "fetch failed" does not say which host it could not reach,
+      // which is the one thing the operator needs.
+      const reason = error?.name === 'TimeoutError' ? `timed out after ${REQUEST_TIMEOUT_MS / 1000}s` : 'could not be reached';
+      throw new Error(`${apiBase} ${reason} (${method} ${path})`);
+    }
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(`${method} ${path} → HTTP ${response.status}: ${text.slice(0, 300)}`);
+    }
+    return text ? JSON.parse(text) : null;
+  };
+
+  const request = (method, path, { body, token } = {}) =>
+    fetch(`${apiBase}${path}`, {
       method,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: {
@@ -138,12 +163,6 @@ async function main() {
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
-    const text = await response.text();
-    if (!response.ok) {
-      throw new Error(`${method} ${path} → HTTP ${response.status}: ${text.slice(0, 300)}`);
-    }
-    return text ? JSON.parse(text) : null;
-  };
 
   // The catalog caps limit at 100, so page rather than assuming one request
   // covers the whole store.
