@@ -33,6 +33,13 @@ export ASC_ISSUER_ID="issuer-uuid-from-app-store-connect"
 export IOS_ALLOW_PROVISIONING_UPDATE="false"
 ```
 
+`ALISTORE_API_BASE_URL` must point at the host that actually serves the API.
+Today that is `https://api.ali.kg/api`; `https://ali.kg/api` still returns the
+storefront HTML with HTTP 404, because the Cloudflare Functions migration
+(`wrangler.toml`, `functions/api`) is not deployed. Switch this value to
+`https://ali.kg/api` only after that route serves the API — a build made against
+a 404 host is broken on every screen and the failure only shows up at runtime.
+
 Optional export configuration (see "Export and upload"):
 
 ```bash
