@@ -43,6 +43,7 @@ struct CourierRootView: View {
             NavigationStack {
                 CourierRouteView(
                     deliveries: orderedDeliveries,
+                    pending: ownedPending,
                     focusedDeliveryId: focusedDeliveryId,
                     isLoading: isLoading,
                     message: message,
@@ -258,6 +259,9 @@ struct CourierRootView: View {
 
 private struct CourierRouteView: View {
     let deliveries: [CourierDelivery]
+    /// Очередь этого курьера — карточка по ней узнаёт, что по заказу уже есть
+    /// неотправленная команда.
+    let pending: [PendingMutation]
     let focusedDeliveryId: String?
     let isLoading: Bool
     let message: String?
@@ -283,6 +287,7 @@ private struct CourierRouteView: View {
                         CourierDeliveryCard(
                             delivery: delivery,
                             focused: delivery.id == focusedDeliveryId,
+                            hasPendingCommand: OfflineCourierQueue.hasPendingCommand(forOrder: delivery.id, in: pending),
                             session: session,
                             submit: submit,
                             refresh: refresh
@@ -301,6 +306,10 @@ private struct CourierRouteView: View {
 private struct CourierDeliveryCard: View {
     let delivery: CourierDelivery
     let focused: Bool
+    /// По этому заказу уже есть неотправленная команда. Сервер разрешает статус
+    /// через CAS, поэтому вторая правка суммы проиграет первой и потеряется из
+    /// виду — курьер должен узнать об этом ДО отправки, а не никогда.
+    let hasPendingCommand: Bool
     let session: StaffSession
     let submit: (String, Data, String) async -> String
     let refresh: () async -> Void
@@ -328,6 +337,14 @@ private struct CourierDeliveryCard: View {
             Text("\(delivery.items.reduce(0) { $0 + $1.qty }) шт. · \(Money.som(delivery.outstandingCOD)) COD")
                 .font(.subheadline.bold()).foregroundStyle(.white)
             if focused { Label("Открыто из уведомления", systemImage: "bell.fill").font(.caption).foregroundStyle(courierCoral) }
+            if hasPendingCommand {
+                Label(
+                    "По этому заказу уже есть команда в очереди. Дождитесь отправки — иначе правка может не примениться.",
+                    systemImage: "clock.arrow.circlepath"
+                )
+                .font(.caption)
+                .foregroundStyle(courierCoral)
+            }
 
             HStack(spacing: 8) {
                 Button("Маршрут", systemImage: "map") { openMap() }.buttonStyle(.bordered).frame(maxWidth: .infinity)

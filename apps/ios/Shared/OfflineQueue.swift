@@ -187,6 +187,22 @@ public enum OfflineCourierQueue {
         }
     }
 
+    /// Есть ли по этому заказу команда, которая ещё не применилась.
+    ///
+    /// Нужно, чтобы карточка доставки предупредила ДО отправки второй: сервер
+    /// разруливает статус заказа через CAS, поэтому первая (возможно устаревшая)
+    /// сумма выигрывает, а поздняя правильная ловит конфликт и пропадает с глаз
+    /// курьера. Сверяем по сегментам пути, а не подстрокой: `order-1` не должен
+    /// совпасть с `order-10`.
+    public static func hasPendingCommand(forOrder orderId: String, in mutations: [PendingMutation]) -> Bool {
+        mutations.contains { mutation in
+            guard unappliedStates.contains(mutation.state) else { return false }
+            return mutation.endpoint.split(separator: "/").contains { $0 == orderId }
+        }
+    }
+
+    private static let unappliedStates: Set<String> = ["queued", "syncing", "failed", "conflict"]
+
     @MainActor
     public static func replay(
         _ mutation: PendingMutation,
