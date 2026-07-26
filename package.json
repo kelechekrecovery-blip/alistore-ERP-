@@ -18,6 +18,7 @@
     "api:smoke:local": "node scripts/cloudflare-local-smoke.mjs",
     "api:build": "npm run build -w @alistore/api",
     "api:test": "npm run test -w @alistore/api -- --runInBand",
+    "api:test:isolated": "node scripts/run-isolated-api-tests.mjs",
     "d1:migrate:local": "npx --no-install wrangler d1 migrations apply DB --env local --local --persist-to .wrangler/state",
     "d1:migrate:staging": "node scripts/cloudflare-remote-command.mjs migrate staging",
     "d1:migrate:production": "node scripts/cloudflare-remote-command.mjs migrate production",
