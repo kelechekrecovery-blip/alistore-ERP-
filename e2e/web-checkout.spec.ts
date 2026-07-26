@@ -64,7 +64,11 @@ test('campaign UTM survives navigation, converts on payment once, and appears as
   await page.getByPlaceholder('password').fill(password);
   await page.getByRole('button', { name: 'Войти' }).click();
   await page.getByRole('button', { name: /Кампании/ }).click();
-  await expect(page.getByText('Instagram · живой checkout')).toBeVisible();
+  // Имя кампании законно встречается дважды: в карточке списка и в <option>
+  // выпадающего списка сверки расходов. Проверяем именно карточку — иначе
+  // strict mode падает на неоднозначности, а не на дефекте.
+  const campaignCard = page.locator('li').filter({ has: page.getByTestId(`campaign-link-${campaign.id}`) });
+  await expect(campaignCard.getByText('Instagram · живой checkout')).toBeVisible();
   await expect(page.getByTestId(`campaign-link-${campaign.id}`)).toContainText(trackingCode);
   await expect(page.getByTestId(`campaign-funnel-${campaign.id}`)).toContainText('100%');
   await expect(page.getByText('20×')).toBeVisible();
