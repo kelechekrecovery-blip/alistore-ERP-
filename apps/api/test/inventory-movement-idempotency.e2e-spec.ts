@@ -101,6 +101,26 @@ describe('Inventory movement idempotency (integration)', () => {
     expect(await prisma.approval.count({ where: { action: 'write_off' } })).toBe(1);
   });
 
+  it('refuses a key already used by a different action instead of replaying it', async () => {
+    // Approval.idempotencyKey is unique across ALL actions, so a key colliding
+    // with another action must not hand back that action's approval — on a money
+    // path, returning a refund's id for a write-off is worse than any error.
+    const product = await quantityProduct();
+    await prisma.approval.create({
+      data: {
+        action: 'refund',
+        requester: 'cashier',
+        reason: 'возврат',
+        status: 'requested',
+        idempotencyKey: 'shared-key',
+        evidence: {},
+      },
+    });
+
+    await expect(writeOff(product.id, 'shared-key')).rejects.toMatchObject({ code: 'idempotency_key_reused' });
+    expect(await prisma.approval.count({ where: { action: 'write_off' } })).toBe(0);
+  });
+
   it('stays backwards compatible: no key still parks an approval', async () => {
     // The shipped iOS build does not send the header yet, and build 4 is in
     // App Review — the endpoint must keep working without a key.

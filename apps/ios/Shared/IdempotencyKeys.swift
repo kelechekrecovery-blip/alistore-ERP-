@@ -24,6 +24,22 @@ public enum IdempotencyKeys {
         "courier-handover-\(runId)-\(try fingerprint(request))"
     }
 
+    /// Ключ списания со склада: namespace + день + отпечаток содержимого.
+    ///
+    /// Одного содержимого мало. Два действительно разных списания одного товара,
+    /// количества и причины дают одинаковый отпечаток, а сервер отказывает по
+    /// ключу, чья заявка уже решена, — законная работа встала бы. День ограничивает
+    /// окно дедупа двойным тапом, ради которого он и нужен. Namespace обязателен:
+    /// `Approval.idempotencyKey` уникален по ВСЕМ действиям, и голый отпечаток мог
+    /// бы столкнуться с чужим — тогда списание получило бы чужую заявку.
+    public static func inventoryWriteOff<Body: Encodable>(_ body: Body, on date: Date = Date()) throws -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let day = calendar.dateComponents([.year, .month, .day], from: date)
+        let stamp = String(format: "%04d-%02d-%02d", day.year ?? 0, day.month ?? 0, day.day ?? 0)
+        return "inventory-write-off-\(stamp)-\(try fingerprint(body))"
+    }
+
     /// Короткий устойчивый отпечаток содержимого.
     public static func fingerprint<Body: Encodable>(_ body: Body) throws -> String {
         let digest = SHA256.hash(data: try OfflineQueueCoding.encode(body))

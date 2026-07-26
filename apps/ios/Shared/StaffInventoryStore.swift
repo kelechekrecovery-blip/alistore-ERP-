@@ -73,7 +73,7 @@ public final class StaffInventoryStore {
                 "inventory/movements",
                 body: request,
                 token: token,
-                idempotencyKey: try IdempotencyKeys.fingerprint(request)
+                idempotencyKey: try IdempotencyKeys.inventoryWriteOff(request)
             )
             lastApproval = approval
             return approval

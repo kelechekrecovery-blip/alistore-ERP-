@@ -109,7 +109,7 @@ export class ApprovalsService {
   async request(req: ApprovalRequest): Promise<{ approvalId: string; status: 'requested' }> {
     const key = req.idempotencyKey?.trim() || undefined;
     if (key) {
-      const replay = await this.replayApproval(key);
+      const replay = await this.replayApproval(key, req.action);
       if (replay) return replay;
     }
     try {
@@ -119,7 +119,7 @@ export class ApprovalsService {
       // lands, so the unique index — not the read above — is what actually
       // decides. Losing that race is a successful replay, not a failure.
       if (key && isUniqueConstraintViolation(error)) {
-        const replay = await this.replayApproval(key);
+        const replay = await this.replayApproval(key, req.action);
         if (replay) return replay;
       }
       throw error;
@@ -127,17 +127,32 @@ export class ApprovalsService {
   }
 
   /**
-   * An approval already decided under this key is not a replay: the physical
-   * event has had its answer, and reporting it back as `requested` would tell
-   * the caller something is pending when nothing is.
+   * A key only replays the action it was minted for.
+   *
+   * `idempotencyKey` is unique across ALL approvals, not per action, so a key
+   * that collides with another action must fail loudly: handing a write-off
+   * back the approvalId of somebody's refund is worse than any error message.
+   *
+   * An approval already decided under this key is likewise not a replay — the
+   * physical event has had its answer, and reporting it as `requested` would
+   * tell the caller something is pending when nothing is.
    */
-  private async replayApproval(key: string): Promise<{ approvalId: string; status: 'requested' } | null> {
+  private async replayApproval(
+    key: string,
+    action: string,
+  ): Promise<{ approvalId: string; status: 'requested' } | null> {
     const existing = await this.prisma.approval.findUnique({ where: { idempotencyKey: key } });
     if (!existing) return null;
+    if (existing.action !== action) {
+      throw new ConflictError(
+        'idempotency_key_reused',
+        'Этот Idempotency-Key уже занят другим действием',
+      );
+    }
     if (existing.status !== 'requested') {
       throw new ConflictError(
         'approval_already_decided',
-        `Эта заявка уже ${existing.status === 'approved' ? 'одобрена' : 'обработана'}`,
+        `Эта заявка уже ${existing.status === 'approved' ? 'одобрена' : 'обработана'}. Повторите с новым ключом, если это новая операция.`,
       );
     }
     return { approvalId: existing.id, status: 'requested' as const };
