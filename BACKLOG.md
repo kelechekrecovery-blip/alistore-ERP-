@@ -1,5 +1,36 @@
 # BACKLOG
 
+## SEC-AUDIT-184 — ✅ поверхность доступа проверена эмпирически, утечек нет (26.07)
+
+- **Зачем:** «RBAC в порядке» до сих пор было утверждением, а не измерением. Статический
+  поиск по `@RequirePermission` даёт **231 «незащищённый» маршрут из 377** и почти все они —
+  ложные срабатывания: композитные декораторы (`@AiReadGuard()` = `JwtAuthGuard` +
+  `ActiveStaffGuard` + `BlindCashReadGuard` + `PermissionGuard` + `RequirePermission('ai','read')`)
+  регуляркой не видны. Поэтому проверял запросами, а не грепом.
+- **Метод (воспроизводим):** поднять API на одноразовой БД, забрать список маршрутов из
+  `GET /api/docs-json`, дёрнуть **каждый** GET без параметров пути **без токена**.
+  ```bash
+  psql -d postgres -c 'CREATE DATABASE rbac_test TEMPLATE alistore_test_template'
+  DATABASE_URL=…/rbac_test NODE_ENV=test JWT_SECRET=… PORT=4350 npm run start:dev -w @alistore/api
+  # затем пройти по путям из /api/docs-json и сверить статусы
+  ```
+- **Результат: 13 из 114 отвечают без авторизации, и все 13 законно публичные** —
+  `health`×3, `metrics`, `catalog/{products,products/delta,categories}`,
+  `logistics/{availability,checkout-options}`, `storefront/content`,
+  `storefront-blocks/public`, `i18n/greeting`, `staff-auth/bootstrap-status`.
+- **Денежные POST без токена дают `401`:** `inventory/movements`, `inventory/receive-quantity`,
+  `debts`, `products`, `campaigns`, `staff-auth/staff`, `shifts/open`.
+- **Два маршрута отвечают `400`, и это правильно:** `POST /orders` и `POST /payments` —
+  гостевой чекаут. У них `ThrottlerGuard` + лимит 20/мин и `x-guest-capability`; в
+  `payments` стоит явная защита с комментарием: неавторизованный может платить **только**
+  подарочной картой (она самопроверяемая), а наличные/карта/рассрочка требуют персонала или
+  вебхука провайдера. `400` на пустом теле — корректный первый отказ публичного маршрута.
+- **`/api/metrics` фейлится закрыто:** в production требует `Bearer METRICS_TOKEN` и
+  отдаёт `401`, **если токен не сконфигурирован** (`metrics.controller.ts:26-33`).
+- **Почему не завёл тестом:** ни один спек не поднимает целиком `AppModule` — все собирают
+  нужные модули точечно. Полномаршрутный тест тянул бы планировщики и очереди; это шло бы
+  против устройства сьюта. Процедура выше воспроизводима вручную.
+
 ## WEB-E2E-183 — ✅ ЗАКРЫТО `2ee06da6` + `1de2b0b5` (26.07): причины разные, обе найдены
 
 - **Падение 1 — настоящий дефект продукта (`2ee06da6`).** Публикация витрины закрыта
