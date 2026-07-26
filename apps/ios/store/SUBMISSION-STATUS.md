@@ -130,10 +130,11 @@ directory and are ready to paste.
   that any electronics store provisions accounts on, rather than the internal
   tooling of one company, but Apple may still direct them to Apple Business
   Manager Custom Apps. That call is Apple's.
-- **Stale iPad screenshots.** Staff, Courier and POS ship as iPhone-only
-  (`UIDeviceFamily = [1]`) since build 4, but their version localizations still
-  carry `APP_IPAD_PRO_3GEN_11` and `APP_IPAD_PRO_3GEN_129` sets left over from the
-  universal builds. App Store Connect follows the current build's device support
-  and ignores them, so this does not block submission; remove them when
-  convenient so the metadata matches the binary. Client is genuinely universal
-  (`UIDeviceFamily = [1, 2]`) and its iPad sets are correct.
+- **Stale iPad screenshots — reviewed, deliberately kept.** Staff, Courier and POS
+  ship as iPhone-only (`UIDeviceFamily = [1]`) since build 4, but their version
+  localizations still carry `APP_IPAD_PRO_3GEN_11` and `APP_IPAD_PRO_3GEN_129` sets
+  left over from the universal builds. App Store Connect follows the current
+  build's device support and ignores them, so this does not block submission. The
+  owner decided on 2026-07-26 to leave them in place — they cost nothing and are
+  already there if these apps go universal again. Not an open task. Client is
+  genuinely universal (`UIDeviceFamily = [1, 2]`) and its iPad sets are correct.
