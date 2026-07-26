@@ -7,6 +7,7 @@ import {
   desiredMetadata,
   planChanges,
   readStoreMetadata,
+  resolveOutcome,
 } from '../apply-ios-store-metadata.mjs';
 
 test('ecosystem metadata maps to the App Store Connect enums', () => {
@@ -79,6 +80,20 @@ test('incomplete App Store Connect credentials fail closed', () => {
     keyId: 'A38GZ3M6DB',
     issuerId: '11111111-2222-3333-4444-555555555555',
   }));
+});
+
+test('--check fails on drift so a release gate can catch it', () => {
+  // The whole point: category and content rights silently went missing once and
+  // nothing noticed until three apps could not be submitted.
+  assert.equal(resolveOutcome({ mode: 'check', pending: 2 }).exitCode, 1);
+  assert.equal(resolveOutcome({ mode: 'check', pending: 0 }).exitCode, 0);
+});
+
+test('dry run and apply report drift without failing', () => {
+  assert.equal(resolveOutcome({ mode: 'dry-run', pending: 2 }).exitCode, 0);
+  assert.equal(resolveOutcome({ mode: 'apply', applied: 2 }).exitCode, 0);
+  assert.match(resolveOutcome({ mode: 'dry-run', pending: 0 }).message, /no changes/iu);
+  assert.match(resolveOutcome({ mode: 'apply', applied: 2 }).message, /2/u);
 });
 
 test('every shipped app declares values this script can apply', () => {

@@ -88,7 +88,18 @@ that `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` resolve to the values in
 manifest and `apps/ios/store/client-metadata.json`. It never prints secret values.
 
 With `--strict-asc` it signs a short-lived App Store Connect JWT and calls
-Apple's API to prove the issuer/key pair works.
+Apple's API to prove the issuer/key pair works. It then runs
+`scripts/apply-ios-store-metadata.mjs --check` and fails if the primary category
+or content rights declaration in App Store Connect has drifted from
+`apps/ios/store/*-metadata.json`. Both fields are required before a version can be
+submitted, and both were silently empty for Staff, Courier and POS until
+2026-07-26 — nothing applied the metadata files, and nothing noticed. To
+reconcile:
+
+```bash
+npm run ios:store-metadata          # dry run — shows what differs
+npm run ios:store-metadata:apply    # writes only the fields that differ
+```
 
 With `--strict-signing` it verifies an Apple Distribution identity for the
 configured team **and one App Store provisioning profile per bundle id** —

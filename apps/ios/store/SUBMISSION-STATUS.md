@@ -45,6 +45,7 @@ open is App Store Connect metadata or owner input, not binary content.
 | Production API | The shipped Client binary carries `API_BASE_URL = https://api.ali.kg/api`, which answers `200` on `/health` |
 | Primary category | Client `SHOPPING`; Staff, Courier and POS `BUSINESS` — applied 2026-07-26 by `scripts/apply-ios-store-metadata.mjs` |
 | Content rights | Client `USES_THIRD_PARTY_CONTENT`; Staff, Courier and POS `DOES_NOT_USE_THIRD_PARTY_CONTENT` — applied in the same run |
+| Drift guard | `store-preflight --strict-asc` now runs `apply-ios-store-metadata.mjs --check` and fails if App Store Connect stops matching the metadata files |
 | Age rating | `FOUR_PLUS` for all four; `ageRatingDeclaration` present |
 | Pricing | `appPriceSchedule` exists for all four |
 | Localization | `ru` version localization for all four with description, keywords, support URL `https://ali.kg/support` and marketing URL `https://ali.kg` |
@@ -62,12 +63,12 @@ App Store Connect or in the ERP.
 2. **Demo accounts are empty for all four** while `demoAccountRequired = true`.
    See the sign-in section below — the mechanism differs between Client and the
    other three.
-3. **App Privacy** data-usage answers must be completed and published. The
-   available App Store Connect API version has no readable relationship for this,
-   so it can only be confirmed in the web interface. The truthful basis for the
-   answers is the shipped `PrivacyInfo.xcprivacy`: phone number, physical address,
-   purchase history, photos or videos and other data — all `Linked`, purpose
-   `AppFunctionality`, no tracking.
+3. **App Privacy** data-usage answers must be completed and published. This is
+   web-interface only — confirmed by introspecting the `apps` resource, which
+   exposes no data-usage or privacy relationship at all, so no script can read or
+   set it. The truthful basis for the answers is the shipped `PrivacyInfo.xcprivacy`:
+   phone number, physical address, purchase history, photos or videos and other
+   data — all `Linked`, purpose `AppFunctionality`, no tracking.
 4. **Review submissions exist but are empty.** All four have a `reviewSubmission`
    in state `READY_FOR_REVIEW` with `submittedDate = null` **and an empty `items`
    list** — no version is attached, so nothing has been submitted. Submitting from

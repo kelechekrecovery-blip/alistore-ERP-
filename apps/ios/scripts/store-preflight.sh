@@ -113,6 +113,13 @@ if [[ "$strict_asc" == "1" ]]; then
   [[ "$issuer_id" != '00000000-0000-0000-0000-000000000000' ]] || fail 'ASC_ISSUER_ID is still the placeholder; copy the real Issuer ID from App Store Connect'
   node "$repo_root/scripts/verify-app-store-connect.mjs" "$asc_key_path" "$asc_key_id" "$issuer_id" \
     || fail 'App Store Connect API verification failed'
+
+  # Primary category and content rights are required before a version can be
+  # submitted, and they silently went missing for Staff, Courier and POS while
+  # the metadata files claimed otherwise. Nothing caught it. Now the gate does.
+  ASC_API_KEY_PATH="$asc_key_path" ASC_KEY_ID="$asc_key_id" ASC_ISSUER_ID="$issuer_id" \
+    node "$repo_root/scripts/apply-ios-store-metadata.mjs" --check \
+    || fail 'App Store Connect metadata differs from apps/ios/store/*-metadata.json — run npm run ios:store-metadata:apply'
 fi
 
 if [[ "$strict_signing" == "1" ]]; then

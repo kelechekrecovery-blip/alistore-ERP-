@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_ENV_FILE = 'apps/ios/.env.production';
 const ASC_BASE_URL = 'https://api.appstoreconnect.apple.com';
+const REQUEST_TIMEOUT_MS = 30_000;
 
 export const APP_KEYS = ['client', 'staff', 'courier', 'pos'];
 
@@ -73,6 +74,20 @@ export function planChanges(desired, current) {
     .map((field) => ({ field, from: current?.[field] ?? null, to: desired[field] }));
 }
 
+/**
+ * How the run reports itself. `check` is the release-gate mode: drift is a
+ * failure, because the silent kind is what left three apps unsubmittable.
+ */
+export function resolveOutcome({ mode, pending = 0, applied = 0 }) {
+  if (mode === 'apply') {
+    return { exitCode: 0, message: applied === 0 ? '✓ No changes needed' : `✓ Applied ${applied} change(s)` };
+  }
+  if (pending === 0) return { exitCode: 0, message: '✓ No changes needed' };
+  return mode === 'check'
+    ? { exitCode: 1, message: `✗ ${pending} field(s) differ from apps/ios/store/*-metadata.json` }
+    : { exitCode: 0, message: `${pending} change(s) pending — re-run with --apply` };
+}
+
 export function assertCredentials({ keyPath, keyId, issuerId }) {
   if (!keyPath) throw new Error('ASC API key path is required');
   if (!/^[A-Z0-9]{10}$/u.test(keyId ?? '')) {
@@ -117,6 +132,7 @@ if (isMain) await main();
 async function main() {
   const args = process.argv.slice(2);
   const apply = args.includes('--apply');
+  const mode = apply ? 'apply' : args.includes('--check') ? 'check' : 'dry-run';
   const envFile = args.includes('--env-file')
     ? args[args.indexOf('--env-file') + 1]
     : DEFAULT_ENV_FILE;
@@ -149,8 +165,11 @@ async function main() {
 
   const token = signAscToken({ privateKey, keyId: credentials.keyId, issuerId: credentials.issuerId });
   const call = async (method, endpoint, body) => {
+    // Bounded: this runs inside store-preflight, and a hung Apple API must fail
+    // the gate rather than stall a release indefinitely.
     const response = await fetch(`${ASC_BASE_URL}${endpoint}`, {
       method,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
@@ -165,7 +184,11 @@ async function main() {
     return response.status === 204 ? null : response.json();
   };
 
-  console.log(apply ? 'Applying iOS store metadata to App Store Connect' : 'Dry run — no writes (pass --apply to write)');
+  console.log({
+    apply: 'Applying iOS store metadata to App Store Connect',
+    check: 'Checking App Store Connect against apps/ios/store/*-metadata.json',
+    'dry-run': 'Dry run — no writes (pass --apply to write)',
+  }[mode]);
 
   let pending = 0;
   let written = 0;
@@ -226,9 +249,7 @@ async function main() {
     }
   }
 
-  if (apply) {
-    console.log(written === 0 ? '✓ No changes needed' : `✓ Applied ${written} change(s)`);
-  } else {
-    console.log(pending === 0 ? '✓ No changes needed' : `${pending} change(s) pending — re-run with --apply`);
-  }
+  const outcome = resolveOutcome({ mode, pending, applied: written });
+  console.log(outcome.message);
+  process.exit(outcome.exitCode);
 }
