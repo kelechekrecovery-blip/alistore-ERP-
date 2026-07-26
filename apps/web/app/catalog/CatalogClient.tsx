@@ -39,7 +39,7 @@ export default function CatalogPage({ initialProducts = null, initialTotal = 0, 
   useEffect(() => {
     if (initialCategories.length > 0) return;
     // Резерв на случай, когда сервер не смог получить список категорий.
-    fetchCatalogCategories().then((items) => setCategories(['Все', ...items.map((item) => item.category)]));
+    fetchCatalogCategories().then((items) => { if (items) setCategories(['Все', ...items.map((item) => item.category)]); });
   }, [initialCategories.length]);
 
   useEffect(() => {

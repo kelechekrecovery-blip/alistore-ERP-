@@ -50,9 +50,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<Sea
   // покажет свой экран ошибки с кнопкой «Повторить», как и раньше.
   const [initial, categories] = await Promise.all([
     loadFirstPage({ q, category }),
-    fetchCatalogCategories()
-      .then((items) => items.map((item) => item.category))
-      .catch(() => []),
+    // Второй `.catch(() => [])` здесь дублировал глушение внутри самого фетчера —
+    // ровно то, что запрещает комментарий выше. Отказ различим и залогирован;
+    // страницу из-за фильтров не роняем.
+    fetchCatalogCategories().then((items) => items?.map((item) => item.category) ?? []),
   ]);
 
   return (

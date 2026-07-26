@@ -25,7 +25,7 @@ export default function MobileCatalog() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setCategory(params.get('category') ?? 'Все');
-    fetchCatalogCategories().then((items) => setCategories(['Все', ...items.map((item) => item.category)]));
+    fetchCatalogCategories().then((items) => { if (items) setCategories(['Все', ...items.map((item) => item.category)]); });
   }, []);
   const sort = SORTS[sortIdx];
   useEffect(() => { setProducts(null); setError(false); fetchCatalog({ category: category === 'Все' ? undefined : category, stockOnly, sort: sort.id as CatalogQuery['sort'], limit: 20, offset }).then((response) => { if (isCatalogUnavailable(response)) throw new Error('catalog unavailable'); setProducts(response.items); setTotal(response.total); }).catch(() => { setProducts([]); setTotal(0); setError(true); }); }, [category, stockOnly, sort, offset, reloadKey]);

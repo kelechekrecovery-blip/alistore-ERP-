@@ -285,13 +285,22 @@ async function fetchProductWithRelatedUncached(id: string, relatedLimit: number)
   }
 }
 
-export async function fetchCatalogCategories(): Promise<Array<{ category: string; count: number }>> {
+/**
+ * Категории каталога, или `null` — если спросить не удалось.
+ *
+ * То же правило, что и у `fetchCatalog` выше: пустой массив означал и «категорий
+ * нет», и «эндпоинт упал». Покупатель видел каталог без фильтров и без единого
+ * признака неполадки, а причина не попадала никуда — ни на экран, ни в лог.
+ */
+export async function fetchCatalogCategories(): Promise<Array<{ category: string; count: number }> | null> {
   try {
     const res = await fetch(`${API_BASE}/catalog/categories`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`categories responded ${res.status}`);
     return (await res.json()) as Array<{ category: string; count: number }>;
-  } catch {
-    return [];
+  } catch (error) {
+    // Серверный компонент не должен падать из-за фильтров, но и молчать нельзя.
+    console.error('[catalog] categories fetch failed', error);
+    return null;
   }
 }
 
