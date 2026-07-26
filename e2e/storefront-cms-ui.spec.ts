@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { customerToken, postJson, prisma, resetDb, seedProduct, seedStaffCredentials } from './helpers';
+import { authenticator } from '../apps/api/node_modules/otplib';
+import { customerToken, patchJson, postJson, prisma, resetDb, seedProduct, seedStaffCredentials } from './helpers';
 
-test('ERP publishes an ordered product collection to the desktop storefront', async ({ page }) => {
+test('ERP publishes an ordered product collection to the desktop storefront', async ({ page, request }) => {
   await resetDb();
   const { username, password } = await seedStaffCredentials('marketer', 'e2e-cms');
   const first = await seedProduct('CMS First', 115_000, 90_000);
@@ -26,7 +27,31 @@ test('ERP publishes an ordered product collection to the desktop storefront', as
   await page.getByRole('button', { name: 'Сохранить черновик' }).click();
   await expect(page.getByText('Черновик сохранён')).toBeVisible();
   await page.getByRole('button', { name: 'Опубликовать сейчас' }).first().click();
-  await expect(page.getByText(/Версия v\d+ опубликована/)).toBeVisible();
+  // Публикация витрины закрыта правилом четырёх глаз: маркетолог паркует заявку,
+  // а не публикует. Раньше ERP всё равно писала «опубликована», и ревизия
+  // оставалась в draft — человек уходил уверенным, что главная обновилась.
+  await expect(page.getByText(/отправлена на согласование/)).toBeVisible();
+  expect(await prisma.storefrontContentRevision.findFirstOrThrow({ where: { version: 1 } }))
+    .toMatchObject({ status: 'draft' });
+
+  const approval = await prisma.approval.findFirstOrThrow({
+    where: { action: 'storefront_publish', status: 'requested' },
+  });
+  const owner = await seedStaffCredentials('owner', 'e2e-cms-owner');
+  // Одобрение опасного действия требует включённой 2FA у одобряющего.
+  const ownerSecret = authenticator.generateSecret();
+  await prisma.staffUser.update({
+    where: { id: owner.staffId },
+    data: { totpEnabled: true, totpSecret: ownerSecret },
+  });
+  await patchJson(
+    request,
+    `/approvals/${approval.id}/decide`,
+    { status: 'approved', totpToken: authenticator.generate(ownerSecret) },
+    owner.accessToken,
+  );
+  expect(await prisma.storefrontContentRevision.findFirstOrThrow({ where: { version: 1 } }))
+    .toMatchObject({ status: 'published' });
 
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Выбор команды AliStore' })).toBeVisible();

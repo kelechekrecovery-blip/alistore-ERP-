@@ -80,8 +80,42 @@ export function fetchStorefrontRevisions(accessToken: string) {
   return getJson<StorefrontContent[]>('/storefront/revisions', accessToken);
 }
 
+/**
+ * Ответ на попытку опубликовать: публикация витрины проходит по правилу четырёх
+ * глаз, поэтому сервер отвечает 202 и паркует заявку, а не публикует.
+ */
+export interface ParkedApproval {
+  approvalId: string;
+  status: 'requested';
+  action: string;
+}
+
+export function isParkedApproval(result: unknown): result is ParkedApproval {
+  return typeof result === 'object'
+    && result !== null
+    && 'approvalId' in result
+    && typeof (result as { approvalId: unknown }).approvalId === 'string';
+}
+
+/**
+ * Что сказать маркетологу после нажатия «Опубликовать сейчас».
+ *
+ * Раньше здесь безусловно писали «Версия vN опубликована»: любой не-бросивший
+ * ответ считался успехом. Но `POST /storefront/revisions/:id/publish` намеренно
+ * закрыт четырьмя глазами (см. комментарий в контроллере: одиночный POST
+ * маркетолога менял главную всем покупателям), отвечает 202 и **паркует заявку**.
+ * Ревизия оставалась `draft`, витрина не менялась, а человек уходил уверенным,
+ * что всё опубликовано.
+ */
+export function storefrontPublishNotice(version: number, result: unknown): string {
+  if (isParkedApproval(result)) {
+    return `Версия v${version} отправлена на согласование (заявка ${result.approvalId}). Витрина обновится после одобрения.`;
+  }
+  return `Версия v${version} опубликована`;
+}
+
 export function publishStorefrontRevision(id: string, accessToken: string) {
-  return postAuthJson<StorefrontContent>(`/storefront/revisions/${encodeURIComponent(id)}/publish`, {}, accessToken);
+  return postAuthJson<ParkedApproval>(`/storefront/revisions/${encodeURIComponent(id)}/publish`, {}, accessToken);
 }
 
 export function scheduleStorefrontRevision(id: string, input: { startsAt: string; endsAt?: string }, accessToken: string) {

@@ -10,6 +10,7 @@ import {
   fetchStorefrontContent,
   fetchStorefrontRevisions,
   publishStorefrontRevision,
+  storefrontPublishNotice,
   scheduleStorefrontRevision,
   type CatalogProduct,
   type StorefrontContent,
@@ -89,6 +90,25 @@ export function StorefrontView({ accessToken, role }: { accessToken: string; rol
   const set = (key: keyof StorefrontContent, value: string) => {
     setForm((current) => current ? { ...current, [key]: value } : current);
   };
+
+  /**
+   * Как `run`, но текст сообщения решает вызывающий по ФАКТИЧЕСКОМУ ответу
+   * сервера. Публикация витрины закрыта четырьмя глазами и отвечает заявкой на
+   * согласование, а не публикацией — фиксированная строка успеха врала об этом.
+   */
+  async function runWithResult(notice: (result: unknown) => string, action: () => Promise<unknown>) {
+    setBusy(true);
+    setNotice('');
+    try {
+      const result = await action();
+      setNotice(notice(result));
+      await load();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Операция не выполнена');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function run(action: () => Promise<unknown>, success: string) {
     setBusy(true);
@@ -223,7 +243,7 @@ export function StorefrontView({ accessToken, role }: { accessToken: string; rol
           <div className="mt-3 grid gap-2"><Field label="Начало"><input type="datetime-local" className={FIELD} min={localDateTime(new Date())} value={startsAt} onChange={(event) => setStartsAt(event.target.value)} /></Field><Field label="Окончание (необязательно)"><input type="datetime-local" className={FIELD} min={startsAt || localDateTime(new Date())} value={endsAt} onChange={(event) => setEndsAt(event.target.value)} /></Field></div>
         </div>
         <div className="mt-4 grid gap-2">
-          {revisions.map((revision) => <div key={revision.id} className="rounded-[8px] border border-surface-3 bg-surface-2 p-3"><div className="flex items-center justify-between"><b>v{revision.version}</b><Status value={revision.status} /></div><div className="mt-1 text-xs text-muted">{revision.heroTitle}</div><div className="mt-1 text-[11px] text-subtle">{revision.featuredProductIds.length} товаров в подборке</div>{revision.startsAt && <div className="mt-2 text-[11px] text-warn">{formatPeriod(revision.startsAt, revision.endsAt)}</div>}<div className="mt-3 flex flex-wrap gap-2">{revision.status === 'draft' && <><button disabled={busy} onClick={() => run(() => publishStorefrontRevision(revision.id, accessToken), `Версия v${revision.version} опубликована`)} className="rounded-[7px] bg-coral px-3 py-1.5 text-xs font-bold text-white">Опубликовать сейчас</button><button disabled={busy || !startsAt} onClick={() => run(() => scheduleStorefrontRevision(revision.id, { startsAt: new Date(startsAt).toISOString(), ...(endsAt ? { endsAt: new Date(endsAt).toISOString() } : {}) }, accessToken), `Версия v${revision.version} запланирована`)} className="rounded-[7px] border border-lime px-3 py-1.5 text-xs font-bold text-lime disabled:opacity-40">Запланировать</button></>}{revision.status === 'scheduled' && <button disabled={busy} onClick={() => run(() => cancelStorefrontSchedule(revision.id, accessToken), `Расписание v${revision.version} отменено`)} className="rounded-[7px] border border-warn px-3 py-1.5 text-xs font-bold text-warn">Отменить расписание</button>}</div></div>)}
+          {revisions.map((revision) => <div key={revision.id} className="rounded-[8px] border border-surface-3 bg-surface-2 p-3"><div className="flex items-center justify-between"><b>v{revision.version}</b><Status value={revision.status} /></div><div className="mt-1 text-xs text-muted">{revision.heroTitle}</div><div className="mt-1 text-[11px] text-subtle">{revision.featuredProductIds.length} товаров в подборке</div>{revision.startsAt && <div className="mt-2 text-[11px] text-warn">{formatPeriod(revision.startsAt, revision.endsAt)}</div>}<div className="mt-3 flex flex-wrap gap-2">{revision.status === 'draft' && <><button disabled={busy} onClick={() => runWithResult((result) => storefrontPublishNotice(revision.version, result), () => publishStorefrontRevision(revision.id, accessToken))} className="rounded-[7px] bg-coral px-3 py-1.5 text-xs font-bold text-white">Опубликовать сейчас</button><button disabled={busy || !startsAt} onClick={() => run(() => scheduleStorefrontRevision(revision.id, { startsAt: new Date(startsAt).toISOString(), ...(endsAt ? { endsAt: new Date(endsAt).toISOString() } : {}) }, accessToken), `Версия v${revision.version} запланирована`)} className="rounded-[7px] border border-lime px-3 py-1.5 text-xs font-bold text-lime disabled:opacity-40">Запланировать</button></>}{revision.status === 'scheduled' && <button disabled={busy} onClick={() => run(() => cancelStorefrontSchedule(revision.id, accessToken), `Расписание v${revision.version} отменено`)} className="rounded-[7px] border border-warn px-3 py-1.5 text-xs font-bold text-warn">Отменить расписание</button>}</div></div>)}
         </div>
       </aside>
     </div></>
