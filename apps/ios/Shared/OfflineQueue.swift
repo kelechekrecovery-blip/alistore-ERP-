@@ -62,7 +62,20 @@ public enum OfflineOrderQueue {
         idempotencyKey: String,
         context: ModelContext
     ) throws {
-        let body = try JSONEncoder().encode(request)
+        // Канон — как в кассе и у курьера: сравнивать сырое кодирование
+        // бессмысленно, порядок ключей не гарантирован.
+        let body = OfflineQueueCoding.canonical(try JSONEncoder().encode(request))
+        let descriptor = FetchDescriptor<PendingMutation>(
+            predicate: #Predicate { $0.idempotencyKey == idempotencyKey }
+        )
+        // Та же развилка, что в двух других очередях: точный повтор идемпотентен,
+        // а другое тело под тем же ключом — потеря заказа, о которой покупатель
+        // обязан узнать. Здесь этой проверки не было, и это была единственная
+        // очередь, где переиспользованный ключ молча давал два заказа.
+        if let existing = try context.fetch(descriptor).first {
+            guard existing.body == body else { throw OfflineQueueError.keyReused }
+            return
+        }
         context.insert(PendingMutation(
             endpoint: "orders/mine",
             method: "POST",
