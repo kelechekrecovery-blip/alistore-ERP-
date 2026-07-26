@@ -28,13 +28,27 @@ export interface StorefrontBlock {
 export type StorefrontBlockInput = Pick<StorefrontBlock, 'type' | 'device' | 'title' | 'tone' | 'productIds'> &
   Partial<Pick<StorefrontBlock, 'eyebrow' | 'body' | 'ctaLabel' | 'ctaHref' | 'imageUrl'>>;
 
-export async function fetchPublicStorefrontBlocks(device: 'desktop' | 'mobile') {
+/**
+ * Опубликованные блоки витрины, или `null` — если спросить не удалось.
+ *
+ * То же правило, что расписано в `catalog.ts`: пустой массив здесь раньше означал
+ * и «ничего не опубликовано», и «эндпоинт упал». Витрина с отказавшим бэкендом
+ * выглядела ровно как витрина, на которую ничего не публиковали, и причина не
+ * попадала никуда — ни на экран, ни в лог. Вызывающий обязан различать: `null` —
+ * это сбой, `[]` — это осознанно пустая витрина.
+ */
+export async function fetchPublicStorefrontBlocks(
+  device: 'desktop' | 'mobile',
+): Promise<StorefrontBlock[] | null> {
   try {
     const response = await fetch(`${API_BASE}/storefront-blocks/public?device=${device}`, { cache: 'no-store' });
     if (!response.ok) throw new Error(`storefront blocks responded ${response.status}`);
     return (await response.json()) as StorefrontBlock[];
-  } catch {
-    return [];
+  } catch (error) {
+    // Серверный компонент не должен падать из-за блоков, но и молчать нельзя:
+    // без этой строки диагностировать нечем.
+    console.error('[storefront-blocks] public fetch failed', error);
+    return null;
   }
 }
 

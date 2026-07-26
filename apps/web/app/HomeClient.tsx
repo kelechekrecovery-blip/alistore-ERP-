@@ -53,7 +53,7 @@ export default function HomePage({ initialStorefront = null, initialBlocks = [],
     }
     Promise.all([fetchStorefrontContent(), fetchPublicStorefrontBlocks('desktop')]).then(async ([payload, publishedBlocks]) => {
       setStorefront(payload);
-      setBlocks(publishedBlocks);
+      setBlocks(publishedBlocks ?? []);
       if (payload?.featuredProducts.length) {
         setProducts(payload.featuredProducts);
         return;

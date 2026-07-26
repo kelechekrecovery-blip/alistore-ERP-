@@ -28,7 +28,7 @@ export default function MobileHome() {
   useEffect(() => {
     Promise.all([fetchStorefrontContent(), fetchPublicStorefrontBlocks('mobile')]).then(async ([payload, publishedBlocks]) => {
       setStorefront(payload);
-      setBlocks(publishedBlocks);
+      setBlocks(publishedBlocks ?? []);
       if (payload?.featuredProducts.length) {
         setProducts(payload.featuredProducts);
         return;

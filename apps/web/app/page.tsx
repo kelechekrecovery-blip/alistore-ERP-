@@ -80,10 +80,14 @@ interface FirstScreen {
  * пустого магазина.
  */
 async function loadFirstScreen(): Promise<FirstScreen> {
-  const [storefront, blocks] = await Promise.all([
+  const [storefront, publishedBlocks] = await Promise.all([
     fetchStorefrontContent(),
     fetchPublicStorefrontBlocks('desktop'),
   ]);
+  // `null` — блоки спросить не удалось (причина в серверном логе), `[]` — их
+  // действительно нет. Первый экран рисуем в обоих случаях: ронять публичную
+  // главную из-за блоков хуже, чем показать её без них.
+  const blocks = publishedBlocks ?? [];
 
   if (storefront === null) return { storefront: null, blocks, products: null };
   if (storefront.featuredProducts.length > 0) {
