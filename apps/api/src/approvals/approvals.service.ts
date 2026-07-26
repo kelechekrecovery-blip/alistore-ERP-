@@ -18,6 +18,13 @@ export interface ApprovalRequest {
   reason: string;
   payload?: Record<string, unknown>;
   evidence?: Record<string, unknown>;
+  /**
+   * Optional replay key. Approval-gated actions are not applied on request, so a
+   * duplicate does not move stock by itself — it parks a SECOND approval for one
+   * physical event, and an approver who confirms both applies it twice. With a
+   * key, the repeat replays the first approval instead.
+   */
+  idempotencyKey?: string;
 }
 
 /**
@@ -100,6 +107,43 @@ export class ApprovalsService {
 
   /** Park a dangerous action for approval; returns the approvalId (caller → 202). */
   async request(req: ApprovalRequest): Promise<{ approvalId: string; status: 'requested' }> {
+    const key = req.idempotencyKey?.trim() || undefined;
+    if (key) {
+      const replay = await this.replayApproval(key);
+      if (replay) return replay;
+    }
+    try {
+      return await this.createApproval(req, key);
+    } catch (error) {
+      // Two identical taps can both read "no approval yet" before either insert
+      // lands, so the unique index — not the read above — is what actually
+      // decides. Losing that race is a successful replay, not a failure.
+      if (key && isUniqueConstraintViolation(error)) {
+        const replay = await this.replayApproval(key);
+        if (replay) return replay;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * An approval already decided under this key is not a replay: the physical
+   * event has had its answer, and reporting it back as `requested` would tell
+   * the caller something is pending when nothing is.
+   */
+  private async replayApproval(key: string): Promise<{ approvalId: string; status: 'requested' } | null> {
+    const existing = await this.prisma.approval.findUnique({ where: { idempotencyKey: key } });
+    if (!existing) return null;
+    if (existing.status !== 'requested') {
+      throw new ConflictError(
+        'approval_already_decided',
+        `Эта заявка уже ${existing.status === 'approved' ? 'одобрена' : 'обработана'}`,
+      );
+    }
+    return { approvalId: existing.id, status: 'requested' as const };
+  }
+
+  private async createApproval(req: ApprovalRequest, key: string | undefined) {
     return this.audit.transaction(async (tx) => {
       const approval = await tx.approval.create({
         data: {
@@ -107,6 +151,7 @@ export class ApprovalsService {
           requester: req.requester,
           reason: req.reason,
           status: 'requested',
+          idempotencyKey: key,
           evidence: {
             payload: req.payload ?? null,
             evidence: req.evidence ?? null,
@@ -295,4 +340,12 @@ export class ApprovalsService {
 
       return { result: updated, events };
   }
+}
+
+/**
+ * Unique-constraint violation. The same shape exists in payment-intents,
+ * courier, auth, customers and service-command — see BACKLOG P2002-DEDUP-181.
+ */
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }

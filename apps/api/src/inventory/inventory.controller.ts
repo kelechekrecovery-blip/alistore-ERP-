@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
   ApiBearerAuth,
@@ -50,8 +50,12 @@ export class InventoryController {
   @Post('movements')
   @HttpCode(202)
   @RequirePermission('inventory', 'movement')
-  async movement(@CurrentUser() user: AuthPrincipal, @Body() dto: MovementDto) {
-    return this.inventory.movement(dto, await requireActiveStaff(user, this.staffAuth));
+  async movement(
+    @CurrentUser() user: AuthPrincipal,
+    @Body() dto: MovementDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+  ) {
+    return this.inventory.movement(dto, await requireActiveStaff(user, this.staffAuth), idempotencyKey);
   }
 
   @ApiOperation({ summary: 'Receive a batch of IMEI units into stock (stock.received)' })

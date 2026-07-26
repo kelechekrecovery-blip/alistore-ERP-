@@ -64,10 +64,16 @@ public final class StaffInventoryStore {
         errorMessage = nil
         defer { isSubmitting = false }
         do {
+            let request = InventoryWriteOffRequest(productId: productId, qty: qty, location: location, reason: reason)
+            // Ключ от содержимого, как у сдачи COD: списание одобряется, а не
+            // применяется сразу, поэтому повтор не двигает сток сам — он паркует
+            // ВТОРУЮ заявку на одно физическое списание, и одобривший обе спишет
+            // дважды. Тот же товар/склад/количество/причина — та же операция.
             let approval: InventoryApproval = try await api.post(
                 "inventory/movements",
-                body: InventoryWriteOffRequest(productId: productId, qty: qty, location: location, reason: reason),
-                token: token
+                body: request,
+                token: token,
+                idempotencyKey: try IdempotencyKeys.fingerprint(request)
             )
             lastApproval = approval
             return approval

@@ -79,6 +79,33 @@ final class StaffInventoryCountTests: XCTestCase {
         XCTAssertNil(store.errorMessage)
     }
 
+    /// INV-WRITEOFF-IDEMPOTENCY-001: a write-off is approval-gated, so a repeat
+    /// does not move stock by itself — it parks a second approval for one physical
+    /// event, and approving both deducts twice. The key is derived from the
+    /// content, so the same write-off retried is the same key.
+    func testWriteOffSendsContentDerivedIdempotencyKey() async {
+        InventoryMockURLProtocol.stub(path: "/api/inventory/movements", status: 202, body: """
+        {"approvalId":"appr-1","status":"requested"}
+        """)
+        let store = makeStore(token: "staff-token")
+
+        await store.writeOff(productId: "p-1", location: "BISHKEK-1", qty: 3, reason: "бой")
+        let first = InventoryMockURLProtocol.request(for: "/api/inventory/movements")?
+            .value(forHTTPHeaderField: "Idempotency-Key")
+        XCTAssertNotNil(first)
+        XCTAssertFalse(first?.isEmpty ?? true)
+
+        await store.writeOff(productId: "p-1", location: "BISHKEK-1", qty: 3, reason: "бой")
+        let repeated = InventoryMockURLProtocol.request(for: "/api/inventory/movements")?
+            .value(forHTTPHeaderField: "Idempotency-Key")
+        XCTAssertEqual(repeated, first, "the same write-off must reuse its key")
+
+        await store.writeOff(productId: "p-1", location: "BISHKEK-1", qty: 4, reason: "бой")
+        let different = InventoryMockURLProtocol.request(for: "/api/inventory/movements")?
+            .value(forHTTPHeaderField: "Idempotency-Key")
+        XCTAssertNotEqual(different, first, "a different quantity is a different write-off")
+    }
+
     func testWriteOffKeepsServerError() async {
         InventoryMockURLProtocol.stub(path: "/api/inventory/movements", status: 422, body: """
         {"message":"Для серийного товара укажите конкретный IMEI"}

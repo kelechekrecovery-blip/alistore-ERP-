@@ -417,7 +417,7 @@ export class InventoryService {
     });
   }
 
-  async movement(dto: MovementDto, requester: string) {
+  async movement(dto: MovementDto, requester: string, idempotencyKey?: string) {
     const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
     if (!product) {
       throw new ValidationError('product_not_found', `Товар ${dto.productId} не найден`);
@@ -432,6 +432,7 @@ export class InventoryService {
       action: ACTION_BY_TYPE[dto.type],
       requester,
       reason: dto.reason,
+      idempotencyKey,
       payload: {
         productId: dto.productId,
         qty: dto.qty,
