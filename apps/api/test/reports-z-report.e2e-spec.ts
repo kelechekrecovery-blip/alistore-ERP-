@@ -31,8 +31,8 @@ describe('Reports: Z-report (integration)', () => {
         openCash: 5000,
         closeCash: 12000,
         diff: -500,
-        openedAt: new Date(`${day}T08:00:00.000Z`),
-        closedAt: new Date(`${day}T20:00:00.000Z`),
+        openedAt: new Date(`${day}T08:00:00.000+06:00`),
+        closedAt: new Date(`${day}T20:00:00.000+06:00`),
       },
     });
     shiftIds.push(shift.id);
@@ -44,7 +44,7 @@ describe('Reports: Z-report (integration)', () => {
       ],
     });
     await prisma.cashIncassation.create({
-      data: { shiftId: shift.id, point, amount: 6000, depositedAt: new Date(`${day}T20:05:00.000Z`), depositedBy: `${run}-cashier`, idempotencyKey: `${run}-inc` },
+      data: { shiftId: shift.id, point, amount: 6000, depositedAt: new Date(`${day}T20:05:00.000+06:00`), depositedBy: `${run}-cashier`, idempotencyKey: `${run}-inc` },
     });
   });
 
@@ -68,6 +68,30 @@ describe('Reports: Z-report (integration)', () => {
     // Refund (-1000) is not a positive sale and must not inflate the cash total.
     // (We asserted >= 8000, not the exact figure, because a neighbouring suite may
     // share the day; the point-scoped shift above is the exact check.)
+  });
+
+  /**
+   * TZ-001. Сутки Z-отчёта раньше резались по UTC, то есть 06:00 → 06:00 по
+   * Бишкеку: смена, закрытая после местной полуночи, уезжала в отчёт за
+   * ПРЕДЫДУЩИЙ день. Именно на этом случае и держится исправление.
+   */
+  it('смена, закрытая после местной полуночи, попадает в свой день', async () => {
+    const lateShift = await prisma.cashShift.create({
+      data: {
+        staffId: `${run}-late`,
+        point: `${point}-late`,
+        openCash: 1000,
+        closeCash: 1000,
+        diff: 0,
+        openedAt: new Date(`${day}T22:00:00.000+06:00`),
+        // 01:30 по Бишкеку следующих суток — это 19:30Z текущих, то есть ровно
+        // то окно, где UTC-граница отправляла смену не в тот день.
+        closedAt: new Date(`${day}T01:30:00.000+06:00`),
+      },
+    });
+
+    const report = await reports.zReport(day);
+    expect(report.shifts.map((shift) => shift.id)).toContain(lateShift.id);
   });
 
   it('rejects a malformed date', async () => {

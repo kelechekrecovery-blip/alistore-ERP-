@@ -1,26 +1,29 @@
-import { buildRangeBuckets, parseUtcDay } from '../src/reports/revenue-buckets';
+import { buildRangeBuckets, parseBusinessDay } from '../src/reports/revenue-buckets';
+import { parseBusinessDay as businessDay } from '../src/common/business-time';
 
 /** Arbitrary date-range revenue bucketing (Phase 8). */
-describe('parseUtcDay', () => {
-  it('parses a valid YYYY-MM-DD to UTC midnight', () => {
-    expect(parseUtcDay('2026-06-01')).toBe(Date.UTC(2026, 5, 1));
+describe('parseBusinessDay', () => {
+  // TZ-001: сутки отчётов — местные (Asia/Bishkek), а не UTC.
+  it('parses a valid YYYY-MM-DD to LOCAL midnight', () => {
+    expect(parseBusinessDay('2026-06-01')).toBe(Date.UTC(2026, 5, 1) - 6 * 60 * 60 * 1000);
+    expect(parseBusinessDay('2026-06-01')).toBe(businessDay('2026-06-01'));
   });
 
   it('rejects malformed strings', () => {
-    expect(parseUtcDay('2026/06/01')).toBeNull();
-    expect(parseUtcDay('06-01-2026')).toBeNull();
-    expect(parseUtcDay('not-a-date')).toBeNull();
+    expect(parseBusinessDay('2026/06/01')).toBeNull();
+    expect(parseBusinessDay('06-01-2026')).toBeNull();
+    expect(parseBusinessDay('not-a-date')).toBeNull();
   });
 
   it('rejects impossible calendar dates (no silent rollover)', () => {
-    expect(parseUtcDay('2026-13-01')).toBeNull();
-    expect(parseUtcDay('2026-02-30')).toBeNull();
+    expect(parseBusinessDay('2026-13-01')).toBeNull();
+    expect(parseBusinessDay('2026-02-30')).toBeNull();
   });
 });
 
 describe('buildRangeBuckets', () => {
-  const from = Date.UTC(2026, 5, 1); // 2026-06-01
-  const to = Date.UTC(2026, 5, 3); // 2026-06-03
+  const from = parseBusinessDay('2026-06-01')!;
+  const to = parseBusinessDay('2026-06-03')!;
 
   it('makes one bucket per day across the inclusive range', () => {
     const b = buildRangeBuckets([], from, to);
@@ -32,6 +35,7 @@ describe('buildRangeBuckets', () => {
     const b = buildRangeBuckets(
       [
         { amount: 1000, createdAt: new Date('2026-06-01T09:00:00Z') },
+        // 20:00Z = 02:00 06-02 по Бишкеку → следующие местные сутки.
         { amount: 500, createdAt: new Date('2026-06-01T20:00:00Z') },
         { amount: 700, createdAt: new Date('2026-06-03T05:00:00Z') },
         { amount: 999, createdAt: new Date('2026-07-01T00:00:00Z') }, // outside range → dropped
@@ -39,8 +43,8 @@ describe('buildRangeBuckets', () => {
       from,
       to,
     );
-    expect(b.find((x) => x.day === '2026-06-01')?.amount).toBe(1500);
-    expect(b.find((x) => x.day === '2026-06-02')?.amount).toBe(0);
+    expect(b.find((x) => x.day === '2026-06-01')?.amount).toBe(1000);
+    expect(b.find((x) => x.day === '2026-06-02')?.amount).toBe(500);
     expect(b.find((x) => x.day === '2026-06-03')?.amount).toBe(700);
     expect(b.reduce((s, x) => s + x.amount, 0)).toBe(2200);
   });

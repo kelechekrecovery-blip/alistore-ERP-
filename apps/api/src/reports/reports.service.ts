@@ -17,7 +17,7 @@ import {
   buildRevenueBuckets,
   buildRevenueTrend,
   DAY_MS,
-  parseUtcDay,
+  parseBusinessDay,
   previousWindowStartMs,
   revenueWindowStartMs,
 } from './revenue-buckets';
@@ -291,8 +291,8 @@ export class ReportsService {
 
   /** Daily revenue buckets for an arbitrary [from, to] date range (YYYY-MM-DD, inclusive). */
   async revenueRange(fromIso: string, toIso: string) {
-    const fromMs = parseUtcDay(fromIso);
-    const toMs = parseUtcDay(toIso);
+    const fromMs = parseBusinessDay(fromIso);
+    const toMs = parseBusinessDay(toIso);
     if (fromMs === null || toMs === null) {
       throw new ValidationError('invalid_date', 'Даты должны быть в формате YYYY-MM-DD');
     }
@@ -344,7 +344,7 @@ export class ReportsService {
    * till summary, not the fiscal Z-report — that arrives with a certified OFD.
    */
   async zReport(dateIso: string) {
-    const dayMs = parseUtcDay(dateIso);
+    const dayMs = parseBusinessDay(dateIso);
     if (dayMs === null) {
       throw new ValidationError('invalid_date', 'Дата должна быть в формате YYYY-MM-DD');
     }

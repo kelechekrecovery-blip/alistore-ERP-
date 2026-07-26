@@ -5,11 +5,12 @@ import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDeliverySlotDto, CreateDeliveryZoneDto, CreateStorePointDto, UpdateStorePointDto } from './logistics.dto';
+// Один источник часового пояса на систему (TZ-001): раньше логистика знала про
+// Asia/Bishkek, а отчёты считали сутки по UTC.
+import { BUSINESS_TIME_ZONE, BUSINESS_UTC_OFFSET } from '../common/business-time';
 
 const ACTIVE_SLOT_STATUSES = ['created', 'awaiting_confirmation', 'confirmed', 'reserved', 'awaiting_payment', 'paid', 'picking', 'packed', 'courier_assigned', 'out_for_delivery'] as const;
 const STORE_POINT_OPEN_ORDER_STATUSES = ['created', 'awaiting_confirmation', 'confirmed', 'reserved', 'awaiting_payment', 'paid', 'picking', 'packed', 'ready_for_pickup', 'courier_assigned', 'out_for_delivery', 'delivered'] as const;
-const BUSINESS_TIME_ZONE = 'Asia/Bishkek';
-const BUSINESS_UTC_OFFSET = '+06:00';
 
 function key(raw?: string) {
   const value = raw?.trim();
