@@ -2,7 +2,14 @@
 
 > Всё до кнопки «Submit» подготовлено и проверено кодом. Дальше — шаги, которые
 > может выполнить **только владелец** (платный аккаунт, подпись, публикация,
-> секреты). Этот файл превращает их в механический чек-лист. Снято 2026-07-24.
+> секреты). Этот файл превращает их в механический чек-лист. Снято 2026-07-24,
+> статус выгрузки обновлён 2026-07-26.
+
+> **Выгрузка уже выполнена.** Все четыре приложения загружены в App Store Connect
+> сборкой **`1.0.0 (4)`**, она `VALID` и привязана к версии. Пересборка и повторная
+> выгрузка не нужны. Актуальное состояние и оставшиеся шаги владельца —
+> в [`apps/ios/store/SUBMISSION-STATUS.md`](../apps/ios/store/SUBMISSION-STATUS.md);
+> разделы ниже описывают, как этот пайплайн устроен.
 
 ## Текущее состояние (проверено кодом)
 
@@ -10,7 +17,8 @@
 |---|---|
 | Сборка 4 приложений (`npm run ios:build`) | ✅ BUILD SUCCEEDED |
 | Юнит-тесты (AliStoreCore, `npm run ios:test`) | ✅ 112/112 |
-| Release-конфигурация (`store-preflight`, non-strict) | ✅ bundle ids `kg.alistore.{client,staff,courier,pos}`, AppIcon, prod APNs, `1.0.0 (3)`, метаданные + privacy manifest |
+| Release-конфигурация (`store-preflight`, non-strict) | ✅ bundle ids `kg.alistore.{client,staff,courier,pos}`, AppIcon, prod APNs, метаданные + privacy manifest |
+| В App Store Connect | ✅ `1.0.0 (4)` загружена и привязана по всем четырём bundle id |
 | Xcode | 26.6 |
 
 Приложения: **AliStoreClient** (клиент), **AliStoreStaff**, **AliStoreCourier**,
@@ -55,6 +63,13 @@ bash apps/ios/scripts/export-archives.sh --env-file apps/ios/.env.production
 Приложение требует вход по SMS-OTP, а в проде эхо кода выключено → **ревьюер Apple
 не сможет войти** и завернёт по Guideline 2.1. Метаданные уже помечены
 `demoAccountRequired: true` для Staff/Courier/POS. Варианты:
+
+> **Охват: механизм ниже закрывает только Client.** `isReviewLogin` живёт в
+> `verifyOtp` и делает `customer.upsert` — токен customer-scope. Staff, Courier и
+> POS входят через `staff-auth/login` логином и учётными данными сотрудника
+> (`apps/ios/Shared/StaffAuthStore.swift`), никакого OTP там нет. Для этих трёх
+> нужны три реальные учётки сотрудников из ERP — с **выключенным TOTP**, иначе
+> ревьюер не войдёт.
 
 1. **Review-учётка через env — РЕАЛИЗОВАНО ✅.** Один заранее заданный номер
    принимает один фиксированный код, только когда заданы **обе** переменные;

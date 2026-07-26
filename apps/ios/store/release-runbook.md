@@ -14,8 +14,9 @@ provider certification.
 
 Version and build number live in `apps/ios/project.yml`
 (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`) and are shared by all four apps.
-Build 2 is already in App Store Connect, so the tree is now at
-`CURRENT_PROJECT_VERSION: 3`. Bump it again before every new upload — App Store
+Build 4 is in App Store Connect for all four bundle ids and is the build attached
+to the `1.0.0` version under review, so the tree is now at
+`CURRENT_PROJECT_VERSION: 5`. Bump it again before every new upload — App Store
 Connect rejects a duplicate build number. `store-preflight.sh` reads the expected
 values from `project.yml`, not from constants inside the script, so the bump is
 the only edit needed.
