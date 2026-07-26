@@ -48,10 +48,22 @@ export class StorefrontBlocksService {
       .sort((a, b) => Number(b.status === 'scheduled') - Number(a.status === 'scheduled') || dateValue(b.startsAt ?? b.publishedAt) - dateValue(a.startsAt ?? a.publishedAt))[0];
     const selected = [...(hero ? [hero] : []), ...rows.filter((row) => row.type !== 'hero')]
       .sort((a, b) => a.position - b.position || a.createdAt.getTime() - b.createdAt.getTime());
-    return Promise.all(selected.map(async (row) => ({
+    // Один батч на все подборки, а не запрос на блок. Эта выдача рендерит первый
+    // экран главной, а `curated` стоит двух запросов (товары + агрегат отзывов),
+    // поэтому N подборок стоили 2N запросов на каждый показ витрины.
+    const wanted = [...new Set(
+      selected.filter((row) => row.type === 'collection').flatMap((row) => row.productIds),
+    )];
+    const curated = await this.catalog.curated(wanted);
+    const byId = new Map(curated.map((product) => [product.id, product]));
+    return selected.map((row) => ({
       ...row,
-      products: row.type === 'collection' ? await this.catalog.curated(row.productIds) : [],
-    })));
+      // Порядок берём из `productIds` самого блока: у каждой подборки он свой,
+      // и общий батч не вправе его усреднить.
+      products: row.type === 'collection'
+        ? row.productIds.map((id) => byId.get(id)).filter((product) => product !== undefined)
+        : [],
+    }));
   }
 
   async create(dto: CreateStorefrontBlockDto, actor: string) {

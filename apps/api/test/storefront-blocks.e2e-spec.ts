@@ -69,6 +69,32 @@ describe('Storefront blocks CMS', () => {
     expect(events.map((event) => event.type)).toEqual(['storefront.block_created', 'storefront.block_published']);
   });
 
+  /**
+   * Публичная выдача блоков рендерит первый экран главной, поэтому каждый лишний
+   * запрос там виден покупателю как задержка. Товары подборок собираются одним
+   * батчем на все блоки — этот тест держит две вещи, которые батч легко ломает:
+   * **свой** порядок товаров внутри каждого блока и отсутствие протечки товаров
+   * между блоками.
+   */
+  it('keeps each collection ordered independently when several are published', async () => {
+    const a = await prisma.product.create({ data: { sku: `${run}-A`, name: 'Batch A', price: 1000, cost: 500, category: 'phones', attrs: {} } });
+    const b = await prisma.product.create({ data: { sku: `${run}-B`, name: 'Batch B', price: 2000, cost: 900, category: 'phones', attrs: {} } });
+    const c = await prisma.product.create({ data: { sku: `${run}-C`, name: 'Batch C', price: 3000, cost: 1200, category: 'phones', attrs: {} } });
+
+    // Первый блок: b, a. Второй: a, c. Порядки разные и пересекаются по `a`.
+    const first = await http.post('/storefront-blocks').set(auth())
+      .send(block('BATCH1', { type: 'collection', device: 'desktop', productIds: [b.id, a.id] })).expect(201);
+    const second = await http.post('/storefront-blocks').set(auth())
+      .send(block('BATCH2', { type: 'collection', device: 'desktop', productIds: [a.id, c.id] })).expect(201);
+    await http.post(`/storefront-blocks/${first.body.id}/publish`).set(auth()).send({}).expect(201);
+    await http.post(`/storefront-blocks/${second.body.id}/publish`).set(auth()).send({}).expect(201);
+
+    const rows = await http.get('/storefront-blocks/public?device=desktop').expect(200);
+    const byId = new Map(rows.body.map((row: { id: string; products: Array<{ id: string }> }) => [row.id, row.products.map((p) => p.id)]));
+    expect(byId.get(first.body.id)).toEqual([b.id, a.id]);
+    expect(byId.get(second.body.id)).toEqual([a.id, c.id]);
+  });
+
   it('prevents overlapping hero schedules, reorders all live blocks and archives without stale publication', async () => {
     const first = await http.post('/storefront-blocks').set(auth()).send(block('SCHEDULE-A', { type: 'hero', device: 'desktop' })).expect(201);
     const second = await http.post('/storefront-blocks').set(auth()).send(block('SCHEDULE-B', { type: 'hero', device: 'all' })).expect(201);
