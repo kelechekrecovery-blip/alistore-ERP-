@@ -10,6 +10,7 @@ import type { Customer, CustomerAddress } from '@prisma/client';
 import { CreateCustomerAddressDto, UpdateCustomerAddressDto, UpdateCustomerSettingsDto, UpsertCustomerDto } from './customers.dto';
 import { buildCustomerOverview, CustomerOverview } from './customer-overview';
 import { warrantyCoverage } from './warranty-coverage';
+import { isUniqueConstraintViolation } from '../common/prisma-errors';
 
 /**
  * Customers for storefront/guest checkout. Phone is the natural key (unique), so
@@ -212,7 +213,7 @@ export class CustomersService {
       });
     } catch (error) {
       // A concurrent checkout can win the unique phone race after the lookup.
-      if (error instanceof Error && 'code' in error && error.code === 'P2002') {
+      if (isUniqueConstraintViolation(error)) {
         throw new ConflictException({
           code: 'guest_customer_requires_auth',
           message: 'Для этого номера войдите в аккаунт перед оформлением заказа',

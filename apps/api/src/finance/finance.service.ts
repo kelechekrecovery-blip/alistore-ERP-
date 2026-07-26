@@ -37,6 +37,7 @@ import {
 } from './finance.dto';
 import { expenseAccountCode, normalBalance, postAccountingEntryOnTx } from './accounting-journal';
 import { expenseAccountingSnapshot } from './expense-accounting';
+import { isUniqueConstraintViolation } from '../common/prisma-errors';
 
 const EXPENSE_INCLUDE = {
   supplier: { select: { id: true, name: true } },
@@ -483,7 +484,7 @@ export class FinanceService {
         };
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (isUniqueConstraintViolation(error)) {
         const replay = await this.prisma.accountingOpeningBalance.findUnique({ where: { idempotencyKey: dto.idempotencyKey }, include: { accountingEntry: { include: { lines: true } }, lines: true } });
         if (replay) return replayOpeningBalance(replay, fingerprint);
       }
@@ -532,7 +533,7 @@ export class FinanceService {
         };
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (isUniqueConstraintViolation(error)) {
         const replay = await this.prisma.accountingCurrencyRate.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
         if (replay) return replayCurrencyRate(replay, input);
         throw new ConflictError('currency_rate_effective_at_conflict', 'Курс этой валюты на указанную дату уже зарегистрирован');
@@ -1404,7 +1405,7 @@ export class FinanceService {
         };
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (isUniqueConstraintViolation(error)) {
         const command = await this.prisma.financeBudgetCommand.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
         if (command) return replayBudgetCommand(command, input);
       }
@@ -1692,7 +1693,7 @@ export class FinanceService {
         };
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (isUniqueConstraintViolation(error)) {
         const replay = await this.prisma.expense.findUnique({
           where: { idempotencyKey: dto.idempotencyKey },
           include: EXPENSE_INCLUDE,
@@ -1779,7 +1780,7 @@ export class FinanceService {
       };
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (isUniqueConstraintViolation(error)) {
         throw new ConflictError('expense_payment_idempotency_conflict', 'Ключ выплаты уже использован для другой операции');
       }
       throw error;

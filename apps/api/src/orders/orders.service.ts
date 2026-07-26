@@ -28,6 +28,7 @@ import {
   resolveOrderInventorySnapshot,
   type OrderInventorySnapshot,
 } from '../inventory/order-inventory-sale';
+import { isUniqueConstraintViolation } from '../common/prisma-errors';
 
 /** Reservation lifetime — every reservation must have expiresAt (invariant #7). */
 const RESERVATION_TTL_MS = 30 * 60 * 1000; // 30 минут
@@ -551,7 +552,7 @@ export class OrdersService {
         };
       });
     } catch (error) {
-      if (idempotencyKey && typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+      if (idempotencyKey && isUniqueConstraintViolation(error)) {
         const existing = await this.prisma.order.findUnique({
           where: { idempotencyKey },
           include: { items: true },

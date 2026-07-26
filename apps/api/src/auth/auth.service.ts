@@ -20,6 +20,7 @@ import {
   NoopEmailOtpSender,
 } from './email-otp.sender';
 import type { AuthPrincipal, JwtPayload } from './jwt.strategy';
+import { isUniqueConstraintViolation } from '../common/prisma-errors';
 
 export interface AuthTokens {
   accessToken: string;
@@ -581,7 +582,7 @@ function normalizeEmail(rawEmail: string): string {
 }
 
 function isUniqueViolation(error: unknown): boolean {
-  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'P2002');
+  return isUniqueConstraintViolation(error);
 }
 
 function socialPhone(provider: string, subject: string): string {

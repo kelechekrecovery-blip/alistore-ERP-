@@ -11,6 +11,7 @@ import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 import { INVENTORY_ASSET_ACCOUNT } from '../inventory/inventory-valuation';
 import { recordCashDrawerMovementOnTx } from '../shifts/cash-drawer';
 import { CreateTradeInDto, TradeInViewDto } from './tradeins.dto';
+import { isUniqueConstraintViolation } from '../common/prisma-errors';
 
 type TradeInCreateInput = Omit<CreateTradeInDto, 'customerId'> & { customerId: string };
 
@@ -221,5 +222,5 @@ export class TradeInsService {
 }
 
 function isUniqueViolation(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+  return isUniqueConstraintViolation(error);
 }

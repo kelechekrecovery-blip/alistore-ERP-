@@ -7,6 +7,7 @@ import { ConflictError, ValidationError } from '../common/errors';
 import { assertWarrantyTransition } from './warranty-state';
 import { OutboxService } from '../outbox/outbox.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
+import { isUniqueConstraintViolation } from '../common/prisma-errors';
 
 /** SLA window for a warranty case (Risk Center flags overdue open cases). */
 export const WARRANTY_SLA_DAYS = 14;
@@ -177,5 +178,5 @@ export class WarrantyService {
 }
 
 function isUniqueViolation(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+  return isUniqueConstraintViolation(error);
 }

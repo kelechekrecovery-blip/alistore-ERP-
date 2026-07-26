@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ApplySupplierAdvanceDto, CreateLandedCostDto, CreatePurchaseOrderDto, CreateSupplierAdvanceDto, CreateSupplierCreditNoteDto, CreateSupplierInvoiceDto, CreateSupplierInvoicePaymentDto, ImportSupplierStatementDto, PaySupplierInvoiceDto, ReceivePurchaseOrderDto, ReconcileSupplierStatementLineDto } from './procurement.dto';
 import { assertCanCancel, assertCanReceive, assertCanSend } from './purchase-order-state';
 import { postAccountingEntryOnTx } from '../finance/accounting-journal';
+import { isUniqueConstraintViolation } from '../common/prisma-errors';
 
 const DETAIL_INCLUDE = {
   supplier: { select: { id: true, name: true, contact: true } },
@@ -104,7 +105,7 @@ export class ProcurementService {
         };
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (isUniqueConstraintViolation(error)) {
         const replay = await this.prisma.purchaseOrder.findUnique({
           where: { idempotencyKey: dto.idempotencyKey },
           include: DETAIL_INCLUDE,
@@ -278,7 +279,7 @@ export class ProcurementService {
         return { result: { ...updated, idempotent: false, receiptId: receipt.id }, events };
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (isUniqueConstraintViolation(error)) {
         throw new ConflictError('imei_already_exists', 'Один или несколько IMEI уже приняты');
       }
       throw error;
@@ -528,7 +529,7 @@ export class ProcurementService {
         };
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (isUniqueConstraintViolation(error)) {
         const replay = await this.prisma.supplierAdvance.findUnique({
           where: { idempotencyKey: dto.idempotencyKey },
           include: { accountingEntry: { include: { lines: true } }, allocations: true },
@@ -607,7 +608,7 @@ export class ProcurementService {
         };
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (isUniqueConstraintViolation(error)) {
         const replay = await this.prisma.supplierInvoiceAdvanceAllocation.findUnique({
           where: { idempotencyKey: dto.idempotencyKey },
           include: { advance: true, invoice: true, accountingEntry: { include: { lines: true } } },
@@ -678,7 +679,7 @@ export class ProcurementService {
         };
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (isUniqueConstraintViolation(error)) {
         const replay = await this.prisma.supplierStatement.findUnique({ where: { idempotencyKey: dto.idempotencyKey }, include: { lines: true } });
         if (replay) return replaySupplierStatement(replay, dto);
       }
@@ -877,7 +878,7 @@ export class ProcurementService {
         };
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (isUniqueConstraintViolation(error)) {
         const replay = await this.prisma.landedCost.findUnique({ where: { idempotencyKey: dto.idempotencyKey }, include: { allocations: true, accountingEntry: { include: { lines: true } } } });
         if (replay) return replayLandedCost(replay, dto, documentNumber, description);
       }

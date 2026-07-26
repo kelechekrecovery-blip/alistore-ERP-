@@ -12,6 +12,7 @@ import {
   PaymentGatewayProvider,
   PaymentIntentView,
 } from './payment-gateway-provider';
+import { isUniqueConstraintViolation } from '../common/prisma-errors';
 
 export type { PaymentIntentView } from './payment-gateway-provider';
 
@@ -262,5 +263,5 @@ export class PaymentIntentsService {
 type PaymentWebhookResult = Awaited<ReturnType<PaymentsService['pay']>> & { parked?: boolean };
 
 function isUniqueViolation(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+  return isUniqueConstraintViolation(error);
 }

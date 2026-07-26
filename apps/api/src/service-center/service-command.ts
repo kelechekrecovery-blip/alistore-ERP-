@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { ConflictError, ValidationError } from '../common/errors';
+import { isUniqueConstraintViolation } from '../common/prisma-errors';
 
 export type ServiceCommandInput = Prisma.InputJsonObject;
 
@@ -27,7 +28,7 @@ export function replayServiceCommand(
 }
 
 export function isServiceCommandUniqueViolation(error: unknown) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+  return isUniqueConstraintViolation(error);
 }
 
 function canonical(value: unknown): string {

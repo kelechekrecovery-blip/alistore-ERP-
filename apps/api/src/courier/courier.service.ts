@@ -17,6 +17,7 @@ import {
   finalizeOrderInventorySaleOnTx,
   orderHasTrackedInventoryOnTx,
 } from '../inventory/order-inventory-sale';
+import { isUniqueConstraintViolation } from '../common/prisma-errors';
 
 const ASSIGNABLE_STATUSES = ['paid', 'packed'] as const;
 const REMOVABLE_FROM_RUN_STATUSES = ['courier_assigned', 'out_for_delivery'] as const;
@@ -683,5 +684,5 @@ function canonicalJson(value: unknown): string {
 }
 
 function isUniqueConflict(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
+  return isUniqueConstraintViolation(error);
 }

@@ -5,6 +5,7 @@ import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePromotionDto, PromotionQuoteDto, UpdatePromotionDto } from './promotions.dto';
+import { isUniqueConstraintViolation } from '../common/prisma-errors';
 
 export interface PromotionLine {
   productId: string;
@@ -233,5 +234,5 @@ export class PromotionsService {
 
 function normalizeCode(value: string) { return value.trim().toUpperCase(); }
 function isUniqueViolation(error: unknown): error is { code: 'P2002' } {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
+  return isUniqueConstraintViolation(error);
 }

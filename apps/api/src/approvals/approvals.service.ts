@@ -10,6 +10,7 @@ import { canApprove, Role } from '../rbac/permissions';
 import { ACTION_EXECUTORS, ACTION_REJECTION_EXECUTORS } from './action-executors';
 import { ExchangesService } from '../exchanges/exchanges.service';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
+import { isUniqueConstraintViolation } from '../common/prisma-errors';
 
 /** A dangerous action captured for approval (Approval Rules Matrix). */
 export interface ApprovalRequest {
@@ -355,12 +356,4 @@ export class ApprovalsService {
 
       return { result: updated, events };
   }
-}
-
-/**
- * Unique-constraint violation. The same shape exists in payment-intents,
- * courier, auth, customers and service-command — see BACKLOG P2002-DEDUP-181.
- */
-function isUniqueConstraintViolation(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }
