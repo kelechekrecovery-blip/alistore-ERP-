@@ -118,10 +118,32 @@ directory and are ready to paste.
 
 ### 3. Review data in the ERP
 
-- Raise stock on at least three or four storefront products so the Client
-  purchase flow can be completed end to end.
-- Seed one live object per role so each app shows its declared workflow: an order
-  in progress for Staff, an assigned delivery for Courier, an open shift for POS.
+**Storefront stock — scripted.** `scripts/seed-review-data.mjs` tops up existing
+products through `POST /inventory/receive-quantity`, so each write goes through the
+Event Ledger with an idempotency key and re-running it cannot double-receive
+(verified against a disposable database: a second `--apply` left `onHand` at
+exactly 3). It never invents products — a catalog that is merely small is reported,
+not filled with fiction.
+
+```bash
+npm run review:seed -- --api-base https://api.ali.kg/api --location <branch>
+```
+
+That is a dry run and shows exactly what would change. To write:
+
+```bash
+ALISTORE_SEED_TOKEN=<staff token> npm run review:seed -- --api-base https://api.ali.kg/api --location <branch> --apply --yes-production
+```
+
+`--yes-production` is required for any non-local API. Use the real branch code for
+`--location` — stock lands wherever you name, and a typo creates a phantom branch.
+Credentials come from `ALISTORE_SEED_TOKEN`, or `ALISTORE_SEED_USERNAME` plus
+`ALISTORE_SEED_SECRET`, never from the command line.
+
+**Role objects — manual.** Seed one live object per role so each app shows its
+declared workflow: an order in progress for Staff, an assigned delivery for
+Courier, an open shift for POS. These depend on your real branches, couriers and
+cashiers, so they are not scripted.
 
 ## Known risks that remain after submission
 
