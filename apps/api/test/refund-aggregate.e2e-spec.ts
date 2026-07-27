@@ -126,6 +126,37 @@ describe('Refund aggregate FIN-003E (integration)', () => {
     expect(cashRefund.shiftId).toBe(payer.id);
   });
 
+  it('F-17: авто-резолв — при пустом shiftId берёт открытую смену исполнителя', async () => {
+    const f = await fixture();
+    // cashier-1 держит открытую смену (создана в fixture). shiftId не передаём.
+    const requested = await refunds.request(
+      f.ret.id,
+      { reason: 'возврат без явной смены' },
+      'cashier-1',
+      `refund-autoshift-${f.ret.id}`,
+    );
+    const cashAlloc = requested!.allocations.find((a) => a.methodSnapshot === 'cash');
+    expect(cashAlloc?.shiftId).toBe(f.shift.id);
+  });
+
+  it('F-17: без открытой смены исполнителя — 422 с инструкцией открыть/передать', async () => {
+    const f = await fixture();
+    let caught: unknown;
+    try {
+      // cashier-no-shift не имеет открытой смены — авто-резолв не находит одну.
+      await refunds.request(
+        f.ret.id,
+        { reason: 'нет смены у исполнителя' },
+        'cashier-no-shift',
+        `refund-noshift-${f.ret.id}`,
+      );
+    } catch (e) {
+      caught = e;
+    }
+    expect((caught as { code?: string; getStatus?: () => number })?.code).toBe('cash_refund_shift_required');
+    expect((caught as { getStatus: () => number }).getStatus()).toBe(422);
+  });
+
   it('allocates server-side, enforces four-eyes, executes once, and exposes drilldown', async () => {
     const f = await fixture();
     const key = `refund-request-${f.ret.id}`;

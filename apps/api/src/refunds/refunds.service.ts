@@ -66,7 +66,9 @@ export class RefundsService {
       }
       const allocations = await this.allocateOnTx(tx, payments, ret.refundAmount);
       const cashAllocation = allocations.find((item) => item.payment.method === 'cash');
-      if (cashAllocation) await this.assertCashShift(tx, dto.shiftId, actor, cashAllocation.payment);
+      const resolvedShiftId = cashAllocation
+        ? await this.assertCashShift(tx, dto.shiftId, actor, cashAllocation.payment)
+        : null;
 
       const approval = await tx.approval.create({
         data: {
@@ -143,7 +145,7 @@ export class RefundsService {
               amount: item.amount,
               ordinal,
               methodSnapshot: item.payment.method,
-              shiftId: item.payment.method === 'cash' ? dto.shiftId : null,
+              shiftId: item.payment.method === 'cash' ? resolvedShiftId : null,
             })),
           },
         },
@@ -253,12 +255,38 @@ export class RefundsService {
     return result;
   }
 
-  private async assertCashShift(tx: Prisma.TransactionClient, shiftId: string | undefined, actor: string, payment: Payment) {
-    if (!shiftId) throw new ValidationError('cash_refund_shift_required', 'Для наличного возврата нужна открытая смена инициатора');
-    await tx.$queryRaw`SELECT id FROM "CashShift" WHERE id = ${shiftId} FOR UPDATE`;
-    const shift = await tx.cashShift.findUnique({ where: { id: shiftId } });
+  /**
+   * Смена, из которой выдаются наличные по возврату — та, что открыл исполнитель.
+   *
+   * F-17: `shiftId` приходилось передавать руками, а текст ошибки врал про «смену
+   * инициатора» (наличные выдаёт исполнитель, не тот, кто запросил возврат).
+   * Теперь при пустом `shiftId` берём единственную открытую смену исполнителя на
+   * точке платежа. Ноль или несколько — 422 с явной инструкцией: детерминировать
+   * выбор автоматически нельзя, не гадаем. Возвращаем эффективный id, чтобы он
+   * лёг в аллокацию, а не потерялся.
+   */
+  private async assertCashShift(
+    tx: Prisma.TransactionClient,
+    shiftId: string | undefined,
+    actor: string,
+    payment: Payment,
+  ): Promise<string> {
+    let effectiveId = shiftId?.trim() || undefined;
+    if (!effectiveId) {
+      const open = await tx.cashShift.findMany({
+        where: { staffId: actor, closedAt: null, ...(payment.point ? { point: payment.point } : {}) },
+        select: { id: true },
+      });
+      if (open.length !== 1) {
+        throw new ValidationError('cash_refund_shift_required', 'Откройте кассовую смену или передайте shiftId');
+      }
+      effectiveId = open[0].id;
+    }
+    await tx.$queryRaw`SELECT id FROM "CashShift" WHERE id = ${effectiveId} FOR UPDATE`;
+    const shift = await tx.cashShift.findUnique({ where: { id: effectiveId } });
     if (!shift || shift.closedAt) throw new ConflictError('cash_refund_shift_closed', 'Смена возврата закрыта или не найдена');
     if (shift.staffId !== actor) throw new ConflictError('cash_refund_shift_foreign', 'Смена принадлежит другому сотруднику');
     if (payment.point && shift.point !== payment.point) throw new ConflictError('cash_refund_shift_wrong_point', 'Смена открыта в другой точке');
+    return effectiveId;
   }
 }
