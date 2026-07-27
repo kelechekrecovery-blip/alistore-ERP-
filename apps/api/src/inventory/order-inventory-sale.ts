@@ -588,8 +588,20 @@ export async function lockInventoryBalancesOnTx(tx: Prisma.TransactionClient, ba
   `);
 }
 
+/**
+ * Резерва не хватает — и сообщение обязано назвать следующий шаг.
+ *
+ * Резервирование в этом домене — явная операция (`POST /orders/:id/reserve`,
+ * она же `/fulfill`), а не побочный эффект создания заказа. Прежний текст
+ * сообщал только факт, поэтому прогон потока без этого шага читался как поломка
+ * склада: в аудите 26.07 так родились сразу три «бага» курьерского контура,
+ * которых нет. Код ошибки не меняется — на него завязаны клиенты.
+ */
 function incompleteReservation(orderId: string, sku: string): ConflictError {
-  return new ConflictError('order_reservation_incomplete', `Резерв заказа ${orderId} не покрывает ${sku}`);
+  return new ConflictError(
+    'order_reservation_incomplete',
+    `Резерв заказа ${orderId} не покрывает ${sku}. Зарезервируйте сток: POST /orders/${orderId}/reserve`,
+  );
 }
 
 function incompleteInventory(orderId: string, sku: string): ConflictError {

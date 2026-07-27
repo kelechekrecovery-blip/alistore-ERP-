@@ -59,7 +59,13 @@ describe('Payments — concurrency (accessory order)', () => {
     await expect(payments.pay(
       { orderId: order.id, method: 'card', amount: 50000, txnId: `expired-${order.id}` },
       'system',
-    )).rejects.toMatchObject({ code: 'order_reservation_incomplete' });
+    )).rejects.toMatchObject({
+      code: 'order_reservation_incomplete',
+      // F-15: три «бага» курьерского контура оказались прогоном потока без шага
+      // резервирования. Сообщение называло факт, но не следующий шаг — теперь
+      // называет, иначе оно снова прочитается как поломка.
+      message: expect.stringContaining('/reserve'),
+    });
     expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
     expect(await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).toMatchObject({ status: 'reserved' });
   });
