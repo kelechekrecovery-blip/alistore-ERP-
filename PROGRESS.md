@@ -6093,3 +6093,26 @@ AI-слой, production-readiness, архитектура, бухгалтери�
 - Result: archive and export are reproducible from the repository, and the signing claim now matches what is actually verified.
 - Limitation: no archive was built and nothing was uploaded to App Store Connect; physical-device gate, demo-account provisioning and store review remain open.
 - Next: on the release machine run preflight `--strict-asc --strict-signing`, then `ios:archive` → `ios:export` → upload, and record build 3 in App Store Connect.
+
+## AUDIT-2026-07-SECURITY-CLUSTER-105-2026-07-27
+- Task: продолжить аудит `fix/audit-2026-07` по `docs/AUDIT-CONTINUATION-PROMPT.md`, порядок P2 от узкого к объёмному, каждая находка — падающий тест до фикса.
+- Правило, которое сработало: сверка находки с кодом до фикса. Из разобранного в этой сессии половина находок описана неточно — фиксов там нет, есть pin-тесты, закрепляющие фактическое поведение.
+- Закрыто фиксом + зелёным тестом:
+  - **S-07** (`9f8709a0`) — публичный `/api/health` больше не перечисляет компоненты сервиса. Код ответа несёт сигнал (200/503), тело — только `{status:"ok"}`; диагностика ушла на staff-only `/health/details`. Ни один потребитель тела в репозитории не читает (проверено), балансировщики не задеты. Тест `health-public-detail-leak.e2e-spec.ts`.
+  - **S-04/F-11** (`1e3f9baf`) — bootstrap первого владельца в production отвечает 404 (не 403). Вторая защёлка помимо «база непуста»: пустая таблица после неполного restore больше не открывает публичную выдачу роли owner. Клапан `STAFF_BOOTSTRAP_ENABLED=true` (строгое сравнение). Тест `staff-bootstrap-production.e2e-spec.ts`.
+  - **S-05** (`b0be26b9`) — refresh сотрудника 30 дн → 24 ч; покупательский оставлен 30 дн осознанно, тест закрепляет обе стороны. `staff-refresh-ttl.e2e-spec.ts`.
+  - **F-08** (`22e6c525`) — `valuationReconciliation` выдаёт `summary.topDiscrepancies`: строки-нарушители по вкладу, cap 25 + `topDiscrepanciesTruncated`. Видно, какой SKU даёт расхождение, без ручного SQL. Корректирующей проводки НЕ делал — происхождение −126500 на проде за владельцем. `inventory-valuation-reconciliation.e2e-spec.ts`.
+- Не воспроизводится — закреплено pin-тестом:
+  - **S-08** (`875459f5`) — публичные ошибки уже не отдают присланное значение, стектрейс и лишние поля конверта; имена полей DTO остаются (контракт клиентов, не утечка). `public-error-disclosure.e2e-spec.ts`.
+  - **F-07** (`ca07a8bd`) — `createFromCatalog` не создаёт курьерский заказ без адреса (fail-closed на `orders.service.ts:177`); `@IsNotEmpty()` сломал бы тестированный дефолт POS. Pin в `orders-fulfillment.e2e-spec.ts`.
+- Рассмотрено и отклонено с обоснованием:
+  - **S-06** (`iss`/`aud` на access-токенах) — дублирует уже подписанную проверку `typ`, против компрометации секрета не помогает (атакующий подпишет верный `aud`), а enforcement ломает ~20 тестов, минтящих токены вручную. Непропорционально. CSP на проде уже отдаётся helmet (проверено в заголовках).
+- Не воспроизводится/нужен исходный текст находки:
+  - **F-16** — staff-workflow тикетов уже есть (`support.controller` `transition`/`escalate`/`mine`).
+  - **F-12** — точный смысл `?includeUnpaid=1` без исходного текста находки не восстановить; не выдумывал фильтр.
+- Осталось (не тронуто в этой сессии):
+  - **F-10** — серверная корзина/избранное. Подтверждено: моделей нет, web хранит в localStorage. Это НЕ фикс, а новая фича с Prisma-миграцией (самая рискованная зона по CLAUDE.md). Не начинал: рушить схему в спешке хуже честного «не сделано». План — модель `CustomerCart`/`CustomerFavorite`, GET/PUT под клиентским JWT, идемпотентный merge по `(customerId, sku)`, слияние localStorage↔сервер при логине.
+  - **F-06** — не миграция: enum `serialized|quantity`, дефолт уже `serialized` и в схеме, и в сервисе, смена при остатках закрыта `tracking_mode_in_use`. Разбор данных на проде за владельцем.
+  - **S-02 хвост** — блокировка после N неверных TOTP: у `StaffUser` нет счётчика, нужна миграция. Rate limit 5/60с и `MinLength(8)` уже есть.
+  - **L-8** — тестовые данные аудита (`TEST-SER-1`, `<script>…`, `audit_*`) в боевом каталоге: удаление прод-данных, согласование с владельцем.
+- Гейт: полный изолированный API — 229 сьютов + 1365 тестов зелёные; 2 «падения» (`hr`, `finance-settlements`) — известные флаки, каждый прошёл в изоляции (перепрыгивают между несвязанными сьютами от прогона к прогону). e2e web-checkout 7/7 на изолированной БД.
