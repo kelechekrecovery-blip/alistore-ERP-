@@ -107,11 +107,16 @@ export class HrService {
         select: { amount: true, receivedBy: true, shift: { select: { staffId: true } } },
       }),
     ]);
-    const staffIds = new Set<string>(schedules.map((row) => row.staffId));
-    payments.forEach((payment) => { const seller = soldBy(payment); if (seller) staffIds.add(seller); });
-    const staff = await tx.staffUser.findMany({ where: { id: { in: [...staffIds] } }, select: { id: true, username: true } });
+    const candidateIds = new Set<string>(schedules.map((row) => row.staffId));
+    payments.forEach((payment) => { const seller = soldBy(payment); if (seller) candidateIds.add(seller); });
+    const staff = await tx.staffUser.findMany({ where: { id: { in: [...candidateIds] } }, select: { id: true, username: true } });
     const names = new Map(staff.map((person) => [person.id, person.username]));
-    const lines = [...staffIds].map((staffId) => {
+    // Только реальные сотрудники. `soldBy` снимает префикс `staff:`, но не может
+    // отличить покупателя (его платёж несёт `receivedBy = <customerId>`) от
+    // сотрудника — это FK на StaffUser. Строка зарплаты на id покупателя роняла
+    // `HrPayrollLine` FK-violation'ом → 500; комиссия призраку не начисляется (F-03).
+    const staffIds = [...candidateIds].filter((id) => names.has(id));
+    const lines = staffIds.map((staffId) => {
       const plans = schedules.filter((row) => row.staffId === staffId);
       const approved = absences.filter((absence) => absence.staffId === staffId);
       const completed = plans.filter((row) => row.attendance?.checkedOutAt);

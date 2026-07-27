@@ -11,7 +11,7 @@ import {
 } from './risk-signals';
 import { buildKpi, SellerKpi, TOP_PRODUCTS_LIMIT, TopProduct } from './kpi';
 import { buildPayroll } from './payroll';
-import { sellerRevenueWhere } from './seller-revenue';
+import { normalizeSellerActor, sellerRevenueWhere } from './seller-revenue';
 import {
   buildRangeBuckets,
   buildRevenueBuckets,
@@ -138,7 +138,9 @@ export class ReportsService {
     };
 
     for (const row of direct) {
-      if (row.receivedBy) add(row.receivedBy, row._sum.amount ?? 0, row._count._all);
+      // `receivedBy` POS-платежа несёт префикс `staff:` — снимаем, чтобы он
+      // слился с чистым id того же сотрудника, а не висел отдельным продавцом (F-03).
+      if (row.receivedBy) add(normalizeSellerActor(row.receivedBy), row._sum.amount ?? 0, row._count._all);
     }
 
     // Смены читаем только те, что реально встретились в группировке.
@@ -155,7 +157,17 @@ export class ReportsService {
       }
     }
 
-    return [...totals.entries()].map(([staffId, value]) => ({ staffId, ...value }));
+    // Только реальные сотрудники: покупательский платёж пишет
+    // `receivedBy = <customerId>`, и без этого фильтра покупатель показывался
+    // отдельным «продавцом» с выручкой. Смены (viaShift) уже дают FK-staffId.
+    const realStaff = await this.prisma.staffUser.findMany({
+      where: { id: { in: [...totals.keys()] } },
+      select: { id: true },
+    });
+    const known = new Set(realStaff.map((row) => row.id));
+    return [...totals.entries()]
+      .filter(([staffId]) => known.has(staffId))
+      .map(([staffId, value]) => ({ staffId, ...value }));
   }
 
   /**

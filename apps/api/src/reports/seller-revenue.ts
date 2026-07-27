@@ -43,9 +43,27 @@ export interface SellerRevenuePayment {
   shift: { staffId: string } | null;
 }
 
+/** Actor-формат POS-платежа: `receivedBy = "staff:<id>"` (payments.controller). */
+const STAFF_ACTOR_PREFIX = 'staff:';
+
+/**
+ * Нормализует actor-значение к чистому идентификатору.
+ *
+ * POS пишет `receivedBy = "staff:<id>"`, а покупательский платёж — сырой
+ * `<customerId>`. Оба лежат в одном столбце. Здесь снимается только префикс
+ * `staff:`; отличить сотрудника от покупателя по строке нельзя — это делает
+ * потребитель, сверяясь с таблицей StaffUser (см. `hr.service`). Возвращать
+ * префиксный id наружу нельзя: он не резолвится в StaffUser.id и роняет
+ * `HrPayrollLine` FK-violation'ом (F-03).
+ */
+export function normalizeSellerActor(value: string): string {
+  return value.startsWith(STAFF_ACTOR_PREFIX) ? value.slice(STAFF_ACTOR_PREFIX.length) : value;
+}
+
 /** Сотрудник, которому принадлежит платёж, или null для исторических строк. */
 export function soldBy(payment: SellerRevenuePayment): string | null {
-  return payment.receivedBy ?? payment.shift?.staffId ?? null;
+  const raw = payment.receivedBy ?? payment.shift?.staffId ?? null;
+  return raw === null ? null : normalizeSellerActor(raw);
 }
 
 /** Плоские строки «сотрудник → сумма» для расчёта комиссии. */

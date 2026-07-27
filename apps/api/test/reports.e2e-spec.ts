@@ -33,6 +33,7 @@ describe('Reports (integration)', () => {
     await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
     await prisma.cashShift.deleteMany();
+    await prisma.staffUser.deleteMany({ where: { id: { in: ['kpi-seller-direct', 'kpi-seller-shift'] } } });
     await prisma.courierRun.deleteMany();
     await prisma.approval.deleteMany();
     await prisma.tradeInDevice.deleteMany();
@@ -323,6 +324,15 @@ describe('Reports (integration)', () => {
       ],
     });
 
+    // Продавцы — реальные StaffUser: KPI считает выручку только настоящим
+    // сотрудникам (F-03), покупательский платёж отдельным «продавцом» не висит.
+    await prisma.staffUser.createMany({
+      data: [
+        { id: 'kpi-seller-direct', username: `kpi-direct-${Date.now()}`, passwordHash: 'x', role: 'seller' },
+        { id: 'kpi-seller-shift', username: `kpi-shift-${Date.now()}`, passwordHash: 'x', role: 'seller' },
+      ],
+      skipDuplicates: true,
+    });
     // Продавец определяется как `receivedBy`, а при его отсутствии — по смене.
     const shift = await prisma.cashShift.create({
       data: { staffId: 'kpi-seller-shift', point: 'BISHKEK-1', openCash: 0 },
