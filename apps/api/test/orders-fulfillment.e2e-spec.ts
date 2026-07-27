@@ -73,6 +73,35 @@ describe('Order fulfillment metadata', () => {
     });
   });
 
+  // F-07 — «fulfillmentType необязателен» не воспроизводится как дыра.
+  //
+  // Находка предлагала сделать поле обязательным (@IsNotEmpty). Это сломало бы
+  // ровно то поведение, что закреплено тестом «defaults native staff sales to
+  // in-store» ниже, и не закрыло бы ничего: публичный вход `createFromCatalog`
+  // не создаёт курьерский заказ без адреса — он падает на нём. Пропуск поля не
+  // «просачивает» заказ.
+  //
+  // Тест намеренно бьёт по `createFromCatalog` (то, что вызывает контроллер для
+  // покупателя и гостя — `orders.controller.ts:69,204`), а не по низкоуровневому
+  // `create`, который исполняет уже проверенный dto. Проверка адреса
+  // (`orders.service.ts:177`) безусловна и не зависит от того, подключён ли
+  // logistics-сервис.
+  it('F-07: courier без адреса доставки отклоняется на публичном входе', async () => {
+    const c = await customer();
+    await expect(
+      orders.createFromCatalog(
+        {
+          customerId: c.id,
+          channel: 'web',
+          fulfillmentType: 'courier',
+          total: 100000,
+          items: [{ sku: 'COURIER-SKU', qty: 1, price: 100000 }],
+        },
+        'system',
+      ),
+    ).rejects.toMatchObject({ code: 'delivery_address_required' });
+  });
+
   it('defaults native staff sales to in-store fulfillment', async () => {
     const c = await customer();
     const order = await orders.create(
