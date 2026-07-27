@@ -51,10 +51,9 @@ describe('Health (terminus)', () => {
     await prisma.$disconnect();
   });
 
-  it('GET /health → ok with the database up', async () => {
+  it('GET /health → ok (public probe, no component detail — see S-07)', async () => {
     const res = await request(app.getHttpServer()).get('/health').expect(200);
-    expect(res.body.status).toBe('ok');
-    expect(res.body.details.database.status).toBe('up');
+    expect(res.body).toEqual({ status: 'ok' });
   });
 
   it('GET /health/live → ok (liveness)', async () => {
@@ -67,6 +66,7 @@ describe('Health (terminus)', () => {
   it('GET /health/ready → DB and heap readiness', async () => {
     const response = await request(app.getHttpServer()).get('/health/ready').expect(200);
     expect(response.body.status).toBe('ok');
+    // The probe still runs both indicators — only the response body is quiet.
     expect(memory.checkHeap).toHaveBeenCalledWith('memory_heap', 1536 * 1024 * 1024);
   });
 

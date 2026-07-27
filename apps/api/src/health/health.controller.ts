@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   HealthCheck,
@@ -34,25 +34,57 @@ export class HealthController {
 
   /** Readiness — DB reachable + heap sane. For orchestrators / load balancers. */
   @Get()
-  @HealthCheck()
   check() {
     return this.ready();
   }
 
   /** Explicit readiness alias for managed-cloud probes. */
   @Get('ready')
-  @HealthCheck()
-  ready() {
-    return this.health.check([
-      () => this.db.pingCheck('database', this.prisma),
-      () => this.memory.checkHeap('memory_heap', READINESS_HEAP_LIMIT_BYTES),
-    ]);
+  async ready() {
+    try {
+      await this.probe();
+    } catch {
+      throw new ServiceUnavailableException();
+    }
+    return { status: 'ok' as const };
   }
 
   /** Liveness — the process is up (no dependencies checked). */
   @Get('live')
   live() {
-    return { status: 'ok' };
+    return { status: 'ok' as const };
+  }
+
+  /**
+   * Полная диагностика — та же проверка, что и `/health/ready`, но с составом.
+   *
+   * Публичные пробы намеренно отвечают одним `{status:"ok"}`: балансировщику
+   * достаточно кода ответа, а перечень компонентов и порог кучи — это карта
+   * внутренностей, которую анониму знать незачем. Диагностика не потеряна,
+   * она просто требует staff-токена.
+   */
+  @Get('details')
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('reports', 'read')
+  @HealthCheck()
+  details() {
+    return this.probe();
+  }
+
+  /**
+   * Собственно проверка. Публичные обёртки гасят её отчёт до кода ответа,
+   * staff-эндпойнт отдаёт как есть.
+   *
+   * Terminus кладёт в тело 503 полный отчёт — с именем упавшего индикатора и
+   * его сообщением. Для публичной пробы это означало бы, что деградация БД
+   * становится публичным событием, а состав сервиса — читаемым без всякой
+   * авторизации.
+   */
+  private probe() {
+    return this.health.check([
+      () => this.db.pingCheck('database', this.prisma),
+      () => this.memory.checkHeap('memory_heap', READINESS_HEAP_LIMIT_BYTES),
+    ]);
   }
 
   /**
