@@ -1,9 +1,10 @@
 import {
-  Patch, Body, Controller, ForbiddenException, Get, HttpCode, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+  Patch, Body, Controller, ForbiddenException, Get, HttpCode, NotFoundException, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { StaffUser } from '@prisma/client';
 import { StaffAuthService } from './staff-auth.service';
+import { isStaffBootstrapAvailable } from './staff-bootstrap-availability';
 import { BootstrapOwnerDto, ChangeStaffRoleDto,
   CreateStaffDto,
   ResetStaffPasswordDto, StaffLoginDto, StaffTotpTokenDto } from './staff-auth.dto';
@@ -29,6 +30,7 @@ export class StaffAuthController {
   /** Есть ли уже персонал — веб решает, показать логин или форму первого владельца. */
   @Get('bootstrap-status')
   async bootstrapStatus() {
+    this.assertBootstrapAvailable();
     return { needsBootstrap: await this.staffAuth.needsBootstrap() };
   }
 
@@ -37,9 +39,23 @@ export class StaffAuthController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async bootstrap(@Body() dto: BootstrapOwnerDto) {
+    this.assertBootstrapAvailable();
     return this.publicView(
       await this.staffAuth.bootstrapOwner(dto.username, dto.password),
     );
+  }
+
+  /**
+   * В production маршрутов bootstrap не существует.
+   *
+   * Именно 404, а не 403: 403 подтверждает, что маршрут есть, и превращает
+   * сканирование в разведку. Веб-клиент уже fail-closed — на любой не-200 он
+   * показывает форму входа (`apps/web/lib/api/staff-auth.ts`), так что 404
+   * ничего не ломает.
+   */
+  private assertBootstrapAvailable(): void {
+    if (isStaffBootstrapAvailable((name) => process.env[name])) return;
+    throw new NotFoundException();
   }
 
   /** Staff login → { accessToken, role }. */
