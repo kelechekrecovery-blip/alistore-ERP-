@@ -65,6 +65,51 @@ export function resolveTrustProxy(env: RuntimeEnvReader): number | false {
   return hops === 0 ? false : hops;
 }
 
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1']);
+
+/** Хост, по которому процесс доступен извне, а не с машины разработчика. */
+export function isPublicHostname(host: string): boolean {
+  const value = host.trim().toLowerCase();
+  if (!value) return false;
+  if (LOCAL_HOSTNAMES.has(value) || value.endsWith('.local') || value.endsWith('.localhost')) return false;
+  // Голый IPv4 из приватных диапазонов — это не публичный хостнейм.
+  if (/^10\./.test(value) || /^192\.168\./.test(value) || /^172\.(1[6-9]|2\d|3[01])\./.test(value)) return false;
+  return value.includes('.');
+}
+
+/**
+ * Не обслуживать публичный хост в не-production режиме.
+ *
+ * `NODE_ENV` — единственный переключатель для целого семейства защит: подавления
+ * `devCode` в ответе OTP (`auth.service.ts`), флага `Secure` на session-cookie,
+ * allowed-hosts middleware, токена на `/api/metrics` и fail-closed на транспорт
+ * уведомлений. Развёрнутый прод однажды уже работал с `NODE_ENV != production`,
+ * и это отдавало коды подтверждения в ответе API — захват аккаунта по одному
+ * номеру телефона.
+ *
+ * Поймать это было нечем: `production-preflight` при не-production сам выходит в
+ * начале, то есть гейт выключался тем же значением, которое должен был ловить.
+ *
+ * Проверка опирается на **фактический `Host` запроса**, а не на конфиг: конфиг
+ * врать может (локальный `.env` совершенно законно держит продовые
+ * `CORS_ORIGINS`, чтобы отлаживаться против боевой витрины), а хост, по которому
+ * пришёл запрос, — это ground truth. Локальная разработка не задевается вовсе.
+ *
+ * Стенд на публичном домене, которому не-production нужен осознанно, ставит
+ * `ALLOW_NON_PRODUCTION_PUBLIC_HOST=true`. По умолчанию — закрыто.
+ */
+export function assertProductionModeForPublicHost(env: RuntimeEnvReader, host: string): void {
+  if (env('NODE_ENV') === 'production') return;
+  if (env('ALLOW_NON_PRODUCTION_PUBLIC_HOST')?.trim().toLowerCase() === 'true') return;
+  if (!isPublicHostname(host)) return;
+  throw new Error(
+    `Refusing to serve public host ${host} with NODE_ENV=${env('NODE_ENV') ?? '<unset>'}. `
+    + 'In this mode OTP codes are returned in API responses, session cookies lose Secure, '
+    + 'allowed-hosts and metrics auth are skipped, and notifications silently degrade to a log '
+    + 'stub. Set NODE_ENV=production, or ALLOW_NON_PRODUCTION_PUBLIC_HOST=true for a staging box.',
+  );
+}
+
 export function resolveAllowedHosts(env: RuntimeEnvReader): string[] {
   const hosts = (env('ALLOWED_HOSTS') ?? '')
     .split(',')
@@ -84,6 +129,12 @@ export function resolveAllowedHosts(env: RuntimeEnvReader): string[] {
 export function allowedHostsMiddleware(env: RuntimeEnvReader): RequestHandler {
   const allowed = resolveAllowedHosts(env);
   return (request, response, next) => {
+    const requestHost = (request.headers.host ?? '').split(':', 1)[0].toLowerCase();
+    // Health оставляем открытым всегда: балансировщику нужно знать состояние
+    // даже у процесса, который мы отказываемся выпускать наружу.
+    if (!request.path.startsWith('/api/health/')) {
+      assertProductionModeForPublicHost(env, requestHost);
+    }
     if (env('NODE_ENV') !== 'production' || request.path.startsWith('/api/health/')) {
       next();
       return;
