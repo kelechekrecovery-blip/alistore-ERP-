@@ -712,6 +712,17 @@ export class OrdersService {
         throw new ConflictError('paid_order_cancel_requires_return', 'Оплаченный заказ отменяется через возврат и refund');
       }
       assertTransition(order.status, to);
+      // `reserved` ставит только резерв стока. Ребро `created→reserved` валидно и
+      // нужно `reserve()`/`fulfill()`, но generic-переход зовёт лишь
+      // `assertTransition`, минуя блокировку юнитов: заказ помечался
+      // «зарезервирован» без стока и взрывался позже на picking. Отсекаем здесь —
+      // так же, как `paid` ставит только сервис оплаты (F-15*).
+      if (to === 'reserved') {
+        throw new ValidationError(
+          'order_reserve_requires_service',
+          'Статус reserved ставит только резерв стока — POST /orders/:id/reserve',
+        );
+      }
       if (order.status === 'reserved' && to === 'picking' && order.paymentMode !== 'cod') {
         throw new ValidationError('cod_picking_required', 'Неоплаченный заказ можно собирать только в режиме COD');
       }
