@@ -338,7 +338,7 @@ describe('ACCESS-STAFF-BATCH: SEC-010 + STAFF-002 + STAFF-001', () => {
       await request(server)
         .post('/staff-auth/staff')
         .set('Authorization', `Bearer ${admin.token}`)
-        .send({ username: legitimate, password: 'pass', role: 'cashier' })
+        .send({ username: legitimate, password: 'Str0ng-Pass!26', role: 'cashier' })
         .expect(201);
     });
   });

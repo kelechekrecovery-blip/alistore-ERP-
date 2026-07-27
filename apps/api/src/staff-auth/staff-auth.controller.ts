@@ -5,6 +5,7 @@ import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { StaffUser } from '@prisma/client';
 import { StaffAuthService } from './staff-auth.service';
 import { isStaffBootstrapAvailable } from './staff-bootstrap-availability';
+import { assertStrongPassword } from './password-policy';
 import { BootstrapOwnerDto, ChangeStaffRoleDto,
   CreateStaffDto,
   ResetStaffPasswordDto, StaffLoginDto, StaffTotpTokenDto } from './staff-auth.dto';
@@ -40,6 +41,7 @@ export class StaffAuthController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async bootstrap(@Body() dto: BootstrapOwnerDto) {
     this.assertBootstrapAvailable();
+    assertStrongPassword(dto.password);
     return this.publicView(
       await this.staffAuth.bootstrapOwner(dto.username, dto.password),
     );
@@ -105,6 +107,7 @@ export class StaffAuthController {
   @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
   @RequirePermission('staff', 'manage')
   async createStaff(@Body() dto: CreateStaffDto) {
+    assertStrongPassword(dto.password);
     return this.publicView(
       await this.staffAuth.createStaff(dto.username, dto.password, dto.role, dto.point),
     );
@@ -194,6 +197,7 @@ export class StaffAuthController {
   @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
   @RequirePermission('staff', 'manage')
   resetPassword(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: ResetStaffPasswordDto) {
+    assertStrongPassword(dto.password);
     return this.staffAuth.resetPasswordByAdmin(user.customerId, id, dto.password);
   }
 

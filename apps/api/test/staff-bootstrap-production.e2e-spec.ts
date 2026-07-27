@@ -93,7 +93,7 @@ describe('Bootstrap первого владельца закрыт в production
       await request(app.getHttpServer()).get('/staff-auth/bootstrap-status').expect(200);
       await request(app.getHttpServer())
         .post('/staff-auth/bootstrap')
-        .send({ username: 'owner-x', password: 'longenough1' })
+        .send({ username: 'owner-x', password: 'Str0ng-Pass!26' })
         .expect(201);
       expect(staffAuth.bootstrapOwner).toHaveBeenCalled();
     });

@@ -53,7 +53,7 @@ describe('Staff management guard (owner-only, casbin)', () => {
     const created = await request(server)
       .post('/staff-auth/staff')
       .set('Authorization', `Bearer ${owner}`)
-      .send({ username: `new-${RUN}`, password: 'p', role: 'cashier', point: 'OSH-1' })
+      .send({ username: `new-${RUN}`, password: 'Str0ng-Pass!26', role: 'cashier', point: 'OSH-1' })
       .expect(201);
     expect(created.body).toMatchObject({ role: 'cashier', point: 'OSH-1' });
 
@@ -67,6 +67,26 @@ describe('Staff management guard (owner-only, casbin)', () => {
       .post('/staff-auth/staff')
       .send({ username: `anon-${RUN}`, password: 'p', role: 'cashier' })
       .expect(401);
+  });
+
+  it('F-19: owner cannot create staff with a weak password', async () => {
+    const owner = await login('owner');
+    const server = app.getHttpServer();
+
+    // 12+ длина, но один класс символов — политика обязана отклонить.
+    const weak = await request(server)
+      .post('/staff-auth/staff')
+      .set('Authorization', `Bearer ${owner}`)
+      .send({ username: `weak-${RUN}`, password: 'aaaaaaaaaaaa', role: 'cashier' })
+      .expect(422);
+    expect(weak.body.code ?? weak.body.error).toContain('password_too_weak');
+
+    // Сильный проходит — политика не мешает нормальной работе.
+    await request(server)
+      .post('/staff-auth/staff')
+      .set('Authorization', `Bearer ${owner}`)
+      .send({ username: `strong-${RUN}`, password: 'Str0ng-Pass!26', role: 'cashier' })
+      .expect(201);
   });
 
   it('me returns the authenticated staff principal', async () => {
@@ -121,7 +141,7 @@ describe('Staff management guard (owner-only, casbin)', () => {
     await login('owner'); // ensure at least one staff row exists
     await request(app.getHttpServer())
       .post('/staff-auth/bootstrap')
-      .send({ username: `boot-${RUN}`, password: 'owner-strong-pass' })
+      .send({ username: `boot-${RUN}`, password: 'Str0ng-Pass!26' })
       .expect(422);
   });
 
