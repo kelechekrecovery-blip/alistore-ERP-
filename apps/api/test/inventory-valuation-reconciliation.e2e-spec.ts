@@ -157,6 +157,56 @@ describe('Inventory valuation reconciliation (integration)', () => {
     expect(completed.summary.difference).toBe(baseline.summary.difference);
   });
 
+  it('F-08: ranks the SKUs that drive the inconsistency so the difference is traceable', async () => {
+    // Расхождение как факт («difference: -126500, inconsistentQuantityRows: 3»)
+    // не говорит, КАКОЙ товар его даёт. topDiscrepancies отвечает на этот вопрос:
+    // строки-нарушители, отсортированные по вкладу, без ручного SQL по проду.
+    const big = await prisma.product.create({
+      data: {
+        sku: `RECON-${run}-BIG`, name: 'Big drift', category: 'accessories',
+        price: 2000, cost: 1000, trackingMode: 'quantity', attrs: {},
+      },
+    });
+    const small = await prisma.product.create({
+      data: {
+        sku: `RECON-${run}-SMALL`, name: 'Small drift', category: 'accessories',
+        price: 2000, cost: 1000, trackingMode: 'quantity', attrs: {},
+      },
+    });
+    // Слой стоит дороже, чем записано в inventoryValue → valueDifference > 0.
+    for (const [product, layerValue, bookValue] of [[big, 100_000, 3_500], [small, 12_000, 9_000]] as const) {
+      const balance = await prisma.inventoryBalance.create({
+        data: { productId: product.id, location: 'RECON-DRIFT', onHand: 5, inventoryValue: bookValue },
+      });
+      await prisma.inventoryValuationLayer.create({
+        data: {
+          productId: product.id, balanceId: balance.id, location: 'RECON-DRIFT',
+          sourceType, sourceRef: `drift-${product.sku}`, unitCost: layerValue / 5,
+          quantityReceived: 5, quantityRemaining: 5,
+        },
+      });
+    }
+
+    const report = await inventory.valuationReconciliation();
+
+    expect(report.summary).toHaveProperty('topDiscrepancies');
+    const top = report.summary.topDiscrepancies;
+    const bigEntry = top.find((row) => row.productId === big.id);
+    const smallEntry = top.find((row) => row.productId === small.id);
+
+    expect(bigEntry).toMatchObject({ sku: big.sku, location: 'RECON-DRIFT', valueDifference: 96_500 });
+    expect(smallEntry).toMatchObject({ sku: small.sku, valueDifference: 3_000 });
+
+    // Наибольший вклад — первым: оператор видит главного виновника сразу.
+    const bigIndex = top.findIndex((row) => row.productId === big.id);
+    const smallIndex = top.findIndex((row) => row.productId === small.id);
+    expect(bigIndex).toBeLessThan(smallIndex);
+
+    // Согласованные строки в список не попадают — это перечень нарушителей.
+    expect(top.every((row) => row.valueDifference !== 0 || row.quantityDifference !== 0
+      || row.reservationDifference !== 0 || (row.missingCostUnits ?? 0) > 0)).toBe(true);
+  });
+
   async function postInventoryDebit(amount: number, ref: string) {
     await prisma.accountingJournalEntry.create({
       data: {
