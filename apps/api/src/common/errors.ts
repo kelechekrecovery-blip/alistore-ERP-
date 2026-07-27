@@ -25,6 +25,17 @@ export class ConflictError extends DomainError {
 }
 
 /** 403 — role/permission check failed on the server. */
+/**
+ * 401 — «мы не знаем, кто вы»: учётные данные неполны или неверны.
+ * Отличается от `ForbiddenError` (403 — «знаем, но нельзя»): неудачный вход это
+ * первое, а не второе.
+ */
+export class UnauthorizedError extends DomainError {
+  constructor(code: string, message: string) {
+    super(HttpStatus.UNAUTHORIZED, code, message);
+  }
+}
+
 export class ForbiddenError extends DomainError {
   constructor(code: string, message: string) {
     super(HttpStatus.FORBIDDEN, code, message);

@@ -47,7 +47,7 @@ export class StaffAuthController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // anti brute-force on staff passwords
   async login(@Body() dto: StaffLoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    const tokens = await this.staffAuth.login(dto.username, dto.password);
+    const tokens = await this.staffAuth.login(dto.username, dto.password, dto.totp);
     if (isStaffWebSessionRequest(request)) setStaffSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
     if (isStaffWebSessionRequest(request)) {
       const { refreshToken: _refreshToken, ...safe } = tokens;

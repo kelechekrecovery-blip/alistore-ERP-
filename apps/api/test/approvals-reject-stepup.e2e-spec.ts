@@ -37,7 +37,9 @@ describe('Approvals: reject requires a 2FA step-up', () => {
     const staff = await staffAuth.createStaff(username, 'pass', 'admin');
     totpSecret = authenticator.generateSecret();
     await prisma.staffUser.update({ where: { id: staff.id }, data: { totpSecret, totpEnabled: true } });
-    adminToken = (await staffAuth.login(username, 'pass')).accessToken;
+    // F-14: при включённой 2FA вход требует код. Логин код НЕ гасит, поэтому
+    // step-up ниже в том же окне проходит тем же кодом.
+    adminToken = (await staffAuth.login(username, 'pass', authenticator.generate(totpSecret))).accessToken;
   });
 
   afterAll(async () => {

@@ -47,7 +47,9 @@ describe('StaffAuth (login → role in JWT)', () => {
     expect(enabled.totpEnabled).toBe(true);
     expect(enabled).not.toHaveProperty('totpSecret');
 
-    const login = await service.login(username, 'strong-pass');
+    // F-14: после включения 2FA вход без кода больше не выдаёт токен.
+    await expect(service.login(username, 'strong-pass')).rejects.toMatchObject({ code: 'totp_required' });
+    const login = await service.login(username, 'strong-pass', authenticator.generate(setup.secret));
     expect(login.totpEnabled).toBe(true);
   });
 

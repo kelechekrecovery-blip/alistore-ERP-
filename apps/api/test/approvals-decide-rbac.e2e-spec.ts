@@ -44,7 +44,8 @@ describe('Approvals RBAC characterization: senior_seller cannot decide refund or
     const staff = await staffAuth.createStaff(username, 'pass', 'senior_seller');
     totpSecret = authenticator.generateSecret();
     await prisma.staffUser.update({ where: { id: staff.id }, data: { totpSecret, totpEnabled: true } });
-    seniorSellerToken = (await staffAuth.login(username, 'pass')).accessToken;
+    // F-14: при включённой 2FA вход требует код.
+    seniorSellerToken = (await staffAuth.login(username, 'pass', authenticator.generate(totpSecret))).accessToken;
   });
 
   afterAll(async () => {

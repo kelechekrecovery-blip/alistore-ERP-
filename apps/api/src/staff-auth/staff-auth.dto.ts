@@ -1,9 +1,17 @@
 import { Role } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class StaffLoginDto {
   @IsString() @IsNotEmpty() username!: string;
   @IsString() @IsNotEmpty() password!: string;
+
+  /**
+   * Код 2FA. Необязателен в схеме, но обязателен по факту для учётки с
+   * включённой 2FA — иначе `login` вернёт 401 `totp_required`. Необязательным
+   * оставлен намеренно: контракт входа для учёток без 2FA не меняется, а
+   * POS-офлайн-клиент мог закэшировать старую схему.
+   */
+  @IsOptional() @IsString() @MaxLength(16) totp?: string;
 }
 
 /**

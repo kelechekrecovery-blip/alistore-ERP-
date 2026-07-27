@@ -4,7 +4,7 @@ import { Prisma, Role, StaffUser } from '@prisma/client';
 import { createHash, randomBytes } from 'node:crypto';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
-import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
+import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from '../common/errors';
 import { TotpService } from '../auth/totp.service';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -75,7 +75,18 @@ export class StaffAuthService {
   }
 
   /** Staff login → JWT carrying the role (server-authoritative authorization). */
-  async login(username: string, password: string): Promise<StaffTokens> {
+  /**
+   * Вход сотрудника. При включённой 2FA код обязателен.
+   *
+   * F-14: раньше `login` проверял только пароль и сразу выдавал accessToken,
+   * даже при `totpEnabled: true`. То есть двухфакторка не защищала ровно тот
+   * вход, ради которого её включают: одобрение опасных действий код требовало, а
+   * сам вход — нет.
+   *
+   * Порядок проверок намеренный: пароль первым. Иначе ответ отличал бы «пароль
+   * верен, нужен код» от «пароль неверен» и стал бы оракулом для подбора.
+   */
+  async login(username: string, password: string, totp?: string): Promise<StaffTokens> {
     const staff = await this.prisma.staffUser.findUnique({ where: { username } });
     const ok =
       staff && staff.active
@@ -87,7 +98,37 @@ export class StaffAuthService {
         'Неверный логин или пароль',
       );
     }
+    if (staff.totpEnabled) {
+      this.assertLoginTotp(staff, totp);
+    }
     return this.issueTokens(staff);
+  }
+
+  /**
+   * Проверяет код входа — и намеренно НЕ гасит его.
+   *
+   * Гашение (`totpLastToken`) принадлежит step-up: оно не даёт одним кодом
+   * одобрить два опасных действия. Если тем же слотом гасить вход, ломается
+   * реальный сценарий «владелец вошёл и сразу одобрил возврат»: код уже потрачен
+   * логином, и одобрение падает с `staff_2fa_token_reused` — на денежном
+   * действии, из-за входа. Это поймалось не рассуждением, а падением
+   * `approvals-reject-stepup`, где вход и step-up идут в одном 30-секундном окне.
+   *
+   * Повтор кода на самом входе прикрыт иначе: нужен ещё и пароль, окно кода —
+   * 30 секунд, а на маршруте стоит лимит 10 попыток в минуту.
+   */
+  private assertLoginTotp(staff: StaffUser, totp?: string): void {
+    if (!staff.totpSecret) {
+      // totpEnabled без секрета — сломанная учётка; молча пускать нельзя.
+      throw new UnauthorizedError('totp_required', 'Нужен код двухфакторной аутентификации');
+    }
+    const token = totp?.trim();
+    if (!token) {
+      throw new UnauthorizedError('totp_required', 'Нужен код двухфакторной аутентификации');
+    }
+    if (!this.totp.verify(token, staff.totpSecret)) {
+      throw new UnauthorizedError('totp_invalid', 'Неверный код двухфакторной аутентификации');
+    }
   }
 
   async refresh(refreshToken: string): Promise<StaffTokens> {
