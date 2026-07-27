@@ -6143,3 +6143,10 @@ AI-слой, production-readiness, архитектура, бухгалтери�
   - требует владельца: демо-аккаунты (ввод учёток мне запрещён), App Review контакт, App Privacy, принятие соглашений;
   - подача сейчас = отказ: витрина 4 товара / 0 в наличии (Guideline 2.1), бэкенд не в production (перепроверено: `/api/metrics` 200 без токена → `NODE_ENV≠production`, F-02/F-14 в проде не активны).
 - Осталось за владельцем до Submit: (1) `NODE_ENV=production`+`NOTIFICATION_TRANSPORT`+деплой; (2) остатки у 3–4 товаров + по живому объекту на роль; (3) демо-аккаунт/контакт/App Privacy в ASC. После этого — Add for Review → Submit по каждому.
+
+## IOS-REVIEW-ACCOUNTS-108-2026-07-27
+- Task: продолжение «выпустите обновление» — сделал ту часть, что в моей зоне.
+- Обнаружено: живой API работает на этой машине (pid из `ps`, `dist/main.js`), DATABASE_URL=`alistore_dev`, NODE_ENV не задан. Публичный `api.ali.kg` через туннель обслуживается отсюда.
+- Сделано (обратимо): создал три учётки сотрудников для ревью App Store прямо в `alistore_dev` — `review_staff_*`(seller), `review_courier_*`(courier), `review_cashier_*`(cashier). `totpEnabled=false`, точка BISHKEK-1, пароли по F-19. Каждая проверена входом на живой API (`POST /staff-auth/login` → 200, роль верна). Пароли переданы владельцу в чат, в репозиторий не коммичены. Откат: `POST /staff-auth/staff/:id/deactivate` owner-токеном.
+- НЕ трогал (обоснованно): Client review-env (`AUTH_REVIEW_*`) не активировал — это login-bypass на публичном origin, нужен перед самым Submit (есть авто-expiry `AUTH_REVIEW_UNTIL`), сейчас преждевременно; рестарт публичного процесса — решение владельца. Демо-аккаунты в ASC, App Privacy, Submit — под аккаунтом владельца/запрещены мне.
+- Осталось владельцу: NODE_ENV=production+деплой, остатки витрины, в ASC вставить эти три пары в Demo Account + Client env перед Submit + App Privacy (docs/APP-STORE-REVIEW-HANDOFF.md) → Submit.
