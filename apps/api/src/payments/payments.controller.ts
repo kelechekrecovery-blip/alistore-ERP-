@@ -1,18 +1,4 @@
-import {
-  Body,
-  BadRequestException,
-  Controller,
-  Get,
-  Headers,
-  HttpCode,
-  Param,
-  Post,
-  Query,
-  Req,
-  UnauthorizedException,
-  Optional,
-  UseGuards,
-} from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, HttpCode, Inject, Optional, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
   ApiBearerAuth,
@@ -34,7 +20,10 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { PermissionGuard } from '../authz/permission.guard';
+import { ConfigService } from '@nestjs/config';
+import { PAYMENT_GATEWAY_PROVIDER, PaymentGatewayProvider } from './payment-gateway-provider';
 import { SandboxConfirmGuard } from './sandbox-confirm.guard';
+import { resolveCustomerPaymentMethods } from './payment-methods-availability';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
@@ -50,8 +39,28 @@ export class PaymentsController {
     private readonly payments: PaymentsService,
     private readonly intents: PaymentIntentsService,
     private readonly staffAuth: StaffAuthService,
+    private readonly config: ConfigService,
+    @Inject(PAYMENT_GATEWAY_PROVIDER) private readonly gateway: PaymentGatewayProvider,
     @Optional() private readonly refunds?: RefundsService,
   ) {}
+
+  /**
+   * Способы оплаты, которые витрина вправе предложить. Публичный: гость на
+   * чекауте должен знать это до входа.
+   *
+   * F-01: список был константой во фронте, и покупатель видел «Картой» там, где
+   * сервер не мог довести оплату до конца — заказ навсегда оставался в
+   * `awaiting_payment`.
+   */
+  @ApiOperation({ summary: 'Payment methods the storefront may offer (server truth)' })
+  @ApiOkResponse({ description: '{ online: boolean, methods: PaymentMethod[] }' })
+  @Get('methods')
+  paymentMethods() {
+    return resolveCustomerPaymentMethods(
+      this.gateway.name,
+      (name: string) => this.config.get<string>(name),
+    );
+  }
 
   @ApiOperation({ summary: 'List payments by order or cash shift' })
   @ApiQuery({ name: 'orderId', required: false })

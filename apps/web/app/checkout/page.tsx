@@ -30,6 +30,8 @@ import { loadAttribution } from '@/lib/attribution';
 import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
 import { guestOrderLink, saveGuestOrderAccess } from '@/lib/guest-order-access';
+import { resolveCheckoutPaymentOptions } from '@/lib/checkout-payment-options';
+import { fetchPaymentMethods, type ServerPaymentMethods } from '@/lib/api/payments';
 import { Banknote, CalendarClock, CreditCard, QrCode, Smartphone, Store, Truck, Zap } from 'lucide-react';
 
 const DELIVERY = [
@@ -95,6 +97,10 @@ export default function CheckoutPage() {
   // были привилегией курьера, и самовывоз — способ получения по умолчанию —
   // оставался без единого рабочего метода оплаты: онлайн-оплата отдаёт 503.
   const cashAllowed = delivery !== 'express';
+  // F-01: способы оплаты берём с сервера. Раньше список был константой, и
+  // покупатель видел «Картой» там, где сервер не мог довести оплату до конца.
+  const [serverPayment, setServerPayment] = useState<ServerPaymentMethods | null>(null);
+  const [paymentProbed, setPaymentProbed] = useState(false);
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
@@ -135,8 +141,23 @@ export default function CheckoutPage() {
 
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user]);
   useEffect(() => {
-    if (!cashAllowed && payment === 'cash') setPayment('card');
-  }, [cashAllowed, payment]);
+    void fetchPaymentMethods().then((result) => { setServerPayment(result); setPaymentProbed(true); });
+  }, []);
+
+  const paymentOptions = resolveCheckoutPaymentOptions({
+    serverMethods: serverPayment?.methods ?? null,
+    online: serverPayment?.online ?? false,
+    cashAllowed,
+  });
+
+  useEffect(() => {
+    if (!paymentProbed) return;
+    // Выбранный способ мог исчезнуть: сменили доставку на экспресс или сервер
+    // сказал, что онлайна нет. Молча оставлять недоступный выбор нельзя.
+    if (paymentOptions.options.length > 0 && !paymentOptions.options.includes(payment)) {
+      setPayment(paymentOptions.options[0]);
+    }
+  }, [paymentProbed, paymentOptions.options, payment]);
   useEffect(() => {
     if (!authHydrated) return;
     if (!user) {
@@ -504,7 +525,15 @@ export default function CheckoutPage() {
         {step === 2 && (
           <>
             <div className="mb-3 font-display text-base font-bold">Оплата</div>
-            {PAYMENT.filter((p) => p.id !== 'cash' || cashAllowed).map((p) => (
+            {paymentOptions.notice && (
+              <p
+                role={paymentOptions.blocked ? 'alert' : undefined}
+                className={`mb-3 rounded-[11px] border p-3 text-sm ${paymentOptions.blocked ? 'border-warn text-warn' : 'border-surface-3 text-subtle'}`}
+              >
+                {paymentOptions.notice}
+              </p>
+            )}
+            {PAYMENT.filter((p) => paymentOptions.options.includes(p.id)).map((p) => (
               <button key={p.id} type="button" aria-pressed={payment === p.id} onClick={() => setPayment(p.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-surface-2 p-3.5 text-left ${payment === p.id ? 'border-lime' : 'border-surface-3'}`}>
                 <p.icon size={20} className="text-ink" />
                 <span className="flex-1 text-sm">{p.name}</span>

@@ -1,4 +1,4 @@
-import { postAuthJson, postJson } from './http';
+import { API_BASE, postAuthJson, postJson } from './http';
 
 export type OnlinePaymentMethod = 'card' | 'qr_mbank' | 'qr_odengi' | 'installment';
 export type PaymentMethod = OnlinePaymentMethod | 'cash' | 'gift_card';
@@ -112,4 +112,24 @@ export function requestReturnRefund(
     accessToken,
     { 'idempotency-key': idempotencyKey },
   );
+}
+
+export interface ServerPaymentMethods {
+  online: boolean;
+  methods: string[];
+}
+
+/**
+ * Что сервер реально умеет провести. `null` — спросить не удалось; вызывающий
+ * обязан отличать это от «онлайна нет», а не подставлять пустоту.
+ */
+export async function fetchPaymentMethods(): Promise<ServerPaymentMethods | null> {
+  try {
+    const response = await fetch(`${API_BASE}/payments/methods`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`payment methods responded ${response.status}`);
+    return (await response.json()) as ServerPaymentMethods;
+  } catch (error) {
+    console.error('[payments] methods fetch failed', error);
+    return null;
+  }
 }
