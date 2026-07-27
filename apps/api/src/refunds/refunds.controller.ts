@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { requireActiveStaff } from '../auth/staff-principal';
 import { PermissionGuard } from '../authz/permission.guard';
+import { RetryRefundDto } from './refunds.dto';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { CancelRefundDto, CreateRefundDto, ResolveRefundDto } from './refunds.dto';
@@ -46,9 +47,9 @@ export class RefundsController {
   @Post('refunds/:id/retry')
   @RequirePermission('refunds', 'retry')
   @ApiOperation({ summary: 'Retry queued or failed refund allocations safely' })
-  async retry(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+  async retry(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto?: RetryRefundDto) {
     const actor = await requireActiveStaff(user, this.staffAuth);
-    await this.processor.processRefund(id, actor);
+    await this.processor.processRefund(id, actor, dto?.shiftId ? { shiftId: dto.shiftId } : undefined);
     return this.refunds.get(id);
   }
 

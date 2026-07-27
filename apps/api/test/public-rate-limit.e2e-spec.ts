@@ -7,6 +7,7 @@ import { CustomersService } from '../src/customers/customers.service';
 import { OrdersController } from '../src/orders/orders.controller';
 import { OrdersService } from '../src/orders/orders.service';
 import { PaymentsController } from '../src/payments/payments.controller';
+import { PAYMENT_GATEWAY_PROVIDER } from '../src/payments/payment-gateway-provider';
 import { PaymentIntentsService } from '../src/payments/payment-intents.service';
 import { PaymentsService } from '../src/payments/payments.service';
 import { RateLimitModule } from '../src/rate-limit/rate-limit.module';
@@ -29,6 +30,8 @@ describe('public endpoint rate limits', () => {
       imports: [ConfigModule.forRoot({ isGlobal: true }), RateLimitModule],
       controllers: [CustomersController, OrdersController, PaymentsController, SupportController],
       providers: [
+        // GET /payments/methods отвечает по фактическому провайдеру шлюза.
+        { provide: PAYMENT_GATEWAY_PROVIDER, useValue: { name: 'none' } },
         { provide: CustomersService, useValue: { createGuest: async () => ({ id: 'customer-1' }) } },
         { provide: OrdersService, useValue: { createFromCatalog: async () => ({ id: 'order-1' }) } },
         { provide: PaymentsService, useValue: { find: async () => [], pay: async () => ({ id: 'pay-1' }), payForCustomer: async () => ({ id: 'pay-1' }) } },

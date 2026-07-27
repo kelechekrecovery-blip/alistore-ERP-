@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import request from 'supertest';
 import { PaymentsController } from './payments.controller';
+import { PAYMENT_GATEWAY_PROVIDER } from './payment-gateway-provider';
 import { PaymentsService } from './payments.service';
 import { PaymentIntentsService } from './payment-intents.service';
 import { StaffAuthController } from '../staff-auth/staff-auth.controller';
@@ -39,6 +40,8 @@ describe('POST /payments guest guard (GAP-PAY-GUARD-001)', () => {
         { provide: PaymentIntentsService, useValue: {} },
         { provide: ConfigService, useValue: { get: jest.fn() } },
         { provide: StaffAuthService, useValue: {} },
+        // Контроллер отдаёт GET /payments/methods по фактическому провайдеру.
+        { provide: PAYMENT_GATEWAY_PROVIDER, useValue: { name: 'none' } },
         // PermissionGuard (on the staff-only routes) is instantiated by DI even
         // though these tests only exercise the anonymous path.
         { provide: AuthzService, useValue: { can: async () => true } },

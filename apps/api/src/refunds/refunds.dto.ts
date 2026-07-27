@@ -34,3 +34,14 @@ export class ResolveRefundDto {
   @MaxLength(500)
   providerReference?: string;
 }
+
+/**
+ * Кто выдаёт наличные при повторном исполнении возврата. F-17: смена инициатора
+ * могла закрыться, пока заявка ждала одобрения, — тогда выплату закрывает своей
+ * сменой тот, кто реально отдаёт деньги.
+ */
+export class RetryRefundDto {
+  @IsOptional()
+  @IsString()
+  shiftId?: string;
+}

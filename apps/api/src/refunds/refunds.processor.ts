@@ -55,7 +55,27 @@ export class RefundProcessor {
     @Optional() private readonly outbox?: OutboxService,
   ) {}
 
-  async processRefund(refundId: string, actor = 'system:refund-worker') {
+  /**
+   * Исполнить одобренный возврат.
+   *
+   * F-17: наличная выплата сверялась со сменой ИНИЦИАТОРА заявки, а проверялась в
+   * момент исполнения. Между заявкой и одобрением проходит время — возврат
+   * четырёхглазый, — поэтому заявка, поданная под конец смены и одобренная после
+   * её закрытия, не исполнялась никогда: деньги клиента зависали, и выдать их
+   * было нечем, даже новой смене того же кассира.
+   *
+   * `payer` даёт тому, кто фактически выдаёт наличные, закрыть выплату своей
+   * открытой сменой. Без него поведение прежнее — выдаёт инициатор.
+   *
+   * Отдельного поля «кто выдал» не заводим: у смены уже есть владелец, и он же
+   * единственный, кто вправе её использовать (`assertExecutionShift`). Лишняя
+   * колонка означала бы второй источник правды о том же факте.
+   */
+  async processRefund(
+    refundId: string,
+    actor = 'system:refund-worker',
+    payer?: { shiftId: string },
+  ) {
     const aggregate = await this.prisma.refund.findUnique({ where: { id: refundId }, include: { allocations: { orderBy: { ordinal: 'asc' } } } });
     if (!aggregate) throw new ValidationError('refund_not_found', 'Refund не найден');
     if (!['approved', 'processing', 'partially_succeeded', 'failed'].includes(aggregate.status)) {
@@ -67,9 +87,14 @@ export class RefundProcessor {
         PROVIDER_METHODS.has(allocation.methodSnapshot) && ['queued', 'failed'].includes(allocation.status))) {
         this.gateway.assertOperational();
       }
+      const payoutStaffId = payer ? actor : aggregate.requester;
+      if (payer) await this.reassignCashAllocations(aggregate.id, actor, payer.shiftId);
+      const pending = payer
+        ? await this.prisma.refundAllocation.findMany({ where: { refundId: aggregate.id }, orderBy: { ordinal: 'asc' } })
+        : aggregate.allocations;
       await this.preflightAllocations(
-        aggregate.allocations.filter((allocation) => !['succeeded', 'provider_pending'].includes(allocation.status)),
-        aggregate.requester,
+        pending.filter((allocation) => !['succeeded', 'provider_pending'].includes(allocation.status)),
+        payoutStaffId,
       );
     } catch (error) {
       await this.deferPreflightFailure(aggregate.id, error, actor);
@@ -588,7 +613,14 @@ export class RefundProcessor {
       if (allocation.amount > allocation.originalPayment.amount + (prior._sum.amount ?? 0)) {
         throw new ConflictError('refund_exceeds_tender', 'Возврат превышает остаток исходного платежа');
       }
-      if (allocation.methodSnapshot === 'cash') await this.assertExecutionShift(tx, allocation.shiftId, allocation.refund.requester, allocation.originalPayment.point);
+      // Кто выдал наличные — владелец смены, на которой закрыта аллокация.
+      // Для обычного пути это инициатор; после передачи выплаты — тот, кто её принял.
+      const payoutBy = allocation.methodSnapshot === 'cash' && allocation.shiftId
+        ? (await tx.cashShift.findUnique({ where: { id: allocation.shiftId } }))?.staffId ?? allocation.refund.requester
+        : allocation.refund.requester;
+      if (allocation.methodSnapshot === 'cash') {
+        await this.assertExecutionShift(tx, allocation.shiftId, payoutBy, allocation.originalPayment.point);
+      }
 
       const key = `refund:${allocation.id}`;
       const payment = await tx.payment.create({
@@ -602,7 +634,7 @@ export class RefundProcessor {
           giftCardId: allocation.originalPayment.giftCardId,
           idempotencyKey: key,
           txnId: providerRefundId ?? key,
-          receivedBy: allocation.refund.requester,
+          receivedBy: payoutBy,
           point: allocation.originalPayment.point,
         },
       });
@@ -614,7 +646,7 @@ export class RefundProcessor {
       const metadata = outputTaxMetadata(allocation.refund.lines);
       const accountingEntry = await postPaymentEntryOnTx(tx, {
         payment, idempotencyKey: key, point: payment.point, actor,
-        receivedBy: allocation.refund.requester,
+        receivedBy: payoutBy,
         tax: { ...metadata, taxAmount },
       });
 
@@ -713,6 +745,24 @@ export class RefundProcessor {
       const events: AuditInput[] = [];
       await this.completeRefundOnTx(tx, refund, paymentId, actor, events);
       return { result: refund, events };
+    });
+  }
+
+  /**
+   * Перевести неисполненные наличные аллокации на смену того, кто выдаёт деньги.
+   * Смена обязана быть открытой и принадлежать ему — иначе выплату можно было бы
+   * повесить на чужую кассу.
+   */
+  private async reassignCashAllocations(refundId: string, staffId: string, shiftId: string) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "CashShift" WHERE id = ${shiftId} FOR UPDATE`;
+      const shift = await tx.cashShift.findUnique({ where: { id: shiftId } });
+      if (!shift || shift.closedAt) throw new ConflictError('cash_refund_shift_closed', 'Смена выплаты закрыта или не найдена');
+      if (shift.staffId !== staffId) throw new ConflictError('cash_refund_shift_foreign', 'Смена принадлежит другому сотруднику');
+      await tx.refundAllocation.updateMany({
+        where: { refundId, methodSnapshot: 'cash', status: { notIn: ['succeeded', 'provider_pending'] } },
+        data: { shiftId },
+      });
     });
   }
 

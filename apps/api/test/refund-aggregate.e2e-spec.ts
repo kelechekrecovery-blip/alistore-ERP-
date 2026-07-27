@@ -88,6 +88,44 @@ describe('Refund aggregate FIN-003E (integration)', () => {
     return { order, card, cash, shift, ret };
   }
 
+  /**
+   * F-17. Наличная выплата привязана к смене ИНИЦИАТОРА заявки и проверяется в
+   * момент ИСПОЛНЕНИЯ — а между заявкой и одобрением проходит время: возврат
+   * четырёхглазый, одобряет другой человек. Заявка, поданная под конец смены и
+   * одобренная после её закрытия, не исполнится никогда: деньги клиента зависают,
+   * и вернуть их нечем — новая смена того же кассира тоже не подойдёт, потому что
+   * сверяется конкретный `shiftId` из заявки.
+   *
+   * Выплату должен закрывать тот, кто её фактически выдаёт, своей открытой сменой.
+   */
+  it('позволяет выдать одобренный возврат, когда смена инициатора уже закрыта', async () => {
+    const f = await fixture();
+    const requested = await refunds.request(
+      f.ret.id,
+      { reason: 'возврат в конце смены', shiftId: f.shift.id },
+      'cashier-1',
+      `refund-late-${f.ret.id}`,
+    );
+    await approvals.decide(requested!.approvalId!, { status: 'approved', approver: 'admin-2', approverRole: 'admin' });
+
+    // Смена закрылась, пока заявка ждала одобрения — обычный конец рабочего дня.
+    await prisma.cashShift.update({ where: { id: f.shift.id }, data: { closedAt: new Date(), closeCash: 50_000 } });
+
+    // Кассир следующей смены выдаёт деньги из своей кассы.
+    const payer = await prisma.cashShift.create({
+      data: { staffId: 'cashier-2', point: 'BISHKEK-1', openCash: 30_000 },
+    });
+    await processor.processRefund(requested!.id, 'cashier-2', { shiftId: payer.id });
+
+    const completed = await refunds.get(requested!.id);
+    expect(completed?.status).toBe('succeeded');
+    // Наличное движение должно лечь в кассу того, кто реально выдал.
+    const cashRefund = await prisma.payment.findFirstOrThrow({
+      where: { orderId: f.order.id, amount: { lt: 0 }, method: 'cash' },
+    });
+    expect(cashRefund.shiftId).toBe(payer.id);
+  });
+
   it('allocates server-side, enforces four-eyes, executes once, and exposes drilldown', async () => {
     const f = await fixture();
     const key = `refund-request-${f.ret.id}`;
