@@ -38,6 +38,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -159,8 +160,11 @@ private fun PosLogin(manager: StaffSessionManager, initialError: String? = null,
 @Composable
 private fun PosWorkspace(session: StaffSession, api: ApiClient, apiBaseUrl: String, onLogout: () -> Unit) {
   val context = LocalContext.current.applicationContext
-  val queue = remember { OfflineQueueDb(context, POS_QUEUE_DB) }
-  val manager = remember(api) { PosSaleManager(api, queue) }
+  val queue = remember(session.staffId) {
+    OfflineQueueDb(context, POS_QUEUE_DB, QueueOwner.staff(session.staffId))
+  }
+  DisposableEffect(queue) { onDispose { queue.close() } }
+  val manager = remember(api, queue) { PosSaleManager(api, queue) }
   var selected by rememberSaveable { mutableStateOf(0) }
   var products by remember { mutableStateOf<List<Product>>(emptyList()) }
   var shift by remember { mutableStateOf<CashShift?>(null) }

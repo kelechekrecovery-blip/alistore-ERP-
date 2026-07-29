@@ -11,6 +11,18 @@ test('launchd template always enables production guards', async () => {
   assert.match(plist, /<key>NODE_ENV<\/key>\s*<string>production<\/string>/u);
 });
 
+test('launchd template configures the public Sign in with Apple audiences without secrets', async () => {
+  const plist = await readFile(`${projectRoot}/scripts/com.alistore.api.plist`, 'utf8');
+  assert.match(
+    plist,
+    /<key>APPLE_CLIENT_ID<\/key>\s*<string>kg\.alistore\.web,kg\.alistore\.client<\/string>/u,
+  );
+  assert.doesNotMatch(
+    plist,
+    /<key>(?:APPLE_PRIVATE_KEY|APPLE_KEY_ID|AUTH_REVIEW_OTP|DATABASE_URL|JWT_SECRET)<\/key>/u,
+  );
+});
+
 test('failed readiness gate makes no filesystem or launchctl changes', async () => {
   const calls = [];
   const run = async (command, args) => {

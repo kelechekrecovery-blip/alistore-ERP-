@@ -261,6 +261,41 @@ export class ApprovalsService {
         }
       }
 
+      const parkedPayload = (approval.evidence as { payload?: Record<string, unknown> } | null)
+        ?.payload;
+      if (
+        input.status === 'approved'
+        && approval.action === 'stock_adjust'
+        && (!parkedPayload || !Object.prototype.hasOwnProperty.call(parkedPayload, 'expectedOnHand'))
+      ) {
+        const rejected = await tx.approval.updateMany({
+          where: { id, status: 'requested' },
+          data: { status: 'rejected', approver: input.approver },
+        });
+        if (rejected.count === 0) {
+          throw new ConflictError(
+            'approval_already_decided',
+            `Approval ${id} уже решён другим аппрувером`,
+          );
+        }
+        return {
+          result: await tx.approval.findUnique({ where: { id } }),
+          events: [
+            {
+              type: EventType.ApprovalRejected,
+              actor: input.approver,
+              payload: {
+                approvalId: id,
+                action: approval.action,
+                outcome: 'legacy_snapshot_required',
+                reason: 'Legacy stock adjustment must be re-requested with a balance snapshot',
+              },
+              refs: [id],
+            },
+          ],
+        };
+      }
+
       // Atomically claim the decision — two concurrent decides cannot both flip
       // requested→(approved|rejected). count===0 ⇒ another decider won the race
       // (prevents a double refund / double price change from one approval).

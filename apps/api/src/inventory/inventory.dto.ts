@@ -230,6 +230,12 @@ export class MovementDto {
   @ApiProperty({ example: 'бой при транспортировке' })
   @IsString() reason!: string;
 
+  @ApiPropertyOptional({
+    example: 'clx_inventory_count_movement',
+    description: 'Observation movement that this adjustment reconciles.',
+  })
+  @IsOptional() @IsString() countMovementId?: string;
+
   @ApiPropertyOptional({ example: 'warehouse_lead' })
   @IsOptional() @IsString() requester?: string;
 }

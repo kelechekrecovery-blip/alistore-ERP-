@@ -65,7 +65,6 @@ internal fun ClientCheckout(
 ) {
   val context = LocalContext.current.applicationContext
   val scope = rememberCoroutineScope()
-  val checkout = remember(apiBaseUrl) { CheckoutManager(ApiClient(apiBaseUrl), OfflineQueueDb(context)) }
   val api = remember(apiBaseUrl) { ApiClient(apiBaseUrl) }
   var fulfillment by rememberSaveable { mutableStateOf("pickup") }
   var paymentMethod by rememberSaveable { mutableStateOf("cash") }
@@ -349,14 +348,17 @@ internal fun ClientCheckout(
                   loyaltyPoints = loyaltyAmount.takeIf { it > 0 },
                 )
                 val onlineMethod = OnlinePaymentMethod.entries.firstOrNull { it.wireValue == paymentMethod }
-                suspend fun submit(token: String) = checkout.submit(
-                  request,
-                  token,
-                  idempotencyKey,
-                  onlineMethod,
-                  if (onlineMethod == null) null else paymentIdempotencyKey,
-                  paymentReturnBaseUrl,
-                )
+                suspend fun submit(token: String) =
+                  OfflineQueueDb(context, owner = QueueOwner.client(authState.user.customerId)).use { queue ->
+                    CheckoutManager(api, queue).submit(
+                      request,
+                      token,
+                      idempotencyKey,
+                      onlineMethod,
+                      if (onlineMethod == null) null else paymentIdempotencyKey,
+                      paymentReturnBaseUrl,
+                    )
+                  }
                 var attempt = runCatching {
                   submit(authState.tokens.accessToken)
                 }

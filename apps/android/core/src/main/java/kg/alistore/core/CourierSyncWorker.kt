@@ -9,30 +9,48 @@ import kotlinx.coroutines.withContext
 class CourierSyncWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
   override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
     val apiBaseUrl = inputData.getString("apiBaseUrl") ?: return@withContext Result.failure()
-    val token = SecureTokenStore(applicationContext, "alistore-courier-session").readToken()
-      ?: return@withContext Result.failure()
-    val queue = OfflineQueueDb(applicationContext, COURIER_QUEUE_DB)
+    val tokenStore = SecureTokenStore(applicationContext, "alistore-courier-session")
+    val session = tokenStore.readSessionSnapshot("staff") ?: return@withContext Result.failure()
+    val queue = OfflineQueueDb(applicationContext, COURIER_QUEUE_DB, session.queueOwner)
     val client = ApiClient(apiBaseUrl)
     var retryRequired = false
-    for (mutation in queue.pending()) {
-      try {
-        queue.markState(mutation.id, "syncing", incrementAttempt = true)
-        val status = client.send(mutation, token)
+    try {
+      queue.recoverStaleSyncing(System.currentTimeMillis() - OFFLINE_CLAIM_TIMEOUT_MS)
+      while (true) {
+        val mutation = queue.claimNext() ?: break
+        try {
+        if (!tokenStore.isCurrent(session)) {
+          queue.markClaimState(mutation, "queued", "Authenticated session changed before replay")
+          return@withContext Result.success()
+        }
+        if (!mutation.hasValidPayloadFingerprint()) {
+          queue.markClaimState(mutation, "quarantined", "Offline command payload fingerprint mismatch")
+          continue
+        }
+        val status = client.send(mutation, session.accessToken)
         when {
-          status in 200..299 -> queue.markSent(mutation.id)
-          status == 409 || status == 422 -> queue.markState(mutation.id, "conflict", "HTTP $status")
-          status == 401 || status == 403 -> queue.markState(mutation.id, "failed", "HTTP $status")
+          status in 200..299 -> queue.markClaimSent(mutation)
+          status == 409 || status == 422 -> queue.markClaimState(mutation, "conflict", "HTTP $status")
+          status == 401 || status == 403 -> queue.markClaimState(mutation, "failed", "HTTP $status")
           else -> {
-            queue.markState(mutation.id, "failed", "HTTP $status")
+            queue.markClaimState(mutation, "queued", "HTTP $status")
+            retryRequired = true
+          }
+          }
+        } catch (error: Exception) {
+          if (error is ApiException && (error.status == 401 || error.status == 403)) {
+            queue.markClaimState(mutation, "failed", "HTTP ${error.status}")
+          } else {
+            queue.markClaimState(mutation, "queued", error.message)
             retryRequired = true
           }
         }
-      } catch (error: Exception) {
-        queue.markState(mutation.id, "queued", error.message)
-        retryRequired = true
+        if (retryRequired) break
       }
+      if (retryRequired) Result.retry() else Result.success()
+    } finally {
+      queue.close()
     }
-    if (retryRequired) Result.retry() else Result.success()
   }
 }
 

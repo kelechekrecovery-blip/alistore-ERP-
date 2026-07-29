@@ -40,6 +40,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -473,7 +474,12 @@ fun StaffShiftScreen(
   apiBaseUrl: String = "",
 ) {
   val context = LocalContext.current.applicationContext
-  val attendanceQueue = remember { OfflineQueueDb(context, STAFF_QUEUE_DB) }
+  val attendanceQueue = remember(session.staffId) {
+    OfflineQueueDb(context, STAFF_QUEUE_DB, QueueOwner.staff(session.staffId))
+  }
+  DisposableEffect(attendanceQueue) {
+    onDispose { attendanceQueue.close() }
+  }
   val attendanceManager = remember(gateway, attendanceQueue) { StaffAttendanceManager(gateway, attendanceQueue) }
   var shift by remember { mutableStateOf<CashShift?>(null) }
   var closedShift by remember { mutableStateOf<CashShift?>(null) }

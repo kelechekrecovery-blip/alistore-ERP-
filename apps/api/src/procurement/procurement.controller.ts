@@ -79,13 +79,13 @@ export class SupplierInvoiceController {
   }
 
   @Post(':id/pay')
-  @RequirePermission('procurement', 'receive')
+  @RequirePermission('accounts_payable', 'pay')
   pay(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: PaySupplierInvoiceDto) {
     return this.procurement.paySupplierInvoice(id, dto, user.customerId);
   }
 
   @Post(':id/payments')
-  @RequirePermission('procurement', 'receive')
+  @RequirePermission('accounts_payable', 'pay')
   createPayment(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: CreateSupplierInvoicePaymentDto) {
     return this.procurement.createSupplierInvoicePayment(id, dto, user.customerId);
   }
@@ -117,7 +117,7 @@ export class SupplierCreditNoteController {
   }
 
   @Post(':id/apply')
-  @RequirePermission('procurement', 'receive')
+  @RequirePermission('accounts_payable', 'apply')
   apply(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
     return this.procurement.applyCreditNote(id, user.customerId);
   }
@@ -143,7 +143,7 @@ export class SupplierAdvanceController {
   }
 
   @Post(':id/apply')
-  @RequirePermission('procurement', 'receive')
+  @RequirePermission('accounts_payable', 'apply')
   apply(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: ApplySupplierAdvanceDto) {
     return this.procurement.applySupplierAdvance(id, dto, user.customerId);
   }
@@ -169,7 +169,7 @@ export class SupplierStatementController {
   }
 
   @Post('lines/:id/reconcile')
-  @RequirePermission('procurement', 'receive')
+  @RequirePermission('accounts_payable', 'reconcile')
   reconcile(@CurrentUser() user: AuthPrincipal, @Param('id') id: string, @Body() dto: ReconcileSupplierStatementLineDto) {
     return this.procurement.reconcileSupplierStatementLine(id, dto, user.customerId);
   }
@@ -189,7 +189,7 @@ export class LandedCostController {
   }
 
   @Post()
-  @RequirePermission('procurement', 'receive')
+  @RequirePermission('landed_cost', 'post')
   apply(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateLandedCostDto) {
     return this.procurement.createLandedCost(dto, user.customerId);
   }

@@ -21,6 +21,7 @@ interface AuthGateway {
 interface SessionStore {
   fun saveSession(tokens: AuthTokens)
   fun readSession(): AuthTokens?
+  fun saveAuthenticatedSession(tokens: AuthTokens, principalId: String)
   fun clear()
 }
 
@@ -48,7 +49,6 @@ class AuthSessionManager(
       }
       runCatching {
         val refreshed = api.refresh(stored.refreshToken)
-        store.saveSession(refreshed)
         requiresQuickUnlock = true
         signedIn(refreshed)
       }.getOrElse(::failAndClear)
@@ -59,10 +59,9 @@ class AuthSessionManager(
 
   suspend fun verify(phone: String, code: String): AuthState = runCatching {
     val tokens = api.verifyOtp(phone.normalizedPhone(), code.trim())
-    store.saveSession(tokens)
     requiresQuickUnlock = false
     signedIn(tokens)
-  }.getOrElse { AuthState.Failed(it.userMessage()) }
+  }.getOrElse(::failAndClear)
 
   suspend fun requestEmailOtp(email: String): EmailOtpChallenge = api.requestEmailOtp(email.normalizedEmail())
 
@@ -72,10 +71,12 @@ class AuthSessionManager(
    */
   suspend fun verifyEmail(email: String, code: String): AuthState = runCatching {
     val tokens = api.verifyEmailOtp(email.normalizedEmail(), code.trim())
-    store.saveSession(tokens)
     requiresQuickUnlock = false
     signedIn(tokens)
-  }.getOrElse { AuthState.Failed(emailAuthMessage(it)) }
+  }.getOrElse {
+    store.clear()
+    AuthState.Failed(emailAuthMessage(it))
+  }
 
   suspend fun requestEmailAttach(email: String, accessToken: String): EmailOtpChallenge =
     api.requestEmailAttach(email.normalizedEmail(), accessToken)
@@ -100,12 +101,14 @@ class AuthSessionManager(
 
   suspend fun refresh(state: AuthState.SignedIn): AuthState = runCatching {
     val refreshed = api.refresh(state.tokens.refreshToken)
-    store.saveSession(refreshed)
     signedIn(refreshed)
   }.getOrElse(::failAndClear)
 
-  private suspend fun signedIn(tokens: AuthTokens): AuthState.SignedIn =
-    AuthState.SignedIn(api.me(tokens.accessToken), tokens)
+  private suspend fun signedIn(tokens: AuthTokens): AuthState.SignedIn {
+    val user = api.me(tokens.accessToken)
+    store.saveAuthenticatedSession(tokens, QueueOwner.client(user.customerId).storageKey)
+    return AuthState.SignedIn(user, tokens)
+  }
 
   private fun failAndClear(error: Throwable): AuthState {
     store.clear()

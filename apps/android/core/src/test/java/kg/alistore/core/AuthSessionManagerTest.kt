@@ -64,6 +64,23 @@ class AuthSessionManagerTest {
     assertEquals("+996700123456", api.requestedPhone)
     assertEquals("+996700123456" to "123456", api.verified)
     assertEquals(api.verifiedTokens, store.tokens)
+    assertEquals("client:customer-1", store.principalId)
+  }
+
+  @Test
+  fun verifyDoesNotPersistTokensWhenPrincipalValidationFails() = runTest {
+    val store = FakeStore()
+    val api = FakeAuthGateway().apply {
+      meFailures[verifiedTokens.accessToken] = ApiException(403, "customer disabled")
+    }
+
+    val state = AuthSessionManager(api, store).verify("+996700123456", "123456")
+
+    assertTrue(state is AuthState.Failed)
+    assertNull(store.tokens)
+    assertNull(store.principalId)
+    assertEquals(0, store.saveCount)
+    assertEquals(1, store.clearCount)
   }
 
   @Test
@@ -137,10 +154,17 @@ class AuthSessionManagerTest {
 
 private class FakeStore(initial: AuthTokens? = null) : SessionStore {
   var tokens: AuthTokens? = initial
+  var principalId: String? = null
+  var saveCount = 0
   var clearCount = 0
-  override fun saveSession(tokens: AuthTokens) { this.tokens = tokens }
+  override fun saveSession(tokens: AuthTokens) { this.tokens = tokens; saveCount += 1 }
   override fun readSession(): AuthTokens? = tokens
-  override fun clear() { tokens = null; clearCount += 1 }
+  override fun saveAuthenticatedSession(tokens: AuthTokens, principalId: String) {
+    this.tokens = tokens
+    this.principalId = principalId
+    saveCount += 1
+  }
+  override fun clear() { tokens = null; principalId = null; clearCount += 1 }
 }
 
 private class FakeAuthGateway : AuthGateway {

@@ -262,6 +262,14 @@ p, admin, procurement, receive
 p, owner, procurement, receive
 p, admin, procurement, cancel
 p, owner, procurement, cancel
+p, admin, accounts_payable, pay
+p, owner, accounts_payable, pay
+p, admin, accounts_payable, apply
+p, owner, accounts_payable, apply
+p, admin, accounts_payable, reconcile
+p, owner, accounts_payable, reconcile
+p, admin, landed_cost, post
+p, owner, landed_cost, post
 p, admin, supply_quarantine, resolve
 p, owner, supply_quarantine, resolve
 p, warehouse, inventory, consignment_receive

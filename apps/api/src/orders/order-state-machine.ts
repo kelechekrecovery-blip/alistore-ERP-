@@ -1,4 +1,4 @@
-import { OrderStatus } from '@prisma/client';
+import { OrderLineFulfillmentStatus, OrderStatus } from '@prisma/client';
 import { ValidationError } from '../common/errors';
 
 /**
@@ -50,4 +50,23 @@ export function assertTransition(from: OrderStatus, to: OrderStatus): void {
       `Недопустимый переход заказа: ${from} → ${to}`,
     );
   }
+}
+
+const TERMINAL_LINE_STATUSES = new Set<OrderLineFulfillmentStatus>([
+  'handed_over',
+  'customer_cancelled',
+  'cancelled',
+]);
+
+/**
+ * Backward-compatible aggregate projection for existing clients.
+ * Line fulfillment is authoritative; callers must not maintain local variants.
+ */
+export function deriveOrderStatusFromLineFulfillment(
+  statuses: OrderLineFulfillmentStatus[],
+): Extract<OrderStatus, 'confirmed' | 'ready_for_pickup' | 'completed'> {
+  const active = statuses.filter((status) => !TERMINAL_LINE_STATUSES.has(status));
+  if (active.length === 0) return 'completed';
+  if (active.every((status) => status === 'ready')) return 'ready_for_pickup';
+  return 'confirmed';
 }

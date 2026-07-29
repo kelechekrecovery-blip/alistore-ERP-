@@ -10,6 +10,7 @@ import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications
 import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UnitsService } from '../units/units.service';
+import { deriveOrderStatusFromLineFulfillment } from './order-state-machine';
 
 const READY_RESERVATION_TTL_MS = 72 * 60 * 60 * 1000;
 
@@ -146,10 +147,14 @@ export class OrderItemReservationService {
         where: { id: orderItemId },
         data: { fulfillmentStatus: 'ready', readyAt },
       });
-      const remaining = await tx.orderItem.count({
-        where: { orderId, fulfillmentStatus: { notIn: ['ready', 'handed_over', 'cancelled', 'customer_cancelled'] } },
+      const orderItems = await tx.orderItem.findMany({
+        where: { orderId },
+        select: { fulfillmentStatus: true },
       });
-      if (remaining === 0 && order.status === 'confirmed') {
+      const projectedStatus = deriveOrderStatusFromLineFulfillment(
+        orderItems.map((item) => item.fulfillmentStatus),
+      );
+      if (projectedStatus === 'ready_for_pickup' && order.status === 'confirmed') {
         await tx.order.update({ where: { id: orderId }, data: { status: 'ready_for_pickup' } });
       }
       await enqueueConsentedCustomerNotice(tx, this.outbox, {

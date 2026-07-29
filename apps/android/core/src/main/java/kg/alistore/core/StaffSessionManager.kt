@@ -12,6 +12,7 @@ interface StaffAuthGateway {
 interface StaffSessionStore {
   fun saveToken(token: String)
   fun readToken(): String?
+  fun saveAuthenticatedToken(token: String, principalId: String)
   fun clear()
 }
 
@@ -36,6 +37,7 @@ class StaffSessionManager(
     val token = store.readToken() ?: return StaffAuthState.SignedOut
     return runCatching {
       val principal = api.staffMe(token)
+      store.saveAuthenticatedToken(token, QueueOwner.staff(principal.id).storageKey)
       requiresQuickUnlock = true
       StaffAuthState.SignedIn(principal.session(token))
     }.getOrElse(::failAndClear)
@@ -43,11 +45,11 @@ class StaffSessionManager(
 
   suspend fun login(username: String, password: String): StaffAuthState = runCatching {
     val session = api.staffLogin(username.trim(), password)
-    store.saveToken(session.accessToken)
-    requiresQuickUnlock = false
     val principal = api.staffMe(session.accessToken)
+    store.saveAuthenticatedToken(session.accessToken, QueueOwner.staff(principal.id).storageKey)
+    requiresQuickUnlock = false
     StaffAuthState.SignedIn(principal.session(session.accessToken))
-  }.getOrElse { StaffAuthState.Failed(it.message?.takeIf(String::isNotBlank) ?: "Не удалось войти") }
+  }.getOrElse(::failAndClear)
 
   fun logout(): StaffAuthState {
     store.clear()

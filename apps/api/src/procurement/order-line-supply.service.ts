@@ -10,6 +10,7 @@ import { CancelOrderLineSupplyDto, PlaceOrderLineSupplyDto } from './order-line-
 import { assertTransition } from './order-line-supply-state';
 import { UnitsService } from '../units/units.service';
 import { handOverReadyOrderItemOnTx } from '../orders/order-item-handover-on-tx';
+import { deriveOrderStatusFromLineFulfillment } from '../orders/order-state-machine';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const DEFAULT_LEAD_DAYS = 14;
@@ -215,13 +216,14 @@ export class OrderLineSupplyService {
           units: this.units,
           events,
         });
-        const remaining = await tx.orderItem.count({
-          where: {
-            orderId,
-            fulfillmentStatus: { notIn: ['handed_over', 'customer_cancelled', 'cancelled'] },
-          },
+        const orderItems = await tx.orderItem.findMany({
+          where: { orderId },
+          select: { fulfillmentStatus: true },
         });
-        if (remaining === 0 && ['ready_for_pickup', 'delivered'].includes(order.status)) {
+        const projectedStatus = deriveOrderStatusFromLineFulfillment(
+          orderItems.map((item) => item.fulfillmentStatus),
+        );
+        if (projectedStatus === 'completed' && ['ready_for_pickup', 'delivered'].includes(order.status)) {
           await tx.order.update({ where: { id: orderId }, data: { status: 'completed' } });
         }
         return {
@@ -246,15 +248,14 @@ export class OrderLineSupplyService {
         },
       });
       if (to === 'ready') {
-        const remaining = await tx.orderItem.count({
-          where: {
-            orderId,
-            fulfillmentStatus: {
-              notIn: ['ready', 'handed_over', 'customer_cancelled', 'cancelled'],
-            },
-          },
+        const orderItems = await tx.orderItem.findMany({
+          where: { orderId },
+          select: { fulfillmentStatus: true },
         });
-        if (remaining === 0) {
+        const projectedStatus = deriveOrderStatusFromLineFulfillment(
+          orderItems.map((item) => item.fulfillmentStatus),
+        );
+        if (projectedStatus === 'ready_for_pickup') {
           const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
           if (order.status === 'confirmed') {
             await tx.order.update({ where: { id: orderId }, data: { status: 'ready_for_pickup' } });

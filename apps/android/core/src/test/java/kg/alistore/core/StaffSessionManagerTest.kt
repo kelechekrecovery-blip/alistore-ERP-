@@ -16,6 +16,7 @@ class StaffSessionManagerTest {
     assertTrue(state is StaffAuthState.SignedIn)
     val signedIn = state as StaffAuthState.SignedIn
     assertEquals("staff-token", store.token)
+    assertEquals("staff:staff-1", store.principalId)
     assertEquals("seller", signedIn.session.username)
     assertEquals("seller", signedIn.session.role)
     assertEquals(listOf("seller"), api.loginNames)
@@ -32,6 +33,20 @@ class StaffSessionManagerTest {
   }
 
   @Test
+  fun loginDoesNotPersistTokenWhenPrincipalValidationFails() = runTest {
+    val store = MemoryStaffStore()
+
+    val state = StaffSessionManager(FakeStaffAuthGateway(rejectMe = true), store)
+      .login("seller", "secret")
+
+    assertTrue(state is StaffAuthState.Failed)
+    assertNull(store.token)
+    assertNull(store.principalId)
+    assertEquals(0, store.saveCount)
+    assertEquals(1, store.clearCount)
+  }
+
+  @Test
   fun rejectedStoredTokenIsCleared() = runTest {
     val store = MemoryStaffStore("revoked-token")
     val state = StaffSessionManager(FakeStaffAuthGateway(rejectMe = true), store).restore()
@@ -42,9 +57,17 @@ class StaffSessionManagerTest {
 }
 
 private class MemoryStaffStore(var token: String? = null) : StaffSessionStore {
-  override fun saveToken(token: String) { this.token = token }
+  var principalId: String? = null
+  var saveCount = 0
+  var clearCount = 0
+  override fun saveToken(token: String) { this.token = token; saveCount += 1 }
   override fun readToken(): String? = token
-  override fun clear() { token = null }
+  override fun saveAuthenticatedToken(token: String, principalId: String) {
+    this.token = token
+    this.principalId = principalId
+    saveCount += 1
+  }
+  override fun clear() { token = null; principalId = null; clearCount += 1 }
 }
 
 private class FakeStaffAuthGateway(private val rejectMe: Boolean = false) : StaffAuthGateway {

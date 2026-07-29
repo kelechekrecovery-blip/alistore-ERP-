@@ -202,6 +202,71 @@ describe('Purchase order procurement (integration + RBAC)', () => {
     expect((await prisma.auditEvent.findFirst({ where: { type: 'purchase_order.received' } }))?.actor).toBe(warehouseId);
   });
 
+  it('lets warehouse receive purchase orders but forbids procurement financial postings', async () => {
+    const { supplier, product } = await fixture();
+    const created = await request(app.getHttpServer())
+      .post('/procurement/purchase-orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        idempotencyKey: `create-${RUN}-warehouse-financial-rbac`,
+        supplierId: supplier.id,
+        location: 'BISHKEK-1',
+        items: [{ productId: product.id, qty: 1, unitCost: 70000 }],
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/procurement/purchase-orders/${created.body.id}/send`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/procurement/purchase-orders/${created.body.id}/receive`)
+      .set('Authorization', `Bearer ${warehouseToken}`)
+      .send({
+        idempotencyKey: `receipt-${RUN}-warehouse-financial-rbac`,
+        lines: [{ itemId: created.body.items[0].id, imeis: [`PO-RBAC-${RUN}`] }],
+      })
+      .expect(201);
+
+    const forbiddenFinancialMutations = [
+      {
+        path: '/procurement/supplier-invoices/invoice-rbac/pay',
+        body: { paymentKey: `pay-${RUN}`, paymentAccountCode: '1010' },
+      },
+      {
+        path: '/procurement/supplier-invoices/invoice-rbac/payments',
+        body: { idempotencyKey: `partial-${RUN}`, paymentKey: `partial-pay-${RUN}`, amount: 1, paymentAccountCode: '1010' },
+      },
+      { path: '/procurement/supplier-credit-notes/credit-rbac/apply' },
+      {
+        path: '/procurement/supplier-advances/advance-rbac/apply',
+        body: { idempotencyKey: `advance-apply-${RUN}`, invoiceId: 'invoice-rbac', amount: 1 },
+      },
+      {
+        path: '/procurement/supplier-statements/lines/statement-line-rbac/reconcile',
+        body: { idempotencyKey: `reconcile-${RUN}`, journalEntryId: 'journal-rbac' },
+      },
+      {
+        path: '/procurement/landed-costs',
+        body: {
+          idempotencyKey: `landed-${RUN}-warehouse-rbac`,
+          documentNumber: `FREIGHT-RBAC-${RUN}`,
+          purchaseOrderId: created.body.id,
+          amount: 1,
+          creditAccountCode: '2000',
+          description: 'Warehouse must not post landed cost',
+        },
+      },
+    ];
+
+    for (const mutation of forbiddenFinancialMutations) {
+      await request(app.getHttpServer())
+        .post(mutation.path)
+        .set('Authorization', `Bearer ${warehouseToken}`)
+        .send(mutation.body ?? {})
+        .expect(403);
+    }
+  });
+
   it('allows owner/admin cancellation only before receiving starts', async () => {
     const { supplier, product } = await fixture();
     const created = await request(app.getHttpServer())

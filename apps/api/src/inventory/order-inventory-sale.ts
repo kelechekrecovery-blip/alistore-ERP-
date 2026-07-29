@@ -61,25 +61,24 @@ export function resolveOrderInventorySnapshot(
 /**
  * Guard for the supply-to-order invariant (docs/SUPPLY-TO-ORDER-PLAN.md, slice 3).
  *
- * Re-keyed from slice 2's "product is `to_order`" to "this order line's supply
- * has not yet been received": once a supplier delivers the goods behind a
+ * Keyed from the immutable order-line snapshot, never the mutable Product:
+ * changing a catalog product after checkout must not rewrite historical
+ * fulfillment behavior. Once a supplier delivers the goods behind a
  * to-order line (`OrderLineSupply.status` reaches `received`/`handed_over`),
  * it IS our stock and must sell through the ordinary path — keeping the
- * product-level check would block that sale forever. Every caller that can
+ * snapshot-only block would prevent that sale forever. Every caller that can
  * walk an order toward reserve/fulfill/pay/COD-delivery
  * (`OrdersService.reserve`, `OrdersService.fulfill`, `PaymentsService.pay`,
- * `CourierService.completeDelivery`) calls this first, using product and
- * supply rows it already loaded — no silent no-op.
+ * `CourierService.completeDelivery`) calls this first.
  */
 export function assertOrderLineSupplyReceived(
   orderId: string,
-  items: Array<{ id: string; sku: string }>,
-  productsBySku: Map<string, { supplyMode: string }>,
+  items: Array<{ id: string; sku: string; supplyModeSnapshot: string }>,
   supplyByOrderItemId: Map<string, { status: string }>,
 ): void {
   const blockedSkus = [...new Set(
     items
-      .filter((item) => productsBySku.get(item.sku)?.supplyMode === 'to_order')
+      .filter((item) => item.supplyModeSnapshot === 'to_order')
       .filter((item) => {
         const supply = supplyByOrderItemId.get(item.id);
         return supply?.status !== 'received' && supply?.status !== 'handed_over';

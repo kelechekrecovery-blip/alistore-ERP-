@@ -967,8 +967,9 @@ export class OrdersService {
   /**
    * `OrderLineSupply` rows only exist for `to_order` lines (docs/SUPPLY-TO-ORDER-PLAN.md,
    * slice 3) — an own-stock order has none, and `assertOrderLineSupplyReceived`
-   * treats a missing row as "not received" for any line whose product IS
-   * `to_order`, which is the correct fail-closed default.
+   * treats a missing row as "not received" for any line whose immutable
+   * `supplyModeSnapshot` is `to_order`, which is the correct fail-closed
+   * default even if the catalog product changes later.
    */
   private async orderLineSupplyMap(tx: Prisma.TransactionClient, itemIds: string[]) {
     const rows = await tx.orderLineSupply.findMany({
@@ -1003,7 +1004,7 @@ export class OrdersService {
       });
       const currentProductsBySku = new Map(currentProducts.map((product) => [product.sku, product]));
       const supplyByOrderItemId = await this.orderLineSupplyMap(tx, order.items.map((item) => item.id));
-      assertOrderLineSupplyReceived(orderId, order.items, currentProductsBySku, supplyByOrderItemId);
+      assertOrderLineSupplyReceived(orderId, order.items, supplyByOrderItemId);
       const inventorySpecs = new Map<string, OrderInventorySnapshot>();
       for (const item of order.items) {
         const product = currentProductsBySku.get(item.sku);
@@ -1384,7 +1385,7 @@ export class OrdersService {
       });
       const currentProductsBySku = new Map(currentProducts.map((product) => [product.sku, product]));
       const supplyByOrderItemId = await this.orderLineSupplyMap(tx, order.items.map((item) => item.id));
-      assertOrderLineSupplyReceived(orderId, order.items, currentProductsBySku, supplyByOrderItemId);
+      assertOrderLineSupplyReceived(orderId, order.items, supplyByOrderItemId);
       const inventorySpecs = new Map<string, OrderInventorySnapshot>();
       for (const item of order.items) {
         const product = currentProductsBySku.get(item.sku);

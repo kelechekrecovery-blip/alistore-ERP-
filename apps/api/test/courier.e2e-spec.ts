@@ -1,8 +1,10 @@
 import { PrismaService } from '../src/prisma/prisma.service';
+import { ApprovalsService } from '../src/approvals/approvals.service';
 import { AuditService } from '../src/audit/audit.service';
 import { CourierService } from '../src/courier/courier.service';
 import { ConflictError, ValidationError } from '../src/common/errors';
 import { OutboxService } from '../src/outbox/outbox.service';
+import { PaymentsService } from '../src/payments/payments.service';
 import { UnitsService } from '../src/units/units.service';
 
 /**
@@ -13,13 +15,17 @@ import { UnitsService } from '../src/units/units.service';
 describe('Courier COD handover (integration)', () => {
   let prisma: PrismaService;
   let courier: CourierService;
+  let payments: PaymentsService;
   let seq = 0;
 
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
+    const audit = new AuditService(prisma);
+    const units = new UnitsService(prisma);
     const outbox = new OutboxService(prisma, { deliver: async () => undefined });
-    courier = new CourierService(prisma, new AuditService(prisma), outbox, new UnitsService(prisma));
+    courier = new CourierService(prisma, audit, outbox, units);
+    payments = new PaymentsService(prisma, audit, units, new ApprovalsService(prisma, audit));
   });
 
   const clean = async () => {
@@ -49,6 +55,7 @@ describe('Courier COD handover (integration)', () => {
       prisma.accountingJournalLine.deleteMany({
         where: { entry: { OR: [
           { sourceType: { startsWith: 'cod.' } },
+          { sourceType: 'order_receivable.receipt' },
           { sourceType: { in: ['order_item.handover', 'order_line.handover'] } },
           { sourceType: 'inventory.cogs', sourceRef: { in: issueIds } },
           { sourceType: 'quantity-consignment.sale', sourceRef: { in: quantityConsignmentRefs } },
@@ -57,6 +64,7 @@ describe('Courier COD handover (integration)', () => {
       prisma.accountingJournalEntry.deleteMany({
         where: { OR: [
           { sourceType: { startsWith: 'cod.' } },
+          { sourceType: 'order_receivable.receipt' },
           { sourceType: { in: ['order_item.handover', 'order_line.handover'] } },
           { sourceType: 'inventory.cogs', sourceRef: { in: issueIds } },
           { sourceType: 'quantity-consignment.sale', sourceRef: { in: quantityConsignmentRefs } },
@@ -72,6 +80,7 @@ describe('Courier COD handover (integration)', () => {
     await prisma.quantityConsignmentAllocation.deleteMany();
     await prisma.quantityConsignmentLot.deleteMany();
     await prisma.orderQuantityAllocation.deleteMany({ where: { productId: { in: productIds } } });
+    await prisma.inventoryMovement.deleteMany({ where: { productId: { in: productIds } } });
     await prisma.orderLineSupply.deleteMany();
     await prisma.purchaseOrder.deleteMany({ where: { number: { startsWith: 'COD-LINE-PO-' } } });
     await prisma.orderItem.deleteMany();
@@ -480,10 +489,10 @@ describe('Courier COD handover (integration)', () => {
     const deposit = await prisma.orderReceivable.create({
       data: { orderId: order.id, orderItemId: order.items[1].id, kind: 'supply_deposit', amount: 1000, settledAmount: 1000, status: 'settled' },
     });
-    await prisma.orderReceivable.create({
+    const supplyReceivable = await prisma.orderReceivable.create({
       data: { orderId: order.id, orderItemId: order.items[1].id, kind: 'supply_balance', amount: 3000 },
     });
-    await prisma.orderReceivable.create({
+    const deliveryReceivable = await prisma.orderReceivable.create({
       data: { orderId: order.id, kind: 'delivery', amount: 300 },
     });
     const payment = await prisma.payment.create({
@@ -516,9 +525,42 @@ describe('Courier COD handover (integration)', () => {
       expect.objectContaining({ accountCode: '4000', debit: 0, credit: 300 }),
     ]));
     expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'cod.receivable', sourceRef: order.id } })).toBe(0);
+    const collectedReceivables = await prisma.orderReceivable.findMany({
+      where: { id: { in: [ownReceivable.id, supplyReceivable.id, deliveryReceivable.id] } },
+      orderBy: { kind: 'asc' },
+    });
+    expect(collectedReceivables).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: ownReceivable.id, status: 'settled', settledAmount: 2000 }),
+      expect.objectContaining({ id: supplyReceivable.id, status: 'settled', settledAmount: 3000 }),
+      expect.objectContaining({ id: deliveryReceivable.id, status: 'settled', settledAmount: 300 }),
+    ]));
+    await expect(payments.settleReceivable(
+      ownReceivable.id,
+      { method: 'card', amount: ownReceivable.amount, txnId: `late-double-cod-${seq}` },
+      'staff:test-cashier',
+      { staffId: 'test-cashier', idempotencyKey: `late-double-cod-${seq}` },
+    )).rejects.toMatchObject({ code: 'receivable_not_open' });
+    const handedOver = await courier.handover(
+      { runId: delivered.courierRunId!, amount: 5300 },
+      'cashier',
+      undefined,
+      `cod-line-handover-${seq}`,
+    );
+    expect(handedOver).toMatchObject({ handedOver: true, diff: 0 });
+    const codLifecycleEntries = await prisma.accountingJournalEntry.findMany({
+      where: {
+        OR: [
+          { sourceType: { in: ['order_item.handover', 'order_line.handover'] }, sourceRef: { in: order.items.map((item) => item.id) } },
+          { sourceType: 'order.delivery.handover', sourceRef: order.id },
+          { sourceType: 'cod.handover', sourceRef: `${handedOver.id}:cod-line-handover-${seq}` },
+        ],
+      },
+      include: { lines: { where: { accountCode: '1100' } } },
+    });
+    expect(codLifecycleEntries.flatMap((entry) => entry.lines)
+      .reduce((balance, line) => balance + line.debit - line.credit, 0)).toBe(0);
     expect(await prisma.inventoryValuationIssue.count({ where: { orderId: order.id } })).toBe(2);
     expect(await prisma.inventoryBalance.count({ where: { productId: supplyProduct.id } })).toBe(0);
-    expect(ownReceivable.status).toBe('open');
   });
 
   it('delivers prepaid and fully settled COD orders after payment finalized inventory', async () => {
@@ -712,10 +754,20 @@ describe('Courier COD handover (integration)', () => {
         customerId: customer.id,
         channel: 'web',
         fulfillmentType: 'courier',
+        fulfillmentLocation: 'BISHKEK-1',
         paymentMode: 'cod',
         total: 1500,
         status: 'packed',
         items: { create: { lineNumber: 1, sku: `COD-PARTIAL-${seq}`, qty: 1, price: 1500 } },
+      },
+      include: { items: true },
+    });
+    const schedule = await prisma.orderReceivable.create({
+      data: {
+        orderId: order.id,
+        orderItemId: order.items[0].id,
+        kind: 'stock_sale',
+        amount: order.total,
       },
     });
     const run = await courier.createRun(
@@ -753,6 +805,35 @@ describe('Courier COD handover (integration)', () => {
     ]));
     const event = await prisma.auditEvent.findFirstOrThrow({ where: { type: 'delivery.delivered', refs: { has: order.id } } });
     expect(event.payload).toMatchObject({ codAmount: 500, expectedCod: 1500, remainingReceivable: 1000 });
+    expect(await prisma.orderReceivable.findUniqueOrThrow({ where: { id: schedule.id } }))
+      .toMatchObject({ status: 'partially_settled', settledAmount: 500 });
+
+    await courier.handover(
+      { runId: run.id, amount: 500, reason: 'Остаток остаётся за клиентом' },
+      'cashier',
+      undefined,
+      `handover-cod-partial-${seq}`,
+    );
+    const remaining = await payments.settleReceivable(
+      schedule.id,
+      { method: 'card', amount: 1000, txnId: `post-handover-ar-${seq}` },
+      'staff:test-cashier',
+      { staffId: 'test-cashier', idempotencyKey: `post-handover-ar-${seq}` },
+    );
+    const receipt = await prisma.accountingJournalEntry.findUniqueOrThrow({
+      where: { id: remaining.payment.accountingEntryId! },
+      include: { lines: true },
+    });
+    expect(receipt).toMatchObject({ sourceType: 'order_receivable.receipt', documentAmount: 1000 });
+    expect(receipt.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '1020', debit: 1000, credit: 0 }),
+      expect.objectContaining({ accountCode: '1100', debit: 0, credit: 1000 }),
+    ]));
+    expect(receipt.lines).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '2400', credit: 1000 }),
+    ]));
+    expect(await prisma.orderReceivable.findUniqueOrThrow({ where: { id: schedule.id } }))
+      .toMatchObject({ status: 'settled', settledAmount: 1500 });
   });
 
   it('collects COD for mixed stock and service lines while finalizing only tracked inventory', async () => {

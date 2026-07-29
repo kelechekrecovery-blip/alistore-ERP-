@@ -195,7 +195,13 @@ internal fun ClientTradeInsScreen(
                   submitError = null
                 }.onFailure { error ->
                   if (error.isNetworkFailure()) {
-                    OfflineQueueDb(context, CLIENT_QUEUE_DB).enqueue("tradeins", "POST", command.toJson().toString(), key)
+                    OfflineQueueDb(
+                      context,
+                      CLIENT_QUEUE_DB,
+                      QueueOwner.client(session.user.customerId),
+                    ).use { queue ->
+                      queue.enqueue("tradeins", "POST", command.toJson().toString(), key)
+                    }
                     scheduleClientTradeInSync(context, apiBaseUrl)
                     queued = true
                     submitError = null

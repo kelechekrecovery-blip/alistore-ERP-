@@ -17,6 +17,8 @@ import { JwtService } from '@nestjs/jwt';
 import { TotpService } from '../src/auth/totp.service';
 import { authenticator } from 'otplib';
 import { ReturnsService } from '../src/returns/returns.service';
+import { SupplyOperationsService } from '../src/procurement/supply-operations.service';
+import { MAX_REFUND_ATTEMPTS } from '../src/refunds/refunds.constants';
 
 /**
  * Slice 2 of docs/SUPPLY-TO-ORDER-PLAN.md — a `to_order` product becomes
@@ -672,6 +674,245 @@ describe('Order supply mode: to_order request (slice 2)', () => {
     ]));
     expect(refundPayment.accountingEntry?.lines.some((line) => ['4000', '2200'].includes(line.accountCode)))
       .toBe(false);
+  });
+
+  it('keeps a transient prepayment refund failure processing and completes it on retry', async () => {
+    const product = await toOrderProduct();
+    const buyer = await customer();
+    const order = await orders.createFromCatalog({
+      customerId: buyer.id,
+      channel: 'web',
+      fulfillmentType: 'pickup',
+      pickupPoint: 'BISHKEK-1',
+      total: product.price,
+      items: [{ sku: product.sku, qty: 1, price: product.price }],
+    }, buyer.id, `cancellation-refund-failure-order-${seq}`);
+    const deposit = await prisma.orderReceivable.findFirstOrThrow({
+      where: { orderId: order.id, kind: 'supply_deposit' },
+    });
+    await payments.settleReceivable(
+      deposit.id,
+      { method: 'card', amount: deposit.amount, txnId: `cancel-refund-failure-${runId}-${seq}` },
+      'staff:test-cashier',
+      { staffId: 'test-cashier', idempotencyKey: `cancel-refund-failure-pay-${runId}-${seq}` },
+    );
+    const cancellation = await cancellations.request(
+      order.id,
+      buyer.id,
+      'Проверка терминальной ошибки возврата',
+      `cancel-refund-failure-request-${runId}-${seq}`,
+    );
+    let gatewayAttempts = 0;
+    const transientGateway = {
+      name: 'production',
+      assertOperational: () => undefined,
+      createIntent: async () => { throw new Error('unused'); },
+      verifyWebhook: async () => { throw new Error('unused'); },
+      verifyRefundWebhook: async () => { throw new Error('unused'); },
+      refund: async (input) => {
+        gatewayAttempts += 1;
+        if (gatewayAttempts === 1) throw new Error('transient_provider_timeout');
+        return {
+          providerRefundId: `provider-${input.idempotencyKey}`,
+          status: 'succeeded' as const,
+        };
+      },
+    } satisfies PaymentGatewayProvider;
+    const transientProcessor = new RefundProcessor(
+      prisma,
+      new AuditService(prisma),
+      transientGateway,
+    );
+    const failureNotice = jest.spyOn(transientProcessor as any, 'notifyRefundFailedOnTx');
+
+    await expect(transientProcessor.processRefund(cancellation.refundId!, 'system:test-transient'))
+      .rejects.toThrow('transient_provider_timeout');
+
+    expect(await prisma.refund.findUniqueOrThrow({ where: { id: cancellation.refundId! } }))
+      .toMatchObject({ purpose: 'customer_prepayment', status: 'failed' });
+    expect(await prisma.orderCancellation.findUniqueOrThrow({ where: { id: cancellation.id } }))
+      .toMatchObject({ status: 'refund_processing' });
+    expect(failureNotice).not.toHaveBeenCalled();
+    await prisma.refundAllocation.updateMany({
+      where: { refundId: cancellation.refundId! },
+      data: { nextAttemptAt: new Date(0) },
+    });
+
+    await transientProcessor.processRefund(cancellation.refundId!, 'system:test-retry');
+
+    expect(gatewayAttempts).toBe(2);
+    expect(await prisma.refund.findUniqueOrThrow({ where: { id: cancellation.refundId! } }))
+      .toMatchObject({ status: 'succeeded' });
+    expect(await prisma.orderCancellation.findUniqueOrThrow({ where: { id: cancellation.id } }))
+      .toMatchObject({ status: 'refunded', completedAt: expect.any(Date) });
+    expect(failureNotice).not.toHaveBeenCalled();
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe('SET CONSTRAINTS ALL DEFERRED');
+      await tx.orderCancellation.delete({ where: { id: cancellation.id } });
+      await tx.refundAllocation.deleteMany({ where: { refundId: cancellation.refundId! } });
+      await tx.refund.delete({ where: { id: cancellation.refundId! } });
+    });
+  });
+
+  it('projects a terminal partial prepayment failure and keeps the aggregate partial', async () => {
+    const product = await toOrderProduct();
+    const buyer = await customer();
+    const order = await orders.createFromCatalog({
+      customerId: buyer.id,
+      channel: 'web',
+      fulfillmentType: 'pickup',
+      pickupPoint: 'BISHKEK-1',
+      total: product.price,
+      items: [{ sku: product.sku, qty: 1, price: product.price }],
+    }, buyer.id, `cancellation-refund-partial-order-${seq}`);
+    const deposit = await prisma.orderReceivable.findFirstOrThrow({
+      where: { orderId: order.id, kind: 'supply_deposit' },
+    });
+    const firstAmount = Math.floor(deposit.amount / 2);
+    await payments.settleReceivable(
+      deposit.id,
+      { method: 'card', amount: firstAmount, txnId: `cancel-refund-partial-a-${runId}-${seq}` },
+      'staff:test-cashier',
+      { staffId: 'test-cashier', idempotencyKey: `cancel-refund-partial-pay-a-${runId}-${seq}` },
+    );
+    await payments.settleReceivable(
+      deposit.id,
+      { method: 'card', amount: deposit.amount - firstAmount, txnId: `cancel-refund-partial-b-${runId}-${seq}` },
+      'staff:test-cashier',
+      { staffId: 'test-cashier', idempotencyKey: `cancel-refund-partial-pay-b-${runId}-${seq}` },
+    );
+    const cancellation = await cancellations.request(
+      order.id,
+      buyer.id,
+      'Проверка частичной терминальной ошибки возврата',
+      `cancel-refund-partial-request-${runId}-${seq}`,
+    );
+    const pendingProviderRefundId = `partial-provider-${runId}-${seq}`;
+    let gatewayAttempts = 0;
+    const partialProcessor = new RefundProcessor(
+      prisma,
+      new AuditService(prisma),
+      {
+        name: 'production',
+        assertOperational: () => undefined,
+        createIntent: async () => { throw new Error('unused'); },
+        verifyWebhook: async () => { throw new Error('unused'); },
+        verifyRefundWebhook: async () => { throw new Error('unused'); },
+        refund: async (input) => {
+          gatewayAttempts += 1;
+          return gatewayAttempts === 1
+            ? { providerRefundId: `succeeded-${input.idempotencyKey}`, status: 'succeeded' as const }
+            : { providerRefundId: pendingProviderRefundId, status: 'accepted' as const };
+        },
+      },
+    );
+    const failureNotice = jest.spyOn(partialProcessor as any, 'notifyRefundFailedOnTx');
+
+    await partialProcessor.processRefund(cancellation.refundId!, 'system:test-partial');
+    await partialProcessor.reconcileProviderRefund({
+      providerRefundId: pendingProviderRefundId,
+      status: 'failed',
+      failureCode: 'provider_rejected',
+    }, 'system:test-provider-webhook');
+
+    expect(await prisma.refund.findUniqueOrThrow({ where: { id: cancellation.refundId! } }))
+      .toMatchObject({ status: 'partially_succeeded' });
+    expect(await prisma.orderCancellation.findUniqueOrThrow({ where: { id: cancellation.id } }))
+      .toMatchObject({ status: 'refund_failed' });
+    expect(failureNotice).toHaveBeenCalledTimes(1);
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe('SET CONSTRAINTS ALL DEFERRED');
+      await tx.orderCancellation.delete({ where: { id: cancellation.id } });
+      await tx.refundAllocation.deleteMany({ where: { refundId: cancellation.refundId! } });
+      await tx.refund.delete({ where: { id: cancellation.refundId! } });
+    });
+  });
+
+  it('projects an exhausted prepayment refund into the cancellation operations queue', async () => {
+    const product = await toOrderProduct();
+    const buyer = await customer();
+    const order = await orders.createFromCatalog({
+      customerId: buyer.id,
+      channel: 'web',
+      fulfillmentType: 'pickup',
+      pickupPoint: 'BISHKEK-1',
+      total: product.price,
+      items: [{ sku: product.sku, qty: 1, price: product.price }],
+    }, buyer.id, `cancellation-refund-exhausted-order-${seq}`);
+    const deposit = await prisma.orderReceivable.findFirstOrThrow({
+      where: { orderId: order.id, kind: 'supply_deposit' },
+    });
+    await payments.settleReceivable(
+      deposit.id,
+      { method: 'card', amount: deposit.amount, txnId: `cancel-refund-exhausted-${runId}-${seq}` },
+      'staff:test-cashier',
+      { staffId: 'test-cashier', idempotencyKey: `cancel-refund-exhausted-pay-${runId}-${seq}` },
+    );
+    const cancellation = await cancellations.request(
+      order.id,
+      buyer.id,
+      'Проверка исчерпания попыток возврата',
+      `cancel-refund-exhausted-request-${runId}-${seq}`,
+    );
+    const failingGateway = {
+      name: 'production',
+      assertOperational: () => undefined,
+      createIntent: async () => { throw new Error('unused'); },
+      verifyWebhook: async () => { throw new Error('unused'); },
+      verifyRefundWebhook: async () => { throw new Error('unused'); },
+      refund: async () => { throw new Error('provider_unavailable'); },
+    } satisfies PaymentGatewayProvider;
+    const failingProcessor = new RefundProcessor(prisma, new AuditService(prisma), failingGateway);
+    const failureNotice = jest.spyOn(failingProcessor as any, 'notifyRefundFailedOnTx');
+
+    for (let attempt = 1; attempt <= MAX_REFUND_ATTEMPTS; attempt += 1) {
+      if (attempt > 1) {
+        await prisma.refundAllocation.updateMany({
+          where: { refundId: cancellation.refundId! },
+          data: { nextAttemptAt: new Date(0) },
+        });
+      }
+      await expect(failingProcessor.processRefund(cancellation.refundId!, `system:test-failure-${attempt}`))
+        .rejects.toThrow('provider_unavailable');
+      expect(await prisma.orderCancellation.findUniqueOrThrow({ where: { id: cancellation.id } }))
+        .toMatchObject({ status: attempt === MAX_REFUND_ATTEMPTS ? 'refund_failed' : 'refund_processing' });
+      expect(failureNotice).toHaveBeenCalledTimes(attempt === MAX_REFUND_ATTEMPTS ? 1 : 0);
+      const allocation = await prisma.refundAllocation.findFirstOrThrow({
+        where: { refundId: cancellation.refundId! },
+      });
+      if (attempt === MAX_REFUND_ATTEMPTS) expect(allocation.nextAttemptAt).toBeNull();
+      else expect(allocation.nextAttemptAt).toBeInstanceOf(Date);
+    }
+
+    expect(await prisma.auditEvent.count({
+      where: { type: 'refund.failed', refs: { has: cancellation.refundId! } },
+    })).toBe(MAX_REFUND_ATTEMPTS);
+
+    const operations = await new SupplyOperationsService(
+      prisma,
+      new ConfigService({ SUPPLY_CANCELLATION_ENABLED: 'true' }),
+    ).list('admin');
+    expect(operations.queues.refund_failed).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: cancellation.id,
+        orderId: order.id,
+        status: 'refund_failed',
+        amount: deposit.amount,
+      }),
+    ]));
+
+    await failingProcessor.resolveRefund(
+      cancellation.refundId!,
+      { action: 'cancel', reason: 'Подтверждено, что провайдер не исполнил возврат' },
+      'staff:test-owner',
+      `cancel-refund-failure-resolve-${runId}-${seq}`,
+    );
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe('SET CONSTRAINTS ALL DEFERRED');
+      await tx.orderCancellation.delete({ where: { id: cancellation.id } });
+      await tx.refundAllocation.deleteMany({ where: { refundId: cancellation.refundId! } });
+      await tx.refund.delete({ where: { id: cancellation.refundId! } });
+    });
   });
 
   it('snapshots owner resolution policy when PO was sent before cancellation', async () => {

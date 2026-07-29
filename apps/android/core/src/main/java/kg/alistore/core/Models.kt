@@ -34,9 +34,11 @@ data class StorePoint(
 
 data class PendingMutation(
   val id: String,
+  val ownerId: String,
   val endpoint: String,
   val method: String,
   val body: String,
+  val payloadFingerprint: String,
   val idempotencyKey: String,
   val attempts: Int,
   val state: String,

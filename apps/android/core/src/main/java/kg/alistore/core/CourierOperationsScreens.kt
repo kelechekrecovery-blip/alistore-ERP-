@@ -41,6 +41,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -209,8 +210,11 @@ private fun CourierWorkspace(
   onLogout: () -> Unit,
 ) {
   val context = LocalContext.current.applicationContext
-  val queue = remember { OfflineQueueDb(context, COURIER_QUEUE_DB) }
-  val commands = remember(api) { CourierCommandManager(api, queue) }
+  val queue = remember(session.staffId) {
+    OfflineQueueDb(context, COURIER_QUEUE_DB, QueueOwner.staff(session.staffId))
+  }
+  DisposableEffect(queue) { onDispose { queue.close() } }
+  val commands = remember(api, queue) { CourierCommandManager(api, queue) }
   var selected by rememberSaveable { mutableStateOf(0) }
   var deliveries by remember { mutableStateOf<List<CourierDelivery>>(emptyList()) }
   var loading by remember { mutableStateOf(true) }

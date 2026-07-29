@@ -351,6 +351,9 @@ class ClientAuthScreenTest {
 private class UiSessionStore(private var tokens: AuthTokens? = null) : SessionStore {
   override fun saveSession(tokens: AuthTokens) { this.tokens = tokens }
   override fun readSession(): AuthTokens? = tokens
+  override fun saveAuthenticatedSession(tokens: AuthTokens, principalId: String) {
+    this.tokens = tokens
+  }
   override fun clear() { tokens = null }
 }
 

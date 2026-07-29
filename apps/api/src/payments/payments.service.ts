@@ -58,10 +58,11 @@ export class PaymentsService {
   }
 
   /**
-   * Takes a customer deposit against one receivable without recognizing sales
-   * revenue. The money is posted to customer-deposit liability 2400. Once every
-   * deposit receivable is settled, this same transaction claims the supplier
-   * quotes and creates one draft PO per supplier.
+   * Settles one scheduled order receivable. Before fulfillment this is a
+   * customer deposit on 2400; after the matching handover has recognized
+   * revenue and debited 1100, the same endpoint collects that accounts
+   * receivable instead. Once every supply deposit is settled, this transaction
+   * also claims supplier quotes and creates one draft PO per supplier.
    */
   settleReceivable(
     receivableId: string,
@@ -133,6 +134,11 @@ export class PaymentsService {
         ? await this.resolveCashShiftOnTx(tx, dto.shiftId, context.staffId, point)
         : null;
       const accountCode = paymentAccountCode(dto.method);
+      const revenueRecognized = await isOrderReceivableRecognizedOnTx(tx, receivable);
+      const accountingSourceType = revenueRecognized
+        ? 'order_receivable.receipt'
+        : 'customer_prepayment.receipt';
+      const offsetAccountCode = revenueRecognized ? '1100' : '2400';
       const payment = await tx.payment.create({
         data: {
           orderId: receivable.orderId,
@@ -149,9 +155,11 @@ export class PaymentsService {
       });
       const accountingEntry = await postAccountingEntryOnTx(tx, {
         idempotencyKey: `accounting:${idempotencyKey}`,
-        sourceType: 'customer_prepayment.receipt',
+        sourceType: accountingSourceType,
         sourceRef: payment.id,
-        description: `Получение предоплаты ${receivable.kind} по заказу ${receivable.orderId}`,
+        description: revenueRecognized
+          ? `Погашение дебиторской задолженности ${receivable.kind} по заказу ${receivable.orderId}`
+          : `Получение предоплаты ${receivable.kind} по заказу ${receivable.orderId}`,
         point,
         documentAmount: dto.amount,
         baseAmount: dto.amount,
@@ -159,7 +167,13 @@ export class PaymentsService {
         createdBy: actor,
         lines: [
           { accountCode, debit: dto.amount, memo: `Поступление оплаты ${receivable.kind}` },
-          { accountCode: '2400', credit: dto.amount, memo: 'Обязательство перед покупателем' },
+          {
+            accountCode: offsetAccountCode,
+            credit: dto.amount,
+            memo: revenueRecognized
+              ? 'Погашение дебиторской задолженности'
+              : 'Обязательство перед покупателем',
+          },
         ],
       });
       const postedPayment = await tx.payment.update({
@@ -196,7 +210,7 @@ export class PaymentsService {
           actor,
           payload: {
             accountingEntryId: accountingEntry.id,
-            sourceType: 'customer_prepayment.receipt',
+            sourceType: accountingSourceType,
             sourceRef: payment.id,
           },
           refs: [accountingEntry.id, payment.id, receivable.orderId],
@@ -560,19 +574,13 @@ export class PaymentsService {
       // move for a line we don't stock, even if that upstream gate is ever
       // bypassed (e.g. a direct DB write, a future caller). Checked before any
       // Payment row is created.
-      const supplyModeBySku = new Map(
-        (await tx.product.findMany({
-          where: { sku: { in: [...new Set(order.items.map((item) => item.sku))] } },
-          select: { sku: true, supplyMode: true },
-        })).map((product) => [product.sku, product]),
-      );
       const supplyByOrderItemId = new Map(
         (await tx.orderLineSupply.findMany({
           where: { orderItemId: { in: order.items.map((item) => item.id) } },
           select: { orderItemId: true, status: true },
         })).map((row) => [row.orderItemId, row]),
       );
-      assertOrderLineSupplyReceived(order.id, order.items, supplyModeBySku, supplyByOrderItemId);
+      assertOrderLineSupplyReceived(order.id, order.items, supplyByOrderItemId);
 
       let point = order.fulfillmentLocation?.trim() || order.storePoint?.inventoryLocation.trim();
       if (!point) {
@@ -939,6 +947,42 @@ export class PaymentsService {
     if (shift.point !== point) throw new ConflictError('cash_shift_wrong_point', 'Кассовая смена открыта в другой точке');
     return shift;
   }
+}
+
+async function isOrderReceivableRecognizedOnTx(
+  tx: Prisma.TransactionClient,
+  receivable: {
+    orderId: string;
+    orderItemId: string | null;
+    kind: string;
+  },
+): Promise<boolean> {
+  if (!['stock_sale', 'supply_balance', 'delivery'].includes(receivable.kind)) {
+    return false;
+  }
+  const recognizedSources: Prisma.AccountingJournalEntryWhereInput[] = [
+    { sourceType: 'cod.receivable', sourceRef: receivable.orderId },
+  ];
+  if (receivable.kind === 'delivery') {
+    recognizedSources.push({
+      sourceType: 'order.delivery.handover',
+      sourceRef: receivable.orderId,
+    });
+  } else if (receivable.orderItemId) {
+    recognizedSources.push({
+      sourceType: receivable.kind === 'supply_balance'
+        ? 'order_line.handover'
+        : 'order_item.handover',
+      sourceRef: receivable.orderItemId,
+    });
+  }
+  return (await tx.accountingJournalEntry.findFirst({
+    where: {
+      OR: recognizedSources,
+      reversal: { is: null },
+    },
+    select: { id: true },
+  })) !== null;
 }
 
 function purchaseOrderNumber() {

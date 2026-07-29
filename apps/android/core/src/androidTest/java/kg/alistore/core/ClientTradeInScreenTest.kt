@@ -95,6 +95,9 @@ private data class CustomerTradeInRequestSnapshot(val customerId: String, val re
 private class TradeInSessionStore(private var tokens: AuthTokens?) : SessionStore {
   override fun saveSession(tokens: AuthTokens) { this.tokens = tokens }
   override fun readSession(): AuthTokens? = tokens
+  override fun saveAuthenticatedSession(tokens: AuthTokens, principalId: String) {
+    this.tokens = tokens
+  }
   override fun clear() { tokens = null }
 }
 

@@ -254,11 +254,7 @@ export class CourierService {
           // гвард здесь — не страховка на будущее, а действующая проверка.
           const codLines = await tx.orderItem.findMany({
             where: { orderId },
-            select: { id: true, sku: true },
-          });
-          const codProducts = await tx.product.findMany({
-            where: { sku: { in: codLines.map((line) => line.sku) } },
-            select: { sku: true, supplyMode: true },
+            select: { id: true, sku: true, supplyModeSnapshot: true },
           });
           const codSupplyByOrderItemId = await tx.orderLineSupply.findMany({
             where: { orderItemId: { in: codLines.map((line) => line.id) } },
@@ -267,7 +263,6 @@ export class CourierService {
           assertOrderLineSupplyReceived(
             orderId,
             codLines,
-            new Map(codProducts.map((product) => [product.sku, product])),
             new Map(codSupplyByOrderItemId.map((row) => [row.orderItemId, row])),
           );
           await assertOrderReservationCoverageOnTx(tx, orderId, new Date(), { enforceExpiry: false });
@@ -296,6 +291,12 @@ export class CourierService {
           actor: courierId,
         })
         : null;
+      await settleCollectedCodReceivablesOnTx(tx, {
+        orderId,
+        amount: dto.codAmount,
+        actor: courierId,
+        events: inventoryEvents,
+      });
       const result = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
       await enqueueConsentedCustomerNotice(tx, this.outbox, {
         customerId: order.customerId,
@@ -520,6 +521,15 @@ export class CourierService {
               include: { lines: { where: { accountCode: '1100' } } },
             })
             : [];
+          const deliveryRecognized = deliveredOrderIds.length > 0
+            ? await tx.accountingJournalEntry.findMany({
+              where: {
+                sourceType: 'order.delivery.handover',
+                sourceRef: { in: deliveredOrderIds },
+              },
+              include: { lines: { where: { accountCode: '1100' } } },
+            })
+            : [];
           const covered = new Set(recognized.map((entry) => entry.sourceRef));
           for (const entry of lineRecognized) {
             const orderId = orderIdByItemId.get(entry.sourceRef);
@@ -527,6 +537,10 @@ export class CourierService {
           }
           const recognizedTotal = recognized.reduce((sum, entry) => sum + (entry.documentAmount ?? 0), 0)
             + lineRecognized.reduce(
+              (sum, entry) => sum + entry.lines.reduce((lineSum, line) => lineSum + line.debit, 0),
+              0,
+            )
+            + deliveryRecognized.reduce(
               (sum, entry) => sum + entry.lines.reduce((lineSum, line) => lineSum + line.debit, 0),
               0,
             );
@@ -757,6 +771,78 @@ function assertCourierLifecycleReady(order: {
       'order_payment_unsettled',
       `Предоплаченный заказ ${order.id} нельзя передать до закрытия начислений`,
     );
+  }
+}
+
+async function settleCollectedCodReceivablesOnTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    orderId: string;
+    amount: number;
+    actor: string;
+    events: AuditInput[];
+  },
+): Promise<void> {
+  if (input.amount === 0) return;
+  const receivables = await tx.orderReceivable.findMany({
+    where: {
+      orderId: input.orderId,
+      kind: { in: ['stock_sale', 'supply_balance', 'delivery'] },
+      status: { not: 'cancelled' },
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+  // Orders created before receivable schedules were introduced keep the legacy
+  // whole-order COD path. Their cash is still reconciled by cod.handover.
+  if (receivables.length === 0) return;
+
+  const collectible = receivables.reduce(
+    (sum, receivable) => sum + Math.max(0, receivable.amount - receivable.settledAmount),
+    0,
+  );
+  if (input.amount > collectible) {
+    throw new ConflictError(
+      'cod_receivable_allocation_invalid',
+      `Собранный COD ${input.amount} превышает открытые начисления ${collectible}`,
+    );
+  }
+
+  let remaining = input.amount;
+  for (const receivable of receivables) {
+    if (remaining === 0) break;
+    const openAmount = Math.max(0, receivable.amount - receivable.settledAmount);
+    if (openAmount === 0) continue;
+    const allocated = Math.min(remaining, openAmount);
+    const settledAmount = receivable.settledAmount + allocated;
+    const status = settledAmount === receivable.amount ? 'settled' : 'partially_settled';
+    const updated = await tx.orderReceivable.updateMany({
+      where: {
+        id: receivable.id,
+        status: receivable.status,
+        settledAmount: receivable.settledAmount,
+      },
+      data: { settledAmount, status },
+    });
+    if (updated.count !== 1) {
+      throw new ConflictError(
+        'cod_receivable_allocation_race',
+        `Начисление ${receivable.id} изменилось параллельно`,
+      );
+    }
+    if (status === 'settled') {
+      input.events.push({
+        type: EventType.OrderReceivableSettled,
+        actor: input.actor,
+        payload: {
+          orderId: input.orderId,
+          receivableId: receivable.id,
+          kind: receivable.kind,
+          source: 'courier_cod',
+        },
+        refs: [input.orderId, receivable.id],
+      });
+    }
+    remaining -= allocated;
   }
 }
 

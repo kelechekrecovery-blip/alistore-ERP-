@@ -2,6 +2,7 @@ import {
   ALLOWED_TRANSITIONS,
   assertTransition,
   canTransition,
+  deriveOrderStatusFromLineFulfillment,
 } from '../src/orders/order-state-machine';
 import { ValidationError } from '../src/common/errors';
 
@@ -36,5 +37,14 @@ describe('order state machine (pure)', () => {
     expect(canTransition('refunded', 'paid')).toBe(false);
     expect(canTransition('cancelled', 'created')).toBe(false);
     expect(canTransition('exchanged', 'reserved')).toBe(false);
+  });
+
+  it('derives the backward-compatible aggregate status from line fulfillment truth', () => {
+    expect(deriveOrderStatusFromLineFulfillment(['ready', 'in_transit']))
+      .toBe('confirmed');
+    expect(deriveOrderStatusFromLineFulfillment(['ready', 'handed_over']))
+      .toBe('ready_for_pickup');
+    expect(deriveOrderStatusFromLineFulfillment(['handed_over', 'customer_cancelled']))
+      .toBe('completed');
   });
 });

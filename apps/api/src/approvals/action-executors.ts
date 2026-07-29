@@ -517,25 +517,61 @@ const stock_adjust: ActionExecutor = async (tx, payload, approver, approvalId, e
   const direction = String(payload['direction'] ?? 'increase');
   const reason = payload['reason'] ? String(payload['reason']) : null;
   const unitCost = Number(payload['unitCost'] ?? 0);
+  const expectedOnHand = Number(payload['expectedOnHand']);
+  const countMovementId = payload['countMovementId'] ? String(payload['countMovementId']) : null;
   if (!location) throw new ValidationError('location_required', 'Укажите склад корректировки');
+  if (!Number.isSafeInteger(expectedOnHand) || expectedOnHand < 0) {
+    throw new ValidationError('stock_adjust_snapshot_invalid', 'Снимок остатка корректировки повреждён');
+  }
   if (direction !== 'increase' && direction !== 'decrease') {
     throw new ValidationError('invalid_adjustment_direction', 'Неизвестное направление корректировки');
   }
   const delta = direction === 'decrease' ? -Math.abs(qty) : Math.abs(qty);
-  let balance: Awaited<ReturnType<typeof lockQuantityBalance>>;
+  if (countMovementId) {
+    const claim = await tx.inventoryMovement.updateMany({
+      where: {
+        id: countMovementId,
+        type: 'count',
+        productId,
+        from: location,
+        qty: delta,
+        idempotencyKey: null,
+      },
+      data: { idempotencyKey: `count-adjustment:${approvalId}` },
+    });
+    if (claim.count !== 1) {
+      throw new ConflictError(
+        'inventory_count_already_applied',
+        'Этот пересчёт уже использован для корректировки',
+      );
+    }
+  }
+  await tx.$queryRaw`SELECT id FROM "InventoryBalance" WHERE "productId" = ${productId} AND location = ${location} FOR UPDATE`;
+  let balance = await tx.inventoryBalance.findUnique({
+    where: { productId_location: { productId, location } },
+  });
+  if ((balance?.onHand ?? 0) !== expectedOnHand) {
+    throw new ConflictError(
+      'stock_adjust_snapshot_changed',
+      'Остаток изменился после отправки корректировки на согласование',
+    );
+  }
   if (delta < 0) {
-    balance = await lockQuantityBalance(tx, productId, location);
+    if (!balance) {
+      throw new ConflictError('inventory_balance_not_found', `На складе ${location} нет остатка товара`);
+    }
     if (balance.onHand - balance.reserved < Math.abs(delta)) {
       throw new ConflictError('insufficient_available_stock', 'Корректировка превышает свободный остаток');
     }
     await assertStoreOwnedAvailable(tx, balance.id, balance.onHand - balance.reserved, Math.abs(delta));
     await tx.inventoryBalance.update({ where: { id: balance.id }, data: { onHand: { decrement: Math.abs(delta) } } });
   } else {
-    balance = await tx.inventoryBalance.upsert({
-      where: { productId_location: { productId, location } },
-      create: { productId, location, onHand: delta },
-      update: { onHand: { increment: delta } },
-    });
+    balance = balance
+      ? await tx.inventoryBalance.update({
+          where: { id: balance.id },
+          data: { onHand: { increment: delta } },
+        })
+      : await tx.inventoryBalance.create({ data: { productId, location, onHand: delta } });
   }
   const movement = await tx.inventoryMovement.create({
     data: { productId, qty: delta, type: 'adjust', from: location, reason },
@@ -557,15 +593,25 @@ const stock_adjust: ActionExecutor = async (tx, payload, approver, approvalId, e
   events.push({
     type: EventType.StockAdjusted,
     actor: approver,
-    payload: { approvalId, productId, location, qty: delta, direction, movementId: movement.id, reason, totalValue: valuation.totalValue },
-    refs: [productId, movement.id],
+    payload: {
+      approvalId,
+      productId,
+      location,
+      qty: delta,
+      direction,
+      movementId: movement.id,
+      countMovementId,
+      reason,
+      totalValue: valuation.totalValue,
+    },
+    refs: [approvalId, productId, movement.id, ...(countMovementId ? [countMovementId] : [])],
   });
   if (valuation.entry) {
     events.push({
       type: EventType.AccountingEntryPosted,
       actor: approver,
       payload: { accountingEntryId: valuation.entry.id, sourceType: 'inventory.adjustment', sourceRef: movement.id, amount: valuation.totalValue },
-      refs: [valuation.entry.id, movement.id, productId],
+      refs: [valuation.entry.id, approvalId, movement.id, productId, ...(countMovementId ? [countMovementId] : [])],
     });
   }
 };

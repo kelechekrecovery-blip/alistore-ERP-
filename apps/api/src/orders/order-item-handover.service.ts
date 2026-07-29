@@ -6,6 +6,7 @@ import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { UnitsService } from '../units/units.service';
 import { handOverReadyOrderItemOnTx } from './order-item-handover-on-tx';
+import { deriveOrderStatusFromLineFulfillment } from './order-state-machine';
 
 type OrderItemHandoverResult = {
   orderId: string;
@@ -71,15 +72,13 @@ export class OrderItemHandoverService {
         units: this.units,
         events,
       });
-      const active = await tx.orderItem.findMany({
-        where: { orderId, fulfillmentStatus: { notIn: ['handed_over', 'customer_cancelled', 'cancelled'] } },
+      const orderItems = await tx.orderItem.findMany({
+        where: { orderId },
         select: { fulfillmentStatus: true },
       });
-      const orderStatus = active.length === 0
-        ? 'completed'
-        : active.every((item) => item.fulfillmentStatus === 'ready')
-          ? 'ready_for_pickup'
-          : 'confirmed';
+      const orderStatus = deriveOrderStatusFromLineFulfillment(
+        orderItems.map((item) => item.fulfillmentStatus),
+      );
       if (orderStatus !== order.status) {
         await tx.order.update({ where: { id: orderId }, data: { status: orderStatus } });
       }

@@ -343,7 +343,7 @@ export class RefundProcessor {
           where: { id: allocation.refundId },
           data: { status: succeeded > 0 ? 'partially_succeeded' : 'failed' },
         });
-        if (succeeded === 0) await this.notifyRefundFailedOnTx(tx, allocation.refundId);
+        await this.projectRefundFailedOnTx(tx, allocation.refundId);
         return {
           result: current,
           events: [{
@@ -906,7 +906,24 @@ export class RefundProcessor {
     });
   }
 
-  /** Customer-facing failure notice for a refund that flipped to terminal `failed`. */
+  /** Atomically project terminal failure to linked workflows before emitting the deduplicated notice. */
+  private async projectRefundFailedOnTx(tx: Prisma.TransactionClient, refundId: string) {
+    const refund = await tx.refund.findUnique({
+      where: { id: refundId },
+      select: { purpose: true },
+    });
+    if (refund?.purpose === 'customer_prepayment') {
+      await tx.orderCancellation.updateMany({
+        where: {
+          refundId,
+          status: { in: ['refund_queued', 'refund_processing'] },
+        },
+        data: { status: 'refund_failed' },
+      });
+    }
+    await this.notifyRefundFailedOnTx(tx, refundId);
+  }
+
   private async notifyRefundFailedOnTx(tx: Prisma.TransactionClient, refundId: string) {
     if (!this.outbox) return;
     const refund = await tx.refund.findUnique({
@@ -936,7 +953,12 @@ export class RefundProcessor {
     await this.audit.transaction(async (tx) => {
       const changed = await tx.refundAllocation.updateMany({
         where: { id: allocationId, status: 'processing', attempts },
-        data: { status: 'failed', lastError: message, lockedAt: null, nextAttemptAt: nextRefundAttempt(attempts) },
+        data: {
+          status: 'failed',
+          lastError: message,
+          lockedAt: null,
+          nextAttemptAt: attempts >= MAX_REFUND_ATTEMPTS ? null : nextRefundAttempt(attempts),
+        },
       });
       const allocation = await tx.refundAllocation.findUniqueOrThrow({ where: { id: allocationId } });
       if (changed.count === 0) {
@@ -945,7 +967,20 @@ export class RefundProcessor {
       const succeeded = await tx.refundAllocation.count({ where: { refundId, status: 'succeeded' } });
       const status = succeeded > 0 ? 'partially_succeeded' as const : 'failed' as const;
       const refund = await tx.refund.update({ where: { id: refundId }, data: { status } });
-      if (status === 'failed') await this.notifyRefundFailedOnTx(tx, refundId);
+      const exhausted = allocation.status === 'failed'
+        && allocation.attempts >= MAX_REFUND_ATTEMPTS
+        && allocation.nextAttemptAt === null;
+      if (exhausted) {
+        await this.projectRefundFailedOnTx(tx, refundId);
+      } else if (refund.purpose === 'customer_prepayment') {
+        await tx.orderCancellation.updateMany({
+          where: {
+            refundId,
+            status: { in: ['refund_queued', 'refund_failed'] },
+          },
+          data: { status: 'refund_processing' },
+        });
+      }
       return {
         result: refund,
         events: [{

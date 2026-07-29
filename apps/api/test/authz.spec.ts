@@ -29,4 +29,19 @@ describe('AuthzService (casbin — Role Permission Matrix)', () => {
     expect(await authz.can('admin', 'finance', 'read')).toBe(true);
     expect(await authz.can('warehouse', 'finance', 'read')).toBe(false);
   });
+
+  it('separates warehouse receiving from procurement financial postings', async () => {
+    expect(await authz.can('warehouse', 'procurement', 'receive')).toBe(true);
+
+    for (const [resource, action] of [
+      ['accounts_payable', 'pay'],
+      ['accounts_payable', 'apply'],
+      ['accounts_payable', 'reconcile'],
+      ['landed_cost', 'post'],
+    ] as const) {
+      expect(await authz.can('warehouse', resource, action)).toBe(false);
+      expect(await authz.can('admin', resource, action)).toBe(true);
+      expect(await authz.can('owner', resource, action)).toBe(true);
+    }
+  });
 });

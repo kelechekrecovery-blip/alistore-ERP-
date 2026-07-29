@@ -55,6 +55,11 @@
          preflight. Never expose api.ali.kg from a non-production process. -->
     <key>NODE_ENV</key>
     <string>production</string>
+    <!-- Sign in with Apple audiences are public identifiers, not secrets.
+         Keep both the web Services ID and native bundle ID here because
+         launchd values take precedence over the production env file. -->
+    <key>APPLE_CLIENT_ID</key>
+    <string>kg.alistore.web,kg.alistore.client</string>
     <key>PATH</key>
     <string>/Users/alistore/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     <!-- Так же, как в npm-скрипте start:prod. -->

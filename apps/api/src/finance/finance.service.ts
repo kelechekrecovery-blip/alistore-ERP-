@@ -2251,6 +2251,7 @@ async function accountingPeriodReadinessOnTx(
     tx.refund.count({
       where: {
         createdAt: { gte: from, lt: to },
+        status: { not: 'rejected' },
         OR: [
           { status: { in: ['requested', 'approved', 'processing', 'partially_succeeded'] } },
           { allocations: { some: { status: { not: 'succeeded' } } } },

@@ -9,27 +9,48 @@ import kotlinx.coroutines.withContext
 class PosSyncWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
   override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
     val apiBaseUrl = inputData.getString("apiBaseUrl") ?: return@withContext Result.failure()
-    val token = SecureTokenStore(applicationContext, "alistore-pos-session").readToken()
-      ?: return@withContext Result.failure()
-    val queue = OfflineQueueDb(applicationContext, POS_QUEUE_DB)
+    val tokenStore = SecureTokenStore(applicationContext, "alistore-pos-session")
+    val session = tokenStore.readSessionSnapshot("staff") ?: return@withContext Result.failure()
+    val queue = OfflineQueueDb(applicationContext, POS_QUEUE_DB, session.queueOwner)
     val client = ApiClient(apiBaseUrl)
     var retry = false
-    for (mutation in queue.pending()) {
-      try {
-        queue.markState(mutation.id, "syncing", incrementAttempt = true)
-        val response = client.sendResponse(mutation, token)
-        when (val decision = posReplayDecision(response)) {
-          PosReplayDecision.Sent -> queue.markSent(mutation.id)
-          is PosReplayDecision.Conflict -> queue.markState(mutation.id, "conflict", decision.message)
-          is PosReplayDecision.Failed -> queue.markState(mutation.id, "failed", decision.message)
-          PosReplayDecision.Retry -> { queue.markState(mutation.id, "failed", "HTTP ${response.status}"); retry = true }
+    try {
+      queue.recoverStaleSyncing(System.currentTimeMillis() - OFFLINE_CLAIM_TIMEOUT_MS)
+      while (true) {
+        val mutation = queue.claimNext() ?: break
+        try {
+        if (!tokenStore.isCurrent(session)) {
+          queue.markClaimState(mutation, "queued", "Authenticated session changed before replay")
+          return@withContext Result.success()
         }
-      } catch (error: Exception) {
-        queue.markState(mutation.id, "queued", error.message)
-        retry = true
+        if (!mutation.hasValidPayloadFingerprint()) {
+          queue.markClaimState(mutation, "quarantined", "Offline command payload fingerprint mismatch")
+          continue
+        }
+        val response = client.sendResponse(mutation, session.accessToken)
+        when (val decision = posReplayDecision(response)) {
+          PosReplayDecision.Sent -> queue.markClaimSent(mutation)
+          is PosReplayDecision.Conflict -> queue.markClaimState(mutation, "conflict", decision.message)
+          is PosReplayDecision.Failed -> queue.markClaimState(mutation, "failed", decision.message)
+          PosReplayDecision.Retry -> {
+            queue.markClaimState(mutation, "queued", "HTTP ${response.status}")
+            retry = true
+          }
+          }
+        } catch (error: Exception) {
+          if (error is ApiException && (error.status == 401 || error.status == 403)) {
+            queue.markClaimState(mutation, "failed", "HTTP ${error.status}")
+          } else {
+            queue.markClaimState(mutation, "queued", error.message)
+            retry = true
+          }
+        }
+        if (retry) break
       }
+      if (retry) Result.retry() else Result.success()
+    } finally {
+      queue.close()
     }
-    if (retry) Result.retry() else Result.success()
   }
 }
 
