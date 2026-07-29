@@ -30,6 +30,7 @@ async function seedVisualState() {
       username: 'visual.owner',
       passwordHash: 'visual-acceptance-not-for-login',
       role: 'owner',
+      point: 'BISHKEK-1',
     },
   });
 }

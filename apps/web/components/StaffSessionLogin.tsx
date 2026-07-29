@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { staffBootstrapNeeded, staffBootstrapOwner, staffLogin } from '@/lib/api';
+import { fetchCheckoutOptions, staffBootstrapNeeded, staffBootstrapOwner, staffLogin, type StorePoint } from '@/lib/api';
 import { saveStaffSession, type StaffSession } from '@/lib/staff-session';
 
 export function StaffSessionLogin({
@@ -21,11 +21,19 @@ export function StaffSessionLogin({
   // При пустой базе (seed не создаёт учёток) показываем создание первого
   // владельца вместо тупика на форме логина. null — статус ещё неизвестен.
   const [needsBootstrap, setNeedsBootstrap] = useState<boolean | null>(null);
+  const [points, setPoints] = useState<StorePoint[]>([]);
   const dark = mode === 'dark';
 
   useEffect(() => {
     let active = true;
-    staffBootstrapNeeded().then((needed) => { if (active) setNeedsBootstrap(needed); });
+    staffBootstrapNeeded().then(async (needed) => {
+      if (!active) return;
+      setNeedsBootstrap(needed);
+      if (needed) {
+        const options = await fetchCheckoutOptions(new Date().toISOString().slice(0, 10)).catch(() => null);
+        if (active) setPoints(options?.pickupPoints ?? []);
+      }
+    });
     return () => { active = false; };
   }, []);
 
@@ -36,9 +44,10 @@ export function StaffSessionLogin({
     const values = new FormData(e.currentTarget as HTMLFormElement);
     const username = String(values.get('username') ?? '').trim();
     const password = String(values.get('password') ?? '');
+    const point = String(values.get('point') ?? '');
     try {
       const session = needsBootstrap
-        ? await staffBootstrapOwner(username, password)
+        ? await staffBootstrapOwner(username, password, point)
         : await staffLogin(username, password);
       saveStaffSession(session);
       onAuthenticated(session);
@@ -74,6 +83,23 @@ export function StaffSessionLogin({
             : 'mt-5 w-full rounded-btn border border-ink/15 px-4 py-3 text-sm outline-none focus:border-ink/40'
         }
       />
+      {needsBootstrap && (
+        <select
+          name="point"
+          required
+          defaultValue=""
+          className={
+            dark
+              ? 'mt-3 w-full rounded-[11px] border border-surface-3 bg-ink-dark px-4 py-3 text-sm text-white outline-none focus:border-lime'
+              : 'mt-3 w-full rounded-btn border border-ink/15 px-4 py-3 text-sm outline-none focus:border-ink/40'
+          }
+        >
+          <option value="" disabled>Выберите активную точку</option>
+          {points.map((point) => (
+            <option key={point.id} value={point.id}>{point.name} · {point.inventoryLocation}</option>
+          ))}
+        </select>
+      )}
       <input
         name="password"
         placeholder="password"

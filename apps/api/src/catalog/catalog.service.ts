@@ -28,6 +28,7 @@ type ProductWithStockCount = Prisma.ProductGetPayload<{
       };
     };
     balances: true;
+    supplierOffers: true;
     bundleComponents: {
       include: {
         componentProduct: {
@@ -361,6 +362,29 @@ export class CatalogService {
   }
 
   private toCatalogProduct(product: ProductWithStockCount): CatalogProductDto {
+    const availableUnits = product.bundleComponents.length > 0
+      ? Math.min(...product.bundleComponents.map((component) =>
+          Math.floor(this.directAvailability(component.componentProduct) / component.qty),
+        ))
+      : this.directAvailability(product);
+    const offer = product.supplierOffers.find((candidate) => candidate.active);
+    const toOrderCheckoutEnabled =
+      this.config.get<string>('TO_ORDER_CHECKOUT_ENABLED')?.trim().toLowerCase() === 'true';
+    const marginBps = offer && product.price > 0
+      ? Math.floor(((product.price - offer.unitCost) * 10_000) / product.price)
+      : -10_000;
+    const orderableToOrder =
+      product.supplyMode === 'to_order'
+      && toOrderCheckoutEnabled
+      && Boolean(offer)
+      && offer!.validUntil > new Date()
+      && offer!.availableQty > 0
+      && marginBps >= 1000;
+    const availabilityKind = availableUnits > 0
+      ? 'in_stock' as const
+      : product.supplyMode === 'to_order'
+        ? 'to_order' as const
+        : 'unavailable' as const;
     return {
       id: product.id,
       sku: product.sku,
@@ -370,6 +394,17 @@ export class CatalogService {
       price: product.price,
       category: product.category,
       trackingMode: product.trackingMode,
+      // Политика поставки — публичная: покупатель должен видеть, что товар идёт
+      // под заказ и сколько это займёт. supplierId и cost сюда НЕ попадают.
+      supplyMode: product.supplyMode,
+      supplyLeadDays: product.supplyLeadDays,
+      orderable: availableUnits > 0 || orderableToOrder,
+      availabilityKind,
+      leadTimeDays: product.supplyMode === 'to_order' ? product.supplyLeadDays : null,
+      estimatedDeliveryDate:
+        product.supplyMode === 'to_order' && product.supplyLeadDays
+          ? bishkekDatePlusDays(product.supplyLeadDays)
+          : null,
       attrs: product.attrs,
       bundleComponents: product.bundleComponents.map((component) => ({
         productId: component.componentProductId,
@@ -377,11 +412,7 @@ export class CatalogService {
         name: component.componentProduct.name,
         qty: component.qty,
       })),
-      availableUnits: product.bundleComponents.length > 0
-        ? Math.min(...product.bundleComponents.map((component) =>
-            Math.floor(this.directAvailability(component.componentProduct) / component.qty),
-          ))
-        : this.directAvailability(product),
+      availableUnits,
       reviewCount: 0,
       avgRating: null,
       updatedAt: product.updatedAt.toISOString(),
@@ -434,6 +465,9 @@ export class CatalogService {
         },
       },
       balances: true,
+      supplierOffers: {
+        where: { active: true },
+      },
     };
   }
 
@@ -498,6 +532,22 @@ export class CatalogService {
   private quoteMeiliFilterValue(value: string): string {
     return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
   }
+}
+
+function bishkekDatePlusDays(days: number, now = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bishkek',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const numberPart = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value);
+  return new Date(Date.UTC(
+    numberPart('year'),
+    numberPart('month') - 1,
+    numberPart('day') + days,
+  )).toISOString().slice(0, 10);
 }
 
 function parseSince(value: string | undefined): Date | undefined {

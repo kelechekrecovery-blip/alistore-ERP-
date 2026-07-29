@@ -296,12 +296,17 @@ private fun CourierRoute(
           Text(delivery.address ?: "Адрес не указан", color = CourierMuted, modifier = Modifier.padding(top = 5.dp))
           delivery.slot?.let { Text(it, color = CourierMuted, fontSize = 12.sp) }
           Text("${delivery.items.sumOf { it.qty }} шт. · ${delivery.outstandingCod} сом COD", color = Color.White, modifier = Modifier.padding(top = 10.dp))
+          if (delivery.nativeReadinessKnown && delivery.readinessReasons.isNotEmpty()) {
+            Text("Нельзя начинать: ${delivery.readinessReasons.joinToString(" · ")}", color = CourierCoral, fontSize = 11.sp)
+          } else if (!delivery.nativeReadinessKnown) {
+            Text("Состав строк не передан; готовность проверит сервер.", color = CourierMuted, fontSize = 11.sp)
+          }
           if (focusedDeliveryId == delivery.id) Text("Открыто из уведомления", color = CourierCoral, fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
           Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { delivery.address?.let { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(it)}"))) } }, modifier = Modifier.weight(1f)) { Text("Маршрут") }
             OutlinedButton(onClick = { if (delivery.customer.phone.isNotBlank()) context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${delivery.customer.phone}"))) }, modifier = Modifier.weight(1f)) { Text("Позвонить") }
           }
-          if (delivery.status == "courier_assigned") CourierActionButton("Начать доставку", busy) {
+          if (delivery.status == "courier_assigned") CourierActionButton("Начать доставку", busy, delivery.canStartByNativePreflight) {
             busy = true
             scope.launch {
               runCatching { commands.start(delivery.id, session.accessToken, UUID.randomUUID().toString()) }
@@ -423,8 +428,8 @@ private fun Bitmap.courierEvidenceDraft(): StaffEvidenceDraft {
 }
 
 @Composable
-private fun CourierActionButton(label: String, busy: Boolean, action: () -> Unit) {
-  Button(action, enabled = !busy, colors = ButtonDefaults.buttonColors(containerColor = CourierLime, contentColor = CourierInk), modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
+private fun CourierActionButton(label: String, busy: Boolean, enabled: Boolean = true, action: () -> Unit) {
+  Button(action, enabled = !busy && enabled, colors = ButtonDefaults.buttonColors(containerColor = CourierLime, contentColor = CourierInk), modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
     Text(label, fontWeight = FontWeight.Bold)
   }
 }

@@ -25,6 +25,17 @@ type Channel = 'phone' | 'email';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function normalizePhone(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (digits.startsWith('996')) {
+    return '+' + digits.slice(0, 12);
+  }
+  if (digits.startsWith('0')) {
+    return '+996' + digits.slice(1, 10);
+  }
+  return '+996' + digits.slice(0, 9);
+}
+
 function LoginForm() {
   const {
     requestOtp,
@@ -45,7 +56,7 @@ function LoginForm() {
 
   const [channel, setChannel] = useState<Channel>('phone');
   const [stepCode, setStepCode] = useState(false);
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState('+996');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [devCode, setDevCode] = useState<string | null>(null);
@@ -53,7 +64,7 @@ function LoginForm() {
   const [busy, setBusy] = useState(false);
   const [recovery, setRecovery] = useState(false);
   const [telegramInitData, setTelegramInitData] = useState('');
-  const phoneValid = /^\+?[0-9]{9,15}$/.test(phone.trim());
+  const phoneValid = /^\+996\d{9}$/.test(phone.trim());
   const emailValid = EMAIL_RE.test(email.trim());
   const identity = channel === 'email' ? email.trim() : phone.trim();
 
@@ -203,7 +214,7 @@ function LoginForm() {
               </div>
             )}
             {channel === 'phone' ? (
-              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+996 700 12 34 56" className="login-field w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-[15px] text-white outline-none focus:border-lime" autoFocus />
+              <input type="tel" value={phone} onChange={(e) => setPhone(normalizePhone(e.target.value))} placeholder="555 000 000" className="login-field w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-[15px] text-white outline-none focus:border-lime" autoFocus />
             ) : (
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" aria-label="Email" className="login-field w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 text-[15px] text-white outline-none focus:border-lime" autoFocus />
             )}

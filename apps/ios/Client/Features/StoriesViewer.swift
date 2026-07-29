@@ -42,7 +42,7 @@ struct StoryPage: Identifiable, Sendable {
                   cta: "Смотреть новинки"),
         StoryPage(id: 4, emoji: "⚡️", title: "Доставка за 1–2 часа",
                   text: "По Бишкеку привезём технику в день заказа. Бесплатно от 5 000 сом.",
-                  cta: "Как это работает"),
+                  cta: "Как это работает")
     ]
 }
 
@@ -126,12 +126,12 @@ struct StoriesViewer: View {
 
     private var progressBars: some View {
         HStack(spacing: 4) {
-            ForEach(pages.indices, id: \.self) { i in
+            ForEach(pages.indices, id: \.self) { pageIndex in
                 GeometryReader { geo in
                     Capsule().fill(Color.white.opacity(0.25))
                         .overlay(alignment: .leading) {
                             Capsule().fill(Color.white)
-                                .frame(width: geo.size.width * fill(for: i))
+                                .frame(width: geo.size.width * fill(for: pageIndex))
                         }
                 }
                 .frame(height: 3)
@@ -159,9 +159,9 @@ struct StoriesViewer: View {
         .padding(.top, 10)
     }
 
-    private func fill(for i: Int) -> Double {
-        if i < index { return 1 }
-        if i == index { return progress }
+    private func fill(for pageIndex: Int) -> Double {
+        if pageIndex < index { return 1 }
+        if pageIndex == index { return progress }
         return 0
     }
 

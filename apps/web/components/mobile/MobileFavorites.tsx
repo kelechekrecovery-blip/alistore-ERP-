@@ -69,7 +69,7 @@ export default function MobileFavorites() {
                     <button
                       type="button"
                       disabled={!inStock}
-                      onClick={() => add({ id: p.id, sku: p.sku, name: p.name, price: p.price, stockLimit: p.availableUnits })}
+                      onClick={() => add({ id: p.id, sku: p.sku, name: p.name, price: p.price, stockLimit: p.availableUnits, supplyMode: 'own_stock', supplyLeadDays: null })}
                       className={`rounded-[8px] px-3 py-1.5 text-[12px] font-bold ${
                         inStock ? 'bg-lime text-lime-ink' : 'bg-surface-3 text-faint'
                       }`}

@@ -35,6 +35,27 @@ export class PayDto {
   @IsOptional() @IsString() giftCardCode?: string;
 }
 
+export class SettleOrderReceivableDto {
+  @ApiProperty({ enum: PaymentMethod, example: PaymentMethod.card })
+  @IsEnum(PaymentMethod)
+  method!: PaymentMethod;
+
+  @ApiProperty({ minimum: 1, example: 20000 })
+  @IsInt()
+  @Min(1)
+  amount!: number;
+
+  @ApiPropertyOptional({ example: 'provider-deposit-0001' })
+  @IsOptional()
+  @IsString()
+  txnId?: string;
+
+  @ApiPropertyOptional({ example: 'clx_shift_001' })
+  @IsOptional()
+  @IsString()
+  shiftId?: string;
+}
+
 export class RefundAllocationDto {
   @ApiProperty({ example: 'clx_payment_001', description: 'Positive original tender to reverse.' })
   @IsString() paymentId!: string;

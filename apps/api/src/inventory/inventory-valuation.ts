@@ -368,8 +368,16 @@ export async function reverseQuantityCostOnTx(
     where: {
       orderId: input.orderId,
       productId: input.productId,
-      sourceType: 'sale',
-      sourceRef: { startsWith: `${input.orderId}:${input.allocationId}:` },
+      OR: [
+        {
+          sourceType: 'sale',
+          sourceRef: { startsWith: `${input.orderId}:${input.allocationId}:` },
+        },
+        {
+          sourceType: 'supply-quantity.sale',
+          sourceRef: input.allocationId,
+        },
+      ],
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });

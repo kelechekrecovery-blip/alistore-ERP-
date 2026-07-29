@@ -326,6 +326,7 @@ fun StaffOrdersScreen(session: StaffSession, gateway: StaffOperationsGateway, mo
         else OutlinedButton(onClick = { status = item }, shape = RoundedCornerShape(6.dp), modifier = Modifier.testTag("staff-status-$item")) { Text(labels[item].orEmpty()) }
       }
     }
+    (gateway as? SupplyParityGateway)?.let { StaffSupplyActions(session, it) }
     when {
       loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = StaffLime) }
       error != null -> StaffError(error.orEmpty()) { revision += 1 }
@@ -485,7 +486,7 @@ fun StaffShiftScreen(
   var queueRevision by remember { mutableStateOf(0) }
   var loading by remember { mutableStateOf(true) }
   var error by remember { mutableStateOf<String?>(null) }
-  var point by rememberSaveable { mutableStateOf("BISHKEK-1") }
+  var point by rememberSaveable(session.staffId) { mutableStateOf(session.point.orEmpty()) }
   var openCash by rememberSaveable { mutableStateOf("5000") }
   var closeCash by rememberSaveable { mutableStateOf("") }
   var reason by rememberSaveable { mutableStateOf("") }
@@ -596,7 +597,15 @@ fun StaffShiftScreen(
     if (!loading && shift == null) {
       item {
         Text("Открытие кассы", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
-        OutlinedTextField(point, { point = it }, label = { Text("Точка") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("shift-point"))
+        OutlinedTextField(
+          point,
+          {},
+          label = { Text("Точка из профиля сотрудника") },
+          readOnly = true,
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth().testTag("shift-point"),
+        )
+        if (point.isBlank()) Text("Точка не назначена — открытие смены заблокировано", color = StaffCoral, fontSize = 12.sp)
         OutlinedTextField(openCash, { openCash = it.filter(Char::isDigit) }, label = { Text("Наличные в кассе") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("shift-open-cash"))
         Button(
           onClick = {

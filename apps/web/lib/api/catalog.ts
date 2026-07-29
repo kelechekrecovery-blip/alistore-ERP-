@@ -9,6 +9,12 @@ export interface CatalogProduct {
   price: number;
   category: string;
   trackingMode?: 'serialized' | 'quantity';
+  supplyMode: 'own_stock' | 'to_order';
+  supplyLeadDays: number | null;
+  orderable: boolean;
+  availabilityKind: 'in_stock' | 'to_order' | 'unavailable';
+  leadTimeDays: number | null;
+  estimatedDeliveryDate: string | null;
   attrs: Record<string, unknown> | null;
   bundleComponents?: Array<{ productId: string; sku: string; name: string; qty: number }>;
   availableUnits: number;

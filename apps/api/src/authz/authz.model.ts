@@ -163,6 +163,11 @@ p, admin, payments, refund
 p, owner, payments, refund
 p, admin, payments, read
 p, owner, payments, read
+p, cashier, payments, take_deposit
+p, seller, payments, take_deposit
+p, senior_seller, payments, take_deposit
+p, admin, payments, take_deposit
+p, owner, payments, take_deposit
 p, admin, refunds, read
 p, owner, refunds, read
 p, admin, refunds, retry
@@ -257,6 +262,8 @@ p, admin, procurement, receive
 p, owner, procurement, receive
 p, admin, procurement, cancel
 p, owner, procurement, cancel
+p, admin, supply_quarantine, resolve
+p, owner, supply_quarantine, resolve
 p, warehouse, inventory, consignment_receive
 p, admin, inventory, consignment_receive
 p, owner, inventory, consignment_receive
@@ -383,6 +390,8 @@ p, admin, outbox, manage
 p, owner, outbox, manage
 p, admin, ai, read
 p, owner, ai, read
+p, admin, telegram_agent, link
+p, owner, telegram_agent, link
 p, cashier, evidence, read
 p, seller, evidence, read
 p, senior_seller, evidence, read

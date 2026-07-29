@@ -59,6 +59,7 @@ describe('Approval decisions use staff JWT role, not body approverRole', () => {
         username: `approval-${role}-${RUN}-${Math.random()}`,
         passwordHash: await argon2.hash('pass'),
         role,
+        point: 'BISHKEK-1',
         totpSecret: secret,
         totpEnabled: Boolean(secret),
       },

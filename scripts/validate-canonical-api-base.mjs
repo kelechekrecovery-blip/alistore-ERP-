@@ -1,26 +1,45 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { projectRoot } from './cloudflare-config.mjs';
+import { pathToFileURL } from 'node:url';
+import {
+  hasProductionRoute,
+  projectRoot,
+  readWranglerConfig,
+} from './cloudflare-config.mjs';
 
-const canonical = 'https://ali.kg/api';
-// The iOS release files (apps/ios/.env.production.example, store/release-runbook.md)
-// are deliberately absent from this list. They configure builds that ship to the
-// App Store, so they must name the host that serves the API right now —
-// https://api.ali.kg/api — and `https://ali.kg/api` still answers 404 until the
-// Cloudflare Functions migration is deployed. Add them back at cutover.
-const requiredFiles = [
-  'apps/mobile/.env.production.example',
+export const cutoverApiBase = 'https://ali.kg/api';
+export const legacyApiBase = 'https://api.ali.kg/api';
+export const requiredApiBaseFiles = Object.freeze([
   'apps/android/README.md',
   'scripts/com.alistore.web.plist',
   'scripts/public-demo-up.sh',
-];
-const failures = requiredFiles.filter((relative) => (
-  !fs.readFileSync(path.join(projectRoot, relative), 'utf8').includes(canonical)
-));
+]);
 
-if (failures.length > 0) {
-  console.error(`✗ Canonical API base is missing from: ${failures.join(', ')}`);
-  process.exit(1);
+export function expectedApiBase(wranglerSource) {
+  return hasProductionRoute(wranglerSource) ? cutoverApiBase : legacyApiBase;
 }
-console.log(`✓ Production client configuration uses ${canonical}`);
+
+export function findApiBaseMismatches(wranglerSource, readSource) {
+  const expected = expectedApiBase(wranglerSource);
+  return {
+    expected,
+    failures: requiredApiBaseFiles.filter((relative) => !readSource(relative).includes(expected)),
+  };
+}
+
+function main() {
+  const { expected, failures } = findApiBaseMismatches(
+    readWranglerConfig(),
+    (relative) => fs.readFileSync(path.join(projectRoot, relative), 'utf8'),
+  );
+
+  if (failures.length > 0) {
+    console.error(`✗ Expected API base ${expected} is missing from: ${failures.join(', ')}`);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`✓ Production client configuration matches the active route phase: ${expected}`);
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) main();

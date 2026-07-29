@@ -34,7 +34,7 @@ public enum IdempotencyKeys {
     /// бы столкнуться с чужим — тогда списание получило бы чужую заявку.
     public static func inventoryWriteOff<Body: Encodable>(_ body: Body, on date: Date = Date()) throws -> String {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        calendar.timeZone = .gmt
         let day = calendar.dateComponents([.year, .month, .day], from: date)
         let stamp = String(format: "%04d-%02d-%02d", day.year ?? 0, day.month ?? 0, day.day ?? 0)
         return "inventory-write-off-\(stamp)-\(try fingerprint(body))"

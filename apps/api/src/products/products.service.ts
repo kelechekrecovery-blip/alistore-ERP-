@@ -135,6 +135,19 @@ export class ProductsService {
     if (!sku || !name || !category) {
       throw new ValidationError('product_fields_required', 'SKU, название и категория обязательны');
     }
+    const supplyMode = dto.supplyMode ?? 'own_stock';
+    if (supplyMode === 'to_order' && (!dto.supplyLeadDays || !dto.supplierOffer)) {
+      throw new ValidationError(
+        'product_supply_offer_required',
+        'Для товара под заказ обязательны срок и действующее предложение поставщика',
+      );
+    }
+    if (supplyMode === 'own_stock' && (dto.supplyLeadDays !== undefined || dto.supplierOffer)) {
+      throw new ValidationError(
+        'product_supply_fields_forbidden',
+        'Срок и предложение поставщика доступны только для товара под заказ',
+      );
+    }
 
     const existing = await this.prisma.product.findUnique({ where: { sku } });
     if (existing) {
@@ -143,9 +156,25 @@ export class ProductsService {
     if (barcode && await this.prisma.product.findUnique({ where: { barcode } })) {
       throw new ConflictError('product_barcode_exists', `Штрихкод ${barcode} уже существует`);
     }
+    if (dto.supplierOffer) {
+      const supplier = await this.prisma.supplier.findUnique({
+        where: { id: dto.supplierOffer.supplierId },
+        select: { id: true },
+      });
+      if (!supplier) {
+        throw new ValidationError(
+          'supplier_not_found',
+          `Поставщик ${dto.supplierOffer.supplierId} не найден`,
+        );
+      }
+    }
 
     return this.audit.transaction(async (tx) => {
       const bundleComponents = await this.resolveBundleComponents(tx, sku, dto.bundleComponents);
+      const checkedAt = new Date();
+      const validUntil = new Date(
+        checkedAt.getTime() + (dto.supplierOffer?.validForHours ?? 24) * 60 * 60 * 1000,
+      );
       const product = await tx.product.create({
         data: {
           sku,
@@ -158,6 +187,25 @@ export class ProductsService {
           taxCode,
           taxRateBps,
           trackingMode: dto.trackingMode ?? 'serialized',
+          supplyMode,
+          supplyLeadDays: supplyMode === 'to_order' ? dto.supplyLeadDays : null,
+          ...(dto.supplierOffer
+            ? {
+                supplier: { connect: { id: dto.supplierOffer.supplierId } },
+                supplierOffers: {
+                  create: {
+                    supplierId: dto.supplierOffer.supplierId,
+                    supplierSku: this.optionalValue(dto.supplierOffer.supplierSku),
+                    unitCost: dto.supplierOffer.unitCost,
+                    availableQty: dto.supplierOffer.availableQty,
+                    leadDays: dto.supplierOffer.leadDays,
+                    checkedAt,
+                    validUntil,
+                    updatedBy: requester,
+                  },
+                },
+              }
+            : {}),
           attrs: (dto.attrs ?? {}) as Prisma.InputJsonValue,
           ...(bundleComponents.length > 0
             ? { bundleComponents: { create: bundleComponents } }
@@ -183,6 +231,9 @@ export class ProductsService {
               taxCode,
               taxRateBps,
               trackingMode: product.trackingMode,
+              supplyMode: product.supplyMode,
+              supplyLeadDays: product.supplyLeadDays,
+              supplierId: product.supplierId,
             },
             refs: [product.id, sku],
           },
@@ -241,6 +292,48 @@ export class ProductsService {
       }
       data.trackingMode = dto.trackingMode;
     }
+    if (dto.supplyMode !== undefined || dto.supplyLeadDays !== undefined) {
+      const supplyMode = dto.supplyMode ?? product.supplyMode;
+      const supplyLeadDays = dto.supplyLeadDays ?? product.supplyLeadDays;
+      if (supplyMode === 'to_order' && supplyLeadDays === null) {
+        throw new ValidationError(
+          'product_supply_lead_days_required',
+          'Для товара под заказ обязателен срок поставки в днях',
+        );
+      }
+      // Товар с реальными остатками не может быть заказным: иначе обычный путь
+      // резервирования продолжит списывать наши units у товара, который система
+      // считает не своим, и обход стокового гейта для to_order даст двойную
+      // продажу. Зеркалит guard на trackingMode выше.
+      if (supplyMode === 'to_order' && product.supplyMode !== 'to_order') {
+        const [unitCount, balanceCount] = await Promise.all([
+          this.prisma.deviceUnit.count({ where: { productId, status: 'in_stock' } }),
+          this.prisma.inventoryBalance.count({ where: { productId, onHand: { gt: 0 } } }),
+        ]);
+        if (unitCount > 0 || balanceCount > 0) {
+          throw new ValidationError(
+            'product_supply_mode_has_stock',
+            'Товар с собственными остатками нельзя перевести в режим «под заказ»',
+          );
+        }
+      }
+      data.supplyMode = supplyMode;
+      // Свой сток не хранит срок поставки: иначе от прошлой политики остаётся
+      // мусорное значение, которое однажды покажут покупателю.
+      data.supplyLeadDays = supplyMode === 'to_order' ? supplyLeadDays : null;
+    }
+    if (dto.supplierId !== undefined) {
+      const supplierId = this.optionalValue(dto.supplierId);
+      if (supplierId) {
+        const supplier = await this.prisma.supplier.findUnique({ where: { id: supplierId } });
+        if (!supplier) {
+          throw new ValidationError('supplier_not_found', `Поставщик ${supplierId} не найден`);
+        }
+        data.supplier = { connect: { id: supplierId } };
+      } else {
+        data.supplier = { disconnect: true };
+      }
+    }
     if (dto.attrs !== undefined) data.attrs = dto.attrs as Prisma.InputJsonValue;
 
     return this.audit.transaction(async (tx) => {
@@ -295,6 +388,42 @@ export class ProductsService {
           refs: [productId, product.sku],
         },
       ];
+      // Срок поставки — это обещание, которое видит покупатель, а в срезе 3 по нему
+      // поедут заказы поставщику. ProductUpdated пишет только имена изменённых
+      // ключей, поэтому «кто и когда растянул срок с 7 дней до 180» по нему не
+      // восстановить — записываем само движение, как это сделано для cost ниже.
+      if (
+        data.supplyMode !== undefined &&
+        (data.supplyMode !== product.supplyMode || data.supplyLeadDays !== product.supplyLeadDays)
+      ) {
+        events.push({
+          type: EventType.ProductSupplyModeChanged,
+          actor: requester,
+          payload: {
+            productId,
+            sku: product.sku,
+            from: { supplyMode: product.supplyMode, supplyLeadDays: product.supplyLeadDays },
+            to: { supplyMode: data.supplyMode, supplyLeadDays: data.supplyLeadDays ?? null },
+          },
+          refs: [productId, product.sku],
+        });
+      }
+      // Смена поставщика уходит в data как связь (data.supplier), поэтому в
+      // changes она видна как 'supplier' без идентификатора — пишем id отдельно.
+      if (dto.supplierId !== undefined && this.optionalValue(dto.supplierId) !== product.supplierId) {
+        events.push({
+          type: EventType.ProductUpdated,
+          actor: requester,
+          payload: {
+            productId,
+            sku: product.sku,
+            changes: ['supplierId'],
+            from: product.supplierId,
+            to: this.optionalValue(dto.supplierId),
+          },
+          refs: [productId, product.sku],
+        });
+      }
       // Cost is the denominator of the POS margin floor (pos.service margin control),
       // so a silent drop weakens that guard for every unit without its own
       // acquisitionCost. ProductUpdated only records which keys changed — record the
@@ -563,6 +692,9 @@ export class ProductsService {
       taxCode: product.taxCode,
       taxRateBps: product.taxRateBps,
       trackingMode: product.trackingMode,
+      supplyMode: product.supplyMode,
+      supplyLeadDays: product.supplyLeadDays,
+      supplierId: product.supplierId,
       attrs: product.attrs,
       bundleComponents: product.bundleComponents.map((component) => ({
         productId: component.componentProductId,

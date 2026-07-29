@@ -40,7 +40,7 @@ struct StaffScannerView: View {
     private let tradeinLabels: [(id: String, title: String)] = [
         ("passport_front", "Паспорт — разворот"),
         ("passport_back", "Паспорт — прописка"),
-        ("tradein_device", "Фото устройства"),
+        ("tradein_device", "Фото устройства")
     ]
     private let background = Design3.screen
     private let surface = Design3.surface
@@ -80,8 +80,7 @@ struct StaffScannerView: View {
         .onChange(of: selectedPhoto) { _, item in
             guard let item else { return }
             Task {
-                do { imageData = try await item.loadTransferable(type: Data.self) }
-                catch { errorMessage = error.localizedDescription }
+                do { imageData = try await item.loadTransferable(type: Data.self) } catch { errorMessage = error.localizedDescription }
             }
         }
     }
@@ -118,7 +117,7 @@ struct StaffScannerView: View {
                 .fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 10) {
                 ForEach(Array(buybackChecklist.enumerated()), id: \.offset) { index, item in
-                    Button(action: { toggleBuybackCheck(index) }) {
+                    Button(action: { toggleBuybackCheck(index) }, label: {
                         HStack(spacing: 11) {
                             Image(systemName: buybackChecks.contains(index) ? "checkmark.circle.fill" : "circle")
                                 .font(.title3.weight(.bold))
@@ -132,7 +131,7 @@ struct StaffScannerView: View {
                         .padding(13)
                         .contentShape(Rectangle())
                         .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    }
+                    })
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("staff-buyback-check-\(index)")
                 }

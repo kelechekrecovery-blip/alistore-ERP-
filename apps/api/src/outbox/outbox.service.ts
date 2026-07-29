@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -38,11 +39,29 @@ export class OutboxService {
     tx: Prisma.TransactionClient,
     input: OutboxInput,
   ): Promise<void> {
+    if (input.dedupKey) {
+      const data = this.toData(input);
+      await tx.outboxMessage.upsert({
+        where: { id: durableMessageId(input) },
+        create: { id: durableMessageId(input), ...data },
+        update: {},
+      });
+      return;
+    }
     await tx.outboxMessage.create({ data: this.toData(input) });
   }
 
   /** Fire-and-forget enqueue outside a transaction. */
   async enqueue(input: OutboxInput): Promise<void> {
+    if (input.dedupKey) {
+      const data = this.toData(input);
+      await this.prisma.outboxMessage.upsert({
+        where: { id: durableMessageId(input) },
+        create: { id: durableMessageId(input), ...data },
+        update: {},
+      });
+      return;
+    }
     await this.prisma.outboxMessage.create({ data: this.toData(input) });
   }
 
@@ -63,6 +82,11 @@ export class OutboxService {
     let failed = 0;
     for (const message of pending) {
       try {
+        if (message.channel === 'telegram' && message.template === 'telegram_agent_reply') {
+          const outcome = await this.deliverTelegramAgentReply(message);
+          if (outcome === 'sent') sent += 1;
+          continue;
+        }
         await this.transport.deliver({
           channel: message.channel,
           recipient: message.recipient,
@@ -78,22 +102,110 @@ export class OutboxService {
         const attempts = message.attempts + 1;
         const capped = attempts >= MAX_ATTEMPTS;
         const delayMs = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1));
-        await this.prisma.outboxMessage.update({
-          where: { id: message.id },
-          data: {
-            attempts,
-            lastError: err instanceof Error ? err.message : 'unknown error',
-            status: capped ? 'failed' : 'pending',
-            nextAttemptAt: capped ? null : new Date(Date.now() + delayMs),
-          },
-        });
-        if (capped) failed += 1;
+        const data = {
+          attempts,
+          lastError: err instanceof Error ? err.message : 'unknown error',
+          status: capped ? 'failed' as const : 'pending' as const,
+          nextAttemptAt: capped ? null : new Date(Date.now() + delayMs),
+        };
+        const updated = message.channel === 'telegram' && message.template === 'telegram_agent_reply'
+          ? await this.prisma.outboxMessage.updateMany({
+              where: { id: message.id, status: 'pending' },
+              data,
+            })
+          : await this.prisma.outboxMessage.update({
+              where: { id: message.id },
+              data,
+            }).then(() => ({ count: 1 }));
+        if (capped && updated.count === 1) failed += 1;
         this.logger.warn(
           `Outbox delivery failed (${message.channel} ${message.id}), attempt ${attempts}`,
         );
       }
     }
     return { sent, failed };
+  }
+
+  /**
+   * Telegram-agent replies are delivered while holding the linked identity and
+   * subject rows. Lifecycle revocation takes the same locks before cancelling
+   * queued replies, giving deactivation/deletion a linearizable delivery fence.
+   */
+  private async deliverTelegramAgentReply(
+    message: {
+      id: string;
+      recipient: string;
+      channel: string;
+      template: string;
+      payload: Prisma.JsonValue;
+    },
+  ): Promise<'sent' | 'cancelled' | 'skipped'> {
+    return this.prisma.$transaction(async (tx) => {
+      const initial = await tx.telegramAgentIdentity.findFirst({
+        where: { chatId: message.recipient },
+        select: { id: true, staffId: true, customerId: true },
+      });
+      if (initial?.staffId) {
+        await tx.$queryRaw`SELECT id FROM "StaffUser" WHERE id = ${initial.staffId} FOR UPDATE`;
+      } else if (initial?.customerId) {
+        await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${initial.customerId} FOR UPDATE`;
+      }
+      if (initial) {
+        await tx.$queryRaw`SELECT id FROM "TelegramAgentIdentity" WHERE id = ${initial.id} FOR UPDATE`;
+      }
+      await tx.$queryRaw`SELECT id FROM "OutboxMessage" WHERE id = ${message.id} FOR UPDATE`;
+      // A second relay may have waited on the subject/identity lock while the
+      // first delivered and committed. Read the outbox state again only after
+      // those locks are held; never trust relayPending()'s earlier snapshot.
+      const queued = await tx.outboxMessage.findUnique({
+        where: { id: message.id },
+        select: { status: true },
+      });
+      if (queued?.status !== 'pending') return 'skipped';
+      const identity = initial
+        ? await tx.telegramAgentIdentity.findUnique({
+            where: { id: initial.id },
+            include: {
+              staff: { select: { active: true, role: true } },
+              customer: { select: { phone: true } },
+            },
+          })
+        : null;
+      const active = Boolean(
+        identity?.active &&
+        (identity.kind === 'staff'
+          ? identity.staff?.active && ['admin', 'owner'].includes(identity.staff.role)
+          : identity.customer && !identity.customer.phone.startsWith('deleted:')),
+      );
+      if (!active) {
+        await tx.outboxMessage.updateMany({
+          where: { id: message.id, status: 'pending' },
+          data: {
+            status: 'cancelled',
+            recipient: initial ? `revoked:${initial.id}` : 'revoked:unlinked',
+            payload: { redacted: true, reason: 'telegram_identity_inactive' },
+            nextAttemptAt: null,
+            lastError: 'telegram_identity_inactive',
+          },
+        });
+        return 'cancelled';
+      }
+
+      await this.transport.deliver({
+        channel: message.channel,
+        recipient: message.recipient,
+        template: message.template,
+        payload: message.payload,
+      });
+      const updated = await tx.outboxMessage.updateMany({
+        where: { id: message.id, status: 'pending' },
+        data: { status: 'sent', sentAt: new Date(), nextAttemptAt: null },
+      });
+      return updated.count === 1 ? 'sent' : 'skipped';
+    }, {
+      maxWait: 2_000,
+      timeout: 8_000,
+    });
   }
 
   /**
@@ -157,4 +269,14 @@ export class OutboxService {
       payload: (input.payload ?? {}) as Prisma.InputJsonValue,
     };
   }
+}
+
+function durableMessageId(input: OutboxInput): string {
+  const fingerprint = [
+    input.channel,
+    input.recipient,
+    input.template,
+    input.dedupKey,
+  ].join('\u001f');
+  return `outbox_dedup_${createHash('sha256').update(fingerprint).digest('hex')}`;
 }

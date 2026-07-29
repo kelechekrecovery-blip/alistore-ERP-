@@ -92,7 +92,7 @@ struct InstallmentPlan: Sendable {
             InstallmentPayment(id: 3, date: "15 августа", amount: 19_150, progress: .next),
             InstallmentPayment(id: 4, date: "15 сентября", amount: 19_150, progress: .future),
             InstallmentPayment(id: 5, date: "15 октября", amount: 19_150, progress: .future),
-            InstallmentPayment(id: 6, date: "15 ноября", amount: 19_150, progress: .future),
+            InstallmentPayment(id: 6, date: "15 ноября", amount: 19_150, progress: .future)
         ]
     )
 }

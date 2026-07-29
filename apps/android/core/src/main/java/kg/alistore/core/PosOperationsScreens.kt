@@ -331,7 +331,7 @@ private fun PosSaleScreen(
           val cash = splitCash.toIntOrNull()?.coerceIn(0, total) ?: 0
           val tenders = posTenders(method, total, cash)
           val request = PosSaleRequest(
-            point = shift?.point ?: "BISHKEK-1", lines = products.mapNotNull { product -> cart[product.id]?.takeIf { it > 0 }?.let { PosLine(product.id, product.sku, product.price, it, selectedImeis[product.id]) } },
+            point = shift?.point ?: session.point.orEmpty(), lines = products.mapNotNull { product -> cart[product.id]?.takeIf { it > 0 }?.let { PosLine(product.id, product.sku, product.price, it, selectedImeis[product.id]) } },
             tenders = tenders, discountPct = pct, clientSaleId = activeSaleId, approvalId = approvalId,
           )
           busy = true
@@ -353,7 +353,7 @@ private fun PosSaleScreen(
             busy = false
           }
         },
-        enabled = !busy && shift != null && cart.isNotEmpty() && total > 0,
+        enabled = !busy && shift != null && NativeSupplyPolicy.canUsePointBoundOperations(session) && cart.isNotEmpty() && total > 0,
         colors = ButtonDefaults.buttonColors(containerColor = PosLime, contentColor = PosInk),
         modifier = Modifier.fillMaxWidth().height(58.dp).padding(top = 10.dp).testTag("pos-submit"),
       ) { Text("Оплатить $total сом", fontWeight = FontWeight.Bold) }
@@ -418,8 +418,13 @@ private fun PosAfterSaleScreen(
 ) {
   val scope = rememberCoroutineScope()
   val context = LocalContext.current
+  val supplyGateway = gateway as? SupplyParityGateway
   var returns by remember { mutableStateOf<List<PosReturn>>(emptyList()) }
   var orderId by rememberSaveable { mutableStateOf("") }
+  var receivableId by rememberSaveable { mutableStateOf("") }
+  var receivableAmount by rememberSaveable { mutableStateOf("") }
+  var receivableMethod by rememberSaveable { mutableStateOf("cash") }
+  var handoverItemId by rememberSaveable { mutableStateOf("") }
   var receipt by remember { mutableStateOf<PosReceipt?>(null) }
   var payments by remember { mutableStateOf<List<PosPayment>>(emptyList()) }
   var paymentId by rememberSaveable { mutableStateOf("") }
@@ -483,6 +488,79 @@ private fun PosAfterSaleScreen(
       payments.forEach { payment ->
         Text("${payment.method} · ${payment.amount} сом · ${payment.status} · ${payment.id.takeLast(8)}", color = PosMuted, fontSize = 11.sp)
       }
+
+      Text("Начисление и частичная выдача", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 22.dp))
+      if (!NativeSupplyPolicy.canUsePointBoundOperations(session)) {
+        Text("Операция заблокирована: у сотрудника нет подтверждённой точки.", color = PosCoral, fontSize = 12.sp)
+      }
+      OutlinedTextField(receivableId, { receivableId = it.trim() }, label = { Text("ID начисления") }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+      OutlinedTextField(receivableAmount, { receivableAmount = it.filter(Char::isDigit) }, label = { Text("Сумма") }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
+      Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf("cash" to "Наличные", "card" to "Карта", "qr_mbank" to "QR").forEach { (wire, label) ->
+          OutlinedButton(onClick = { receivableMethod = wire }, modifier = Modifier.weight(1f)) {
+            Text(if (receivableMethod == wire) "✓ $label" else label, fontSize = 10.sp)
+          }
+        }
+      }
+      Button(
+        onClick = {
+          val amount = receivableAmount.toIntOrNull() ?: return@Button
+          busy = true
+          scope.launch {
+            runCatching {
+              requireNotNull(supplyGateway) { "API начислений недоступен в этой сборке" }
+              supplyGateway.settleReceivable(
+                receivableId = receivableId,
+                method = receivableMethod,
+                amount = amount,
+                txnId = null,
+                shiftId = null,
+                token = session.accessToken,
+                idempotencyKey = UUID.randomUUID().toString(),
+              )
+            }.onSuccess {
+              message = "Начисление погашено"
+              receivableId = ""
+              receivableAmount = ""
+            }.onFailure { message = it.message }
+            busy = false
+          }
+        },
+        enabled = !busy &&
+          supplyGateway != null &&
+          NativeSupplyPolicy.canUsePointBoundOperations(session) &&
+          receivableId.isNotBlank() &&
+          (receivableAmount.toIntOrNull() ?: 0) > 0,
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("pos-settle-receivable"),
+      ) { Text("Принять оплату по начислению") }
+
+      OutlinedTextField(handoverItemId, { handoverItemId = it.trim() }, label = { Text("ID строки заказа") }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp))
+      Button(
+        onClick = {
+          busy = true
+          scope.launch {
+            runCatching {
+              requireNotNull(supplyGateway) { "API частичной выдачи недоступен в этой сборке" }
+              supplyGateway.handOverOrderItem(
+                orderId = orderId,
+                itemId = handoverItemId,
+                token = session.accessToken,
+                idempotencyKey = UUID.randomUUID().toString(),
+              )
+            }.onSuccess {
+              message = "Строка заказа выдана"
+              handoverItemId = ""
+            }.onFailure { message = it.message }
+            busy = false
+          }
+        },
+        enabled = !busy &&
+          supplyGateway != null &&
+          NativeSupplyPolicy.canUsePointBoundOperations(session) &&
+          orderId.isNotBlank() &&
+          handoverItemId.isNotBlank(),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("pos-handover-item"),
+      ) { Text("Выдать выбранную строку") }
 
       Text("Refund через approval", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 22.dp))
       OutlinedTextField(paymentId, { paymentId = it.trim() }, label = { Text("ID платежа") }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))

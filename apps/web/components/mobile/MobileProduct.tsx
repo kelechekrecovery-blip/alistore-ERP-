@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { MobileFrame } from "@/components/mobile/MobileFrame";
 import { productImage, productSpecEntries } from "@/components/ProductCard";
+import { StatusPill } from "@/components/ui/Badge";
 import { ImageOff } from "lucide-react";
-import { som, conditionLabel } from "@/lib/format";
-import { useCart } from "@/lib/cart";
+import { som, conditionLabel, supplyLeadLabel } from "@/lib/format";
+import { TO_ORDER_CART_QTY_CAP, useCart } from "@/lib/cart";
 import { useFavorites } from "@/lib/favorites";
 import type { CatalogProduct, ProductReviews } from "@/lib/api";
 
@@ -47,6 +48,12 @@ export default function MobileProduct({
 
   const attrs = product.attrs ?? {};
   const inStock = product.availableUnits > 0;
+  const toOrder = !inStock && product.supplyMode === "to_order" && product.orderable;
+  const buyable = product.orderable;
+  // A to-order line has no stock ceiling — the `+` control must not clamp to
+  // `availableUnits` (always 0 for it). See TO_ORDER_CART_QTY_CAP's doc
+  // comment in lib/cart.tsx for why 10.
+  const qtyCap = toOrder ? TO_ORDER_CART_QTY_CAP : product.availableUnits;
   const oldPrice = Number(attrs.oldPrice ?? attrs.old_price ?? 0) || 0;
   const optionValues = Object.entries(attrs)
     .filter(([k]) => VARIANT_KEYS.some((vk) => k.toLowerCase().includes(vk)))
@@ -55,14 +62,16 @@ export default function MobileProduct({
   const specs = productSpecEntries(product);
 
   function addToCart() {
-    if (!inStock) return;
+    if (!buyable) return;
     add(
       {
         id: product.id,
         sku: product.sku,
         name: product.name,
         price: product.price,
-        stockLimit: product.availableUnits,
+        stockLimit: qtyCap,
+        supplyMode: toOrder ? "to_order" : "own_stock",
+        supplyLeadDays: toOrder ? product.supplyLeadDays : null,
       },
       qty,
     );
@@ -132,8 +141,8 @@ export default function MobileProduct({
               </span>
               <button
                 type="button"
-                disabled={qty >= product.availableUnits}
-                onClick={() => setQty((q) => Math.min(product.availableUnits, q + 1))}
+                disabled={qty >= qtyCap}
+                onClick={() => setQty((q) => Math.min(qtyCap, q + 1))}
                 className="text-lg text-white disabled:opacity-30"
               >
                 +
@@ -142,16 +151,17 @@ export default function MobileProduct({
             <button
               type="button"
               onClick={addToCart}
-              disabled={!inStock}
+              disabled={!buyable}
+              data-testid="pdp-add-to-cart"
               className={`flex-1 rounded-[12px] py-3 text-center text-[15px] font-bold transition ${
                 added
                   ? "bg-success text-white"
-                  : inStock
+                  : buyable
                     ? "bg-lime text-lime-ink"
                     : "bg-surface-3 text-faint"
               }`}
             >
-              {added ? "Добавлено ✓" : inStock ? "В корзину" : "Под заказ"}
+              {added ? "Добавлено ✓" : inStock ? "В корзину" : toOrder ? "Заказать" : "Под заказ"}
             </button>
           </div>
 
@@ -218,6 +228,11 @@ export default function MobileProduct({
                 ● {inStock ? `${product.availableUnits} шт` : "нет"}
               </span>
             </div>
+            {!inStock && product.supplyMode === "to_order" && product.supplyLeadDays && (
+              <div className="mt-2">
+                <StatusPill status="info">{supplyLeadLabel(product.supplyLeadDays)}</StatusPill>
+              </div>
+            )}
           </div>
 
           {/* specs */}

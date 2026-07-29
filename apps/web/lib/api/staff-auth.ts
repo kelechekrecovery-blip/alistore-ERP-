@@ -6,6 +6,13 @@ export interface StaffLoginResult {
   staffId: string;
   username: string;
   role: string;
+  point: string;
+  storePoint: {
+    id: string;
+    code: string;
+    name: string;
+    inventoryLocation: string;
+  };
   totpEnabled: boolean;
 }
 
@@ -13,6 +20,8 @@ export interface StaffPublicProfile {
   id: string;
   username: string;
   role: string;
+  point: string;
+  storePoint: StaffLoginResult['storePoint'];
   active: boolean;
   totpEnabled: boolean;
 }
@@ -46,8 +55,8 @@ export async function staffBootstrapNeeded(): Promise<boolean> {
 }
 
 /** Создание первого владельца (только при пустой базе — сервер закрывает после). */
-export function staffBootstrapOwner(username: string, password: string): Promise<StaffLoginResult> {
-  return postJson('/staff-auth/bootstrap', { username, password }, { 'x-alistore-staff-web': '1' }, true);
+export function staffBootstrapOwner(username: string, password: string, point: string): Promise<StaffLoginResult> {
+  return postJson('/staff-auth/bootstrap', { username, password, point }, { 'x-alistore-staff-web': '1' }, true);
 }
 
 export function staffAuthRefresh(): Promise<StaffLoginResult> {

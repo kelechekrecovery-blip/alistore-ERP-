@@ -67,6 +67,35 @@ describe('Customer account deletion and export', () => {
     await prisma.customerIdentity.create({
       data: { customerId: owner.id, provider: 'apple', subject: `sub-${run}` },
     });
+    const telegramIdentity = await prisma.telegramAgentIdentity.create({
+      data: {
+        customerId: owner.id,
+        telegramUserId: `tg-${run}`,
+        chatId: `chat-${run}`,
+        kind: 'customer',
+      },
+    });
+    await prisma.telegramAgentMessage.create({
+      data: {
+        externalKey: `telegram:delete:${run}`,
+        identityId: telegramIdentity.id,
+        telegramUserId: telegramIdentity.telegramUserId,
+        chatId: telegramIdentity.chatId,
+        direction: 'inbound',
+        text: 'Личные данные клиента',
+        status: 'answered',
+        expiresAt: new Date(Date.now() + 86_400_000),
+      },
+    });
+    const telegramOutbox = await prisma.outboxMessage.create({
+      data: {
+        id: `telegram-customer-delete-${run}`,
+        channel: 'telegram',
+        recipient: telegramIdentity.chatId,
+        template: 'telegram_agent_reply',
+        payload: { message: 'История заказа клиента' },
+      },
+    });
     await prisma.pushToken.create({
       data: { customerId: owner.id, token: `push-${run}`, platform: 'ios', deviceId: `device-${run}` },
     });
@@ -92,6 +121,17 @@ describe('Customer account deletion and export', () => {
     });
     expect(await prisma.customerAddress.count({ where: { customerId: owner.id } })).toBe(0);
     expect(await prisma.customerIdentity.count({ where: { customerId: owner.id } })).toBe(0);
+    expect(await prisma.telegramAgentIdentity.count({ where: { customerId: owner.id } })).toBe(0);
+    expect(await prisma.telegramAgentMessage.count({
+      where: { telegramUserId: telegramIdentity.telegramUserId },
+    })).toBe(0);
+    expect(await prisma.outboxMessage.findUniqueOrThrow({
+      where: { id: telegramOutbox.id },
+    })).toMatchObject({
+      status: 'cancelled',
+      recipient: `revoked:${telegramIdentity.id}`,
+      payload: { redacted: true, reason: 'customer_account_deleted' },
+    });
     expect(await prisma.pushToken.count({ where: { customerId: owner.id } })).toBe(0);
     const sessions = await prisma.refreshToken.findMany({ where: { customerId: owner.id } });
     expect(sessions).toHaveLength(2);

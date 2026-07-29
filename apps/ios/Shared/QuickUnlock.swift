@@ -197,7 +197,7 @@ public struct LocalPINStore: Sendable {
         try tokens.clear(account: Self.attemptsAccount)
     }
 
-    private func read(account: String) -> String? { (try? tokens.read(account: account)) ?? nil }
+    private func read(account: String) -> String? { try? tokens.read(account: account) }
 
     /// Монотонные часы: секунды с загрузки, а не настенное время. Перевод
     /// системных часов на них не влияет — иначе лок-аут снимался бы установкой

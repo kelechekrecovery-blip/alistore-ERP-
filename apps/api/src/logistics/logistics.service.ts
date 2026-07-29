@@ -8,6 +8,7 @@ import { CreateDeliverySlotDto, CreateDeliveryZoneDto, CreateStorePointDto, Upda
 // Один источник часового пояса на систему (TZ-001): раньше логистика знала про
 // Asia/Bishkek, а отчёты считали сутки по UTC.
 import { BUSINESS_TIME_ZONE, BUSINESS_UTC_OFFSET } from '../common/business-time';
+import { resolveActiveStorePoint } from '../common/store-point-identity';
 
 const ACTIVE_SLOT_STATUSES = ['created', 'awaiting_confirmation', 'confirmed', 'reserved', 'awaiting_payment', 'paid', 'picking', 'packed', 'courier_assigned', 'out_for_delivery'] as const;
 const STORE_POINT_OPEN_ORDER_STATUSES = ['created', 'awaiting_confirmation', 'confirmed', 'reserved', 'awaiting_payment', 'paid', 'picking', 'packed', 'ready_for_pickup', 'courier_assigned', 'out_for_delivery', 'delivered'] as const;
@@ -74,30 +75,11 @@ export class LogisticsService {
   }
 
   async resolveStorePoint(storePointId?: string, legacyAlias?: string, requireSelection = false) {
-    const alias = legacyAlias?.trim();
-    const knownCode = alias === 'alistore-center' || alias === 'AliStore Центр' ? 'center' : alias?.toLowerCase();
-    const point = storePointId
-      ? await this.prisma.storePoint.findFirst({ where: { id: storePointId, active: true } })
-      : alias
-        ? await this.prisma.storePoint.findFirst({
-            where: {
-              active: true,
-              OR: [{ code: knownCode }, { inventoryLocation: alias.toUpperCase() }],
-            },
-          })
-        : requireSelection
-          ? null
-          : await this.prisma.storePoint.findFirst({
-              where: { active: true },
-              orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-            });
-    if (!point) {
-      throw new ValidationError(
-        storePointId ? 'store_point_unavailable' : 'store_point_required',
-        storePointId ? 'Точка недоступна или отключена' : 'Нет доступной точки выполнения заказа',
-      );
+    const reference = storePointId ?? legacyAlias;
+    if (!reference && !requireSelection) {
+      throw new ValidationError('store_point_required', 'Выберите точку выполнения заказа');
     }
-    return point;
+    return resolveActiveStorePoint(this.prisma, reference);
   }
 
   async overview(date?: string) {

@@ -33,8 +33,7 @@ public struct StaffLoginView: View {
                 Button {
                     Task { await auth.login(username: username.trimmingCharacters(in: .whitespaces), password: password) }
                 } label: {
-                    if auth.isLoading { ProgressView().frame(maxWidth: .infinity) }
-                    else { Label("Войти в рабочее место", systemImage: "arrow.right.circle.fill").frame(maxWidth: .infinity) }
+                    if auth.isLoading { ProgressView().frame(maxWidth: .infinity) } else { Label("Войти в рабочее место", systemImage: "arrow.right.circle.fill").frame(maxWidth: .infinity) }
                 }
                 .buttonStyle(.borderedProminent).tint(Design3.lime).foregroundStyle(.black).controlSize(.large)
                 .disabled(auth.isLoading || username.trimmingCharacters(in: .whitespaces).isEmpty || password.isEmpty)

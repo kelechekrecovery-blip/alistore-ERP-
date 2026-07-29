@@ -15,7 +15,7 @@ export function AddToCartButton({ product, disabled, full }: AddToCartButtonProp
   const [added, setAdded] = useState(false);
 
   const onClick = () => {
-    add(product);
+    add({ ...product, supplyMode: 'own_stock', supplyLeadDays: null });
     track('add_to_cart', { productId: product.id });
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1200);

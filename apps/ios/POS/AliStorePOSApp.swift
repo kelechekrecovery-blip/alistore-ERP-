@@ -127,8 +127,7 @@ private struct POSLoginView: View {
                 Button {
                     Task { await auth.login(username: username.trimmingCharacters(in: .whitespaces), password: password) }
                 } label: {
-                    if auth.isLoading { ProgressView().frame(maxWidth: .infinity) }
-                    else { Label("Открыть кассу", systemImage: "lock.open.fill").frame(maxWidth: .infinity) }
+                    if auth.isLoading { ProgressView().frame(maxWidth: .infinity) } else { Label("Открыть кассу", systemImage: "lock.open.fill").frame(maxWidth: .infinity) }
                 }
                 .buttonStyle(.borderedProminent).tint(POSPalette.lime).foregroundStyle(POSPalette.ink)
                 .controlSize(.large)

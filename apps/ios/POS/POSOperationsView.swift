@@ -35,13 +35,11 @@ struct POSOfflineView: View {
                         if let error = mutation.lastError { Text(error).font(.caption).foregroundStyle(POSPalette.coral) }
                         if OfflinePOSQueue.approvalId(from: mutation.lastError) != nil {
                             Button("Повторить после одобрения", systemImage: "checkmark.shield") {
-                                do { try OfflinePOSQueue.attachApproval(mutation, context: modelContext); Task { await replay(mutation) } }
-                                catch { message = error.localizedDescription }
+                                do { try OfflinePOSQueue.attachApproval(mutation, context: modelContext); Task { await replay(mutation) } } catch { message = error.localizedDescription }
                             }
                         } else if mutation.state == "failed" || mutation.state == "conflict" {
                             Button("Повторить", systemImage: "arrow.clockwise") {
-                                do { try OfflinePOSQueue.retry(mutation, context: modelContext); Task { await replay(mutation) } }
-                                catch { message = error.localizedDescription }
+                                do { try OfflinePOSQueue.retry(mutation, context: modelContext); Task { await replay(mutation) } } catch { message = error.localizedDescription }
                             }
                         }
                     }
@@ -87,7 +85,7 @@ struct POSShiftView: View {
     let logout: () -> Void
     @State private var shift: CashShift?
     @State private var closedShift: CashShift?
-    @State private var point = "BISHKEK-1"
+    @State private var point = ""
     @State private var openCash = "0"
     @State private var closeCash = ""
     @State private var reason = ""
@@ -146,7 +144,10 @@ struct POSShiftView: View {
                 Section { Button("Выйти", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive, action: logout) }
             }
             .navigationTitle("Смена")
-            .task { await load() }
+            .task {
+                if point.isEmpty { point = session.point ?? "" }
+                await load()
+            }
             .refreshable { await load() }
         }
     }
@@ -174,8 +175,7 @@ struct POSShiftView: View {
                 closeKey = UUID().uuidString
             }
             shift = loaded
-        }
-        catch { errorMessage = error.localizedDescription }
+        } catch { errorMessage = error.localizedDescription }
     }
 
     @MainActor private func open() async {
@@ -261,6 +261,10 @@ struct POSOperationsView: View {
     @State private var products: [Product] = []
     @State private var returns: [POSReturn] = []
     @State private var orderId = ""
+    @State private var receivableId = ""
+    @State private var receivableAmount = ""
+    @State private var receivableMethod = "cash"
+    @State private var handoverItemId = ""
     @State private var receipt: POSReceipt?
     @State private var payments: [POSPayment] = []
     @State private var paymentId = ""
@@ -298,6 +302,39 @@ struct POSOperationsView: View {
                         Button("Печать", systemImage: "printer", action: { POSReceiptPrinter.print(receipt.markup) })
                     }
                 }
+                Section("Начисление и частичная выдача") {
+                    if !NativeSupplyPolicy.canUsePointBoundOperations(session: session) {
+                        Text("Операция заблокирована: у сотрудника нет подтверждённой точки.")
+                            .foregroundStyle(POSPalette.coral)
+                    }
+                    TextField("ID начисления", text: $receivableId).textInputAutocapitalization(.never)
+                    TextField("Сумма", text: $receivableAmount).keyboardType(.numberPad)
+                    Picker("Способ оплаты", selection: $receivableMethod) {
+                        Text("Наличные").tag("cash")
+                        Text("Карта").tag("card")
+                        Text("QR").tag("qr_mbank")
+                    }
+                    Button("Принять оплату", systemImage: "creditcard.fill") {
+                        Task { await settleReceivable() }
+                    }
+                    .disabled(
+                        isBusy ||
+                        !NativeSupplyPolicy.canUsePointBoundOperations(session: session) ||
+                        receivableId.isEmpty ||
+                        (Int(receivableAmount) ?? 0) <= 0
+                    )
+
+                    TextField("ID строки заказа", text: $handoverItemId).textInputAutocapitalization(.never)
+                    Button("Выдать выбранную строку", systemImage: "shippingbox.and.arrow.backward.fill") {
+                        Task { await handOverItem() }
+                    }
+                    .disabled(
+                        isBusy ||
+                        !NativeSupplyPolicy.canUsePointBoundOperations(session: session) ||
+                        orderId.isEmpty ||
+                        handoverItemId.isEmpty
+                    )
+                }
                 Section("Refund через approval") {
                     TextField("ID платежа", text: $paymentId).textInputAutocapitalization(.never)
                     TextField("Сумма", text: $refundAmount).keyboardType(.numberPad)
@@ -331,8 +368,9 @@ struct POSOperationsView: View {
                     Picker("Доплата", selection: $exchangeMethod) {
                         Text("Наличные").tag("cash"); Text("Карта").tag("card"); Text("MBank").tag("qr_mbank")
                     }
+                    let hasExchangeEvidence = exchangeEvidence != nil
                     PhotosPicker(selection: $exchangePhotoItem, matching: .images) {
-                        Label(exchangeEvidence == nil ? "Фото состояния" : "Фото выбрано", systemImage: "camera.fill")
+                        Label(hasExchangeEvidence ? "Фото выбрано" : "Фото состояния", systemImage: "camera.fill")
                     }
                     .onChange(of: exchangePhotoItem) { _, item in
                         Task { exchangeEvidence = try? await item?.loadTransferable(type: Data.self) }
@@ -389,6 +427,42 @@ struct POSOperationsView: View {
         } catch { errorMessage = error.localizedDescription }
     }
 
+    @MainActor private func settleReceivable() async {
+        isBusy = true; errorMessage = nil; message = nil; defer { isBusy = false }
+        do {
+            let encoded = receivableId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? receivableId
+            let _: POSSupplyMutationReceipt = try await api.post(
+                "payments/receivables/\(encoded)/settle",
+                body: POSReceivableSettlementRequest(
+                    method: receivableMethod,
+                    amount: Int(receivableAmount) ?? 0,
+                    txnId: nil,
+                    shiftId: nil
+                ),
+                token: session.accessToken,
+                idempotencyKey: UUID().uuidString
+            )
+            message = "Начисление погашено"
+            receivableId = ""; receivableAmount = ""
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor private func handOverItem() async {
+        isBusy = true; errorMessage = nil; message = nil; defer { isBusy = false }
+        do {
+            let encodedOrder = orderId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? orderId
+            let encodedItem = handoverItemId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? handoverItemId
+            let _: POSSupplyMutationReceipt = try await api.post(
+                "orders/\(encodedOrder)/items/\(encodedItem)/hand-over",
+                body: POSItemHandoverRequest(),
+                token: session.accessToken,
+                idempotencyKey: UUID().uuidString
+            )
+            message = "Строка заказа выдана"
+            handoverItemId = ""
+        } catch { errorMessage = error.localizedDescription }
+    }
+
     @MainActor private func transition(_ item: POSReturn, to status: String) async {
         isBusy = true; errorMessage = nil; message = nil; defer { isBusy = false }
         do {
@@ -425,4 +499,18 @@ struct POSOperationsView: View {
             await refresh()
         } catch { errorMessage = error.localizedDescription }
     }
+}
+
+private struct POSReceivableSettlementRequest: Encodable, Sendable {
+    let method: String
+    let amount: Int
+    let txnId: String?
+    let shiftId: String?
+}
+
+private struct POSItemHandoverRequest: Encodable, Sendable {}
+
+private struct POSSupplyMutationReceipt: Decodable, Sendable {
+    let id: String?
+    let status: String?
 }

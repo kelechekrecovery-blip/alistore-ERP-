@@ -74,6 +74,23 @@ export function planChanges(desired, current) {
     .map((field) => ({ field, from: current?.[field] ?? null, to: desired[field] }));
 }
 
+export function appInfoState(info) {
+  return info?.attributes?.appStoreState ?? info?.attributes?.state ?? 'UNKNOWN';
+}
+
+/**
+ * Submitted versions no longer expose an editable PREPARE_FOR_SUBMISSION
+ * record. Read-only checks must still verify their current appInfo instead of
+ * failing merely because submission already happened. Apply mode remains
+ * fail-closed and may target only an editable record.
+ */
+export function selectAppInfo(appInfos, mode) {
+  const records = appInfos ?? [];
+  const editable = records.find((info) => appInfoState(info) === 'PREPARE_FOR_SUBMISSION');
+  if (editable || mode === 'apply') return editable ?? null;
+  return records[0] ?? null;
+}
+
 /**
  * How the run reports itself. `check` is the release-gate mode: drift is a
  * failure, because the silent kind is what left three apps unsubmittable.
@@ -198,13 +215,10 @@ async function main() {
 
     const app = await call('GET', `/v1/apps/${appId}`);
     const appInfos = await call('GET', `/v1/apps/${appId}/appInfos?limit=10`);
-    // The editable record is the one still being prepared; a live version's
-    // appInfo is read-only and must not be targeted.
-    const appInfo = (appInfos.data ?? []).find(
-      (info) => (info.attributes?.appStoreState ?? info.attributes?.state) === 'PREPARE_FOR_SUBMISSION',
-    );
+    const appInfo = selectAppInfo(appInfos.data, mode);
     if (!appInfo) {
-      console.error(`✗ ${appKey}: no editable appInfo in PREPARE_FOR_SUBMISSION`);
+      const requirement = mode === 'apply' ? 'editable ' : '';
+      console.error(`✗ ${appKey}: no ${requirement}appInfo available`);
       process.exit(1);
     }
     const primaryCategory = await call('GET', `/v1/appInfos/${appInfo.id}/primaryCategory`);
@@ -216,8 +230,17 @@ async function main() {
     const changes = planChanges(desired, current);
 
     if (changes.length === 0) {
-      console.log(`  ✓ ${appKey}: already matches (${desired.primaryCategory}, ${desired.contentRightsDeclaration})`);
+      console.log(
+        `  ✓ ${appKey}: already matches (${desired.primaryCategory}, ${desired.contentRightsDeclaration}; ${appInfoState(appInfo)})`,
+      );
       continue;
+    }
+
+    if (apply && appInfoState(appInfo) !== 'PREPARE_FOR_SUBMISSION') {
+      console.error(
+        `✗ ${appKey}: metadata drift exists, but appInfo is read-only in ${appInfoState(appInfo)}`,
+      );
+      process.exit(1);
     }
 
     for (const change of changes) {

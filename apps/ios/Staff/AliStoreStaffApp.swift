@@ -1,3 +1,5 @@
+// Legacy composition root: split by feature in a dedicated refactor.
+// swiftlint:disable file_length
 import AliStoreCore
 import SwiftData
 import SwiftUI
@@ -331,9 +333,9 @@ private struct StaffHomeView: View {
                 .font(.headline.weight(.black))
                 .foregroundStyle(primaryText)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                actionTile("Заказы", subtitle: "3 новых", icon: "shippingbox.fill", tint: coral, identifier: "staff-home-orders", action: openOrders)
-                actionTile("Скупка Б/У", subtitle: "оценка", icon: "iphone.gen3", tint: Design3.blue, identifier: "staff-home-buyback", action: openBuyback)
-                actionTile("Задачи и KPI", subtitle: "2 активных", icon: "chart.bar.fill", tint: Design3.gold, identifier: "staff-home-kpi", action: openTasks)
+                actionTile(.init(title: "Заказы", subtitle: "3 новых", icon: "shippingbox.fill", tint: coral, identifier: "staff-home-orders"), action: openOrders)
+                actionTile(.init(title: "Скупка Б/У", subtitle: "оценка", icon: "iphone.gen3", tint: Design3.blue, identifier: "staff-home-buyback"), action: openBuyback)
+                actionTile(.init(title: "Задачи и KPI", subtitle: "2 активных", icon: "chart.bar.fill", tint: Design3.gold, identifier: "staff-home-kpi"), action: openTasks)
                 NavigationLink {
                     StaffInventoryView(session: session, environment: AppEnvironment.live())
                 } label: {
@@ -404,29 +406,37 @@ private struct StaffHomeView: View {
         .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
-    private func actionTile(_ title: String, subtitle: String, icon: String, tint: Color, identifier: String, action: @escaping () -> Void) -> some View {
+    private struct ActionTileConfiguration {
+        let title: String
+        let subtitle: String
+        let icon: String
+        let tint: Color
+        let identifier: String
+    }
+
+    private func actionTile(_ configuration: ActionTileConfiguration, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 10) {
-                Image(systemName: icon)
+                Image(systemName: configuration.icon)
                     .font(.title3.weight(.bold))
-                    .foregroundStyle(tint)
+                    .foregroundStyle(configuration.tint)
                     .frame(width: 32, height: 32)
-                    .background(tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                Text(title)
+                    .background(configuration.tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                Text(configuration.title)
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(primaryText)
                     .lineLimit(2)
                     .minimumScaleFactor(0.82)
-                Text(subtitle)
+                Text(configuration.subtitle)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(tint)
+                    .foregroundStyle(configuration.tint)
             }
             .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
             .padding(13)
             .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier(identifier)
+        .accessibilityIdentifier(configuration.identifier)
     }
 
     private func toolPill(_ title: String, icon: String, identifier: String, action: @escaping () -> Void) -> some View {
@@ -858,7 +868,7 @@ private struct Customer360View: View {
             "new": "Новая",
             "in_progress": "В работе",
             "waiting": "Ожидание",
-            "resolved": "Решено",
+            "resolved": "Решено"
         ][status] ?? status
     }
 
@@ -911,7 +921,7 @@ private struct Customer360View: View {
                 spent: 428_700,
                 recent: [
                     Customer360Order(id: "4102", status: "Курьер", total: 109_900, createdAt: now.addingTimeInterval(-3_600)),
-                    Customer360Order(id: "4090", status: "Выдан", total: 189_900, createdAt: now.addingTimeInterval(-86_400)),
+                    Customer360Order(id: "4090", status: "Выдан", total: 189_900, createdAt: now.addingTimeInterval(-86_400))
                 ]
             ),
             debts: Customer360Debts(
@@ -922,14 +932,14 @@ private struct Customer360View: View {
             warranties: Customer360Warranties(
                 open: 1,
                 items: [
-                    Customer360Warranty(id: "warranty-airpods", imei: "356789104200777", status: "diagnostics", sla: now.addingTimeInterval(7_200)),
+                    Customer360Warranty(id: "warranty-airpods", imei: "356789104200777", status: "diagnostics", sla: now.addingTimeInterval(7_200))
                 ]
             ),
             tickets: Customer360Tickets(
                 open: 2,
                 items: [
                     Customer360Ticket(id: "support-4102", subject: "Где мой заказ №4102?", status: "new", priority: "high", sla: now.addingTimeInterval(1_800)),
-                    Customer360Ticket(id: "support-warranty", subject: "Нужна гарантия по AirPods", status: "in_progress", priority: "normal", sla: now.addingTimeInterval(5_400)),
+                    Customer360Ticket(id: "support-warranty", subject: "Нужна гарантия по AirPods", status: "in_progress", priority: "normal", sla: now.addingTimeInterval(5_400))
                 ]
             )
         )
@@ -959,7 +969,7 @@ struct StaffOrdersView: View {
         ("paid", "Оплачены"),
         ("picking", "Сборка"),
         ("packed", "Упакованы"),
-        ("ready_for_pickup", "Выдача"),
+        ("ready_for_pickup", "Выдача")
     ]
 
     var body: some View {
@@ -1197,25 +1207,40 @@ struct StaffOrdersView: View {
 
     private static var fixtureOrders: [CustomerOrder] {
         [
-            fixtureOrder(id: "4102", status: "created", sku: "iPhone 15", qty: 1, total: 109_900, fulfillmentType: "pickup", location: "AliStore Центр"),
-            fixtureOrder(id: "4098", status: "packed", sku: "AirPods", qty: 2, total: 49_800, fulfillmentType: "courier", location: "пр. Чуй 132"),
-            fixtureOrder(id: "4090", status: "completed", sku: "MacBook Air", qty: 1, total: 189_900, fulfillmentType: "pickup", location: "Выдано в ЦУМ"),
-        ]
+            OrderFixture(id: "4102", status: "created", sku: "iPhone 15", quantity: 1, total: 109_900, fulfillmentType: "pickup", location: "AliStore Центр"),
+            OrderFixture(id: "4098", status: "packed", sku: "AirPods", quantity: 2, total: 49_800, fulfillmentType: "courier", location: "пр. Чуй 132"),
+            OrderFixture(id: "4090", status: "completed", sku: "MacBook Air", quantity: 1, total: 189_900, fulfillmentType: "pickup", location: "Выдано в ЦУМ")
+        ].map(fixtureOrder)
     }
 
-    private static func fixtureOrder(id: String, status: String, sku: String, qty: Int, total: Int, fulfillmentType: String, location: String) -> CustomerOrder {
+    private struct OrderFixture {
+        let id: String
+        let status: String
+        let sku: String
+        let quantity: Int
+        let total: Int
+        let fulfillmentType: String
+        let location: String
+    }
+
+    private static func fixtureOrder(_ fixture: OrderFixture) -> CustomerOrder {
         CustomerOrder(
-            id: id,
+            id: fixture.id,
             channel: "web",
-            fulfillmentType: fulfillmentType,
-            pickupPoint: fulfillmentType == "pickup" ? location : nil,
-            deliveryAddress: fulfillmentType == "courier" ? location : nil,
+            fulfillmentType: fixture.fulfillmentType,
+            pickupPoint: fixture.fulfillmentType == "pickup" ? fixture.location : nil,
+            deliveryAddress: fixture.fulfillmentType == "courier" ? fixture.location : nil,
             deliverySlot: nil,
             pickupCode: nil,
-            status: status,
-            total: total,
+            status: fixture.status,
+            total: fixture.total,
             createdAt: Date(timeIntervalSince1970: 1_785_000_000),
-            items: [CustomerOrderItem(sku: sku, qty: qty, price: total / max(qty, 1), imei: nil)]
+            items: [CustomerOrderItem(
+                sku: fixture.sku,
+                qty: fixture.quantity,
+                price: fixture.total / max(fixture.quantity, 1),
+                imei: nil
+            )]
         )
     }
 

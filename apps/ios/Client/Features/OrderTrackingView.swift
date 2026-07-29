@@ -48,7 +48,7 @@ struct TrackedOrder: Sendable {
             OrderStage(id: 1, title: "Заказ оформлен", time: "14:02", progress: .done),
             OrderStage(id: 2, title: "Собран на складе", time: "14:40", progress: .done),
             OrderStage(id: 3, title: "Передан курьеру", time: "15:10", progress: .active),
-            OrderStage(id: 4, title: "Доставлен", time: "—", progress: .upcoming),
+            OrderStage(id: 4, title: "Доставлен", time: "—", progress: .upcoming)
         ],
         storeCoord: CLLocationCoordinate2D(latitude: 42.8746, longitude: 74.5698),
         destinationCoord: CLLocationCoordinate2D(latitude: 42.8404, longitude: 74.6120)
@@ -257,8 +257,8 @@ struct OrderTrackingView: View {
         filter.message = Data(string.utf8)
         filter.correctionLevel = "M"
         guard let output = filter.outputImage?.transformed(by: CGAffineTransform(scaleX: 8, y: 8)),
-              let cg = context.createCGImage(output, from: output.extent) else { return nil }
-        return UIImage(cgImage: cg)
+              let cgImage = context.createCGImage(output, from: output.extent) else { return nil }
+        return UIImage(cgImage: cgImage)
     }
 }
 

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { OutboxService } from './outbox.service';
 import { OutboxChannel } from './outbox.types';
@@ -12,6 +13,37 @@ export interface CustomerNoticeInput {
    * always reach the customer; marketing consent gates only promo-class traffic.
    */
   transactional?: boolean;
+  /** Stable domain event key, for example `deposit:<paymentId>`. */
+  dedupKey?: string;
+}
+
+export type SupplyCustomerTemplate =
+  | 'supply_deposit_received'
+  | 'supply_po_sent'
+  | 'supply_supplier_confirmed'
+  | 'supply_late'
+  | 'supply_received'
+  | 'supply_ready'
+  | 'supply_balance_due'
+  | 'supply_cancellation_requested'
+  | 'supply_cancellation_owner_review'
+  | 'supply_refund_queued'
+  | 'supply_refund_completed'
+  | 'supply_refund_failed'
+  | 'order_no_show_reminder';
+
+export interface SupplyCustomerNoticeInput {
+  customerId: string;
+  template: SupplyCustomerTemplate;
+  eventKey: string;
+  payload: {
+    orderId: string;
+    amount?: number;
+    expectedAt?: string;
+    reminderDay?: 1 | 3 | 7 | 13;
+    refundId?: string;
+  };
+  channel?: OutboxChannel;
 }
 
 /**
@@ -29,9 +61,10 @@ export async function enqueueConsentedCustomerNotice(
   });
   if (!customer?.phone || (!input.transactional && !customer.consent)) return false;
 
-  const projection = customerNotificationProjection(input);
-  await tx.customerNotification.create({
-    data: {
+  const safePayload = redactCustomerNotificationPayload(input.payload ?? {});
+  const safeInput = { ...input, payload: safePayload };
+  const projection = customerNotificationProjection(safeInput);
+  const notificationData = {
       customerId: input.customerId,
       template: input.template,
       title: projection.title,
@@ -39,16 +72,42 @@ export async function enqueueConsentedCustomerNotice(
       symbol: projection.symbol,
       route: projection.route,
       referenceId: projection.referenceId,
-    },
-  });
+  };
+  if (input.dedupKey) {
+    const id = durableCustomerNotificationId(input.customerId, input.template, input.dedupKey);
+    await tx.customerNotification.upsert({
+      where: { id },
+      create: { id, ...notificationData },
+      update: {},
+    });
+  } else {
+    await tx.customerNotification.create({ data: notificationData });
+  }
 
   await outbox.enqueueOnTx(tx, {
+    ...(input.dedupKey ? { dedupKey: input.dedupKey } : {}),
     channel: input.channel ?? 'sms',
     recipient: input.channel === 'push' ? input.customerId : customer.phone,
     template: input.template,
-    payload: { customerId: input.customerId, ...(input.payload ?? {}) },
+    payload: { customerId: input.customerId, ...safePayload },
   });
   return true;
+}
+
+/** Strict supply lifecycle producer: transactional, redacted and deduplicated. */
+export function enqueueSupplyCustomerNotice(
+  tx: Prisma.TransactionClient,
+  outbox: OutboxService,
+  input: SupplyCustomerNoticeInput,
+): Promise<boolean> {
+  return enqueueConsentedCustomerNotice(tx, outbox, {
+    customerId: input.customerId,
+    template: input.template,
+    payload: input.payload,
+    channel: input.channel,
+    transactional: true,
+    dedupKey: `supply:${input.template}:${input.eventKey}`,
+  });
 }
 
 export interface StaffNoticeInput {
@@ -56,6 +115,7 @@ export interface StaffNoticeInput {
   title: string;
   body: string;
   payload?: Record<string, unknown>;
+  dedupKey?: string;
 }
 
 const MANAGER_ROLES = ['owner', 'admin'] as const;
@@ -76,6 +136,7 @@ export async function enqueueStaffNotice(
   });
   for (const recipient of recipients) {
     await outbox.enqueueOnTx(tx, {
+      ...(input.dedupKey ? { dedupKey: `${input.template}:${input.dedupKey}` } : {}),
       channel: 'push',
       recipient: recipient.id,
       template: input.template,
@@ -85,7 +146,7 @@ export async function enqueueStaffNotice(
   return recipients.length;
 }
 
-function customerNotificationProjection(input: CustomerNoticeInput) {
+export function customerNotificationProjection(input: CustomerNoticeInput) {
   const payload = input.payload ?? {};
   const referenceId = stringValue(payload.orderId)
     ?? stringValue(payload.warrantyId)
@@ -111,6 +172,110 @@ function customerNotificationProjection(input: CustomerNoticeInput) {
         title: 'Заказ готов',
         detail: `Заказ №${shortReference(payload.orderId)} можно забрать или получить`,
         symbol: 'checkmark.circle.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'order_no_show_reminder':
+      return {
+        title: 'Заказ ждёт вас',
+        detail: `Заказ №${shortReference(payload.orderId)} готов к выдаче`,
+        symbol: 'clock.badge.exclamationmark.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'supply_deposit_received':
+      return {
+        title: 'Задаток получен',
+        detail: `По заказу №${shortReference(payload.orderId)} получено ${numberValue(payload.amount)} сом`,
+        symbol: 'creditcard.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'supply_po_sent':
+      return {
+        title: 'Заказ передан поставщику',
+        detail: `Товар по заказу №${shortReference(payload.orderId)} заказан у поставщика`,
+        symbol: 'shippingbox.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'supply_supplier_confirmed':
+      return {
+        title: 'Поставщик подтвердил заказ',
+        detail: `Ожидаем товар по заказу №${shortReference(payload.orderId)}`,
+        symbol: 'checkmark.circle.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'supply_late':
+      return {
+        title: 'Срок поставки изменился',
+        detail: `Заказ №${shortReference(payload.orderId)} задерживается${dateSuffix(payload.expectedAt)}`,
+        symbol: 'exclamationmark.triangle.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'supply_received':
+      return {
+        title: 'Товар поступил',
+        detail: `Товар по заказу №${shortReference(payload.orderId)} принят и проходит проверку`,
+        symbol: 'shippingbox.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'supply_ready':
+      return {
+        title: 'Заказ готов',
+        detail: `Заказ №${shortReference(payload.orderId)} готов к выдаче`,
+        symbol: 'checkmark.circle.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'supply_balance_due':
+      return {
+        title: 'Остаток к оплате',
+        detail: `По заказу №${shortReference(payload.orderId)} осталось оплатить ${numberValue(payload.amount)} сом`,
+        symbol: 'creditcard.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'supply_cancellation_requested':
+      return {
+        title: 'Запрос на отмену принят',
+        detail: `Проверяем отмену заказа №${shortReference(payload.orderId)}`,
+        symbol: 'clock.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'supply_cancellation_owner_review':
+      return {
+        title: 'Отмена передана на рассмотрение',
+        detail: `По заказу №${shortReference(payload.orderId)} требуется решение владельца`,
+        symbol: 'person.crop.circle.badge.questionmark',
+        route: 'order',
+        referenceId,
+      };
+    case 'supply_refund_queued':
+      return {
+        title: 'Возврат поставлен в очередь',
+        detail: `Возвращаем ${numberValue(payload.amount)} сом по заказу №${shortReference(payload.orderId)}`,
+        symbol: 'arrow.uturn.backward.circle.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'supply_refund_completed':
+      return {
+        title: 'Деньги возвращены',
+        detail: `Возврат ${numberValue(payload.amount)} сом по заказу №${shortReference(payload.orderId)} выполнен`,
+        symbol: 'checkmark.circle.fill',
+        route: 'order',
+        referenceId,
+      };
+    case 'supply_refund_failed':
+      return {
+        title: 'Возврат требует проверки',
+        detail: `Не удалось вернуть ${numberValue(payload.amount)} сом по заказу №${shortReference(payload.orderId)} — мы проверяем операцию`,
+        symbol: 'exclamationmark.triangle.fill',
         route: 'order',
         referenceId,
       };
@@ -275,6 +440,61 @@ function customerNotificationProjection(input: CustomerNoticeInput) {
         referenceId,
       };
   }
+}
+
+const CUSTOMER_PAYLOAD_DENYLIST = new Set([
+  'supplier',
+  'supplierid',
+  'supplierofferid',
+  'suppliersku',
+  'cost',
+  'unitcost',
+  'purchasecost',
+  'evidence',
+  'ownerreason',
+  'requesthash',
+  'internalstatus',
+]);
+
+/** Defensive recursive copy: internal procurement/approval data never leaves via customer channels. */
+export function redactCustomerNotificationPayload(
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
+  return redactRecord(payload);
+}
+
+function redactRecord(payload: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(payload).flatMap(([key, value]) => {
+      if (CUSTOMER_PAYLOAD_DENYLIST.has(key.replaceAll('_', '').toLowerCase())) return [];
+      if (Array.isArray(value)) {
+        return [[key, value.map((item) => (
+          item && typeof item === 'object' && !Array.isArray(item)
+            ? redactRecord(item as Record<string, unknown>)
+            : item
+        ))]];
+      }
+      if (value && typeof value === 'object') {
+        return [[key, redactRecord(value as Record<string, unknown>)]];
+      }
+      return [[key, value]];
+    }),
+  );
+}
+
+function durableCustomerNotificationId(customerId: string, template: string, dedupKey: string): string {
+  const hash = createHash('sha256')
+    .update(`${customerId}\u001f${template}\u001f${dedupKey}`)
+    .digest('hex');
+  return `customer_notice_dedup_${hash}`;
+}
+
+function dateSuffix(value: unknown): string {
+  const date = stringValue(value);
+  if (!date) return '';
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.valueOf())) return '';
+  return `, новая дата — ${parsed.toLocaleDateString('ru-RU', { timeZone: 'Asia/Bishkek' })}`;
 }
 
 function stringValue(value: unknown): string | undefined {

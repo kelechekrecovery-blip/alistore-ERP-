@@ -16,6 +16,7 @@ import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 describe('Logistics zones, capacity and dispatch (integration + RBAC)', () => {
   let app: INestApplication; let prisma: PrismaService; let orders: OrdersService;
   let ownerToken: string; let sellerToken: string; let courierToken: string; let courierId: string;
+  let pointId = ''; let fulfillmentLocation = '';
   const run = Math.floor(Math.random() * 1_000_000);
   // Tomorrow (UTC): the slot window below must stay in the future, otherwise
   // checkout rejects it as a past slot. A hardcoded date made this spec pass only
@@ -25,7 +26,19 @@ describe('Logistics zones, capacity and dispatch (integration + RBAC)', () => {
     const moduleRef = await Test.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, AuditModule, StaffAuthModule, LogisticsModule, OrdersModule, CourierModule] }).compile();
     app = moduleRef.createNestApplication(); app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true })); await app.init();
     prisma = moduleRef.get(PrismaService); orders = moduleRef.get(OrdersService); const auth = moduleRef.get(StaffAuthService);
-    const session = async (role: 'owner' | 'seller' | 'courier') => { const username = `${role}-logistics-${run}`; const staff = await auth.createStaff(username, 'pass', role); return { id: staff.id, token: (await auth.login(username, 'pass')).accessToken }; };
+    const point = await prisma.storePoint.create({
+      data: {
+        code: `logistics-${run}`,
+        name: 'Logistics fixture',
+        address: 'Test address',
+        inventoryLocation: `LOGISTICS-${run}`,
+        hours: '10:00–20:00',
+        createdBy: 'logistics-test',
+        idempotencyKey: `logistics-point-${run}`,
+      },
+    });
+    pointId = point.id; fulfillmentLocation = point.inventoryLocation;
+    const session = async (role: 'owner' | 'seller' | 'courier') => { const username = `${role}-logistics-${run}`; const staff = await auth.createStaff(username, 'pass', role, fulfillmentLocation); return { id: staff.id, token: (await auth.login(username, 'pass')).accessToken }; };
     ownerToken = (await session('owner')).token; sellerToken = (await session('seller')).token; const courier = await session('courier'); courierToken = courier.token; courierId = courier.id;
   });
   afterAll(async () => {
@@ -43,6 +56,7 @@ describe('Logistics zones, capacity and dispatch (integration + RBAC)', () => {
     if (product) { await prisma.inventoryBalance.deleteMany({ where: { productId: product.id } }); await prisma.product.delete({ where: { id: product.id } }); }
     await prisma.customer.deleteMany({ where: { name: { in: ['A', 'B'] }, phone: { contains: String(run) } } });
     await prisma.staffUser.deleteMany({ where: { username: { contains: `-logistics-${run}` } } });
+    if (pointId) await prisma.storePoint.deleteMany({ where: { id: pointId } });
     await app.close();
   });
 
@@ -51,11 +65,11 @@ describe('Logistics zones, capacity and dispatch (integration + RBAC)', () => {
     await request(app.getHttpServer()).post('/logistics/zones').set('Authorization', `Bearer ${sellerToken}`).set('Idempotency-Key', `zone-${run}`).send(zonePayload).expect(403);
     const zone = await request(app.getHttpServer()).post('/logistics/zones').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `zone-${run}`).send(zonePayload).expect(201);
     const slot = await request(app.getHttpServer()).post('/logistics/slots').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `slot-${run}`).send({ zoneId: zone.body.id, startsAt: `${date}T04:00:00.000Z`, endsAt: `${date}T06:00:00.000Z`, capacity: 1 }).expect(201);
-    const product = await prisma.product.create({ data: { sku: `LOG-${run}`, name: 'Logistics phone', price: 1000, cost: 700, category: 'phones', attrs: {}, trackingMode: 'quantity', balances: { create: { location: 'BISHKEK-1', onHand: 2 } } } });
+    const product = await prisma.product.create({ data: { sku: `LOG-${run}`, name: 'Logistics phone', price: 1000, cost: 700, category: 'phones', attrs: {}, trackingMode: 'quantity', balances: { create: { location: fulfillmentLocation, onHand: 2 } } } });
     const customerA = await prisma.customer.create({ data: { phone: `+996701${run}1`, name: 'A' } });
     const customerB = await prisma.customer.create({ data: { phone: `+996701${run}2`, name: 'B' } });
     const token = (id: string, phone: string) => sign({ sub: id, typ: 'customer', phone }, process.env.JWT_SECRET ?? 'dev-insecure-change-me', { expiresIn: '15m' });
-    const payload = { channel: 'web', fulfillmentType: 'courier', paymentMode: 'cod', deliveryAddress: 'Бишкек, Киевская 95', deliverySlot: '10:00–12:00', deliveryZoneId: zone.body.id, deliverySlotId: slot.body.id, total: 1, items: [{ sku: product.sku, qty: 1, price: 1 }] };
+    const payload = { channel: 'web', fulfillmentType: 'courier', paymentMode: 'cod', storePointId: pointId, deliveryAddress: 'Бишкек, Киевская 95', deliverySlot: '10:00–12:00', deliveryZoneId: zone.body.id, deliverySlotId: slot.body.id, total: 1, items: [{ sku: product.sku, qty: 1, price: 1 }] };
     await request(app.getHttpServer()).post('/orders/mine').set('Authorization', `Bearer ${token(customerA.id, customerA.phone)}`).set('Idempotency-Key', `order-pickup-spoof-${run}`).send({ ...payload, fulfillmentType: 'pickup' }).expect(422);
     const results = await Promise.all([
       request(app.getHttpServer()).post('/orders/mine').set('Authorization', `Bearer ${token(customerA.id, customerA.phone)}`).set('Idempotency-Key', `order-a-${run}`).send(payload),

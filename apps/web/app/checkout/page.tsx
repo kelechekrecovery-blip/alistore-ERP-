@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useCart } from '@/lib/cart';
 import { checkoutOrderKey, paymentIntentKey, type CheckoutSnapshot } from '@/lib/checkout-idempotency';
 import { useAuth } from '@/lib/auth';
-import { som } from '@/lib/format';
+import { daysLabel, som } from '@/lib/format';
 import {
   confirmSandboxPayment,
   createCustomer,
@@ -34,11 +34,14 @@ import { resolveCheckoutPaymentOptions } from '@/lib/checkout-payment-options';
 import { fetchPaymentMethods, type ServerPaymentMethods } from '@/lib/api/payments';
 import { Banknote, CalendarClock, CreditCard, QrCode, Smartphone, Store, Truck, Zap } from 'lucide-react';
 
+// Meta-подписи получения не хардкодят город/точку — они не знают заранее,
+// какие StorePoint/DeliveryZone отдаст сервер (магазин может быть в любом
+// городе). Собираются из состояния в теле компонента, см. `deliveryMeta`.
 const DELIVERY = [
-  { id: 'pickup', icon: Store, name: 'Самовывоз', meta: 'AliStore Центр · сегодня', price: 'бесплатно', fee: 0 },
-  { id: 'courier', icon: Truck, name: 'Курьер', meta: 'по Бишкеку, 1–2 ч', price: '200 с', fee: 200 },
-  { id: 'express', icon: Zap, name: 'Экспресс', meta: 'в течение часа', price: '400 с', fee: 400 },
-];
+  { id: 'pickup', icon: Store, name: 'Самовывоз', price: 'бесплатно', fee: 0 },
+  { id: 'courier', icon: Truck, name: 'Курьер', price: '200 с', fee: 200 },
+  { id: 'express', icon: Zap, name: 'Экспресс', price: '400 с', fee: 400 },
+] as const;
 const PAYMENT = [
   { id: 'cash', icon: Banknote, name: 'Наличными при получении' },
   { id: 'card', icon: CreditCard, name: 'Картой' },
@@ -56,7 +59,7 @@ const STEPS = ['Получение', 'Контакты', 'Оплата', 'Под
  * по своему настоящему заказу. Оплату в бою подтверждает вебхук провайдера.
  */
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
-type DoneState = { order: CreatedOrder; intent?: PaymentIntent; paid?: boolean };
+type DoneState = { order: CreatedOrder; intent?: PaymentIntent; paid?: boolean; toOrderLeadDays?: number | null };
 
 function logisticsDate() {
   return new Intl.DateTimeFormat('en-CA', {
@@ -227,9 +230,40 @@ export default function CheckoutPage() {
     ? selectedDeliveryZone.fee
     : DELIVERY.find((d) => d.id === delivery)?.fee ?? 0;
   const selectedPickupPoint = pickupPoints.find((point) => point.id === pickupPoint);
+  // Подписи получения: сервер — источник правды о том, какая точка/зона
+  // реально обслуживает покупателя (магазин физически не в Бишкеке). Пока
+  // список грузится или пуст, подпись остаётся нейтральной и не называет
+  // никакой город.
+  const pickupDisplayPoint = selectedPickupPoint ?? pickupPoints[0];
+  const pickupMeta = pickupDisplayPoint
+    ? `${pickupDisplayPoint.name} · ${pickupDisplayPoint.hours}`
+    : deliveryCapacityLoading ? 'Уточняем точки самовывоза…' : 'Нет доступных точек самовывоза';
+  const courierDisplayZone = selectedDeliveryZone ?? deliveryZones[0];
+  const courierMeta = courierDisplayZone
+    ? courierDisplayZone.name
+    : deliveryCapacityLoading ? 'Уточняем зону доставки…' : 'Зона и время — при оформлении';
+  const deliveryMeta: Record<string, string> = {
+    pickup: pickupMeta,
+    courier: courierMeta,
+    express: 'в течение часа',
+  };
   const payable = total + deliveryFee;
   const giftAmount = giftCard?.redeemable ? Math.min(giftCard.balance, payable) : 0;
   const dueAfterGift = Math.max(payable - giftAmount, 0);
+  // Public online deposits remain fail-closed until the production payment and
+  // refund webhooks are certified. The order is still created with an exact
+  // receivable schedule; staff/POS can settle its deposit safely.
+  const hasToOrderLine = items.some((item) => item.supplyMode === 'to_order');
+  const toOrderLeadDays = hasToOrderLine
+    ? Math.max(...items.filter((item) => item.supplyMode === 'to_order').map((item) => item.supplyLeadDays ?? 0))
+    : null;
+  const toOrderGross = items
+    .filter((item) => item.supplyMode === 'to_order')
+    .reduce((sum, item) => sum + item.price * item.qty, 0);
+  const estimatedToOrderNet = subtotal > 0 ? Math.floor(total * toOrderGross / subtotal) : 0;
+  const estimatedDeposit = Math.ceil(estimatedToOrderNet * 2000 / 10_000);
+  const estimatedSupplyBalance = estimatedToOrderNet - estimatedDeposit;
+  const estimatedStockAtPickup = total - estimatedToOrderNet;
 
   async function applyGiftCard() {
     const code = giftCode.trim();
@@ -264,7 +298,7 @@ export default function CheckoutPage() {
         deliveryAddress: delivery !== 'pickup' ? deliveryAddress.trim() : undefined,
         deliverySlot: delivery === 'pickup'
           ? selectedPickupPoint?.hours
-          : selectedDeliverySlot ? slotLabel(selectedDeliverySlot) : DELIVERY.find((d) => d.id === delivery)?.meta,
+          : selectedDeliverySlot ? slotLabel(selectedDeliverySlot) : deliveryMeta[delivery],
         deliveryZoneId: delivery === 'courier' ? selectedDeliveryZone?.id : undefined,
         deliverySlotId: delivery === 'courier' ? selectedDeliverySlot?.id : undefined,
         total: payable,
@@ -295,6 +329,12 @@ export default function CheckoutPage() {
         guestCapability = customer.guestCapability;
         order = await createOrder({ ...orderInput, customerId: customer.id }, guestCapability, orderKey);
         if (order.guestAccess) saveGuestOrderAccess(order.id, order.guestAccess.capability, order.guestAccess.expiresIn);
+      }
+      if (hasToOrderLine) {
+        setDone({ order, toOrderLeadDays });
+        clear();
+        rotateCheckoutAttempt();
+        return;
       }
       const serverTotal = order.total;
       const serverGiftAmount = giftCard?.redeemable ? Math.min(giftCard.balance, serverTotal) : 0;
@@ -370,11 +410,36 @@ export default function CheckoutPage() {
   );
 
   if (done) {
+    const schedule = done.order.paymentSchedule ?? [];
+    const scheduled = (kind: (typeof schedule)[number]['kind']) =>
+      schedule.filter((row) => row.kind === kind).reduce((sum, row) => sum + row.amount, 0);
+    const exactDeposit = done.order.initialDue ?? scheduled('supply_deposit');
+    const exactStock = scheduled('stock_sale');
+    const exactBalance = scheduled('supply_balance');
+    const exactDelivery = scheduled('delivery');
     return wrap(
       <div className="flex flex-1 flex-col items-center justify-center px-7 text-center">
         <div className="grid h-20 w-20 place-items-center rounded-full bg-lime/15 text-4xl">✓</div>
-        <div className="mt-5 font-display text-2xl font-extrabold">{done.intent && !done.paid ? 'Ожидаем оплату' : 'Заказ оформлен!'}</div>
+        <div className="mt-5 font-display text-2xl font-extrabold">
+          {done.toOrderLeadDays ? 'Заказ создан!' : done.intent && !done.paid ? 'Ожидаем оплату' : 'Заказ оформлен!'}
+        </div>
         <div className="mt-2.5 text-sm text-muted">№ <span className="font-mono text-white">{done.order.id.slice(-8)}</span> · {done.order.status}. Мы свяжемся для подтверждения.</div>
+        {done.toOrderLeadDays && (
+          <p className="mt-3 max-w-sm text-sm text-muted">
+            Для запуска закупки внесите задаток в магазине. После подтверждения задатка
+            цена фиксируется{done.toOrderLeadDays ? `; срок поставки — ${daysLabel(done.toOrderLeadDays)}` : ''}.
+          </p>
+        )}
+        {schedule.length > 0 && (
+          <div className="checkout-surface mt-4 w-full max-w-md rounded-[14px] border border-surface-3 bg-surface-2 p-4 text-left">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">График оплаты</div>
+            <Row k="Задаток сейчас" v={som(exactDeposit)} />
+            {exactStock > 0 && <Row k="Складские товары при получении" v={som(exactStock)} />}
+            {exactBalance > 0 && <Row k="Остаток заказных товаров" v={som(exactBalance)} />}
+            {exactDelivery > 0 && <Row k="Доставка перед отправкой" v={som(exactDelivery)} />}
+            <p className="mt-2 text-xs text-muted">Онлайн-задаток временно отключён до сертификации платёжного возврата.</p>
+          </div>
+        )}
         {done.order.pickupCode && (
           <div className="checkout-surface mt-4 rounded-[14px] border border-surface-3 bg-surface-2 px-5 py-3">
             <div className="text-[12px] text-muted">Код выдачи</div>
@@ -409,7 +474,6 @@ export default function CheckoutPage() {
   if (hydrated && items.length === 0) {
     return wrap(<div className="flex flex-1 flex-col items-center justify-center text-center"><p className="font-display text-lg font-bold">Корзина пуста</p><Link href="/" className="mt-3 text-sm text-lime">В каталог →</Link></div>);
   }
-
   return wrap(
     <>
       <div className="flex items-center gap-3 px-5 pb-3 pt-5 sm:px-7 sm:pt-7">
@@ -427,7 +491,7 @@ export default function CheckoutPage() {
             {DELIVERY.map((d) => (
               <button key={d.id} type="button" disabled={!hydrated || deliveryCapacityLoading} aria-pressed={delivery === d.id} onClick={() => setDelivery(d.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-surface-2 p-3.5 text-left disabled:cursor-wait disabled:opacity-60 ${delivery === d.id ? 'border-lime' : 'border-surface-3'}`}>
                 <d.icon size={22} className="text-ink" />
-                <div className="flex-1"><div className="text-sm font-semibold">{d.name}</div><div className="text-xs text-muted">{d.meta}</div></div>
+                <div className="flex-1"><div className="text-sm font-semibold">{d.name}</div><div className="text-xs text-muted">{deliveryMeta[d.id]}</div></div>
                 <span className="text-[13px] text-bright">{d.price}</span>
               </button>
             ))}
@@ -525,43 +589,59 @@ export default function CheckoutPage() {
         {step === 2 && (
           <>
             <div className="mb-3 font-display text-base font-bold">Оплата</div>
-            {paymentOptions.notice && (
-              <p
-                role={paymentOptions.blocked ? 'alert' : undefined}
-                className={`mb-3 rounded-[11px] border p-3 text-sm ${paymentOptions.blocked ? 'border-warn text-warn' : 'border-surface-3 text-subtle'}`}
-              >
-                {paymentOptions.notice}
+            {hasToOrderLine ? (
+              <p className="mb-3 rounded-[11px] border border-lime/40 bg-lime/10 p-3.5 text-sm text-lime">
+                Для заказных товаров нужен задаток 20%. Онлайн-задаток пока отключён до
+                сертификации возвратов; после оформления точную сумму можно внести в магазине
+                наличными, картой или QR{toOrderLeadDays ? ` · срок ${daysLabel(toOrderLeadDays)}` : ''}.
               </p>
+            ) : (
+              <>
+                {paymentOptions.notice && (
+                  <p
+                    role={paymentOptions.blocked ? 'alert' : undefined}
+                    className={`mb-3 rounded-[11px] border p-3 text-sm ${paymentOptions.blocked ? 'border-warn text-warn' : 'border-surface-3 text-subtle'}`}
+                  >
+                    {paymentOptions.notice}
+                  </p>
+                )}
+                {PAYMENT.filter((p) => paymentOptions.options.includes(p.id)).map((p) => (
+                  <button key={p.id} type="button" aria-pressed={payment === p.id} onClick={() => setPayment(p.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-surface-2 p-3.5 text-left ${payment === p.id ? 'border-lime' : 'border-surface-3'}`}>
+                    <p.icon size={20} className="text-ink" />
+                    <span className="flex-1 text-sm">{p.name}</span>
+                    <span className={`h-4.5 w-4.5 rounded-full border-2 ${payment === p.id ? 'border-lime' : 'border-line'}`} style={{ height: 18, width: 18 }} />
+                  </button>
+                ))}
+                <div className="checkout-surface mt-3 rounded-[13px] border border-surface-3 bg-surface-2 p-3.5">
+                  <div className="mb-2 text-sm font-semibold">Подарочная карта</div>
+                  <div className="flex gap-2">
+                    <input value={giftCode} onChange={(e) => { setGiftCode(e.target.value); setGiftCard(null); }} placeholder="GC-ALISTORE" className="checkout-field min-w-0 flex-1 rounded-[10px] border border-line bg-ink-dark px-3 py-2.5 font-mono text-sm text-white outline-none focus:border-lime" />
+                    <button type="button" disabled={giftBusy} onClick={applyGiftCard} className="checkout-primary rounded-[10px] bg-lime px-3 text-sm font-bold text-lime-ink disabled:opacity-60">{giftBusy ? '...' : 'OK'}</button>
+                  </div>
+                  {giftCard && <div className="mt-2 text-[12px] text-lime">Баланс {som(giftCard.balance)} · спишем {som(giftAmount)}</div>}
+                  {giftError && <div className="mt-2 text-[12px] text-danger-soft">{giftError}</div>}
+                </div>
+              </>
             )}
-            {PAYMENT.filter((p) => paymentOptions.options.includes(p.id)).map((p) => (
-              <button key={p.id} type="button" aria-pressed={payment === p.id} onClick={() => setPayment(p.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-surface-2 p-3.5 text-left ${payment === p.id ? 'border-lime' : 'border-surface-3'}`}>
-                <p.icon size={20} className="text-ink" />
-                <span className="flex-1 text-sm">{p.name}</span>
-                <span className={`h-4.5 w-4.5 rounded-full border-2 ${payment === p.id ? 'border-lime' : 'border-line'}`} style={{ height: 18, width: 18 }} />
-              </button>
-            ))}
-            <div className="checkout-surface mt-3 rounded-[13px] border border-surface-3 bg-surface-2 p-3.5">
-              <div className="mb-2 text-sm font-semibold">Подарочная карта</div>
-              <div className="flex gap-2">
-                <input value={giftCode} onChange={(e) => { setGiftCode(e.target.value); setGiftCard(null); }} placeholder="GC-ALISTORE" className="checkout-field min-w-0 flex-1 rounded-[10px] border border-line bg-ink-dark px-3 py-2.5 font-mono text-sm text-white outline-none focus:border-lime" />
-                <button type="button" disabled={giftBusy} onClick={applyGiftCard} className="checkout-primary rounded-[10px] bg-lime px-3 text-sm font-bold text-lime-ink disabled:opacity-60">{giftBusy ? '...' : 'OK'}</button>
-              </div>
-              {giftCard && <div className="mt-2 text-[12px] text-lime">Баланс {som(giftCard.balance)} · спишем {som(giftAmount)}</div>}
-              {giftError && <div className="mt-2 text-[12px] text-danger-soft">{giftError}</div>}
-            </div>
             <button type="button" onClick={() => setStep(3)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink">К подтверждению</button>
           </>
         )}
         {step === 3 && (
           <>
             <div className="mb-3 font-display text-base font-bold">Подтверждение</div>
+            {hasToOrderLine && (
+              <p className="mb-3 rounded-[11px] border border-lime/40 bg-lime/10 p-3.5 text-sm text-lime">
+                Цена заказных строк фиксируется после задатка. Точный график начислений
+                сформирует сервер при оформлении{toOrderLeadDays ? `; срок — ${daysLabel(toOrderLeadDays)}` : ''}.
+              </p>
+            )}
             <div className="checkout-surface rounded-[14px] border border-surface-3 bg-surface-2 p-4">
               <Row k="Получение" v={DELIVERY.find((d) => d.id === delivery)?.name ?? ''} />
               {delivery === 'pickup' && <Row k="Точка" v={selectedPickupPoint?.name ?? 'не выбрана'} />}
               {delivery !== 'pickup' && <Row k="Адрес" v={deliveryAddress || 'не указан'} />}
               {delivery === 'courier' && selectedDeliveryZone && <Row k="Зона" v={selectedDeliveryZone.name} />}
               {delivery === 'courier' && selectedDeliverySlot && <Row k="Интервал" v={slotLabel(selectedDeliverySlot)} />}
-              <Row k="Оплата" v={PAYMENT.find((p) => p.id === payment)?.name ?? ''} />
+              <Row k="Оплата" v={hasToOrderLine ? 'Задаток в магазине · наличные / карта / QR' : PAYMENT.find((p) => p.id === payment)?.name ?? ''} />
               <Row k="Телефон" v={phone} />
               <Row k="Товаров" v={String(items.reduce((s, i) => s + i.qty, 0))} />
               <div className="my-2 border-t border-surface-3" />
@@ -570,7 +650,13 @@ export default function CheckoutPage() {
               {bonusDiscount > 0 && <Row k="Бонусы" v={`−${som(bonusDiscount)}`} />}
               <Row k="Доставка" v={deliveryFee ? som(deliveryFee) : 'бесплатно'} />
               {giftAmount > 0 && <Row k={`Подарочная ${giftCard?.code ?? ''}`} v={`−${som(giftAmount)}`} />}
-              <div className="flex items-center justify-between"><span className="text-[15px] font-bold">К оплате</span><span className="font-display text-lg font-extrabold text-lime">{som(dueAfterGift)}</span></div>
+              {hasToOrderLine && <Row k="Задаток сейчас (предварительно)" v={som(estimatedDeposit)} />}
+              {hasToOrderLine && estimatedStockAtPickup > 0 && <Row k="Складские товары при получении" v={som(estimatedStockAtPickup)} />}
+              {hasToOrderLine && <Row k="Остаток заказных товаров" v={som(estimatedSupplyBalance)} />}
+              <div className="flex items-center justify-between">
+                <span className="text-[15px] font-bold">{hasToOrderLine ? 'Ориентировочная сумма' : 'К оплате'}</span>
+                <span className="font-display text-lg font-extrabold text-lime">{som(dueAfterGift)}</span>
+              </div>
             </div>
             <label className="checkout-surface mt-3 flex cursor-pointer items-start gap-3 rounded-[13px] border border-surface-3 bg-surface-2 p-3.5">
               <input

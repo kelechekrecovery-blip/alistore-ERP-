@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -57,6 +58,7 @@ internal fun ClientOrdersScreen(
 ) {
   val gateway = remember(apiBaseUrl, providedGateway) { providedGateway ?: ApiClient(apiBaseUrl) }
   val paymentApi = paymentGateway(gateway)
+  val supplyApi = gateway as? SupplyParityGateway
   val scope = rememberCoroutineScope()
   val uriHandler = LocalUriHandler.current
   var orders by remember { mutableStateOf<List<CustomerOrder>>(emptyList()) }
@@ -65,6 +67,8 @@ internal fun ClientOrdersScreen(
   var manualRefresh by remember { mutableStateOf(0) }
   var paymentBusy by remember { mutableStateOf(false) }
   var paymentError by remember { mutableStateOf<String?>(null) }
+  var cancellationPreviews by remember { mutableStateOf<Map<String, OrderCancellationPreview>>(emptyMap()) }
+  var cancellations by remember { mutableStateOf<Map<String, OrderCancellation>>(emptyMap()) }
 
   LaunchedEffect(session.tokens.accessToken, refreshRevision, manualRefresh) {
     loading = true
@@ -76,7 +80,20 @@ internal fun ClientOrdersScreen(
       if (refreshed is AuthState.SignedIn) attempt = runCatching { gateway.orders(refreshed.tokens.accessToken) }
     }
     attempt
-      .onSuccess { orders = it; error = null }
+      .onSuccess {
+        orders = it
+        error = null
+        if (supplyApi != null) {
+          cancellationPreviews = it.mapNotNull { order ->
+            runCatching { supplyApi.cancellationPreview(order.id, session.tokens.accessToken) }
+              .getOrNull()?.let { preview -> order.id to preview }
+          }.toMap()
+          cancellations = it.mapNotNull { order ->
+            runCatching { supplyApi.currentCancellation(order.id, session.tokens.accessToken) }
+              .getOrNull()?.let { cancellation -> order.id to cancellation }
+          }.toMap()
+        }
+      }
       .onFailure { error = it.message ?: "Не удалось загрузить заказы" }
     loading = false
   }
@@ -175,10 +192,118 @@ internal fun ClientOrdersScreen(
           }
           Text("${order.items.sumOf { it.qty }} тов. · ${order.total} сом", color = OrdersMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 7.dp))
           order.createdAt?.take(10)?.let { Text(it, color = OrdersMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp)) }
+          order.items.forEach { line ->
+            Text(
+              "${line.sku} · ${line.qty} шт. · ${line.fulfillmentStatus.supplyStatusLabel()}",
+              color = Color.White,
+              fontSize = 12.sp,
+              modifier = Modifier.padding(top = 8.dp),
+            )
+            line.promisedDate?.take(10)?.let { eta ->
+              Text("Обещанная дата: $eta", color = OrdersMuted, fontSize = 11.sp)
+            }
+          }
+          if (order.paymentSchedule.isNotEmpty()) {
+            Text("График оплаты", color = OrdersLime, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+            order.paymentSchedule.forEach { receivable ->
+              Text(
+                "${receivable.kind.receivableLabel()}: ${receivable.settledAmount}/${receivable.amount} сом · ${receivable.status}",
+                color = OrdersMuted,
+                fontSize = 11.sp,
+              )
+            }
+          }
+          cancellations[order.id]?.let { cancellation ->
+            Text(
+              "Отмена/возврат: ${cancellation.status} · ${cancellation.approvedRefundAmount ?: cancellation.requestedRefundAmount} сом",
+              color = OrdersCoral,
+              fontSize = 12.sp,
+              modifier = Modifier.padding(top = 10.dp).testTag("cancellation-status-${order.id}"),
+            )
+          }
+          val preview = cancellationPreviews[order.id]
+          if (preview != null && cancellations[order.id] == null) {
+            CancellationControls(
+              orderId = order.id,
+              preview = preview,
+              enabled = supplyApi != null,
+              onRequest = { reason ->
+                supplyApi?.let { api ->
+                  scope.launch {
+                    runCatching {
+                      api.requestCancellation(
+                        order.id,
+                        reason,
+                        session.tokens.accessToken,
+                        UUID.randomUUID().toString(),
+                      )
+                    }.onSuccess { cancellation ->
+                      cancellations = cancellations + (order.id to cancellation)
+                    }.onFailure { failure ->
+                      error = failure.message ?: "Не удалось отправить отмену"
+                    }
+                  }
+                }
+              },
+            )
+          }
         }
       }
     }
   }
+}
+
+@Composable
+private fun CancellationControls(
+  orderId: String,
+  preview: OrderCancellationPreview,
+  enabled: Boolean,
+  onRequest: (String) -> Unit,
+) {
+  var reason by remember(orderId) { mutableStateOf("") }
+  Text(
+    "Возврат задатка: ${preview.estimatedRefundAmount} сом · ${if (preview.ownerReviewRequired) "решение владельца" else "автоматически"}",
+    color = OrdersMuted,
+    fontSize = 11.sp,
+    modifier = Modifier.padding(top = 10.dp),
+  )
+  if (preview.canCancel && preview.requestEnabled && enabled) {
+    OutlinedTextField(
+      value = reason,
+      onValueChange = { reason = it },
+      label = { Text("Причина отмены") },
+      modifier = Modifier.fillMaxWidth().padding(top = 6.dp).testTag("cancellation-reason-$orderId"),
+    )
+    Button(
+      onClick = { onRequest(reason.trim()) },
+      enabled = reason.trim().length >= 3,
+      colors = ButtonDefaults.buttonColors(containerColor = OrdersCoral),
+      modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("cancellation-request-$orderId"),
+    ) { Text("Запросить отмену") }
+  } else if (!preview.blockedReason.isNullOrBlank()) {
+    Text("Отмена недоступна: ${preview.blockedReason}", color = OrdersMuted, fontSize = 11.sp)
+  }
+}
+
+private fun String?.supplyStatusLabel(): String = when (this) {
+  "awaiting_deposit" -> "ожидает задатка"
+  "procurement_draft" -> "закупка проверяется"
+  "supplier_ordered" -> "заказан поставщику"
+  "in_transit" -> "в пути"
+  "received", "quality_check" -> "поступил, проверяем"
+  "ready" -> "готов"
+  "handed_over" -> "выдан"
+  "quarantined" -> "на решении владельца"
+  "customer_cancelled", "cancelled" -> "отменён"
+  else -> this ?: "обрабатывается"
+}
+
+private fun String.receivableLabel(): String = when (this) {
+  "supply_deposit" -> "Задаток"
+  "stock_sale" -> "Складской товар"
+  "supply_balance" -> "Остаток заказного товара"
+  "delivery" -> "Доставка"
+  else -> this
 }
 
 private fun String.withPaymentQuery(orderId: String, method: String): String {

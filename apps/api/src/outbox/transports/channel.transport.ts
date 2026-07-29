@@ -14,6 +14,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class ChannelNotificationTransport implements NotificationTransport {
   private readonly email: EmailNotificationTransport;
   private readonly log = new LogNotificationTransport();
+  private readonly isProduction: boolean;
   private readonly expoPush?: ExpoPushTransport;
   private readonly fcmPush?: FcmPushTransport;
   private readonly novu?: NovuHttpTransport;
@@ -21,6 +22,8 @@ export class ChannelNotificationTransport implements NotificationTransport {
   private readonly whatsapp?: WhatsAppCloudTransport;
 
   constructor(config: ConfigService, prisma?: PrismaService) {
+    this.isProduction =
+      config.get<string>('NODE_ENV')?.trim().toLowerCase() === 'production';
     this.email = new EmailNotificationTransport(config);
     if (prisma && hasConfig(config, 'EXPO_PUBLIC_EAS_PROJECT_ID')) {
       this.expoPush = new ExpoPushTransport(config, prisma);
@@ -47,9 +50,9 @@ export class ChannelNotificationTransport implements NotificationTransport {
       case 'email':
         return this.email.deliver(message);
       case 'telegram':
-        return (this.telegram ?? this.log).deliver(message);
+        return (this.telegram ?? this.fallbackFor('telegram')).deliver(message);
       case 'whatsapp':
-        return (this.whatsapp ?? this.log).deliver(message);
+        return (this.whatsapp ?? this.fallbackFor('whatsapp')).deliver(message);
       case 'push': {
         const nativeTransports: NotificationTransport[] = [];
         if (this.fcmPush) nativeTransports.push(this.fcmPush);
@@ -57,14 +60,27 @@ export class ChannelNotificationTransport implements NotificationTransport {
         if (nativeTransports.length > 0) {
           return Promise.all(nativeTransports.map((transport) => transport.deliver(message))).then(() => undefined);
         }
-        return (this.novu ?? this.log).deliver(message);
+        return (this.novu ?? this.fallbackFor('push')).deliver(message);
       }
       case 'sms':
       case 'webhook':
-        return (this.novu ?? this.log).deliver(message);
+        return (this.novu ?? this.fallbackFor(message.channel)).deliver(message);
       default:
-        return this.log.deliver(message);
+        return this.fallbackFor(message.channel).deliver(message);
     }
+  }
+
+  private fallbackFor(channel: string): NotificationTransport {
+    if (this.isProduction) {
+      return {
+        deliver: async () => {
+          throw new Error(
+            `No production notification provider configured for channel: ${channel}`,
+          );
+        },
+      };
+    }
+    return this.log;
   }
 }
 

@@ -23,7 +23,7 @@ enum ClientDebugFeature: String, Identifiable {
         UITestBootstrap.featureRoute.flatMap { ClientDebugFeature(rawValue: $0) }
     }
 
-    @ViewBuilder var screen: some View {
+    @MainActor @ViewBuilder var screen: some View {
         NavigationStack {
             switch self {
             case .installment: InstallmentView()

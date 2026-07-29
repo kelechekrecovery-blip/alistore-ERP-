@@ -69,6 +69,7 @@ describe('Courier run deadlock (LOGIC-002)', () => {
         username: `courier-deadlock-${seq}`,
         passwordHash: 'test-only',
         role: 'courier',
+        point: 'BISHKEK-1',
       },
     });
   };

@@ -147,7 +147,7 @@ describe('Reservation expiry sweep (invariant #7)', () => {
     expect(await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).toMatchObject({ status: 'reserved' });
   });
 
-  it('releases every reservation for an order atomically when one expires', async () => {
+  it('releases only expired line reservations and preserves later ready-line holds', async () => {
     seq += 1;
     const suffix = seq.toString().padStart(3, '0');
     const customer = await prisma.customer.create({ data: { phone: `+9967110${suffix}`, name: 'Multi reserve' } });
@@ -166,9 +166,10 @@ describe('Reservation expiry sweep (invariant #7)', () => {
     const held = await prisma.reservation.findMany({ where: { orderId: order.id }, orderBy: { id: 'asc' } });
     await prisma.reservation.update({ where: { id: held[0].id }, data: { expiresAt: new Date(Date.now() - 1000) } });
 
-    expect((await reservations.releaseExpired()).released).toBe(2);
-    expect(await prisma.reservation.count({ where: { orderId: order.id, active: true } })).toBe(0);
-    expect(await prisma.deviceUnit.count({ where: { imei: { in: imeis }, status: 'in_stock', orderId: null } })).toBe(2);
+    expect((await reservations.releaseExpired()).released).toBe(1);
+    expect(await prisma.reservation.count({ where: { orderId: order.id, active: true } })).toBe(1);
+    expect(await prisma.deviceUnit.count({ where: { imei: { in: imeis }, status: 'in_stock', orderId: null } })).toBe(1);
+    expect(await prisma.deviceUnit.count({ where: { imei: { in: imeis }, status: 'reserved', orderId: order.id } })).toBe(1);
   });
 
   it('does not expire stock after warehouse picking has started', async () => {

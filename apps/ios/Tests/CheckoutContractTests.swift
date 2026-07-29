@@ -1,3 +1,5 @@
+// JSON wire fixtures stay inline so the asserted contract is visible beside each test.
+// swiftlint:disable line_length
 import AliStoreCore
 import Foundation
 import XCTest
@@ -113,6 +115,80 @@ final class CheckoutContractTests: XCTestCase {
         XCTAssertEqual(items.first?["sku"] as? String, "IP-1")
         XCTAssertEqual(items.first?["qty"] as? Int, 1)
         XCTAssertNil(items.first?["price"])
+    }
+
+    func testSupplyPolicyRequiresServerCapabilityTotpAndAuthoritativePoint() {
+        let owner = StaffSession(
+            accessToken: "token",
+            staffId: "owner-1",
+            username: "owner",
+            role: "owner",
+            point: "MANAS-1",
+            totpEnabled: true
+        )
+        XCTAssertTrue(NativeSupplyPolicy.canResolveOwnerCancellation(session: owner, serverCapability: true))
+        XCTAssertTrue(NativeSupplyPolicy.canUsePointBoundOperations(session: owner))
+        XCTAssertFalse(NativeSupplyPolicy.canResolveOwnerCancellation(
+            session: StaffSession(accessToken: "t", staffId: "admin", username: "admin", role: "admin"),
+            serverCapability: true
+        ))
+        XCTAssertFalse(NativeSupplyPolicy.canUsePointBoundOperations(
+            session: StaffSession(accessToken: "t", staffId: "seller", username: "seller", role: "seller")
+        ))
+    }
+
+    func testCourierGateRequiresEveryLineAndReceivableReady() {
+        let ready = CustomerOrderItem(
+            sku: "TO-1",
+            qty: 1,
+            price: 100,
+            imei: nil,
+            id: "line-1",
+            supplyModeSnapshot: "to_order",
+            fulfillmentStatus: "ready"
+        )
+        let waiting = CustomerOrderItem(
+            sku: "TO-2",
+            qty: 1,
+            price: 100,
+            imei: nil,
+            id: "line-2",
+            supplyModeSnapshot: "to_order",
+            fulfillmentStatus: "in_transit"
+        )
+        let settled = OrderReceivable(
+            id: "r-1",
+            orderItemId: "line-1",
+            kind: "supply_balance",
+            amount: 100,
+            settledAmount: 100,
+            status: "settled",
+            dueAt: nil
+        )
+        let order = CustomerOrder(
+            id: "o-1",
+            channel: "app",
+            fulfillmentType: "courier",
+            pickupPoint: nil,
+            deliveryAddress: "Манас",
+            deliverySlot: nil,
+            pickupCode: nil,
+            status: "confirmed",
+            total: 200,
+            createdAt: Date(),
+            items: [ready, waiting],
+            paymentSchedule: [settled]
+        )
+        XCTAssertFalse(NativeSupplyPolicy.allLinesReadyForCourier(order))
+    }
+
+    func testDecodesCancellationPreviewAndRefundStatusAdditively() throws {
+        let preview = try JSONDecoder().decode(OrderCancellationPreview.self, from: Data("""
+        {"orderId":"o-1","canCancel":true,"blockedReason":null,"policy":"owner_resolution","purchaseOrderSent":true,"depositPaid":2000,"estimatedRefundAmount":2000,"supplierExpenseDeduction":0,"ownerReviewRequired":true,"note":"Проверка","requestEnabled":true}
+        """.utf8))
+        XCTAssertTrue(preview.requestEnabled == true)
+        XCTAssertTrue(preview.ownerReviewRequired)
+        XCTAssertEqual(preview.estimatedRefundAmount, 2000)
     }
 
     private func makeSession(status: Int, body: String) -> URLSession {

@@ -12,7 +12,7 @@ final class DesignContrastTests: XCTestCase {
     /// это степперы и мелкие контролы, где текста нет.
     private let backgrounds: [(name: String, color: Color)] = [
         ("screen", Design3.screen),
-        ("surface", Design3.surface),
+        ("surface", Design3.surface)
     ]
 
     func testTextRampMeetsAA() {
@@ -21,7 +21,7 @@ final class DesignContrastTests: XCTestCase {
             ("textBright", Design3.textBright),
             ("textMuted", Design3.textMuted),
             ("textSubtle", Design3.textSubtle),
-            ("textFaint", Design3.textFaint),
+            ("textFaint", Design3.textFaint)
         ]
         for token in ramp {
             for background in backgrounds {
@@ -45,9 +45,9 @@ final class DesignContrastTests: XCTestCase {
     }
 
     private func contrastRatio(_ lhs: Color, _ rhs: Color) -> Double {
-        let a = relativeLuminance(lhs)
-        let b = relativeLuminance(rhs)
-        return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+        let leftLuminance = relativeLuminance(lhs)
+        let rightLuminance = relativeLuminance(rhs)
+        return (max(leftLuminance, rightLuminance) + 0.05) / (min(leftLuminance, rightLuminance) + 0.05)
     }
 
     private func relativeLuminance(_ color: Color) -> Double {

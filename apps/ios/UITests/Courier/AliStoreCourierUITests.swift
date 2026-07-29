@@ -1,7 +1,8 @@
 import XCTest
 
+@MainActor
 final class AliStoreCourierUITests: XCTestCase {
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         continueAfterFailure = false
         terminateOtherAliStoreApps()
     }
@@ -57,7 +58,7 @@ final class AliStoreCourierUITests: XCTestCase {
         app.launchArguments = [
             "--ui-testing-signed-in",
             "--ui-testing-role=courier",
-            "--ui-testing-visual-evidence",
+            "--ui-testing-visual-evidence"
         ]
         app.launch()
 

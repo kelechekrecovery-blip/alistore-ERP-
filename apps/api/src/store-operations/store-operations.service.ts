@@ -6,6 +6,7 @@ import { ConflictError, ForbiddenError, ValidationError } from '../common/errors
 import { AuthPrincipal } from '../auth/jwt.strategy';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateStoreChecklistDto, CreateStoreIncidentDto, ResolveStoreIncidentDto, StoreOperationsQueryDto, UpdateChecklistItemDto } from './store-operations.dto';
+import { resolveActiveStorePoint } from '../common/store-point-identity';
 
 const CHECKLIST_TEMPLATE: Record<StoreChecklistType, Array<{ code: string; label: string }>> = {
   opening: [
@@ -64,11 +65,33 @@ export class StoreOperationsService {
       select: { point: true, role: true },
     });
     if (!staff) throw new ForbiddenError('staff_not_found', 'Сотрудник не найден');
-    if (staff.role === 'admin' || staff.role === 'owner') return requested;
-    if (requested && requested !== staff.point) {
+    const assignedPoint = await resolveActiveStorePoint(this.prisma, staff.point, 'Точка сотрудника недоступна или отключена');
+    if (staff.role === 'admin' || staff.role === 'owner') {
+      return requested
+        ? (await resolveActiveStorePoint(this.prisma, requested)).inventoryLocation
+        : undefined;
+    }
+    const requestedPoint = requested
+      ? await resolveActiveStorePoint(this.prisma, requested)
+      : assignedPoint;
+    if (requestedPoint.id !== assignedPoint.id) {
       throw new ForbiddenError('store_point_mismatch', 'Доступны операции только своей точки');
     }
-    return staff.point;
+    return assignedPoint.inventoryLocation;
+  }
+
+  private async resolveWritablePoint(requested: string | undefined, actor: string): Promise<string> {
+    const staff = await this.prisma.staffUser.findUnique({
+      where: { id: actor },
+      select: { point: true, role: true, active: true },
+    });
+    if (!staff?.active) throw new ForbiddenError('staff_not_found', 'Сотрудник не найден или отключён');
+    const assigned = await resolveActiveStorePoint(this.prisma, staff.point, 'Точка сотрудника недоступна или отключена');
+    const selected = await resolveActiveStorePoint(this.prisma, requested);
+    if (staff.role !== 'admin' && staff.role !== 'owner' && selected.id !== assigned.id) {
+      throw new ForbiddenError('store_point_mismatch', 'Операции разрешены только в своей точке');
+    }
+    return selected.inventoryLocation;
   }
 
   async overview(query: StoreOperationsQueryDto, user: AuthPrincipal) {
@@ -103,7 +126,7 @@ export class StoreOperationsService {
 
   async createChecklist(dto: CreateStoreChecklistDto, actor: string, rawKey?: string) {
     const key = commandKey(rawKey);
-    const point = dto.point.trim();
+    const point = await this.resolveWritablePoint(dto.point, actor);
     const date = businessDate(dto.businessDate);
     if (!point) throw new ValidationError('store_point_required', 'Точка обязательна');
     const payload = { point, businessDate: date.toISOString(), type: dto.type };
@@ -182,7 +205,7 @@ export class StoreOperationsService {
 
   async createIncident(dto: CreateStoreIncidentDto, actor: string, rawKey?: string) {
     const key = commandKey(rawKey);
-    const point = dto.point.trim();
+    const point = await this.resolveWritablePoint(dto.point, actor);
     const date = businessDate(dto.businessDate);
     const payload = { point, businessDate: date.toISOString(), category: dto.category.trim(), severity: dto.severity, title: dto.title.trim(), description: dto.description.trim() };
     if (!point || !payload.category || !payload.title || !payload.description) throw new ValidationError('store_incident_fields_required', 'Точка, категория, заголовок и описание обязательны');

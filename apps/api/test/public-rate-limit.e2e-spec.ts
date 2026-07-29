@@ -6,6 +6,10 @@ import { CustomersController } from '../src/customers/customers.controller';
 import { CustomersService } from '../src/customers/customers.service';
 import { OrdersController } from '../src/orders/orders.controller';
 import { OrdersService } from '../src/orders/orders.service';
+import { OrderCancellationsService } from '../src/orders/order-cancellations.service';
+import { OrderCancellationResolutionService } from '../src/orders/order-cancellation-resolution.service';
+import { OrderItemHandoverService } from '../src/orders/order-item-handover.service';
+import { OrderItemReservationService } from '../src/orders/order-item-reservation.service';
 import { PaymentsController } from '../src/payments/payments.controller';
 import { PAYMENT_GATEWAY_PROVIDER } from '../src/payments/payment-gateway-provider';
 import { PaymentIntentsService } from '../src/payments/payment-intents.service';
@@ -34,6 +38,19 @@ describe('public endpoint rate limits', () => {
         { provide: PAYMENT_GATEWAY_PROVIDER, useValue: { name: 'none' } },
         { provide: CustomersService, useValue: { createGuest: async () => ({ id: 'customer-1' }) } },
         { provide: OrdersService, useValue: { createFromCatalog: async () => ({ id: 'order-1' }) } },
+        {
+          provide: OrderCancellationsService,
+          useValue: { preview: async () => null, request: async () => null, current: async () => null },
+        },
+        {
+          provide: OrderCancellationResolutionService,
+          useValue: { resolve: async () => null },
+        },
+        { provide: OrderItemHandoverService, useValue: { handOver: async () => null } },
+        {
+          provide: OrderItemReservationService,
+          useValue: { reserve: async () => null, ready: async () => null },
+        },
         { provide: PaymentsService, useValue: { find: async () => [], pay: async () => ({ id: 'pay-1' }), payForCustomer: async () => ({ id: 'pay-1' }) } },
         { provide: PaymentIntentsService, useValue: { create: async () => ({ id: 'intent-1' }), webhook: async () => ({ ok: true }) } },
         { provide: SupportService, useValue: { open: async () => ({ id: 'ticket-1' }), list: async () => [] } },

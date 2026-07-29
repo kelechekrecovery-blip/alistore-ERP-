@@ -288,8 +288,8 @@ struct StoriesRail: View {
 
 struct SectionHeader: View {
     let title: String
-    var actionLabel: String? = nil
-    var action: (() -> Void)? = nil
+    var actionLabel: String?
+    var action: (() -> Void)?
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(title).font(Design3.heading(18, .bold)).foregroundStyle(Design3.textPrimary)

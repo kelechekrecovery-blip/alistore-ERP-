@@ -71,7 +71,7 @@ struct SystemStateScaffold: View {
     let detail: String
     let primaryTitle: String
     let primaryAction: () -> Void
-    var secondaryTitle: String? = nil
+    var secondaryTitle: String?
     var secondaryAction: () -> Void = {}
     var secondaryIsGlass: Bool = false
 

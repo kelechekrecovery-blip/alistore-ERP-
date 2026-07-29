@@ -14,6 +14,11 @@ export type OutboxChannel =
 
 export interface OutboxInput {
   campaignId?: string;
+  /**
+   * Stable business-event key. When supplied, enqueue becomes an immutable
+   * upsert so scheduler/webhook retries cannot create duplicate delivery rows.
+   */
+  dedupKey?: string;
   channel: OutboxChannel;
   recipient: string;
   template: string;

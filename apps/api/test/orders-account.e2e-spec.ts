@@ -65,11 +65,11 @@ describe('Orders by customer (account)', () => {
   it('returns only the customer own orders', async () => {
     const a = await customer();
     const b = await customer();
-    await orders.create(
+    const first = await orders.create(
       { customerId: a.id, channel: 'web', total: 100, items: [{ sku: 'X', qty: 1, price: 100 }] },
       'system',
     );
-    await orders.create(
+    const second = await orders.create(
       { customerId: a.id, channel: 'web', total: 200, items: [{ sku: 'Y', qty: 1, price: 200 }] },
       'system',
     );
@@ -80,7 +80,8 @@ describe('Orders by customer (account)', () => {
 
     const mine = await orders.listByCustomer(a.id);
     expect(mine).toHaveLength(2);
-    expect(mine.every((o) => o.customerId === a.id)).toBe(true);
+    expect(mine.map((order) => order.id).sort()).toEqual([first.id, second.id].sort());
+    expect(mine.every((order) => !('customerId' in order))).toBe(true);
     // newest first
     expect(mine[0].createdAt >= mine[1].createdAt).toBe(true);
     expect(mine[0].items).toBeDefined();

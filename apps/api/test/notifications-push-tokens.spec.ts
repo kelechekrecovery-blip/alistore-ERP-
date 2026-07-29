@@ -82,6 +82,7 @@ describe('Notifications push token registry (integration)', () => {
         username: 'push-cashier',
         passwordHash: 'not-used',
         role: 'cashier',
+        point: 'BISHKEK-1',
       },
     });
 
@@ -101,7 +102,7 @@ describe('Notifications push token registry (integration)', () => {
 
   it('binds an FCM registration token to an active Android staff session', async () => {
     const staff = await prisma.staffUser.create({
-      data: { username: 'push-android-staff', passwordHash: 'not-used', role: 'seller' },
+      data: { username: 'push-android-staff', passwordHash: 'not-used', role: 'seller', point: 'BISHKEK-1' },
     });
     const token = 'android-device-token_1234567890:APA91b-alistore';
 

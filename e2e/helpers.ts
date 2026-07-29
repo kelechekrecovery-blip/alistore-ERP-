@@ -161,6 +161,7 @@ export async function bootstrapStaff(
       username,
       passwordHash: await argon2.hash('pass-e2e'),
       role,
+      point: 'BISHKEK-1',
     },
   });
   return sign({ sub: staff.id, role: staff.role, typ: 'staff' }, 'dev-secret-alistore-local', { expiresIn: '8h' });
@@ -170,7 +171,7 @@ export async function seedStaffCredentials(role: Role = 'owner', prefix = 'e2e')
   const username = `${prefix}-${role}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   const password = 'pass-e2e';
   const staff = await prisma.staffUser.create({
-    data: { username, passwordHash: await argon2.hash(password), role },
+    data: { username, passwordHash: await argon2.hash(password), role, point: 'BISHKEK-1' },
   });
   return {
     staffId: staff.id,

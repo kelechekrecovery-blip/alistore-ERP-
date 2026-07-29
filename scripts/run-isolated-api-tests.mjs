@@ -31,10 +31,12 @@
  * count changes.
  *
  * Usage
- *   node scripts/run-isolated-api-tests.mjs [--keep] [jest args…]
+ *   node scripts/run-isolated-api-tests.mjs [--keep] [--cleanup-orphans] [jest args…]
  *   node scripts/run-isolated-api-tests.mjs --testPathPattern reports-money-truth
  *
  * --keep leaves the run database in place for post-mortem inspection.
+ * --cleanup-orphans removes databases left by crashed runs before starting.
+ * Do not combine it with concurrent runners.
  */
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -51,7 +53,8 @@ const ADMIN_DB = process.env.ALISTORE_TEST_ADMIN_DB ?? 'postgres';
 
 const argv = process.argv.slice(2);
 const keep = argv.includes('--keep');
-const jestArgs = argv.filter((arg) => arg !== '--keep');
+const cleanupOrphans = argv.includes('--cleanup-orphans');
+const jestArgs = argv.filter((arg) => arg !== '--keep' && arg !== '--cleanup-orphans');
 
 /** Base connection string, with the database name replaced per call. */
 function urlFor(database) {
@@ -142,7 +145,10 @@ async function main() {
   // refusal is the last thing standing between a typo and the dev database.
   const runDb = `alistore_test_run_${process.pid}_${process.hrtime.bigint().toString(36).slice(-6)}`;
 
-  await dropOrphans();
+  // Automatic orphan cleanup races with another runner between CREATE DATABASE
+  // and Jest's first connection. Each healthy run removes only its own database;
+  // stale databases are cleaned explicitly when no concurrent run is starting.
+  if (cleanupOrphans) await dropOrphans();
   await ensureTemplate();
 
   console.log(`[isolated] создаю ${runDb} из шаблона`);

@@ -56,6 +56,34 @@ describe('StaffUser.point → StorePoint (integration)', () => {
     expect(staff.point).toBe(loc);
   });
 
+  it('resolves the legacy AliStore Центр alias to the canonical active point', async () => {
+    const staff = await staffAuth.createStaff(`${run}-legacy`, 'pass', 'seller', 'AliStore Центр');
+    expect(staff.point).toBe('BISHKEK-1');
+    const session = await staffAuth.login(staff.username, 'pass');
+    expect(session.point).toBe('BISHKEK-1');
+    expect(session.storePoint.code).toBe('center');
+  });
+
+  it('fails closed when the assigned StorePoint becomes inactive', async () => {
+    const location = `${run}-loc-inactive`;
+    const point = await prisma.storePoint.create({
+      data: {
+        code: `${run}-code-inactive`,
+        name: 'Отключаемая точка',
+        address: '—',
+        inventoryLocation: location,
+        hours: '—',
+        createdBy: run,
+        idempotencyKey: `${run}:sp:inactive`,
+      },
+    });
+    const staff = await staffAuth.createStaff(`${run}-inactive`, 'pass', 'seller', point.id);
+    await prisma.storePoint.update({ where: { id: point.id }, data: { active: false } });
+    await expect(staffAuth.login(staff.username, 'pass')).rejects.toMatchObject({
+      code: 'store_point_unavailable',
+    });
+  });
+
   it('refuses to create a staff bound to a non-existent point', async () => {
     await expect(
       staffAuth.createStaff(`${run}-c`, 'pass', 'seller', `${run}-loc-does-not-exist`),

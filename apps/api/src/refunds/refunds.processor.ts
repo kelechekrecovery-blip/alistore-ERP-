@@ -6,11 +6,17 @@ import { EventType } from '../audit/event-types';
 import { applyCampaignRefundOnTx } from '../campaigns/campaign-refund-adjustment';
 import { ConflictError, ValidationError } from '../common/errors';
 import { reconcileRefundLoyaltyOnTx } from '../customers/loyalty-ledger';
-import { postPaymentEntryOnTx } from '../finance/accounting-journal';
+import {
+  postCustomerPrepaymentRefundOnTx,
+  postPaymentEntryOnTx,
+} from '../finance/accounting-journal';
 import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
 import { canTransition } from '../orders/order-state-machine';
 import { OutboxService } from '../outbox/outbox.service';
-import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
+import {
+  enqueueConsentedCustomerNotice,
+  enqueueSupplyCustomerNotice,
+} from '../outbox/customer-notifications';
 import {
   GatewayRefundWebhookPayload,
   PAYMENT_GATEWAY_PROVIDER,
@@ -474,7 +480,8 @@ export class RefundProcessor {
               providerReference,
               withoutProviderCallback: true,
             },
-            refs: [refundId, refund.returnId, refund.orderId, idempotencyRef, ...resolvable.map((item) => item.id)],
+            refs: [refundId, refund.returnId, refund.orderId, idempotencyRef, ...resolvable.map((item) => item.id)]
+              .filter((ref): ref is string => Boolean(ref)),
           }] : undefined,
         },
       );
@@ -521,7 +528,14 @@ export class RefundProcessor {
         data: { status: 'failed', lastError: `operator_cancelled:${reason}`, lockedAt: null, nextAttemptAt: null },
       });
       const result = await tx.refund.update({ where: { id: refundId }, data: { status: 'rejected' } });
-      await tx.return.update({ where: { id: refund.returnId }, data: { status: 'rejected' } });
+      if (refund.returnId) {
+        await tx.return.update({ where: { id: refund.returnId }, data: { status: 'rejected' } });
+      } else {
+        await tx.orderCancellation.updateMany({
+          where: { refundId: refund.id },
+          data: { status: 'refund_failed' },
+        });
+      }
       return {
         result,
         events: [{
@@ -535,7 +549,8 @@ export class RefundProcessor {
             allocationIds: cancellable.map((allocation) => allocation.id),
             withoutProviderCallback: true,
           },
-          refs: [refundId, refund.returnId, refund.orderId, idempotencyRef, ...cancellable.map((allocation) => allocation.id)],
+          refs: [refundId, refund.returnId, refund.orderId, idempotencyRef, ...cancellable.map((allocation) => allocation.id)]
+            .filter((ref): ref is string => Boolean(ref)),
         }],
       };
     });
@@ -638,17 +653,30 @@ export class RefundProcessor {
           point: allocation.originalPayment.point,
         },
       });
-      const totalTax = allocation.refund.lines.reduce((sum, line) => sum + line.taxAmount, 0);
+      const prepaymentRefund = allocation.refund.purpose === 'customer_prepayment';
+      const totalTax = prepaymentRefund
+        ? 0
+        : allocation.refund.lines.reduce((sum, line) => sum + line.taxAmount, 0);
       const allocatedBefore = allocation.refund.allocations
         .filter((item) => item.ordinal < allocation.ordinal)
         .reduce((sum, item) => sum + item.amount, 0);
       const taxAmount = cumulativeTaxDelta(totalTax, allocation.refund.amount, allocatedBefore, allocation.amount);
-      const metadata = outputTaxMetadata(allocation.refund.lines);
-      const accountingEntry = await postPaymentEntryOnTx(tx, {
-        payment, idempotencyKey: key, point: payment.point, actor,
-        receivedBy: payoutBy,
-        tax: { ...metadata, taxAmount },
-      });
+      const accountingEntry = prepaymentRefund
+        ? await postCustomerPrepaymentRefundOnTx(tx, {
+          payment,
+          idempotencyKey: key,
+          point: payment.point,
+          actor,
+          receivedBy: payoutBy,
+        })
+        : await postPaymentEntryOnTx(tx, {
+          payment,
+          idempotencyKey: key,
+          point: payment.point,
+          actor,
+          receivedBy: payoutBy,
+          tax: { ...outputTaxMetadata(allocation.refund.lines), taxAmount },
+        });
 
       if (allocation.methodSnapshot === 'gift_card') {
         const giftCardId = allocation.originalPayment.giftCardId;
@@ -676,7 +704,27 @@ export class RefundProcessor {
         data: { status: 'succeeded', providerRefundId, refundPaymentId: payment.id, accountingEntryId: accountingEntry.id, lockedAt: null, nextAttemptAt: null },
       });
       const events: AuditInput[] = [
-        { type: EventType.PaymentRefunded, actor, payload: { refundId: allocation.refundId, allocationId: allocation.id, originalPaymentId: allocation.originalPaymentId, paymentId: payment.id, amount: allocation.amount, taxAmount }, refs: [allocation.refundId, allocation.refund.returnId, allocation.refund.orderId, allocation.id, payment.id, allocation.originalPaymentId] },
+        {
+          type: EventType.PaymentRefunded,
+          actor,
+          payload: {
+            refundId: allocation.refundId,
+            allocationId: allocation.id,
+            originalPaymentId: allocation.originalPaymentId,
+            paymentId: payment.id,
+            amount: allocation.amount,
+            taxAmount,
+            purpose: allocation.refund.purpose,
+          },
+          refs: [
+            allocation.refundId,
+            allocation.refund.returnId,
+            allocation.refund.orderId,
+            allocation.id,
+            payment.id,
+            allocation.originalPaymentId,
+          ].filter((ref): ref is string => Boolean(ref)),
+        },
         { type: EventType.AccountingEntryPosted, actor, payload: { accountingEntryId: accountingEntry.id, sourceType: 'payment.refund', sourceRef: payment.id }, refs: [accountingEntry.id, payment.id] },
       ];
       if (providerRefundId) {
@@ -710,22 +758,63 @@ export class RefundProcessor {
     await tx.refund.update({ where: { id: refund.id }, data: { status: 'succeeded', completedAt: new Date() } });
     const first = await tx.refundAllocation.findFirst({ where: { refundId: refund.id }, orderBy: { ordinal: 'asc' }, select: { refundPaymentId: true } });
     const primaryPaymentId = first?.refundPaymentId ?? paymentId;
-    await tx.return.update({ where: { id: refund.returnId }, data: { status: 'paid' } });
-    await applyCampaignRefundOnTx(tx, { orderId: refund.orderId, refundPaymentId: primaryPaymentId, returnId: refund.returnId, amount: refund.amount, actor }, events);
-    await reconcileRefundLoyaltyOnTx(tx, { order: refund.order, refundPaymentId: primaryPaymentId, actor }, events);
+    if (refund.purpose === 'customer_prepayment') {
+      await tx.orderCancellation.updateMany({
+        where: { refundId: refund.id },
+        data: { status: 'refunded', completedAt: new Date() },
+      });
+    } else {
+      if (!refund.returnId) {
+        throw new ConflictError('refund_return_missing', 'Возврат продажи не связан с Return');
+      }
+      await tx.return.update({ where: { id: refund.returnId }, data: { status: 'paid' } });
+      await applyCampaignRefundOnTx(tx, {
+        orderId: refund.orderId,
+        refundPaymentId: primaryPaymentId,
+        returnId: refund.returnId,
+        amount: refund.amount,
+        actor,
+      }, events);
+      await reconcileRefundLoyaltyOnTx(tx, {
+        order: refund.order,
+        refundPaymentId: primaryPaymentId,
+        actor,
+      }, events);
+    }
     const net = await tx.payment.aggregate({ where: { orderId: refund.orderId }, _sum: { amount: true } });
     if ((net._sum.amount ?? 0) <= 0 && canTransition(refund.order.status, 'refunded')) {
       await tx.order.update({ where: { id: refund.orderId }, data: { status: 'refunded' } });
       events.push({ type: 'order.refunded', actor, payload: { orderId: refund.orderId, refundId: refund.id }, refs: [refund.orderId, refund.id] });
     }
-    events.push({ type: 'refund.succeeded', actor, payload: { refundId: refund.id, returnId: refund.returnId, amount: refund.amount }, refs: [refund.id, refund.returnId, refund.orderId] });
+    events.push({
+      type: 'refund.succeeded',
+      actor,
+      payload: {
+        refundId: refund.id,
+        returnId: refund.returnId,
+        amount: refund.amount,
+        purpose: refund.purpose,
+      },
+      refs: [refund.id, refund.returnId, refund.orderId]
+        .filter((ref): ref is string => Boolean(ref)),
+    });
     if (this.outbox) {
-      await enqueueConsentedCustomerNotice(tx, this.outbox, {
-        customerId: refund.order.customerId,
-        template: 'refund_succeeded',
-        payload: { refundId: refund.id, returnId: refund.returnId, orderId: refund.orderId, amount: refund.amount },
-        transactional: true,
-      });
+      if (refund.purpose === 'customer_prepayment') {
+        await enqueueSupplyCustomerNotice(tx, this.outbox, {
+          customerId: refund.order.customerId,
+          template: 'supply_refund_completed',
+          eventKey: refund.id,
+          payload: { refundId: refund.id, orderId: refund.orderId, amount: refund.amount },
+        });
+      } else {
+        await enqueueConsentedCustomerNotice(tx, this.outbox, {
+          customerId: refund.order.customerId,
+          template: 'refund_succeeded',
+          payload: { refundId: refund.id, returnId: refund.returnId, orderId: refund.orderId, amount: refund.amount },
+          transactional: true,
+          dedupKey: `refund_succeeded:${refund.id}`,
+        });
+      }
     }
   }
 
@@ -825,12 +914,22 @@ export class RefundProcessor {
       include: { order: { select: { customerId: true } } },
     });
     if (!refund) return;
-    await enqueueConsentedCustomerNotice(tx, this.outbox, {
-      customerId: refund.order.customerId,
-      template: 'refund_failed',
-      payload: { refundId, returnId: refund.returnId, orderId: refund.orderId, amount: refund.amount },
-      transactional: true,
-    });
+    if (refund.purpose === 'customer_prepayment') {
+      await enqueueSupplyCustomerNotice(tx, this.outbox, {
+        customerId: refund.order.customerId,
+        template: 'supply_refund_failed',
+        eventKey: refund.id,
+        payload: { refundId, orderId: refund.orderId, amount: refund.amount },
+      });
+    } else {
+      await enqueueConsentedCustomerNotice(tx, this.outbox, {
+        customerId: refund.order.customerId,
+        template: 'refund_failed',
+        payload: { refundId, returnId: refund.returnId, orderId: refund.orderId, amount: refund.amount },
+        transactional: true,
+        dedupKey: `refund_failed:${refund.id}`,
+      });
+    }
   }
 
   private async recordFailure(allocationId: string, refundId: string, message: string, actor: string, attempts: number) {

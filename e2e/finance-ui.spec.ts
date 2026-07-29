@@ -9,7 +9,7 @@ test('owner submits, approves and pays an operating expense in ERP', async ({ pa
   const username = `e2e-finance-${Date.now().toString(36)}`;
   const password = 'pass-e2e';
   await prisma.staffUser.create({
-    data: { username, passwordHash: await argon2.hash(password), role: 'owner' },
+    data: { username, passwordHash: await argon2.hash(password), role: 'owner', point: 'BISHKEK-1' },
   });
 
   await page.goto('/erp');
@@ -99,7 +99,7 @@ test('owner sees the server-calculated open foreign-currency exposure in ERP', a
   const username = `e2e-fx-${Date.now().toString(36)}`;
   const password = 'pass-e2e';
   const staff = await prisma.staffUser.create({
-    data: { username, passwordHash: await argon2.hash(password), role: 'owner' },
+    data: { username, passwordHash: await argon2.hash(password), role: 'owner', point: 'BISHKEK-1' },
   });
   const rate = await prisma.accountingCurrencyRate.create({
     data: {
@@ -150,7 +150,7 @@ test('owner creates and closes an authoritative provider settlement in ERP', asy
   await resetDb();
   const username = `e2e-settlement-${Date.now().toString(36)}`;
   const password = 'pass-e2e';
-  await prisma.staffUser.create({ data: { username, passwordHash: await argon2.hash(password), role: 'owner' } });
+  await prisma.staffUser.create({ data: { username, passwordHash: await argon2.hash(password), role: 'owner', point: 'BISHKEK-1' } });
   const customer = await prisma.customer.create({ data: { phone: `+996700${Date.now().toString().slice(-6)}`, name: 'Finance UI' } });
   const order = await prisma.order.create({ data: { customerId: customer.id, status: 'paid', channel: 'web', total: 12_500, storePointCode: 'center', storePointName: 'AliStore Центр' } });
   const payment = await prisma.payment.create({ data: { orderId: order.id, amount: 12_500, method: 'qr_mbank', status: 'received', txnId: `e2e-settlement-${Date.now()}` } });

@@ -38,7 +38,7 @@ final class POSMoneyTests: XCTestCase {
         Golden(gross: 250, pct: 50, total: 125),
         Golden(gross: 350, pct: 50, total: 175),
         Golden(gross: 0, pct: 100, total: 0),
-        Golden(gross: 7, pct: 15, total: 6),
+        Golden(gross: 7, pct: 15, total: 6)
     ]
 
     func testMatchesServerTotalsExactly() {

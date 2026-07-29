@@ -8,6 +8,7 @@ import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
+import { randomUUID } from 'node:crypto';
 
 describe('HR schedules, attendance and absence (integration + RBAC)', () => {
   let app: INestApplication;
@@ -16,9 +17,13 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
   let sellerToken: string;
   let secondSellerToken: string;
   let sellerId: string;
-  const run = Math.floor(Math.random() * 1_000_000);
+  const run = `${Date.now().toString(36)}-${process.pid}-${randomUUID().slice(0, 8)}`;
   const weekStart = '2026-07-13';
+  const primaryPoint = `HR-PRIMARY-${run}`;
+  const secondaryPoint = `HR-SECONDARY-${run}`;
   const payrollPoint = `HR-PAYROLL-${run}`;
+  const attributionPoint = `${payrollPoint}-ATTR`;
+  const pointIds: string[] = [];
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -28,10 +33,26 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
     prisma = moduleRef.get(PrismaService);
+    const points = await Promise.all(
+      [primaryPoint, secondaryPoint, payrollPoint, attributionPoint].map((inventoryLocation) =>
+        prisma.storePoint.create({
+          data: {
+            code: inventoryLocation.toLowerCase(),
+            name: `${inventoryLocation} fixture`,
+            address: 'Test address',
+            inventoryLocation,
+            hours: '10:00–20:00',
+            createdBy: 'test',
+            idempotencyKey: `hr-point-${inventoryLocation}`,
+          },
+        }),
+      ),
+    );
+    pointIds.push(...points.map((point) => point.id));
     const auth = moduleRef.get(StaffAuthService);
     const session = async (role: 'owner' | 'seller', suffix: string) => {
       const username = `${role}-hr-${suffix}-${run}`;
-      const staff = await auth.createStaff(username, 'pass', role);
+      const staff = await auth.createStaff(username, 'pass', role, primaryPoint);
       return { id: staff.id, token: (await auth.login(username, 'pass')).accessToken };
     };
     ownerToken = (await session('owner', 'owner')).token;
@@ -71,13 +92,14 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
     await prisma.hrSchedule.deleteMany();
     await prisma.hrAbsence.deleteMany();
     await prisma.staffUser.deleteMany({ where: { username: { contains: `-hr-` } } });
+    await prisma.storePoint.deleteMany({ where: { id: { in: pointIds } } });
     await app.close();
   });
 
   it('runs owner schedule → self attendance → derived timesheet with ownership and idempotency', async () => {
     const payload = {
       staffId: sellerId,
-      point: 'BISHKEK-1',
+      point: primaryPoint,
       shiftDate: '2026-07-15',
       startsAt: '2026-07-15T03:00:00.000Z',
       endsAt: '2026-07-15T15:00:00.000Z',
@@ -100,7 +122,7 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
     expect(closed.body.id).toBe(opened.body.id);
 
     await prisma.hrAttendance.update({ where: { id: opened.body.id }, data: { checkedInAt: new Date('2026-07-15T03:12:00.000Z'), checkedOutAt: new Date('2026-07-15T15:25:00.000Z') } });
-    const report = await request(app.getHttpServer()).get(`/hr/week?weekStart=${weekStart}&point=BISHKEK-1`).set('Authorization', `Bearer ${ownerToken}`).expect(200);
+    const report = await request(app.getHttpServer()).get(`/hr/week?weekStart=${weekStart}&point=${primaryPoint}`).set('Authorization', `Bearer ${ownerToken}`).expect(200);
     expect(report.body.timesheet.find((row: { staffId: string }) => row.staffId === sellerId)).toMatchObject({ shifts: 1, minutes: 733, lateMinutes: 12, overtimeMinutes: 25 });
     expect(await prisma.auditEvent.count({ where: { type: { startsWith: 'hr.' }, refs: { has: sellerId } } })).toBe(3);
   });
@@ -112,20 +134,20 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
     const approved = await request(app.getHttpServer()).post(`/hr/absences/${absence.body.id}/decide`).set('Authorization', `Bearer ${ownerToken}`).send({ status: 'approved' }).expect(201);
     expect(approved.body.status).toBe('approved');
 
-    await request(app.getHttpServer()).post('/hr/schedules').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-plan-absence-${run}`).send({ staffId: sellerId, point: 'BISHKEK-1', shiftDate: '2026-07-16', startsAt: '2026-07-16T03:00:00.000Z', endsAt: '2026-07-16T15:00:00.000Z' }).expect(409);
+    await request(app.getHttpServer()).post('/hr/schedules').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-plan-absence-${run}`).send({ staffId: sellerId, point: primaryPoint, shiftDate: '2026-07-16', startsAt: '2026-07-16T03:00:00.000Z', endsAt: '2026-07-16T15:00:00.000Z' }).expect(409);
     const events = await prisma.auditEvent.findMany({ where: { refs: { has: absence.body.id } }, orderBy: { ts: 'asc' } });
     expect(events.map((event) => event.type)).toEqual(['hr.absence_requested', 'hr.absence_approved']);
   });
 
   it('lets owner edit or cancel an unstarted plan with replay protection', async () => {
     const created = await request(app.getHttpServer()).post('/hr/schedules').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-edit-plan-${run}`).send({
-      staffId: sellerId, point: 'BISHKEK-1', shiftDate: '2026-07-14', startsAt: '2026-07-14T03:00:00.000Z', endsAt: '2026-07-14T15:00:00.000Z',
+      staffId: sellerId, point: primaryPoint, shiftDate: '2026-07-14', startsAt: '2026-07-14T03:00:00.000Z', endsAt: '2026-07-14T15:00:00.000Z',
     }).expect(201);
-    const update = { point: 'BISHKEK-2', shiftDate: '2026-07-14', startsAt: '2026-07-14T04:00:00.000Z', endsAt: '2026-07-14T14:00:00.000Z' };
+    const update = { point: secondaryPoint, shiftDate: '2026-07-14', startsAt: '2026-07-14T04:00:00.000Z', endsAt: '2026-07-14T14:00:00.000Z' };
     await request(app.getHttpServer()).patch(`/hr/schedules/${created.body.id}`).set('Authorization', `Bearer ${sellerToken}`).set('Idempotency-Key', `hr-edit-${run}`).send(update).expect(403);
     const edited = await request(app.getHttpServer()).patch(`/hr/schedules/${created.body.id}`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-edit-${run}`).send(update).expect(200);
     const replay = await request(app.getHttpServer()).patch(`/hr/schedules/${created.body.id}`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-edit-${run}`).send(update).expect(200);
-    expect(edited.body).toMatchObject({ point: 'BISHKEK-2', startsAt: update.startsAt, cancelledAt: null });
+    expect(edited.body).toMatchObject({ point: secondaryPoint, startsAt: update.startsAt, cancelledAt: null });
     expect(replay.body.id).toBe(created.body.id);
 
     const cancelled = await request(app.getHttpServer()).post(`/hr/schedules/${created.body.id}/cancel`).set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `hr-cancel-${run}`).send({ reason: 'Изменение загрузки' }).expect(201);
@@ -208,7 +230,7 @@ describe('HR schedules, attendance and absence (integration + RBAC)', () => {
    * `[point, createdAt]` — выборка не нуждается в смене вообще.
    */
   it('начисляет комиссию продавцу с безналичной продажи и по факту продавшего', async () => {
-    const point = `${payrollPoint}-ATTR`;
+    const point = attributionPoint;
     const period = '2026-07';
     await prisma.hrSchedule.create({ data: {
       staffId: sellerId, point, shiftDate: new Date('2026-07-16T00:00:00.000Z'),

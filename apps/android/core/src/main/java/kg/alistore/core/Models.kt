@@ -10,6 +10,11 @@ data class Product(
   val category: String,
   val availableUnits: Int,
   val imageUrls: List<String> = emptyList(),
+  val supplyMode: String? = null,
+  val orderable: Boolean? = null,
+  val availabilityKind: String? = null,
+  val leadTimeDays: Int? = null,
+  val estimatedDeliveryDate: String? = null,
 )
 
 data class CatalogProductDetail(
@@ -108,9 +113,34 @@ data class CustomerOrder(
   val items: List<CustomerOrderItem> = emptyList(),
   val createdAt: String? = null,
   val channel: String = "web",
+  val paymentSchedule: List<OrderReceivable> = emptyList(),
+  val initialDue: Int? = null,
+  val balanceDue: Int? = null,
 )
 
-data class CustomerOrderItem(val sku: String, val qty: Int, val price: Int, val imei: String? = null)
+data class CustomerOrderItem(
+  val sku: String,
+  val qty: Int,
+  val price: Int,
+  val imei: String? = null,
+  val id: String? = null,
+  val supplyModeSnapshot: String? = null,
+  val supplyLeadDaysSnapshot: Int? = null,
+  val promisedDate: String? = null,
+  val fulfillmentStatus: String? = null,
+  val readyAt: String? = null,
+  val handedOverAt: String? = null,
+)
+
+data class OrderReceivable(
+  val id: String,
+  val orderItemId: String?,
+  val kind: String,
+  val amount: Int,
+  val settledAmount: Int,
+  val status: String,
+  val dueAt: String?,
+)
 
 data class StaffSession(
   val accessToken: String,
@@ -118,6 +148,8 @@ data class StaffSession(
   val username: String,
   val role: String,
   val totpEnabled: Boolean,
+  val point: String? = null,
+  val capabilities: Set<String> = emptySet(),
 )
 
 data class StaffPrincipal(
@@ -127,7 +159,110 @@ data class StaffPrincipal(
   val active: Boolean,
   val totpEnabled: Boolean,
   val type: String,
+  val point: String? = null,
+  val capabilities: Set<String> = emptySet(),
 )
+
+data class OrderCancellationPreview(
+  val orderId: String,
+  val canCancel: Boolean,
+  val blockedReason: String?,
+  val policy: String,
+  val purchaseOrderSent: Boolean,
+  val depositPaid: Int,
+  val estimatedRefundAmount: Int,
+  val supplierExpenseDeduction: Int,
+  val ownerReviewRequired: Boolean,
+  val note: String,
+  val requestEnabled: Boolean = false,
+  val automaticRefundEnabled: Boolean = false,
+)
+
+data class OrderCancellation(
+  val id: String,
+  val orderId: String,
+  val status: String,
+  val policySnapshot: String,
+  val requestedRefundAmount: Int,
+  val approvedRefundAmount: Int?,
+  val customerReason: String,
+  val ownerReason: String?,
+  val refundId: String?,
+)
+
+data class OwnerCancellationPreview(
+  val id: String,
+  val orderId: String,
+  val status: String,
+  val depositPaidSnapshot: Int,
+  val requestedRefundAmount: Int,
+  val canResolve: Boolean,
+  val fullRefundAmount: Int,
+)
+
+data class SupplyOperationFlags(
+  val checkoutEnabled: Boolean,
+  val cancellationEnabled: Boolean,
+  val autoRefundEnabled: Boolean,
+  val ownerResolutionEnabled: Boolean,
+)
+
+data class SupplyOperationCapabilities(
+  val financialQueuesVisible: Boolean,
+  val ownerResolutionAvailable: Boolean,
+)
+
+data class SupplyOperationRow(
+  val id: String,
+  val queue: String,
+  val orderId: String,
+  val purchaseOrderId: String?,
+  val purchaseOrderNumber: String?,
+  val status: String,
+  val amount: Int?,
+  val expectedAt: String?,
+  val sku: String?,
+  val quantity: Int?,
+  val detailHref: String,
+)
+
+data class SupplyOperationsResponse(
+  val flags: SupplyOperationFlags,
+  val capabilities: SupplyOperationCapabilities,
+  val counts: Map<String, Int>,
+  val queues: Map<String, List<SupplyOperationRow>>,
+)
+
+data class SupplyQuarantineResolution(
+  val id: String,
+  val orderLineSupplyId: String,
+  val productId: String,
+  val storePointId: String,
+  val inventoryLocationSnapshot: String,
+  val trackingModeSnapshot: String,
+  val quarantinedQty: Int,
+  val imeis: List<String>,
+  val status: String,
+  val disposition: String?,
+  val inventoryMovementId: String?,
+)
+
+object NativeSupplyPolicy {
+  private val courierReadyStates = setOf("ready", "handed_over", "customer_cancelled", "cancelled")
+
+  fun canResolveOwnerCancellation(session: StaffSession, serverCapability: Boolean): Boolean =
+    serverCapability && session.role in setOf("owner", "admin") && session.totpEnabled
+
+  fun canUsePointBoundOperations(session: StaffSession): Boolean = !session.point.isNullOrBlank()
+
+  fun canPartiallyHandOver(item: CustomerOrderItem): Boolean =
+    item.id != null && item.fulfillmentStatus in setOf("ready", "reserved")
+
+  fun allLinesReadyForCourier(order: CustomerOrder): Boolean =
+    order.items.isNotEmpty() &&
+      order.items.all { it.fulfillmentStatus in courierReadyStates } &&
+      order.paymentSchedule.all { it.status in setOf("settled", "cancelled") }
+}
 
 data class CourierCustomer(val name: String, val phone: String)
 
@@ -148,7 +283,14 @@ data class CourierDelivery(
   val items: List<CustomerOrderItem>,
   val outstandingCod: Int,
   val run: CourierRunSummary?,
-)
+) {
+  val nativeReadinessKnown: Boolean get() = items.isNotEmpty()
+  val readinessReasons: List<String> get() = if (!nativeReadinessKnown) emptyList() else items.mapNotNull { item ->
+    if (item.fulfillmentStatus in setOf("ready", "handed_over", "customer_cancelled", "cancelled")) null
+    else "${item.sku}: ${item.fulfillmentStatus ?: "статус не получен"}"
+  }
+  val canStartByNativePreflight: Boolean get() = !nativeReadinessKnown || readinessReasons.isEmpty()
+}
 
 data class PosLine(val productId: String, val sku: String, val price: Int, val qty: Int, val imei: String? = null)
 data class PosUnit(val imei: String, val productId: String, val status: String, val sku: String, val product: String, val price: Int)

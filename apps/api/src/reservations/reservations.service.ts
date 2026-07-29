@@ -55,14 +55,14 @@ export class ReservationsService {
           select: { status: true },
         });
         const activeReservations = await tx.reservation.findMany({
-          where: { orderId, active: true },
+          where: { orderId, active: true, expiresAt: { lte: now } },
           include: { quantityAllocation: true },
           orderBy: { id: 'asc' },
         });
         if (
           !lockedOrder
           || !(EXPIRABLE_ORDER_STATUSES as readonly string[]).includes(lockedOrder.status)
-          || !activeReservations.some((reservation) => reservation.expiresAt <= now)
+          || activeReservations.length === 0
         ) {
           return { result: 0, events: [] };
         }
@@ -85,9 +85,15 @@ export class ReservationsService {
         }
         const events: AuditInput[] = [];
         const order = await tx.order.findUnique({ where: { id: orderId } });
+        const expiredOrderItemIds = new Set<string>();
         for (const fresh of activeReservations) {
           await tx.reservation.update({ where: { id: fresh.id }, data: { active: false } });
           if (fresh.imei) {
+            const item = await tx.orderItem.findFirst({
+              where: { orderId: fresh.orderId, imei: fresh.imei, supplyModeSnapshot: 'own_stock' },
+              select: { id: true },
+            });
+            if (item) expiredOrderItemIds.add(item.id);
             const freed = await this.units.releaseOnTx(tx, fresh.imei, fresh.orderId);
             if (freed) {
               events.push({
@@ -101,6 +107,7 @@ export class ReservationsService {
           if (fresh.quantityAllocationId) {
             const allocation = fresh.quantityAllocation;
             if (allocation?.active) {
+              expiredOrderItemIds.add(allocation.orderItemId);
               const releasedBalance = await tx.inventoryBalance.updateMany({
                 where: { id: allocation.balanceId, reserved: { gte: allocation.qty } },
                 data: { reserved: { decrement: allocation.qty } },
@@ -136,10 +143,25 @@ export class ReservationsService {
             });
           }
         }
-        await tx.orderBundleAllocation.updateMany({
-          where: { orderId, active: true },
-          data: { active: false, releasedAt: now },
-        });
+        if (expiredOrderItemIds.size > 0) {
+          await tx.orderItem.updateMany({
+            where: {
+              id: { in: [...expiredOrderItemIds] },
+              supplyModeSnapshot: 'own_stock',
+              fulfillmentStatus: { in: ['reserved', 'ready'] },
+            },
+            data: { fulfillmentStatus: 'reservation_expired', readyAt: null },
+          });
+        }
+        const expiredImeis = activeReservations.flatMap((reservation) => (
+          reservation.imei ? [reservation.imei] : []
+        ));
+        if (expiredImeis.length > 0) {
+          await tx.orderBundleAllocation.updateMany({
+            where: { orderId, active: true, imei: { in: expiredImeis } },
+            data: { active: false, releasedAt: now },
+          });
+        }
         if (lockedOrder.status === 'reserved' || lockedOrder.status === 'awaiting_payment') {
           await tx.order.update({ where: { id: orderId }, data: { status: 'confirmed' } });
           events.push({

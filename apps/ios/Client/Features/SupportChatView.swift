@@ -197,20 +197,20 @@ struct SupportChatView: View {
     }
 
     private func botReply(to text: String) -> String {
-        let q = text.lowercased()
-        if q.contains("оператор") || q.contains("человек") || q.contains("менеджер") {
+        let normalizedText = text.lowercased()
+        if normalizedText.contains("оператор") || normalizedText.contains("человек") || normalizedText.contains("менеджер") {
             return "Передаю диалог живому оператору — обычно отвечаем в течение 2 минут. Тикет по заказу №4102 создан, вы получите ответ здесь и пушем."
         }
-        if q.contains("заказ") || q.contains("где") || q.contains("достав") || q.contains("трек") {
+        if normalizedText.contains("заказ") || normalizedText.contains("где") || normalizedText.contains("достав") || normalizedText.contains("трек") {
             return "Заказ №4102 уже собран и передан курьеру — доставим сегодня до 18:00 по Бишкеку. Отслеживание и код получения придут пушем."
         }
-        if q.contains("возврат") || q.contains("обмен") || q.contains("верну") {
+        if normalizedText.contains("возврат") || normalizedText.contains("обмен") || normalizedText.contains("верну") {
             return "Технику можно вернуть в течение 14 дней при сохранении товарного вида и комплекта. Оформить заявку — в разделе «Возвраты» в кабинете."
         }
-        if q.contains("гарант") {
+        if normalizedText.contains("гарант") {
             return "На новую технику действует 12 месяцев официальной гарантии, на Б/У — 3 месяца AliStore. Талон и статус — в разделе «Устройства»."
         }
-        if q.contains("рассроч") || q.contains("платёж") || q.contains("плати") {
+        if normalizedText.contains("рассроч") || normalizedText.contains("платёж") || normalizedText.contains("плати") {
             return "Ваш график рассрочки и следующий платёж — в разделе «Моя рассрочка». Напоминание придёт за 2 дня до списания."
         }
         return "Спасибо за сообщение! Уточню детали по заказу №4102 и вернусь с ответом — обычно это занимает пару минут."

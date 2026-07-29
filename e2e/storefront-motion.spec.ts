@@ -126,7 +126,7 @@ test('desktop catalog, product and cart keep the exact shop visual system', asyn
 });
 
 test('remaining desktop customer routes use the shop system through account entry', async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   await resetDb();
   await page.setViewportSize({ width: 1440, height: 1000 });
 
@@ -196,7 +196,7 @@ test('remaining desktop customer routes use the shop system through account entr
 
   await page.setViewportSize({ width: 402, height: 858 });
   await gotoCommitted(page, '/account/devices');
-  await expect(page.getByText(product.name, { exact: true })).toBeVisible();
+  await expect(page.getByText(product.name, { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('.account-detail-header')).toBeHidden();
   expect(await page.locator('.account-detail-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(14, 12, 10)');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(402);

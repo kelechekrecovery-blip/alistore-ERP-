@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { fetchReorder, type ReorderReport, type ReorderReview } from '@/lib/ai';
 import { ProcurementView } from './ProcurementView';
+import { SupplyOperationsQueue } from './SupplyOperationsQueue';
 
 const URGENCY_META: Record<ReorderReview['urgency'], { color: string; dot: string; label: string }> = {
   high: { color: '#FF8A7A', dot: '🔴', label: 'Срочно' },
@@ -20,11 +21,12 @@ export function ReorderView({ accessToken }: { accessToken: string }) {
     fetchReorder(accessToken).then(setReport).catch(() => setFailed(true));
   }, [accessToken]);
 
-  if (failed) return <div className="max-w-5xl"><p className="font-mono text-sm text-danger-soft">Рекомендации недоступны для этой роли.</p><ProcurementView accessToken={accessToken} /></div>;
-  if (report === null) return <div className="max-w-5xl"><p className="font-mono text-sm text-faint">Считаю потребность…</p><ProcurementView accessToken={accessToken} /></div>;
+  if (failed) return <div className="max-w-5xl"><SupplyOperationsQueue accessToken={accessToken} /><p className="font-mono text-sm text-danger-soft">Рекомендации недоступны для этой роли.</p><ProcurementView accessToken={accessToken} /></div>;
+  if (report === null) return <div className="max-w-5xl"><SupplyOperationsQueue accessToken={accessToken} /><p className="font-mono text-sm text-faint">Считаю потребность…</p><ProcurementView accessToken={accessToken} /></div>;
 
   return (
     <div className="max-w-5xl">
+      <SupplyOperationsQueue accessToken={accessToken} />
       <div className="mb-4 flex items-center gap-2.5 rounded-[14px] border border-surface-3 bg-surface px-4 py-3">
         <span className="grid h-8 w-8 place-items-center rounded-full bg-surface-2 text-base">🛒</span>
         <div>

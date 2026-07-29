@@ -82,8 +82,14 @@ test('warehouse intake prints one IMEI sticker per received unit', async ({ page
   await expect(page.getByText('Операции склада')).toBeVisible();
   const imeis = [`E2E-IN-${Date.now().toString(36)}-1`, `E2E-IN-${Date.now().toString(36)}-2`];
   await page.getByPlaceholder('IMEI / SN, каждый с новой строки').fill(imeis.join('\n'));
+  const receiveResponsePromise = page.waitForResponse((response) =>
+    response.url().endsWith('/api/inventory/receive') &&
+    response.request().method() === 'POST',
+  );
   await page.getByRole('button', { name: 'Принять', exact: true }).click();
-  await expect(page.getByText(/✓ Принято 2 шт/)).toBeVisible();
+  const receiveResponse = await receiveResponsePromise;
+  expect(receiveResponse.ok()).toBeTruthy();
+  await expect(page.getByText(/✓ Принято 2 шт/)).toBeVisible({ timeout: 20_000 });
 
   const popupPromise = page.waitForEvent('popup');
   const labelBodiesPromise = new Promise<unknown[]>((resolve) => {

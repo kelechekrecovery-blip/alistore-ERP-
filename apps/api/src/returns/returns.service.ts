@@ -198,7 +198,19 @@ export class ReturnsService {
     const order = await tx.order.findUnique({
       where: { id: ret.orderId },
       include: {
-        items: { select: { id: true, sku: true, qty: true, imei: true } },
+        items: {
+          select: {
+            id: true,
+            sku: true,
+            qty: true,
+            imei: true,
+            orderLineSupply: {
+              select: {
+                quantityAllocations: { where: { consumedAt: { not: null } } },
+              },
+            },
+          },
+        },
         bundleAllocations: { select: { id: true, orderItemId: true, componentProductId: true, imei: true } },
         quantityAllocations: { where: { consumedAt: { not: null } } },
       },
@@ -221,7 +233,6 @@ export class ReturnsService {
       const allocations = order.quantityAllocations
         .filter((allocation) => allocation.orderItemId === item.id)
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      if (allocations.length === 0) continue;
       for (const allocation of allocations) {
         if (remaining === 0) break;
         const available = allocation.qty - allocation.returnedQty;
@@ -232,6 +243,27 @@ export class ReturnsService {
           data: { returnedQty: { increment: qty } },
         });
         if (changed.count !== 1) throw new ConflictError('return_quantity_conflict', 'Остаток возврата изменён параллельно');
+        quantityByProduct.set(allocation.productId, (quantityByProduct.get(allocation.productId) ?? 0) + qty);
+        returnedQuantityAllocations.push({ id: allocation.id, productId: allocation.productId, qty });
+        remaining -= qty;
+      }
+      const supplyAllocations = (item.orderLineSupply?.quantityAllocations ?? [])
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      // Serialized items and bundle components are reconciled by IMEI below.
+      // Historical orders can legitimately have neither quantity allocation type.
+      if (allocations.length === 0 && supplyAllocations.length === 0) continue;
+      for (const allocation of supplyAllocations) {
+        if (remaining === 0) break;
+        const available = allocation.qty - allocation.returnedQty;
+        const qty = Math.min(available, remaining);
+        if (qty <= 0) continue;
+        const changed = await tx.supplyQuantityAllocation.updateMany({
+          where: { id: allocation.id, returnedQty: allocation.returnedQty },
+          data: { returnedQty: { increment: qty } },
+        });
+        if (changed.count !== 1) {
+          throw new ConflictError('return_quantity_conflict', 'Остаток поставочного возврата изменён параллельно');
+        }
         quantityByProduct.set(allocation.productId, (quantityByProduct.get(allocation.productId) ?? 0) + qty);
         returnedQuantityAllocations.push({ id: allocation.id, productId: allocation.productId, qty });
         remaining -= qty;

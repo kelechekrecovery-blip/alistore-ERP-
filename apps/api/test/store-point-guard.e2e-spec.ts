@@ -12,6 +12,7 @@ import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 describe('Store point deactivation guard (LOGIC-009)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let auth: StaffAuthService;
   let ownerToken: string;
   const run = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const suffix = run.replace(/\W/g, '').slice(-12).toUpperCase();
@@ -31,7 +32,7 @@ describe('Store point deactivation guard (LOGIC-009)', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
     prisma = moduleRef.get(PrismaService);
-    const auth = moduleRef.get(StaffAuthService);
+    auth = moduleRef.get(StaffAuthService);
     const staff = await auth.createStaff(`guard-owner-${run}`, 'pass', 'owner');
     staffId = staff.id;
     ownerToken = (await auth.login(staff.username, 'pass')).accessToken;
@@ -47,10 +48,10 @@ describe('Store point deactivation guard (LOGIC-009)', () => {
     await prisma.inventoryBalance.deleteMany({ where: { productId: { in: productIds } } });
     await prisma.product.deleteMany({ where: { id: { in: productIds } } });
     await prisma.storePointCommand.deleteMany({ where: { storePointId: { in: pointIds } } });
-    await prisma.storePoint.deleteMany({ where: { id: { in: pointIds } } });
     await prisma.storePoint.updateMany({ where: { id: 'alistore-bishkek-1' }, data: { active: true } });
     if (customerId) await prisma.customer.deleteMany({ where: { id: customerId } });
     await prisma.staffUser.deleteMany({ where: { id: staffId } });
+    await prisma.storePoint.deleteMany({ where: { id: { in: pointIds } } });
     await app.close();
   });
 
@@ -142,6 +143,8 @@ describe('Store point deactivation guard (LOGIC-009)', () => {
 
   it('always blocks deactivating the last active store point', async () => {
     const point = await createPoint('last');
+    await prisma.staffUser.update({ where: { id: staffId }, data: { point: point.inventoryLocation } });
+    ownerToken = (await auth.login(`guard-owner-${run}`, 'pass')).accessToken;
     const previouslyActive = await prisma.storePoint.findMany({
       where: { active: true, id: { not: point.id } },
       select: { id: true },

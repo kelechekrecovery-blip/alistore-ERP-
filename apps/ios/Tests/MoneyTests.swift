@@ -29,10 +29,10 @@ final class MoneyTests: XCTestCase {
     /// Результат не зависит от текущей локали процесса — это и было дефектом.
     func testIsIndependentOfCurrentLocale() {
         // Значение прибито к ru_KG внутри; проверяем стабильность результата.
-        let a = Money.som(109_900)
-        let b = Money.som(109_900)
-        XCTAssertEqual(a, b)
-        XCTAssertFalse(a.contains("KGS"), "валюта не должна печататься кодом KGS")
-        XCTAssertTrue(a.hasSuffix("сом"))
+        let firstValue = Money.som(109_900)
+        let secondValue = Money.som(109_900)
+        XCTAssertEqual(firstValue, secondValue)
+        XCTAssertFalse(firstValue.contains("KGS"), "валюта не должна печататься кодом KGS")
+        XCTAssertTrue(firstValue.hasSuffix("сом"))
     }
 }

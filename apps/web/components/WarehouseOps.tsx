@@ -3,26 +3,28 @@
 import { useEffect, useState } from 'react';
 import { fetchCatalog, inventoryCount, printServerSvgLabels, receiveInventoryBatch, receiveQuantityInventory, renderImeiLabel, requestInventoryMovement, transferQuantityInventory, transferUnit, uploadEvidenceImages, type CatalogProduct } from '@/lib/api';
 import { EvidencePicker } from './EvidencePicker';
+import { useOperationalStorePoint } from '@/lib/use-operational-store-point';
 
 /** Transfer + inventory-count operations for the warehouse console. */
 export function WarehouseOps({ accessToken, actor }: { accessToken: string; actor: string }) {
+  const { points, point, canSelect, error: pointError, loading: pointsLoading } = useOperationalStorePoint(accessToken);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [imei, setImei] = useState('');
   const [transferProductId, setTransferProductId] = useState('');
-  const [transferFrom, setTransferFrom] = useState('BISHKEK-1');
+  const [transferFrom, setTransferFrom] = useState('');
   const [transferQty, setTransferQty] = useState('');
-  const [dest, setDest] = useState('BISHKEK-2');
+  const [dest, setDest] = useState('');
   const [productId, setProductId] = useState('');
-  const [location, setLocation] = useState('BISHKEK-1');
+  const [location, setLocation] = useState('');
   const [counted, setCounted] = useState('');
   const [countScans, setCountScans] = useState('');
   const [receiveProductId, setReceiveProductId] = useState('');
-  const [receiveLocation, setReceiveLocation] = useState('BISHKEK-1');
+  const [receiveLocation, setReceiveLocation] = useState('');
   const [receiveGrade, setReceiveGrade] = useState('A');
   const [receiveImeis, setReceiveImeis] = useState('');
   const [receiveQuantity, setReceiveQuantity] = useState('');
   const [adjustProductId, setAdjustProductId] = useState('');
-  const [adjustLocation, setAdjustLocation] = useState('BISHKEK-1');
+  const [adjustLocation, setAdjustLocation] = useState('');
   const [adjustQty, setAdjustQty] = useState('');
   const [adjustType, setAdjustType] = useState<'write_off' | 'adjust'>('write_off');
   const [adjustDirection, setAdjustDirection] = useState<'increase' | 'decrease'>('decrease');
@@ -45,6 +47,13 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
       }
     });
   }, []);
+  useEffect(() => {
+    if (!point) return;
+    setTransferFrom(point);
+    setLocation(point);
+    setReceiveLocation(point);
+    setAdjustLocation(point);
+  }, [point]);
 
   function flash(m: string) {
     setMsg(m);
@@ -199,7 +208,7 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
               {products.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.trackingMode === 'quantity' ? 'количество' : 'IMEI'}</option>)}
             </select>
             <div className="flex gap-2">
-              <input value={receiveLocation} onChange={(e) => setReceiveLocation(e.target.value)} placeholder="склад" className="min-w-0 flex-1 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-faint focus:border-coral" />
+              <select aria-label="Склад приёмки" required disabled={!canSelect || pointsLoading} value={receiveLocation} onChange={(e) => setReceiveLocation(e.target.value)} className="min-w-0 flex-1 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-coral disabled:opacity-70"><option value="" disabled>Выберите склад</option>{points.map((item) => <option key={item.id} value={item.inventoryLocation}>{item.name} · {item.inventoryLocation}</option>)}</select>
               <select disabled={products.find((product) => product.id === receiveProductId)?.trackingMode === 'quantity'} value={receiveGrade} onChange={(e) => setReceiveGrade(e.target.value)} className="w-20 rounded-btn border border-surface-3 bg-surface px-2 py-2 text-sm outline-none focus:border-coral disabled:text-faint">
                 <option value="A">A</option>
                 <option value="B">B</option>
@@ -238,15 +247,15 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
             </select>
             {products.find((product) => product.id === transferProductId)?.trackingMode === 'quantity' ? (
               <div className="grid grid-cols-2 gap-2">
-                <input aria-label="Склад отправления" value={transferFrom} onChange={(e) => setTransferFrom(e.target.value)} placeholder="откуда" className="min-w-0 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-faint focus:border-coral" />
+                <select aria-label="Склад отправления" required disabled={!canSelect || pointsLoading} value={transferFrom} onChange={(e) => setTransferFrom(e.target.value)} className="min-w-0 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-coral disabled:opacity-70"><option value="" disabled>Откуда</option>{points.map((item) => <option key={item.id} value={item.inventoryLocation}>{item.name} · {item.inventoryLocation}</option>)}</select>
                 <input aria-label="Количество для перемещения" value={transferQty} onChange={(e) => setTransferQty(e.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="количество" className="min-w-0 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-faint focus:border-coral" />
               </div>
             ) : (
               <input value={imei} onChange={(e) => setImei(e.target.value)} placeholder="IMEI единицы" className="rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-faint focus:border-coral" />
             )}
             <div className="flex gap-2">
-              <input aria-label="Склад назначения" value={dest} onChange={(e) => setDest(e.target.value)} placeholder="куда (склад)" className="flex-1 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-faint focus:border-coral" />
-              <button type="button" disabled={busy === 'transfer'} onClick={doTransfer} className="rounded-btn bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-deep disabled:bg-surface-3">Переместить</button>
+              <select aria-label="Склад назначения" required disabled={pointsLoading} value={dest} onChange={(e) => setDest(e.target.value)} className="flex-1 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-coral disabled:opacity-70"><option value="" disabled>Куда</option>{points.map((item) => <option key={item.id} value={item.inventoryLocation}>{item.name} · {item.inventoryLocation}</option>)}</select>
+              <button type="button" disabled={busy === 'transfer' || !dest || Boolean(pointError)} onClick={doTransfer} className="rounded-btn bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-deep disabled:bg-surface-3">Переместить</button>
             </div>
             <EvidencePicker files={transferFiles} onChange={setTransferFiles} label="Фото перемещения" hint="Коробка, IMEI или полка" max={3} />
           </div>
@@ -269,7 +278,7 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
               </select>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <input aria-label="Склад корректировки" value={adjustLocation} onChange={(e) => setAdjustLocation(e.target.value)} placeholder="склад" className="min-w-0 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-faint focus:border-coral" />
+              <select aria-label="Склад корректировки" required disabled={!canSelect || pointsLoading} value={adjustLocation} onChange={(e) => setAdjustLocation(e.target.value)} className="min-w-0 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-coral disabled:opacity-70"><option value="" disabled>Выберите склад</option>{points.map((item) => <option key={item.id} value={item.inventoryLocation}>{item.name} · {item.inventoryLocation}</option>)}</select>
               <input aria-label="Количество корректировки" value={adjustQty} onChange={(e) => setAdjustQty(e.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="количество" className="min-w-0 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-faint focus:border-coral" />
             </div>
             <input aria-label="Причина корректировки" value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} placeholder="причина и основание" className="rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-faint focus:border-coral" />
@@ -284,7 +293,7 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
               {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <div className="flex gap-2">
-              <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="склад" className="w-28 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-faint focus:border-coral" />
+              <select aria-label="Склад инвентаризации" required disabled={!canSelect || pointsLoading} value={location} onChange={(e) => setLocation(e.target.value)} className="w-48 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-coral disabled:opacity-70"><option value="" disabled>Выберите склад</option>{points.map((item) => <option key={item.id} value={item.inventoryLocation}>{item.name} · {item.inventoryLocation}</option>)}</select>
               <input value={counted} onChange={(e) => setCounted(e.target.value.replace(/\D/g, ''))} placeholder="факт" inputMode="numeric" className="w-20 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-faint focus:border-coral" />
               <button type="button" disabled={busy === 'count'} onClick={doCount} className="flex-1 rounded-btn bg-lime px-4 py-2 text-sm font-semibold text-lime-ink transition hover:bg-lime-dark disabled:bg-surface-3">Записать</button>
             </div>

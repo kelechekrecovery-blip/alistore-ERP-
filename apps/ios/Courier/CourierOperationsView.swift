@@ -276,8 +276,7 @@ private struct CourierRouteView: View {
                 Text("\(deliveries.filter { $0.status != "delivered" }.count) активных доставок")
                     .foregroundStyle(courierMuted)
                 if let message { Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(courierCoral) }
-                if isLoading { ProgressView().tint(courierLime).frame(maxWidth: .infinity).padding(.top, 60) }
-                else if deliveries.isEmpty {
+                if isLoading { ProgressView().tint(courierLime).frame(maxWidth: .infinity).padding(.top, 60) } else if deliveries.isEmpty {
                     ContentUnavailableView("Маршрут пуст", systemImage: "map", description: Text("Новые назначения появятся после диспетчеризации."))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
@@ -345,6 +344,15 @@ private struct CourierDeliveryCard: View {
                 .font(.caption)
                 .foregroundStyle(courierCoral)
             }
+            if delivery.nativeReadinessKnown, !delivery.readinessReasons.isEmpty {
+                Text("Нельзя начинать: \(delivery.readinessReasons.joined(separator: " · "))")
+                    .font(.caption)
+                    .foregroundStyle(courierCoral)
+            } else if !delivery.nativeReadinessKnown {
+                Text("Состав строк не передан; готовность повторно проверит сервер.")
+                    .font(.caption)
+                    .foregroundStyle(courierMuted)
+            }
 
             HStack(spacing: 8) {
                 Button("Маршрут", systemImage: "map") { openMap() }.buttonStyle(.bordered).frame(maxWidth: .infinity)
@@ -353,7 +361,7 @@ private struct CourierDeliveryCard: View {
             .tint(.white)
 
             if delivery.status == "courier_assigned" {
-                primaryButton("Начать доставку") {
+                primaryButton("Начать доставку", disabled: !delivery.canStartByNativePreflight) {
                     await execute(endpoint: "courier/orders/\(delivery.id)/start", body: EmptyMutationRequest())
                 }
             } else if delivery.status == "out_for_delivery" {
@@ -543,8 +551,7 @@ private struct CourierEvidenceView: View {
         .onChange(of: selectedPhoto) { _, item in
             guard let item else { return }
             Task {
-                do { imageData = try await item.loadTransferable(type: Data.self); message = "Фото готово" }
-                catch { message = error.localizedDescription }
+                do { imageData = try await item.loadTransferable(type: Data.self); message = "Фото готово" } catch { message = error.localizedDescription }
             }
         }
     }

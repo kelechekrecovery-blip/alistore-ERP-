@@ -1,3 +1,5 @@
+// Legacy composition root: structural extraction is tracked separately from release fixes.
+// swiftlint:disable file_length type_body_length function_body_length line_length
 import AliStoreCore
 import AuthenticationServices
 import PhotosUI
@@ -173,7 +175,7 @@ private struct ClientHeader: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 6) {
-                Label("Бишкек", systemImage: "mappin.fill")
+                Label("Магазины AliStore", systemImage: "mappin.fill")
                     .font(ClientTheme.body(12, weight: .medium))
                     .foregroundStyle(ClientTheme.muted)
                 Spacer()
@@ -513,9 +515,9 @@ private struct ClientLoginView: View {
     /// адрес всё равно подтверждается письмом.
     private var isPlausibleEmail: Bool {
         let value = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard value.count <= 254, let at = value.firstIndex(of: "@") else { return false }
-        let local = value[value.startIndex..<at]
-        let domain = value[value.index(after: at)...]
+        guard value.count <= 254, let separatorIndex = value.firstIndex(of: "@") else { return false }
+        let local = value[value.startIndex..<separatorIndex]
+        let domain = value[value.index(after: separatorIndex)...]
         return !local.isEmpty
             && !domain.isEmpty
             && domain.contains(".")
@@ -760,13 +762,15 @@ private struct ClientOverlayView: View {
         )
         switch notification.route {
         case "order" where notification.referenceId != nil:
-            NavigationLink {
-                ClientNotificationOrderView(environment: environment, auth: auth, orderId: notification.referenceId!, products: products, cart: $cart)
-            } label: {
-                row
+            if let orderId = notification.referenceId {
+                NavigationLink {
+                    ClientNotificationOrderView(environment: environment, auth: auth, orderId: orderId, products: products, cart: $cart)
+                } label: {
+                    row
+                }
+                .buttonStyle(.plain)
+                .simultaneousGesture(TapGesture().onEnded { markNotificationRead(notification) })
             }
-            .buttonStyle(.plain)
-            .simultaneousGesture(TapGesture().onEnded { markNotificationRead(notification) })
         case "warranty":
             NavigationLink {
                 DevicesView(environment: environment, auth: auth)
@@ -1265,7 +1269,7 @@ private struct ClientRootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .alistoreAPNsFailure)) { notification in
             pushStatus = notification.object as? String ?? "APNs registration failed"
         }
-        .onReceive(NotificationCenter.default.publisher(for: .alistorePushRoute)) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .alistorePushRoute)) { _ in
             guard auth.session != nil else { return }
             selectedTab = .account
             orderRefreshRevision += 1
@@ -1320,7 +1324,7 @@ private struct ClientRootView: View {
                 favorites = ["ui-product-iphone", "ui-product-macbook"]
                 compared = ["ui-product-iphone", "ui-product-samsung", "ui-product-macbook"]
             }
-            if (UITestBootstrap.startsAtCheckout || UITestBootstrap.startsAtCart), let product = products.first {
+            if UITestBootstrap.startsAtCheckout || UITestBootstrap.startsAtCart, let product = products.first {
                 cart[product.id] = 1
             }
             catalogError = nil
@@ -1620,6 +1624,25 @@ private struct CartView: View {
     private var selectedDeliverySlot: DeliverySlot? { selectedDeliveryZone?.slots.first(where: { $0.id == selectedDeliverySlotId }) }
     private var managedCourierDelivery: Bool { fulfillment == "courier" && !deliveryZones.isEmpty }
     private var deliveryFee: Int { fulfillment == "courier" ? selectedDeliveryZone?.fee ?? 200 : 0 }
+    private var courierDetail: String {
+        guard let zone = selectedDeliveryZone else {
+            return deliveryZones.isEmpty ? "Условия будут рассчитаны при оформлении" : "Выберите зону доставки"
+        }
+        let eta: String
+        switch (zone.etaMinMinutes, zone.etaMaxMinutes) {
+        case let (minimum?, maximum?) where minimum == maximum:
+            eta = "около \(minimum) мин."
+        case let (minimum?, maximum?):
+            eta = "\(minimum)–\(maximum) мин."
+        case let (minimum?, nil):
+            eta = "от \(minimum) мин."
+        case let (nil, maximum?):
+            eta = "до \(maximum) мин."
+        default:
+            eta = "доступные интервалы — на следующем шаге"
+        }
+        return "\(zone.name) · \(eta)"
+    }
     private var bonusDiscount: Int { bonusApplied ? min(max(total - promoDiscount, 0), loyaltyBalance) : 0 }
     private var payable: Int { total - promoDiscount - bonusDiscount + deliveryFee }
 
@@ -1808,12 +1831,18 @@ private struct CartView: View {
             case .delivery:
                 Text("Способ получения").font(ClientTheme.display(16, weight: .bold)).foregroundStyle(.white)
                 ClientChoiceRow(symbol: "building.2.fill", title: "Самовывоз", detail: "Заберите сегодня из магазина", trailing: "бесплатно", selected: fulfillment == "pickup") { fulfillment = "pickup" }
-                ClientChoiceRow(symbol: "bolt.fill", title: "Курьер", detail: "Доставка по Бишкеку за 1–2 часа", trailing: "от 200 сом", selected: fulfillment == "courier") { fulfillment = "courier" }
+                ClientChoiceRow(
+                    symbol: "bolt.fill",
+                    title: "Курьер",
+                    detail: courierDetail,
+                    trailing: selectedDeliveryZone.map { Money.som($0.fee) },
+                    selected: fulfillment == "courier"
+                ) { fulfillment = "courier" }
             case .address:
                 Text("Контакты и адрес").font(ClientTheme.display(16, weight: .bold)).foregroundStyle(.white)
                 ClientReadOnlyField(title: "Телефон", value: auth.session?.phone ?? "Войдите в аккаунт", monospaced: true)
                 if fulfillment == "courier" {
-                    ClientInputField(title: "Адрес доставки", text: $address, placeholder: "г. Бишкек, улица, дом")
+                    ClientInputField(title: "Адрес доставки", text: $address, placeholder: "Город, улица, дом")
                     if managedCourierDelivery {
                         Text("Зона доставки").font(ClientTheme.body(11, weight: .medium)).foregroundStyle(ClientTheme.muted)
                         ForEach(deliveryZones) { zone in
@@ -2098,53 +2127,17 @@ private struct CartView: View {
                 : selectedDeliverySlot.map { slotLabel($0) }
         )
         let idempotencyKey = UUID().uuidString
-        // Подарочная карта: покрытие проверяем ДО создания заказа. Либо карта
-        // закрывает заказ целиком, либо не оформляем — полуоплаченный заказ создавать
-        // нельзя. Само списание считает сервер, здесь только предпроверка.
-        if paymentMethod == "gift_card" {
-            let code = giftCardCode.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !code.isEmpty else {
-                errorMessage = "Введите код подарочной карты."
-                return
-            }
-            do {
-                let card = try await GiftCardCheckout(environment: environment).lookup(code: code)
-                guard card.redeemable, card.balance >= payable else {
-                    errorMessage = "На карте \(Money.som(card.balance)), а к оплате \(Money.som(payable)). Пополните карту или выберите другой способ."
-                    return
-                }
-            } catch {
-                errorMessage = "Не удалось проверить подарочную карту: \(error.localizedDescription)"
-                return
-            }
-        }
+        guard await giftCardCanCoverOrder() else { return }
         // Создание заказа и запуск оплаты — две разные операции, и раньше они
         // стояли под одним `catch`. Если заказ создавался, а оплата падала по
         // сети, покупатель читал «сохранено офлайн» про уже существующий заказ,
         // `completedOrder` не выставлялся — и работающая кнопка повторной оплаты
         // становилась недостижимой. Заказ висел неоплаченным.
-        let order: CustomerOrder
-        do {
-            order = try await APIClient(baseURL: environment.apiBaseURL).post(
-                "orders/mine",
-                body: request,
-                token: session.accessToken,
-                idempotencyKey: idempotencyKey
-            )
-        } catch {
-            guard error is URLError else {
-                errorMessage = error.localizedDescription
-                return
-            }
-            do {
-                try OfflineOrderQueue.enqueue(request, idempotencyKey: idempotencyKey, context: modelContext)
-                queuedOffline = true
-                cart.removeAll()
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-            return
-        }
+        guard let order = await createOrder(
+            request,
+            token: session.accessToken,
+            idempotencyKey: idempotencyKey
+        ) else { return }
 
         // С этого места заказ существует на сервере. Офлайн-очередь здесь уже
         // неуместна: повторять нечего, платить — есть чем.
@@ -2186,6 +2179,58 @@ private struct CartView: View {
             )
         } catch {
             retryErrorMessage = "Заказ создан, но оплата не началась. Повторите оплату — заказ не потерян."
+        }
+    }
+
+    /// Подарочная карта должна покрывать заказ полностью до его создания.
+    /// Сервер остаётся источником истины и повторно проверяет баланс при списании.
+    private func giftCardCanCoverOrder() async -> Bool {
+        guard paymentMethod == "gift_card" else { return true }
+        let code = giftCardCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty else {
+            errorMessage = "Введите код подарочной карты."
+            return false
+        }
+        do {
+            let card = try await GiftCardCheckout(environment: environment).lookup(code: code)
+            guard card.redeemable, card.balance >= payable else {
+                errorMessage = "На карте \(Money.som(card.balance)), а к оплате \(Money.som(payable)). Пополните карту или выберите другой способ."
+                return false
+            }
+            return true
+        } catch {
+            errorMessage = "Не удалось проверить подарочную карту: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    /// Сетевая ошибка до подтверждённого создания безопасно уходит в offline
+    /// queue. Любая серверная ошибка остаётся видимой и не дублирует заказ.
+    private func createOrder(
+        _ request: CreateOrderRequest,
+        token: String,
+        idempotencyKey: String
+    ) async -> CustomerOrder? {
+        do {
+            return try await APIClient(baseURL: environment.apiBaseURL).post(
+                "orders/mine",
+                body: request,
+                token: token,
+                idempotencyKey: idempotencyKey
+            )
+        } catch {
+            guard error is URLError else {
+                errorMessage = error.localizedDescription
+                return nil
+            }
+            do {
+                try OfflineOrderQueue.enqueue(request, idempotencyKey: idempotencyKey, context: modelContext)
+                queuedOffline = true
+                cart.removeAll()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            return nil
         }
     }
 
@@ -2424,6 +2469,11 @@ private struct ClientOrderStatusView: View {
     @State private var repeatMessage: String?
     @State private var repeatFailed = false
     @State private var ledger: [OrderLedgerEvent]?
+    @State private var cancellationPreview: OrderCancellationPreview?
+    @State private var cancellation: OrderCancellation?
+    @State private var cancellationReason = ""
+    @State private var isRequestingCancellation = false
+    @State private var cancellationError: String?
 
     private let stepIcons = ["checkmark.circle", "creditcard", "shippingbox", "truck.box", "house"]
 
@@ -2513,6 +2563,46 @@ private struct ClientOrderStatusView: View {
                     .padding(18)
                     .glass(radius: 16)
                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(Array(order.items.enumerated()), id: \.offset) { _, item in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("\(item.sku) · \(item.qty) шт.")
+                                    .font(ClientTheme.body(13, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Text(nativeSupplyStatusLabel(item.fulfillmentStatus))
+                                    .font(ClientTheme.body(11))
+                                    .foregroundStyle(ClientTheme.lime)
+                                if let promisedDate = item.promisedDate {
+                                    Text("Обещанная дата: \(promisedDate.formatted(date: .abbreviated, time: .omitted))")
+                                        .font(ClientTheme.body(11))
+                                        .foregroundStyle(ClientTheme.muted)
+                                }
+                            }
+                        }
+                        if let schedule = order.paymentSchedule, !schedule.isEmpty {
+                            Divider().overlay(ClientTheme.line)
+                            Text("График оплаты")
+                                .font(ClientTheme.body(13, weight: .bold))
+                                .foregroundStyle(.white)
+                            ForEach(schedule) { receivable in
+                                Text("\(nativeReceivableLabel(receivable.kind)): \(Money.som(receivable.settledAmount)) / \(Money.som(receivable.amount)) · \(receivable.status)")
+                                    .font(ClientTheme.body(11))
+                                    .foregroundStyle(ClientTheme.muted)
+                            }
+                        }
+                        if let cancellation {
+                            Divider().overlay(ClientTheme.line)
+                            Text("Отмена/возврат: \(cancellation.status)")
+                                .font(ClientTheme.body(12, weight: .bold))
+                                .foregroundStyle(ClientTheme.coral)
+                            Text(Money.som(cancellation.approvedRefundAmount ?? cancellation.requestedRefundAmount))
+                                .font(ClientTheme.body(11))
+                                .foregroundStyle(ClientTheme.muted)
+                        }
+                    }
+                    .padding(16)
+                    .glass(radius: 16)
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 8)], spacing: 8) {
                         NavigationLink {
                             ClientReceiptView(environment: environment, auth: auth, order: order)
@@ -2539,9 +2629,17 @@ private struct ClientOrderStatusView: View {
                         .accessibilityIdentifier("order-status-whatsapp")
 
                         Button {
-                            showCancelConfirm = true
+                            if cancellation == nil, cancellationPreview?.requestEnabled == true, cancellationPreview?.canCancel == true {
+                                showCancelConfirm = true
+                            } else {
+                                showSupport = true
+                            }
                         } label: {
-                            ClientStatusAction(symbol: "xmark.circle", title: "Отменить", tint: ClientTheme.coral)
+                            ClientStatusAction(
+                                symbol: "xmark.circle",
+                                title: cancellation == nil ? "Отменить" : "Отмена отправлена",
+                                tint: ClientTheme.coral
+                            )
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("order-status-cancel")
@@ -2578,17 +2676,33 @@ private struct ClientOrderStatusView: View {
                     Button("Закрыть") { dismiss() }
                 }
             }
-            .confirmationDialog(
-                "Отменить заказ?",
-                isPresented: $showCancelConfirm,
-                titleVisibility: .visible
-            ) {
-                Button("Написать в поддержку") {
-                    showSupport = true
+            .sheet(isPresented: $showCancelConfirm) {
+                NavigationStack {
+                    Form {
+                        if let preview = cancellationPreview {
+                            Section("Предварительный расчёт") {
+                                LabeledContent("Возврат", value: Money.som(preview.estimatedRefundAmount))
+                                LabeledContent("Политика", value: preview.ownerReviewRequired ? "Решение владельца" : "Автоматический возврат")
+                                Text(preview.note)
+                            }
+                        }
+                        Section("Причина") {
+                            TextField("Почему вы хотите отменить заказ", text: $cancellationReason, axis: .vertical)
+                            if let cancellationError { Text(cancellationError).foregroundStyle(ClientTheme.coral) }
+                        }
+                        Button(isRequestingCancellation ? "Отправляем…" : "Отправить запрос") {
+                            Task { await requestCancellation() }
+                        }
+                        .disabled(isRequestingCancellation || cancellationReason.trimmingCharacters(in: .whitespacesAndNewlines).count < 3)
+                    }
+                    .navigationTitle("Отмена заказа")
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Закрыть") { showCancelConfirm = false }
+                        }
+                    }
                 }
-                Button("Оставить заказ", role: .cancel) {}
-            } message: {
-                Text("Самостоятельная отмена в приложении недоступна: заказ отменяет поддержка после проверки статуса. Если заказ ещё собирается, деньги вернутся на счёт после подтверждения.")
+                .preferredColorScheme(.dark)
             }
             .sheet(isPresented: $showSupport) {
                 NavigationStack {
@@ -2600,7 +2714,11 @@ private struct ClientOrderStatusView: View {
         }
         .tint(ClientTheme.lime)
         .preferredColorScheme(.dark)
-        .task { await loadLedger() }
+        .task {
+            async let ledgerTask: Void = loadLedger()
+            async let cancellationTask: Void = loadCancellation()
+            _ = await (ledgerTask, cancellationTask)
+        }
     }
 
     @MainActor
@@ -2614,6 +2732,34 @@ private struct ClientOrderStatusView: View {
 #endif
         // A failed ledger read keeps the status-based timeline without timestamps.
         ledger = try? await APIClient(baseURL: environment.apiBaseURL).get("orders/\(order.id)/ledger", token: token)
+    }
+
+    @MainActor
+    private func loadCancellation() async {
+        guard let token = auth.session?.accessToken else { return }
+        let api = APIClient(baseURL: environment.apiBaseURL)
+        cancellationPreview = try? await api.get("orders/mine/\(order.id)/cancellation-preview", token: token)
+        let current: OrderCancellation? = try? await api.get("orders/mine/\(order.id)/cancellations/current", token: token)
+        cancellation = current
+    }
+
+    @MainActor
+    private func requestCancellation() async {
+        guard let token = auth.session?.accessToken else { return }
+        isRequestingCancellation = true
+        cancellationError = nil
+        defer { isRequestingCancellation = false }
+        do {
+            cancellation = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "orders/mine/\(order.id)/cancellations",
+                body: CreateOrderCancellationRequest(reason: cancellationReason.trimmingCharacters(in: .whitespacesAndNewlines)),
+                token: token,
+                idempotencyKey: UUID().uuidString
+            )
+            showCancelConfirm = false
+        } catch {
+            cancellationError = error.localizedDescription
+        }
     }
 
     /// Re-adds the order's real positions (orders/mine items) to the cart,
@@ -2789,6 +2935,31 @@ private struct ClientStatusAction: View {
         .frame(maxWidth: .infinity, minHeight: 44)
         .glass(radius: 11)
         .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+    }
+}
+
+private func nativeSupplyStatusLabel(_ status: String?) -> String {
+    switch status {
+    case "awaiting_deposit": "Ожидает задатка"
+    case "procurement_draft": "Закупка проверяется"
+    case "supplier_ordered": "Заказан поставщику"
+    case "in_transit": "В пути"
+    case "received", "quality_check": "Поступил, проверяем"
+    case "ready": "Готов"
+    case "handed_over": "Выдан"
+    case "quarantined": "На решении владельца"
+    case "customer_cancelled", "cancelled": "Отменён"
+    default: status ?? "Обрабатывается"
+    }
+}
+
+private func nativeReceivableLabel(_ kind: String) -> String {
+    switch kind {
+    case "supply_deposit": "Задаток"
+    case "stock_sale": "Складской товар"
+    case "supply_balance": "Остаток заказного товара"
+    case "delivery": "Доставка"
+    default: kind
     }
 }
 
@@ -2970,10 +3141,10 @@ private enum ClientUIFixture {
 
     /// Fixture ledger for ui-order-2401 (ready_for_pickup): four steps done, pickup pending.
     static let orderLedger: [OrderLedgerEvent] = [
-        OrderLedgerEvent(id: "ui-ledger-4", type: "order.packed", actor: "ui-staff", ts: referenceDate.addingTimeInterval(7_800)),
-        OrderLedgerEvent(id: "ui-ledger-3", type: "order.picking", actor: "ui-staff", ts: referenceDate.addingTimeInterval(4_200)),
-        OrderLedgerEvent(id: "ui-ledger-2", type: "payment.received", actor: "ui-customer", ts: referenceDate.addingTimeInterval(60)),
-        OrderLedgerEvent(id: "ui-ledger-1", type: "order.created", actor: "ui-customer", ts: referenceDate)
+        OrderLedgerEvent(id: "ui-ledger-4", type: "order.packed", actor: "ui-staff", timestamp: referenceDate.addingTimeInterval(7_800)),
+        OrderLedgerEvent(id: "ui-ledger-3", type: "order.picking", actor: "ui-staff", timestamp: referenceDate.addingTimeInterval(4_200)),
+        OrderLedgerEvent(id: "ui-ledger-2", type: "payment.received", actor: "ui-customer", timestamp: referenceDate.addingTimeInterval(60)),
+        OrderLedgerEvent(id: "ui-ledger-1", type: "order.created", actor: "ui-customer", timestamp: referenceDate)
     ]
 
     static let notifications: [CustomerNotification] = [
@@ -3420,16 +3591,17 @@ private struct CustomerReturnRequestView: View {
                             .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
                             .accessibilityIdentifier("return-reason-details")
                     }
+                    let hasSelectedPhoto = selectedPhoto != nil
                     PhotosPicker(selection: $selectedPhoto, matching: .images, photoLibrary: .shared()) {
                         Label(
-                            selectedPhoto == nil ? "Добавить фото состояния" : "Фото выбрано",
-                            systemImage: selectedPhoto == nil ? "camera.fill" : "checkmark.circle.fill"
+                            hasSelectedPhoto ? "Фото выбрано" : "Добавить фото состояния",
+                            systemImage: hasSelectedPhoto ? "checkmark.circle.fill" : "camera.fill"
                         )
                         .font(ClientTheme.body(12, weight: .semibold))
-                        .foregroundStyle(selectedPhoto == nil ? ClientTheme.muted : ClientTheme.lime)
+                        .foregroundStyle(hasSelectedPhoto ? ClientTheme.lime : ClientTheme.muted)
                         .frame(maxWidth: .infinity, minHeight: 52)
                         .glass(radius: 11)
-                        .overlay(RoundedRectangle(cornerRadius: 11).stroke(selectedPhoto == nil ? ClientTheme.line : ClientTheme.lime, style: StrokeStyle(lineWidth: 1, dash: selectedPhoto == nil ? [5, 4] : [])))
+                        .overlay(RoundedRectangle(cornerRadius: 11).stroke(hasSelectedPhoto ? ClientTheme.lime : ClientTheme.line, style: StrokeStyle(lineWidth: 1, dash: hasSelectedPhoto ? [] : [5, 4])))
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("return-photo-picker")
@@ -3894,8 +4066,7 @@ private struct CustomerTradeInFormView: View {
                     Button { Task { await submit() } } label: {
                         HStack {
                             Spacer()
-                            if isSubmitting { ProgressView().tint(.black) }
-                            else { Text("Создать оценку") }
+                            if isSubmitting { ProgressView().tint(.black) } else { Text("Создать оценку") }
                             Spacer()
                         }
                         .font(ClientTheme.body(15, weight: .bold))
@@ -4378,7 +4549,7 @@ private struct AccountMenuTile<Destination: View>: View {
     let title: String
     let detail: String
     let symbol: String
-    var badge: String? = nil
+    var badge: String?
     @ViewBuilder let destination: () -> Destination
 
     var body: some View {
@@ -5026,9 +5197,9 @@ private struct CustomerSettingsView: View {
     private var canSubmitEmail: Bool {
         if emailRequested { return emailCode.filter(\.isNumber).count == 6 }
         let value = emailInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard value.count <= 254, let at = value.firstIndex(of: "@") else { return false }
-        let domain = value[value.index(after: at)...]
-        return at != value.startIndex && domain.contains(".") && !value.contains(" ")
+        guard value.count <= 254, let separatorIndex = value.firstIndex(of: "@") else { return false }
+        let domain = value[value.index(after: separatorIndex)...]
+        return separatorIndex != value.startIndex && domain.contains(".") && !value.contains(" ")
     }
 
     private func attachEmail() async {
@@ -5037,12 +5208,12 @@ private struct CustomerSettingsView: View {
             return
         }
         if emailRequested {
-            let ok = await auth.confirmEmailAttach(
+            let attachmentConfirmed = await auth.confirmEmailAttach(
                 email: emailInput,
                 code: emailCode.filter(\.isNumber),
                 token: token
             )
-            if ok {
+            if attachmentConfirmed {
                 attachedEmail = CustomerAuthStore.normalizedEmail(emailInput)
                 emailRequested = false
                 emailCode = ""
@@ -6223,7 +6394,6 @@ private struct ClientHomeView: View {
     @Binding var favorites: Set<String>
     let openCatalog: () -> Void
 
-
     private let categories = [("Смартфоны", "iphone"), ("Ноутбуки", "laptopcomputer"), ("Аудио", "airpodsmax"), ("Часы", "applewatch"), ("Планшеты", "ipad")]
 
     // «Для вас» — client-side ranking by favourite-category affinity, then availability.
@@ -6248,7 +6418,7 @@ private struct ClientHomeView: View {
                         // в checkout-options. Пока они не прочитаны с сервера, обещать
                         // «1–2 часа» и «бесплатно» нельзя: это тот же класс, за который
                         // Apple отклоняла сборку дважды.
-                        ServiceCard(title: "Доставка", detail: "по Бишкеку", symbol: "bolt.fill", highlighted: true)
+                        ServiceCard(title: "Доставка", detail: "условия при оформлении", symbol: "bolt.fill", highlighted: true)
                         ServiceCard(title: "Самовывоз", detail: "из магазина", symbol: "building.2")
                         ServiceCard(title: "Trade-in", detail: "обмен старого", symbol: "arrow.triangle.2.circlepath")
                     }
@@ -6527,7 +6697,7 @@ private struct ProductDetail: View {
                     }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
                         ProductTrustCell(symbol: "shield.checkered", text: "Гарантия 12 мес")
-                        ProductTrustCell(symbol: "bolt.fill", text: "Доставка 1–2 ч")
+                        ProductTrustCell(symbol: "bolt.fill", text: "Срок и стоимость — при оформлении")
                         ProductTrustCell(symbol: "building.2.fill", text: "Самовывоз сегодня")
                         ProductTrustCell(symbol: "arrow.uturn.left", text: "Возврат 14 дней")
                     }

@@ -41,6 +41,7 @@ describe('Staff admin lifecycle: role change, reactivation, password reset', () 
 
   afterAll(async () => {
     await prisma.auditEvent.deleteMany({ where: { type: { in: ['staff.role_changed', 'staff.reactivated', 'staff.password_reset'] } } });
+    await prisma.outboxMessage.deleteMany({ where: { id: { startsWith: `tg-outbox-${RUN}` } } });
     await prisma.refreshToken.deleteMany({ where: { customerId: { contains: RUN } } });
     await prisma.staffUser.deleteMany({ where: { username: { startsWith: RUN } } });
     await app.close();
@@ -117,13 +118,54 @@ describe('Staff admin lifecycle: role change, reactivation, password reset', () 
 
   it('owner reactivates a deactivated account, idempotently', async () => {
     const target = await makeStaff('rehire');
+    const identity = await prisma.telegramAgentIdentity.create({
+      data: {
+        telegramUserId: `tg-user-${RUN}`,
+        chatId: `tg-chat-${RUN}`,
+        kind: 'staff',
+        staffId: target.id,
+      },
+    });
+    await prisma.telegramAgentPairing.create({
+      data: {
+        staffId: target.id,
+        codeHash: `pairing-${RUN}`,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    const outboxId = `tg-outbox-${RUN}`;
+    await prisma.outboxMessage.create({
+      data: {
+        id: outboxId,
+        channel: 'telegram',
+        recipient: identity.chatId,
+        template: 'telegram_agent_reply',
+        payload: { message: 'sensitive staff data' },
+      },
+    });
     await staffAuth.deactivateStaff('test-admin', target.id);
+    expect(await prisma.telegramAgentIdentity.findUniqueOrThrow({
+      where: { id: identity.id },
+    })).toMatchObject({ active: false });
+    expect(await prisma.telegramAgentPairing.count({
+      where: { staffId: target.id, usedAt: null },
+    })).toBe(0);
+    expect(await prisma.outboxMessage.findUniqueOrThrow({
+      where: { id: outboxId },
+    })).toMatchObject({
+      status: 'cancelled',
+      recipient: `revoked:${identity.id}`,
+      payload: { redacted: true, reason: 'staff_deactivated' },
+    });
 
     const res = await request(app.getHttpServer())
       .post(`/staff-auth/staff/${target.id}/reactivate`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .expect(201);
     expect(res.body.active).toBe(true);
+    expect(await prisma.telegramAgentIdentity.findUniqueOrThrow({
+      where: { id: identity.id },
+    })).toMatchObject({ active: false });
 
     // Second call is a no-op, and exactly one ledger event exists.
     await request(app.getHttpServer())

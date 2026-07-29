@@ -8,10 +8,12 @@ import {
   createB2BQuote,
   fetchBusinessProfile,
   fetchCatalog,
+  fetchCheckoutOptions,
   fetchMyB2BQuotes,
   saveBusinessProfile,
   type B2BQuote,
   type CatalogProduct,
+  type StorePoint,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { som } from '@/lib/format';
@@ -39,6 +41,8 @@ export default function B2BPage() {
   const [lines, setLines] = useState([{ sku: '', qty: '10', targetPrice: '' }]);
   const [paymentIntent, setPaymentIntent] = useState<'invoice' | 'bank_transfer'>('invoice');
   const [fulfillmentType, setFulfillmentType] = useState<'delivery' | 'pickup'>('delivery');
+  const [pickupPoints, setPickupPoints] = useState<StorePoint[]>([]);
+  const [pickupPoint, setPickupPoint] = useState('');
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -54,7 +58,8 @@ export default function B2BPage() {
       authed(fetchBusinessProfile),
       authed(fetchMyB2BQuotes),
       fetchCatalog({ limit: 100 }),
-    ]).then(([saved, mine, catalog]) => {
+      fetchCheckoutOptions(new Date().toISOString().slice(0, 10)),
+    ]).then(([saved, mine, catalog, logistics]) => {
       if (cancelled) return;
       if (saved) {
         setProfile({
@@ -67,6 +72,7 @@ export default function B2BPage() {
       }
       setQuotes(mine);
       setProducts(catalog.items);
+      setPickupPoints(logistics.pickupPoints);
       setLines((current) => current.map((line, index) => ({
         ...line,
         sku: line.sku || (index === 0 ? catalog.items[0]?.sku : '') || '',
@@ -89,7 +95,7 @@ export default function B2BPage() {
         paymentIntent,
         fulfillmentType,
         deliveryAddress: fulfillmentType === 'delivery' ? profile.billingAddress : undefined,
-        pickupPoint: fulfillmentType === 'pickup' ? 'alistore-center' : undefined,
+        pickupPoint: fulfillmentType === 'pickup' ? pickupPoint : undefined,
         comment: comment.trim() || undefined,
         items: lines.map((line) => ({
           sku: line.sku,
@@ -141,6 +147,12 @@ export default function B2BPage() {
             <Input testId="b2b-email" label="Email" value={profile.email} onChange={(email) => setProfile((p) => ({ ...p, email }))} type="email" required={false} />
             <Input testId="b2b-address" label="Адрес" value={profile.billingAddress} onChange={(billingAddress) => setProfile((p) => ({ ...p, billingAddress }))} />
           </div>
+          {fulfillmentType === 'pickup' && (
+            <select required value={pickupPoint} onChange={(event) => setPickupPoint(event.target.value)} className="mt-3 w-full rounded-[10px] border border-surface-3 bg-ink-dark px-3 py-3 text-sm text-white">
+              <option value="" disabled>Выберите активную точку самовывоза</option>
+              {pickupPoints.map((point) => <option key={point.id} value={point.id}>{point.name} · {point.inventoryLocation}</option>)}
+            </select>
+          )}
         </section>
 
         <section className="rounded-[14px] border border-surface-3 bg-surface-2 p-4">

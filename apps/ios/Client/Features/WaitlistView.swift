@@ -33,7 +33,7 @@ final class WaitlistStore {
             // First run: seed representative watches so the screen reads as designed.
             items = [
                 WaitlistItem(id: "wl-1", name: "iPhone 15 Pro · 256 ГБ · титан", price: 132_000, symbol: "iphone"),
-                WaitlistItem(id: "wl-2", name: "AirPods Pro 2 · USB-C", price: 21_500, symbol: "airpods.pro"),
+                WaitlistItem(id: "wl-2", name: "AirPods Pro 2 · USB-C", price: 21_500, symbol: "airpods.pro")
             ]
         }
     }
@@ -55,7 +55,7 @@ final class WaitlistStore {
 }
 
 struct WaitlistView: View {
-    var onOpenCatalog: (() -> Void)? = nil
+    var onOpenCatalog: (() -> Void)?
     @State private var store = WaitlistStore()
     @Environment(\.dismiss) private var dismiss
 

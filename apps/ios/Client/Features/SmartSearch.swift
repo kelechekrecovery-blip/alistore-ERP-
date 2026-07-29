@@ -13,16 +13,16 @@ enum SmartSearch {
         "аудио": ["наушники", "airpods"],
         "часы": ["watch", "смарт-часы"],
         "планшет": ["ipad", "tablet"],
-        "зарядка": ["адаптер", "charger", "кабель"],
+        "зарядка": ["адаптер", "charger", "кабель"]
     ]
 
     /// True if `query` matches any field via substring, synonym, or a small typo distance.
     static func matches(_ query: String, fields: [String]) -> Bool {
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !q.isEmpty else { return true }
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalizedQuery.isEmpty else { return true }
 
         let haystack = fields.map { $0.lowercased() }
-        let terms = [q] + expandedSynonyms(for: q)
+        let terms = [normalizedQuery] + expandedSynonyms(for: normalizedQuery)
 
         for term in terms {
             for field in haystack where field.contains(term) {
@@ -31,10 +31,9 @@ enum SmartSearch {
         }
         // Typo tolerance: compare the query against each whitespace token of every field.
         for field in haystack {
-            for token in field.split(whereSeparator: { $0 == " " || $0 == "-" || $0 == "·" }) {
-                if levenshtein(q, String(token)) <= typoTolerance(for: q) {
-                    return true
-                }
+            for token in field.split(whereSeparator: { $0 == " " || $0 == "-" || $0 == "·" })
+                where levenshtein(normalizedQuery, String(token)) <= typoTolerance(for: normalizedQuery) {
+                return true
             }
         }
         return false
@@ -56,22 +55,23 @@ enum SmartSearch {
         if lhs.isEmpty { return rhs.count }
         if rhs.isEmpty { return lhs.count }
 
-        let a = Array(lhs), b = Array(rhs)
-        var previous = Array(0...b.count)
-        var current = [Int](repeating: 0, count: b.count + 1)
+        let leftCharacters = Array(lhs)
+        let rightCharacters = Array(rhs)
+        var previous = Array(0...rightCharacters.count)
+        var current = [Int](repeating: 0, count: rightCharacters.count + 1)
 
-        for i in 1...a.count {
-            current[0] = i
-            for j in 1...b.count {
-                let cost = a[i - 1] == b[j - 1] ? 0 : 1
-                current[j] = min(
-                    previous[j] + 1,        // deletion
-                    current[j - 1] + 1,     // insertion
-                    previous[j - 1] + cost  // substitution
+        for leftIndex in 1...leftCharacters.count {
+            current[0] = leftIndex
+            for rightIndex in 1...rightCharacters.count {
+                let cost = leftCharacters[leftIndex - 1] == rightCharacters[rightIndex - 1] ? 0 : 1
+                current[rightIndex] = min(
+                    previous[rightIndex] + 1,        // deletion
+                    current[rightIndex - 1] + 1,     // insertion
+                    previous[rightIndex - 1] + cost  // substitution
                 )
             }
             swap(&previous, &current)
         }
-        return previous[b.count]
+        return previous[rightCharacters.count]
     }
 }

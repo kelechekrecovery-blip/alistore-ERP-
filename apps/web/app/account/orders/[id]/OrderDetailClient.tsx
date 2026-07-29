@@ -3,8 +3,16 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { fetchCatalog, fetchOrder, type CatalogProduct, type OrderDetail } from '@/lib/api';
-import { useCart } from '@/lib/cart';
+import {
+  fetchCatalog,
+  fetchOrder,
+  fetchOrderCancellationPreview,
+  requestOrderCancellation,
+  type CatalogProduct,
+  type OrderCancellationPreview,
+  type OrderDetail,
+} from '@/lib/api';
+import { TO_ORDER_CART_QTY_CAP, useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
 import { WarrantyRequest } from '@/components/WarrantyRequest';
 import { som } from '@/lib/format';
@@ -16,12 +24,34 @@ const STAGE: Record<string, number> = {
   paid: 2, picking: 3, packed: 3, ready_for_pickup: 4, courier_assigned: 4, out_for_delivery: 4, delivered: 4, completed: 5,
 };
 const BAD = new Set(['cancelled', 'returned', 'refunded']);
+const LINE_STATUS: Record<string, string> = {
+  pending_payment: 'Ожидает оплаты',
+  reserved: 'Зарезервирован',
+  awaiting_deposit: 'Ожидает задатка',
+  procurement_draft: 'Закупка подготовлена',
+  supplier_ordered: 'Заказан поставщику',
+  in_transit: 'В пути',
+  received: 'Поступил',
+  quality_check: 'Проверка качества',
+  ready: 'Готов к выдаче',
+  handed_over: 'Выдан',
+  late: 'Поставка задерживается',
+  supplier_rejected: 'Поставщик отказал',
+  customer_cancelled: 'Отменён покупателем',
+  quarantined: 'На проверке',
+  cancelled: 'Отменён',
+};
 
 export default function OrderDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { add } = useCart();
   const { user, hydrated, authed } = useAuth();
   const [order, setOrder] = useState<OrderDetail | null | 'missing'>(null);
+  const [cancellation, setCancellation] = useState<OrderCancellationPreview | null>(null);
+  const [cancellationReason, setCancellationReason] = useState('');
+  const [cancellationBusy, setCancellationBusy] = useState(false);
+  const [cancellationResult, setCancellationResult] = useState<string | null>(null);
+  const [cancellationError, setCancellationError] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
 
   useEffect(() => {
@@ -33,6 +63,9 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     authed((token) => fetchOrder(params.id, token))
       .then((o) => setOrder(o ?? 'missing'))
       .catch(() => setOrder('missing'));
+    authed((token) => fetchOrderCancellationPreview(params.id, token))
+      .then(setCancellation)
+      .catch(() => setCancellation(null));
     fetchCatalog({ limit: 100 }).then((c) => setCatalog(c.items));
   }, [authed, hydrated, params.id, user]);
   const bySku = useMemo(() => new Map(catalog.map((p) => [p.sku, p])), [catalog]);
@@ -50,8 +83,48 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   function reorder() {
     if (order === null || order === 'missing') return;
     let any = false;
-    for (const i of order.items) { const p = bySku.get(i.sku); if (p) { add({ id: p.id, sku: p.sku, name: p.name, price: i.price, stockLimit: p.availableUnits }, i.qty); any = true; } }
+    for (const i of order.items) {
+      const p = bySku.get(i.sku);
+      if (!p) continue;
+      const toOrder = p.supplyMode === 'to_order';
+      add({
+        id: p.id, sku: p.sku, name: p.name, price: i.price,
+        stockLimit: toOrder ? TO_ORDER_CART_QTY_CAP : p.availableUnits,
+        supplyMode: toOrder ? 'to_order' : 'own_stock',
+        supplyLeadDays: toOrder ? p.supplyLeadDays : null,
+      }, i.qty);
+      any = true;
+    }
     if (any) router.push('/cart');
+  }
+
+  async function requestCancellation() {
+    const reason = cancellationReason.trim();
+    if (reason.length < 3 || cancellationBusy || order === null || order === 'missing') return;
+    const orderId = order.id;
+    setCancellationBusy(true);
+    setCancellationError(null);
+    try {
+      const result = await authed((token) => requestOrderCancellation(
+        orderId,
+        reason,
+        token,
+        crypto.randomUUID(),
+      ));
+      setCancellationResult(
+        result.status === 'awaiting_owner'
+          ? 'Запрос принят. Решение проверит владелец.'
+          : result.status === 'refund_queued'
+            ? `Заказ отменён. Возврат ${som(result.approvedRefundAmount ?? result.requestedRefundAmount)} поставлен в очередь.`
+            : 'Запрос на отмену принят.',
+      );
+      const refreshed = await authed((token) => fetchOrder(orderId, token));
+      if (refreshed) setOrder(refreshed);
+    } catch (error) {
+      setCancellationError(error instanceof Error ? error.message : 'Не удалось отправить запрос');
+    } finally {
+      setCancellationBusy(false);
+    }
   }
 
   return frame(
@@ -128,6 +201,17 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-surface-3 to-ink-dark font-display font-extrabold text-white/15">{(bySku.get(i.sku)?.name ?? i.sku).slice(0, 1)}</div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-semibold">{bySku.get(i.sku)?.name ?? i.sku}</div>
+            {i.fulfillmentStatus && (
+              <div className="mt-1 text-[11px] text-lime">
+                {LINE_STATUS[i.fulfillmentStatus] ?? i.fulfillmentStatus}
+                {i.promisedDate ? ` · обещанная дата ${new Date(i.promisedDate).toLocaleDateString('ru-RU')}` : ''}
+              </div>
+            )}
+            {i.orderLineSupply && i.orderLineSupply.orderedQty > 1 && (
+              <div className="mt-0.5 text-[11px] text-subtle">
+                Принято {i.orderLineSupply.receivedQty} из {i.orderLineSupply.orderedQty}
+              </div>
+            )}
             {i.imei && <div className="font-mono text-[11px] text-subtle">IMEI {i.imei}</div>}
             {i.imei && user && <div className="mt-1"><WarrantyRequest imei={i.imei} customerId={user.customerId} /></div>}
           </div>
@@ -142,6 +226,72 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           {order.payments.map((p, idx) => (
             <div key={idx} className="flex justify-between py-1 text-[13px]"><span className="text-muted">{p.method}</span><span className="font-mono">{som(p.amount)}</span></div>
           ))}
+        </div>
+      )}
+      {(order.receivables?.length ?? 0) > 0 && (
+        <div className="mt-3 rounded-[14px] border border-surface-3 bg-surface-2 p-4">
+          <div className="mb-2 text-xs uppercase tracking-wide text-subtle">График начислений</div>
+          {order.receivables?.map((row) => (
+            <div key={row.id} className="flex justify-between gap-3 py-1 text-[13px]">
+              <span className="text-muted">
+                {row.kind === 'supply_deposit' ? 'Задаток'
+                  : row.kind === 'stock_sale' ? 'Складской товар'
+                    : row.kind === 'supply_balance' ? 'Остаток заказного товара'
+                      : 'Доставка'}
+              </span>
+              <span className="text-right font-mono">
+                {som(row.settledAmount)} / {som(row.amount)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {cancellation?.canCancel && (
+        <div className="mt-3 rounded-[14px] border border-coral/30 bg-coral/5 p-4">
+          <div className="text-xs uppercase tracking-wide text-coral">Предварительный расчёт отмены</div>
+          <div className="mt-2 flex justify-between gap-3 text-[13px]">
+            <span className="text-muted">Ожидаемый возврат</span>
+            <span className="font-mono font-semibold text-bright">{som(cancellation.estimatedRefundAmount)}</span>
+          </div>
+          <p className="mt-2 text-[12px] leading-5 text-muted">{cancellation.note}</p>
+          {cancellation.ownerReviewRequired && (
+            <p className="mt-1 text-[11px] text-coral">PO уже отправлен: решение и подтверждающие документы проверит владелец.</p>
+          )}
+          {cancellationResult ? (
+            <p className="mt-3 rounded-[11px] border border-lime/30 bg-lime/5 px-3 py-2 text-[12px] text-lime">
+              {cancellationResult}
+            </p>
+          ) : cancellation.requestEnabled ? (
+            <div className="mt-3">
+              <label className="block text-[11px] text-muted" htmlFor="cancellation-reason">
+                Причина отмены
+              </label>
+              <textarea
+                id="cancellation-reason"
+                value={cancellationReason}
+                onChange={(event) => setCancellationReason(event.target.value)}
+                minLength={3}
+                maxLength={500}
+                rows={3}
+                className="mt-1 w-full resize-none rounded-[11px] border border-surface-3 bg-ink-dark px-3 py-2 text-[12px] text-bright outline-none focus:border-coral"
+                placeholder="Например: передумал покупать товар"
+              />
+              {cancellationError && <p className="mt-1 text-[11px] text-danger-soft">{cancellationError}</p>}
+              <button
+                type="button"
+                disabled={cancellationBusy || cancellationReason.trim().length < 3}
+                onClick={() => void requestCancellation()}
+                className="mt-2 w-full rounded-[11px] border border-coral/30 px-3 py-2 text-[12px] font-semibold text-coral disabled:opacity-40"
+              >
+                {cancellationBusy ? 'Отправляем…' : 'Подтвердить запрос на отмену'}
+              </button>
+            </div>
+          ) : (
+            <Link href="/support" className="mt-3 block rounded-[11px] border border-coral/30 px-3 py-2 text-center text-[12px] font-semibold text-coral">
+              Запросить отмену через поддержку
+            </Link>
+          )}
         </div>
       )}
 

@@ -9,6 +9,8 @@ describe('Production preflight report', () => {
           DATABASE_URL: '',
           JWT_SECRET: '',
           AUTH_OTP_DEV_ECHO: 'false',
+          SMTP_HOST: '',
+          SMTP_FROM: '',
           RESERVATION_SWEEP_ENABLED: 'true',
           OUTBOX_RELAY_ENABLED: 'true',
           REFUND_RELAY_ENABLED: '',
@@ -28,7 +30,7 @@ describe('Production preflight report', () => {
     // хватало, чтобы авария стала видимой.
     // +1: media_storage — без объектного хранилища доказательства (паспорта)
     // раздаются публично с диска без подписи.
-    expect(report.summary.missing).toBe(11);
+    expect(report.summary.missing).toBe(12);
     expect(report.nextActions).toEqual(
       expect.arrayContaining([
         expect.stringContaining('Production database URL'),
@@ -62,6 +64,22 @@ describe('Production preflight report', () => {
     expect(serialized).not.toContain('password');
   });
 
+  it('blocks production until email verification can deliver a real code', () => {
+    const emailCheck = (env: Record<string, string>) =>
+      buildProductionPreflightReport((name) => env[name]).checks.find(
+        (check) => check.id === 'email_otp_delivery',
+      );
+
+    expect(emailCheck({})?.status).toBe('missing');
+    expect(emailCheck({ SMTP_HOST: 'smtp.provider.test' })?.status).toBe('missing');
+    expect(
+      emailCheck({
+        SMTP_HOST: 'smtp.provider.test',
+        SMTP_FROM: 'AliStore <no-reply@ali.kg>',
+      })?.status,
+    ).toBe('ready');
+  });
+
   it('keeps live production blocked while the refund adapter is not implemented', () => {
     const strongSecret = '0123456789abcdef0123456789abcdef';
     const report = buildProductionPreflightReport((name) =>
@@ -72,13 +90,15 @@ describe('Production preflight report', () => {
         ALLOWED_HOSTS: 'api.ali.kg',
         JWT_SECRET: strongSecret,
         AUTH_OTP_DEV_ECHO: 'false',
+        SMTP_HOST: 'smtp.provider.test',
+        SMTP_FROM: 'AliStore <no-reply@ali.kg>',
         RESERVATION_SWEEP_ENABLED: 'true',
         OUTBOX_RELAY_ENABLED: 'true',
         DEBT_REMINDERS_ENABLED: 'true',
         ALERT_TELEGRAM_BOT_TOKEN: 'bot-token',
         ALERT_TELEGRAM_CHAT_ID: '-100123',
-      NOTIFICATION_TRANSPORT: 'realtime',
-                REFUND_RELAY_ENABLED: 'true',
+        NOTIFICATION_TRANSPORT: 'realtime',
+        REFUND_RELAY_ENABLED: 'true',
         PROCESS_ROLE: 'worker',
         SMS_PROVIDER: 'disabled',
         PUBLIC_DEMO_MODE: 'false',
@@ -87,12 +107,35 @@ describe('Production preflight report', () => {
         JOB_BACKEND: 'bullmq',
         REDIS_URL: 'rediss://worker:queue-secret@redis.internal:6379',
         MEDIA_STORAGE: 's3',
+        S3_ENDPOINT: 'https://account.r2.cloudflarestorage.com',
+        MINIO_BUCKET: 'alistore-media-prod',
+        MINIO_ROOT_USER: 'access-key',
+        MINIO_ROOT_PASSWORD: 'secret-key',
       })[name],
     );
 
     expect(report.status).toBe('blocked');
     expect(report.summary.blockingRemaining).toBe(1);
     expect(report.checks.find((check) => check.id === 'refund_relay')?.status).toBe('unsafe');
+  });
+
+  describe('BullMQ Redis runtime', () => {
+    const redisCheck = (url: string) =>
+      buildProductionPreflightReport((name) => ({
+        JOB_BACKEND: 'bullmq',
+        REDIS_URL: url,
+      })[name]).checks.find((check) => check.id === 'bullmq_runtime');
+
+    it('accepts protected loopback Redis without a password', () => {
+      expect(redisCheck('redis://127.0.0.1:6379')?.status).toBe('ready');
+      expect(redisCheck('redis://localhost:6379')?.status).toBe('ready');
+      expect(redisCheck('redis://[::1]:6379')?.status).toBe('ready');
+    });
+
+    it('still requires authentication for every non-loopback Redis host', () => {
+      expect(redisCheck('redis://redis.internal:6379')?.status).toBe('unsafe');
+      expect(redisCheck('rediss://worker:secret@redis.internal:6379')?.status).toBe('ready');
+    });
   });
 
   /**
@@ -109,6 +152,8 @@ describe('Production preflight report', () => {
       ALLOWED_HOSTS: 'api.ali.kg',
       JWT_SECRET: '0123456789abcdef0123456789abcdef',
       AUTH_OTP_DEV_ECHO: 'false',
+      SMTP_HOST: 'smtp.provider.test',
+      SMTP_FROM: 'AliStore <no-reply@ali.kg>',
       RESERVATION_SWEEP_ENABLED: 'true',
       OUTBOX_RELAY_ENABLED: 'true',
       DEBT_REMINDERS_ENABLED: 'true',
@@ -132,11 +177,19 @@ describe('Production preflight report', () => {
     // оказывается публично скачиваемым по угадываемому ключу.
     it('блокирует прод без объектного хранилища с подписанными URL', () => {
       expect(mediaCheck(base)?.status).toBe('missing');
-      expect(mediaCheck({ ...base, MEDIA_STORAGE: 'local' })?.status).toBe('unsafe');
+      expect(mediaCheck({ ...base, MEDIA_STORAGE: 'local' })?.status).toBe('missing');
     });
 
-    it('признаёт прод с MEDIA_STORAGE=s3 — evidence уходит подписанными ссылками', () => {
-      expect(mediaCheck({ ...base, MEDIA_STORAGE: 's3' })?.status).toBe('ready');
+    it('требует полный S3/R2 набор, а не только переключатель режима', () => {
+      expect(mediaCheck({ ...base, MEDIA_STORAGE: 's3' })?.status).toBe('missing');
+      expect(mediaCheck({
+        ...base,
+        MEDIA_STORAGE: 's3',
+        S3_ENDPOINT: 'https://account.r2.cloudflarestorage.com',
+        MINIO_BUCKET: 'alistore-media-prod',
+        MINIO_ROOT_USER: 'access-key',
+        MINIO_ROOT_PASSWORD: 'secret-key',
+      })?.status).toBe('ready');
     });
   });
 
@@ -183,6 +236,8 @@ describe('Production preflight report', () => {
       ALLOWED_HOSTS: 'api.ali.kg',
       JWT_SECRET: '0123456789abcdef0123456789abcdef',
       AUTH_OTP_DEV_ECHO: 'false',
+      SMTP_HOST: 'smtp.provider.test',
+      SMTP_FROM: 'AliStore <no-reply@ali.kg>',
       RESERVATION_SWEEP_ENABLED: 'true',
       OUTBOX_RELAY_ENABLED: 'true',
       DEBT_REMINDERS_ENABLED: 'true',
@@ -197,6 +252,10 @@ describe('Production preflight report', () => {
       REDIS_URL: 'rediss://worker:queue-secret@redis.internal:6379',
       PROCESS_ROLE: 'api',
       MEDIA_STORAGE: 's3',
+      S3_ENDPOINT: 'https://account.r2.cloudflarestorage.com',
+      MINIO_BUCKET: 'alistore-media-prod',
+      MINIO_ROOT_USER: 'access-key',
+      MINIO_ROOT_PASSWORD: 'secret-key',
     };
 
     const ready = buildProductionPreflightReport(
@@ -221,6 +280,8 @@ describe('Production preflight report', () => {
       ALLOWED_HOSTS: 'api-staging.ali.kg',
       JWT_SECRET: '0123456789abcdef0123456789abcdef',
       AUTH_OTP_DEV_ECHO: 'false',
+      SMTP_HOST: 'smtp.provider.test',
+      SMTP_FROM: 'AliStore <no-reply@ali.kg>',
       RESERVATION_SWEEP_ENABLED: 'true',
       OUTBOX_RELAY_ENABLED: 'true',
       DEBT_REMINDERS_ENABLED: 'true',
@@ -235,6 +296,10 @@ describe('Production preflight report', () => {
       JOB_BACKEND: 'bullmq',
       REDIS_URL: 'rediss://worker:queue-secret@redis.internal:6379',
       MEDIA_STORAGE: 's3',
+      S3_ENDPOINT: 'https://account.r2.cloudflarestorage.com',
+      MINIO_BUCKET: 'alistore-media-prod',
+      MINIO_ROOT_USER: 'access-key',
+      MINIO_ROOT_PASSWORD: 'secret-key',
     };
     const worker = buildProductionPreflightReport((name) => ({ ...base, PROCESS_ROLE: 'worker' })[name]);
     const api = buildProductionPreflightReport((name) => ({ ...base, PROCESS_ROLE: 'api' })[name]);

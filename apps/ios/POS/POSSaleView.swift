@@ -218,8 +218,7 @@ struct POSSaleView: View {
             Button {
                 Task { await submit() }
             } label: {
-                if isBusy { ProgressView().frame(maxWidth: .infinity) }
-                else { Label("Оплатить \(Money.som(total))", systemImage: "creditcard.fill").frame(maxWidth: .infinity) }
+                if isBusy { ProgressView().frame(maxWidth: .infinity) } else { Label("Оплатить \(Money.som(total))", systemImage: "creditcard.fill").frame(maxWidth: .infinity) }
             }
             .buttonStyle(.borderedProminent).tint(POSPalette.lime).foregroundStyle(POSPalette.ink)
             .disabled(isBusy || shift == nil || cart.isEmpty || total <= 0)

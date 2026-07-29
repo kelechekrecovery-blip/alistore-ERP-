@@ -3,6 +3,7 @@ import { AuditService } from '../src/audit/audit.service';
 import { HrService } from '../src/hr/hr.service';
 import { SettingsService } from '../src/settings/settings.service';
 import { DomainError } from '../src/common/errors';
+import { randomUUID } from 'node:crypto';
 
 /**
  * F-03: `POST /hr/payroll/runs` отвечал 500. Находка предполагала пустой
@@ -14,7 +15,7 @@ import { DomainError } from '../src/common/errors';
 describe('HR payroll run', () => {
   let prisma: PrismaService;
   let hr: HrService;
-  const RUN = Math.floor(Math.random() * 1_000_000);
+  const RUN = `${Date.now().toString(36)}-${process.pid}-${randomUUID().slice(0, 8)}`;
   const point = `PAYROLL-${RUN}`;
   const period = '2026-05';
 
@@ -28,8 +29,19 @@ describe('HR payroll run', () => {
   afterAll(async () => { await prisma.$disconnect(); });
 
   it('проводит начисление по отработанной смене', async () => {
+    await prisma.storePoint.create({
+      data: {
+        code: `payroll-${RUN}`,
+        name: 'Payroll test point',
+        address: '—',
+        inventoryLocation: point,
+        hours: '09:00–18:00',
+        createdBy: 'test',
+        idempotencyKey: `payroll-point-${RUN}`,
+      },
+    });
     const staff = await prisma.staffUser.create({
-      data: { username: `payroll-${RUN}`, passwordHash: 'x', role: 'seller' },
+      data: { username: `payroll-${RUN}`, passwordHash: 'x', role: 'seller', point },
     });
     const schedule = await prisma.hrSchedule.create({
       data: {
@@ -58,7 +70,7 @@ describe('HR payroll run', () => {
   });
 
   it('период без данных отказывает доменной ошибкой, а не падением', async () => {
-    const error = await hr.postPayroll('2026-04', `${point}-empty`, 'owner-test', `payroll-empty-${RUN}`)
+    const error = await hr.postPayroll('2026-04', point, 'owner-test', `payroll-empty-${RUN}`)
       .catch((cause) => cause);
     expect(error).toBeInstanceOf(DomainError);
     expect(error.code).toBe('hr_payroll_empty');

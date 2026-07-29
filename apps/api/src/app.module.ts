@@ -38,6 +38,7 @@ import { LocalizationModule } from './localization/localization.module';
 import { StaffAuthModule } from './staff-auth/staff-auth.module';
 import { TradeInsModule } from './tradeins/tradeins.module';
 import { AiModule } from './ai/ai.module';
+import { TelegramAgentModule } from './telegram-agent/telegram-agent.module';
 import { EvidenceModule } from './evidence/evidence.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { GiftcardsModule } from './giftcards/giftcards.module';
@@ -56,10 +57,14 @@ import { PromotionsModule } from './promotions/promotions.module';
 import { StorefrontBlocksModule } from './storefront-blocks/storefront-blocks.module';
 import { RefundsModule } from './refunds/refunds.module';
 import { StoreOperationsModule } from './store-operations/store-operations.module';
+import { resolveRuntimeEnvFiles } from './config/runtime-env-files';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: resolveRuntimeEnvFiles(process.env.NODE_ENV),
+    }),
     PrismaModule,
     AuditModule,
     AnalyticsModule,
@@ -99,6 +104,7 @@ import { StoreOperationsModule } from './store-operations/store-operations.modul
     TradeInsModule,
     EvidenceModule,
     AiModule,
+    TelegramAgentModule,
     CampaignsModule,
     GiftcardsModule,
     NotificationsModule,

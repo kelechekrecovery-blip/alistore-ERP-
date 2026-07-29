@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { motion } from 'motion/react';
 import { useState } from 'react';
 import type { CatalogProduct } from '@/lib/api';
-import { som } from '@/lib/format';
-import { useCart } from '@/lib/cart';
+import { som, supplyLeadLabel } from '@/lib/format';
+import { TO_ORDER_CART_QTY_CAP, useCart } from '@/lib/cart';
 import { useFavorites } from '@/lib/favorites';
 import { useCompare } from '@/lib/compare';
 import { productImage } from '@/components/ProductCard';
+import { StatusPill } from '@/components/ui/Badge';
 import { ImageOff } from 'lucide-react';
 
 interface MobileProductCardProps {
@@ -31,11 +32,21 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
   const compare = useCompare();
   const [added, setAdded] = useState(false);
   const inStock = product.availableUnits > 0;
+  const toOrder = !inStock && product.supplyMode === 'to_order' && product.orderable;
+  const buyable = product.orderable;
   const href = `/product/${product.id}`;
 
   function addToCart() {
-    if (!inStock) return;
-    add({ id: product.id, sku: product.sku, name: product.name, price: product.price, stockLimit: product.availableUnits });
+    if (!buyable) return;
+    add({
+      id: product.id,
+      sku: product.sku,
+      name: product.name,
+      price: product.price,
+      stockLimit: toOrder ? TO_ORDER_CART_QTY_CAP : product.availableUnits,
+      supplyMode: toOrder ? 'to_order' : 'own_stock',
+      supplyLeadDays: toOrder ? product.supplyLeadDays : null,
+    });
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1200);
   }
@@ -72,22 +83,28 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
         </Link>
         <div className="mt-1.5 font-display text-[16px] font-extrabold text-white">{som(product.price)}</div>
         <div className="mt-0.5 text-[10px] text-subtle">
-          {inStock ? `${product.availableUnits} в наличии` : 'под заказ'}
+          {inStock ? (
+            `${product.availableUnits} в наличии`
+          ) : product.supplyMode === 'to_order' && product.supplyLeadDays ? (
+            <StatusPill status="info">{supplyLeadLabel(product.supplyLeadDays)}</StatusPill>
+          ) : (
+            'под заказ'
+          )}
         </div>
         <div className="mt-2.5 flex gap-1.5">
           <button
             type="button"
             onClick={addToCart}
-            disabled={!inStock}
-            className={`flex-1 rounded-[9px] py-2 text-center text-[12px] font-bold transition ${
+            disabled={!buyable}
+            className={`flex-1 rounded-[9px] py-2 text-center text-[12px] font-bold transition disabled:cursor-not-allowed ${
               added
                 ? 'bg-success text-white'
-                : inStock
+                : buyable
                   ? 'bg-lime text-lime-ink'
                   : 'bg-surface-3 text-faint'
             }`}
           >
-            {added ? 'Добавлено ✓' : inStock ? 'В корзину' : 'Под заказ'}
+            {added ? 'Добавлено ✓' : inStock ? 'В корзину' : toOrder ? 'Заказать' : 'Под заказ'}
           </button>
           {showCompare && (
             <button

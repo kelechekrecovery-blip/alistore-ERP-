@@ -8,6 +8,6 @@ export async function clearGiftCardTransactions(prisma: PrismaClient) {
     throw new Error(`Refusing destructive test cleanup outside an explicit test database: ${database ?? 'unknown'}`);
   }
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "GiftCardTransaction", "RefundLine", "RefundAllocation", "Refund"',
+    'TRUNCATE TABLE "GiftCardTransaction", "OrderCancellation", "RefundLine", "RefundAllocation", "Refund"',
   );
 }

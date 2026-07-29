@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import {
   APP_KEYS,
   ASC_APP_IDS,
+  appInfoState,
   assertCredentials,
   desiredMetadata,
   planChanges,
   readStoreMetadata,
   resolveOutcome,
+  selectAppInfo,
 } from '../apply-ios-store-metadata.mjs';
 
 test('ecosystem metadata maps to the App Store Connect enums', () => {
@@ -69,6 +71,18 @@ test('only the field that actually differs is changed', () => {
   });
   assert.equal(changes.length, 1);
   assert.equal(changes[0].field, 'contentRightsDeclaration');
+});
+
+test('read-only checks inspect submitted appInfo while apply remains fail-closed', () => {
+  const submitted = { id: 'submitted', attributes: { appStoreState: 'WAITING_FOR_REVIEW' } };
+  const editable = { id: 'editable', attributes: { appStoreState: 'PREPARE_FOR_SUBMISSION' } };
+
+  assert.equal(selectAppInfo([submitted], 'check'), submitted);
+  assert.equal(selectAppInfo([submitted], 'dry-run'), submitted);
+  assert.equal(selectAppInfo([submitted], 'apply'), null);
+  assert.equal(selectAppInfo([submitted, editable], 'apply'), editable);
+  assert.equal(appInfoState(submitted), 'WAITING_FOR_REVIEW');
+  assert.equal(appInfoState({}), 'UNKNOWN');
 });
 
 test('incomplete App Store Connect credentials fail closed', () => {

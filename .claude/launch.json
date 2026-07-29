@@ -4,20 +4,51 @@
     {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "web"],
+      "runtimeArgs": [
+        "run",
+        "web"
+      ],
       "port": 3000
+    },
+    {
+      "name": "contest-site",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "contest:site"
+      ],
+      "port": 4322
+    },
+    {
+      "name": "contest-demo",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "contest:demo"
+      ],
+      "port": 4321
     },
     {
       "name": "web-prod",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "start", "-p", "3000"],
+      "runtimeArgs": [
+        "next",
+        "start",
+        "-p",
+        "3000"
+      ],
       "cwd": "apps/web",
       "port": 3000
     },
     {
       "name": "web-verify",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "start", "-p", "3100"],
+      "runtimeArgs": [
+        "next",
+        "start",
+        "-p",
+        "3100"
+      ],
       "cwd": "apps/web",
       "port": 3100
     }

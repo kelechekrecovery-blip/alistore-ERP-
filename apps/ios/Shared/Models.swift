@@ -1,3 +1,5 @@
+// Wire-contract declarations mirror server payloads and keep related fields together.
+// swiftlint:disable line_length
 import Foundation
 
 public struct CatalogResponse: Decodable, Sendable {
@@ -44,8 +46,13 @@ public struct Product: Decodable, Identifiable, Sendable {
     public let category: String
     public let availableUnits: Int
     public let attrs: ProductAttributes?
+    public let supplyMode: String?
+    public let orderable: Bool?
+    public let availabilityKind: String?
+    public let leadTimeDays: Int?
+    public let estimatedDeliveryDate: Date?
 
-    public init(id: String, sku: String, name: String, price: Int, category: String, availableUnits: Int, attrs: ProductAttributes? = nil) {
+    public init(id: String, sku: String, name: String, price: Int, category: String, availableUnits: Int, attrs: ProductAttributes? = nil, supplyMode: String? = nil, orderable: Bool? = nil, availabilityKind: String? = nil, leadTimeDays: Int? = nil, estimatedDeliveryDate: Date? = nil) {
         self.id = id
         self.sku = sku
         self.name = name
@@ -53,6 +60,11 @@ public struct Product: Decodable, Identifiable, Sendable {
         self.category = category
         self.availableUnits = availableUnits
         self.attrs = attrs
+        self.supplyMode = supplyMode
+        self.orderable = orderable
+        self.availabilityKind = availabilityKind
+        self.leadTimeDays = leadTimeDays
+        self.estimatedDeliveryDate = estimatedDeliveryDate
     }
 
     public init(from decoder: Decoder) throws {
@@ -64,11 +76,17 @@ public struct Product: Decodable, Identifiable, Sendable {
         category = try container.decode(String.self, forKey: .category)
         availableUnits = try container.decode(Int.self, forKey: .availableUnits)
         // attrs is arbitrary JSON on the API; non-object payloads decode as nil.
-        attrs = (try? container.decodeIfPresent(ProductAttributes.self, forKey: .attrs)) ?? nil
+        attrs = try? container.decodeIfPresent(ProductAttributes.self, forKey: .attrs)
+        supplyMode = try? container.decodeIfPresent(String.self, forKey: .supplyMode)
+        orderable = try? container.decodeIfPresent(Bool.self, forKey: .orderable)
+        availabilityKind = try? container.decodeIfPresent(String.self, forKey: .availabilityKind)
+        leadTimeDays = try? container.decodeIfPresent(Int.self, forKey: .leadTimeDays)
+        estimatedDeliveryDate = try? container.decodeIfPresent(Date.self, forKey: .estimatedDeliveryDate)
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, sku, name, price, category, availableUnits, attrs
+        case supplyMode, orderable, availabilityKind, leadTimeDays, estimatedDeliveryDate
     }
 }
 
@@ -99,6 +117,8 @@ public struct DeliveryZone: Decodable, Identifiable, Sendable {
     public let code: String
     public let name: String
     public let fee: Int
+    public let etaMinMinutes: Int?
+    public let etaMaxMinutes: Int?
     public let slots: [DeliverySlot]
 }
 
@@ -112,12 +132,28 @@ public struct StaffSession: Codable, Sendable {
     public let staffId: String
     public let username: String
     public let role: String
+    /// Authoritative inventory location from StaffUser/JWT refresh. A missing
+    /// point disables point-bound operations; native clients never invent one.
+    public let point: String?
+    public let totpEnabled: Bool
+    public let capabilities: [String]?
 
-    public init(accessToken: String, staffId: String, username: String, role: String) {
+    public init(
+        accessToken: String,
+        staffId: String,
+        username: String,
+        role: String,
+        point: String? = nil,
+        totpEnabled: Bool = false,
+        capabilities: [String]? = nil
+    ) {
         self.accessToken = accessToken
         self.staffId = staffId
         self.username = username
         self.role = role
+        self.point = point
+        self.totpEnabled = totpEnabled
+        self.capabilities = capabilities
     }
 }
 
@@ -128,6 +164,8 @@ public struct StaffPrincipal: Decodable, Sendable {
     public let active: Bool
     public let totpEnabled: Bool
     public let typ: String
+    public let point: String?
+    public let capabilities: [String]?
 }
 
 public struct StaffLogin: Encodable, Sendable {
@@ -616,16 +654,197 @@ public struct RefreshRequest: Encodable, Sendable {
 }
 
 public struct CustomerOrderItem: Decodable, Sendable {
+    public let id: String?
     public let sku: String
     public let qty: Int
     public let price: Int
     public let imei: String?
+    public let supplyModeSnapshot: String?
+    public let supplyLeadDaysSnapshot: Int?
+    public let promisedDate: Date?
+    public let fulfillmentStatus: String?
+    public let readyAt: Date?
+    public let handedOverAt: Date?
 
-    public init(sku: String, qty: Int, price: Int, imei: String?) {
+    public init(sku: String, qty: Int, price: Int, imei: String?, id: String? = nil, supplyModeSnapshot: String? = nil, supplyLeadDaysSnapshot: Int? = nil, promisedDate: Date? = nil, fulfillmentStatus: String? = nil, readyAt: Date? = nil, handedOverAt: Date? = nil) {
+        self.id = id
         self.sku = sku
         self.qty = qty
         self.price = price
         self.imei = imei
+        self.supplyModeSnapshot = supplyModeSnapshot
+        self.supplyLeadDaysSnapshot = supplyLeadDaysSnapshot
+        self.promisedDate = promisedDate
+        self.fulfillmentStatus = fulfillmentStatus
+        self.readyAt = readyAt
+        self.handedOverAt = handedOverAt
+    }
+}
+
+public struct OrderReceivable: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let orderItemId: String?
+    public let kind: String
+    public let amount: Int
+    public let settledAmount: Int
+    public let status: String
+    public let dueAt: Date?
+
+    public init(id: String, orderItemId: String?, kind: String, amount: Int, settledAmount: Int, status: String, dueAt: Date?) {
+        self.id = id
+        self.orderItemId = orderItemId
+        self.kind = kind
+        self.amount = amount
+        self.settledAmount = settledAmount
+        self.status = status
+        self.dueAt = dueAt
+    }
+}
+
+public struct OrderCancellationPreview: Decodable, Sendable {
+    public let orderId: String
+    public let canCancel: Bool
+    public let blockedReason: String?
+    public let policy: String
+    public let purchaseOrderSent: Bool
+    public let depositPaid: Int
+    public let estimatedRefundAmount: Int
+    public let supplierExpenseDeduction: Int
+    public let ownerReviewRequired: Bool
+    public let note: String
+    public let requestEnabled: Bool?
+    public let automaticRefundEnabled: Bool?
+}
+
+public struct OrderCancellation: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let orderId: String
+    public let status: String
+    public let policySnapshot: String
+    public let purchaseOrderSentSnapshot: Bool
+    public let depositPaidSnapshot: Int
+    public let requestedRefundAmount: Int
+    public let approvedRefundAmount: Int?
+    public let customerReason: String
+    public let ownerReason: String?
+    public let refundId: String?
+    public let createdAt: Date
+    public let resolvedAt: Date?
+    public let completedAt: Date?
+}
+
+public struct CreateOrderCancellationRequest: Encodable, Sendable {
+    public let reason: String
+    public init(reason: String) { self.reason = reason }
+}
+
+public struct OwnerCancellationResolutionRequest: Encodable, Sendable {
+    public let action: String
+    public let refundAmount: Int?
+    public let supplierExpenseAmount: Int?
+    public let faultParty: String?
+    public let ownerReason: String
+    public let evidenceIds: [String]?
+    public let totpToken: String
+}
+
+public struct SupplyOperationFlags: Decodable, Sendable {
+    public let checkoutEnabled: Bool
+    public let cancellationEnabled: Bool
+    public let autoRefundEnabled: Bool
+    public let ownerResolutionEnabled: Bool
+}
+
+public struct SupplyOperationCapabilities: Decodable, Sendable {
+    public let financialQueuesVisible: Bool
+    public let ownerResolutionAvailable: Bool
+}
+
+public struct SupplyOperationRow: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let queue: String
+    public let orderId: String
+    public let purchaseOrderId: String?
+    public let purchaseOrderNumber: String?
+    public let status: String
+    public let amount: Int?
+    public let expectedAt: Date?
+    public let createdAt: Date
+    public let updatedAt: Date
+    public let sku: String?
+    public let quantity: Int?
+    public let detailHref: String
+}
+
+public struct SupplyOperationsResponse: Decodable, Sendable {
+    public let generatedAt: Date
+    public let flags: SupplyOperationFlags
+    public let capabilities: SupplyOperationCapabilities
+    public let counts: [String: Int]
+    public let queues: [String: [SupplyOperationRow]]
+}
+
+public struct SupplyQuarantineProposalRequest: Encodable, Sendable {
+    public let reason: String
+    public let evidence: [String: String]
+    public let imeis: [String]?
+}
+
+public struct SupplyQuarantineResolutionRequest: Encodable, Sendable {
+    public let disposition: String
+    public let reason: String
+    public let evidence: [String: String]
+}
+
+public struct SupplyQuarantineResolution: Decodable, Identifiable, Sendable {
+    public let id: String
+    public let orderLineSupplyId: String
+    public let productId: String
+    public let storePointId: String
+    public let inventoryLocationSnapshot: String
+    public let trackingModeSnapshot: String
+    public let quarantinedQty: Int
+    public let imeis: [String]?
+    public let status: String
+    public let disposition: String?
+    public let proposalReason: String
+    public let proposedBy: String
+    public let resolutionReason: String?
+    public let resolvedBy: String?
+    public let inventoryMovementId: String?
+    public let createdAt: Date
+    public let resolvedAt: Date?
+}
+
+public enum NativeSupplyPolicy {
+    private static let terminalLineStates = Set(["handed_over", "customer_cancelled", "cancelled"])
+    private static let courierReadyStates = Set(["ready", "handed_over", "customer_cancelled", "cancelled"])
+
+    public static func canResolveOwnerCancellation(session: StaffSession, serverCapability: Bool) -> Bool {
+        serverCapability
+            && ["owner", "admin"].contains(session.role)
+            && session.totpEnabled
+    }
+
+    public static func canUsePointBoundOperations(session: StaffSession) -> Bool {
+        !(session.point?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    }
+
+    public static func canPartiallyHandOver(_ item: CustomerOrderItem) -> Bool {
+        item.id != nil
+            && ["ready", "reserved"].contains(item.fulfillmentStatus ?? "")
+    }
+
+    public static func allLinesReadyForCourier(_ order: CustomerOrder) -> Bool {
+        !order.items.isEmpty
+            && order.items.allSatisfy { courierReadyStates.contains($0.fulfillmentStatus ?? "") }
+            && (order.paymentSchedule ?? []).allSatisfy { receivable in
+                receivable.status == "settled" || receivable.status == "cancelled"
+            }
+    }
+
+    public static func activeLineCount(_ order: CustomerOrder) -> Int {
+        order.items.filter { !terminalLineStates.contains($0.fulfillmentStatus ?? "") }.count
     }
 }
 
@@ -641,8 +860,11 @@ public struct CustomerOrder: Decodable, Identifiable, Sendable {
     public let total: Int
     public let createdAt: Date
     public let items: [CustomerOrderItem]
+    public let paymentSchedule: [OrderReceivable]?
+    public let initialDue: Int?
+    public let balanceDue: Int?
 
-    public init(id: String, channel: String, fulfillmentType: String?, pickupPoint: String?, deliveryAddress: String?, deliverySlot: String?, pickupCode: String?, status: String, total: Int, createdAt: Date, items: [CustomerOrderItem]) {
+    public init(id: String, channel: String, fulfillmentType: String?, pickupPoint: String?, deliveryAddress: String?, deliverySlot: String?, pickupCode: String?, status: String, total: Int, createdAt: Date, items: [CustomerOrderItem], paymentSchedule: [OrderReceivable]? = nil, initialDue: Int? = nil, balanceDue: Int? = nil) {
         self.id = id
         self.channel = channel
         self.fulfillmentType = fulfillmentType
@@ -654,6 +876,9 @@ public struct CustomerOrder: Decodable, Identifiable, Sendable {
         self.total = total
         self.createdAt = createdAt
         self.items = items
+        self.paymentSchedule = paymentSchedule
+        self.initialDue = initialDue
+        self.balanceDue = balanceDue
     }
 }
 
@@ -666,14 +891,16 @@ public struct OrderLedgerEvent: Decodable, Identifiable, Sendable {
     public let id: String
     public let type: String
     public let actor: String
-    public let ts: Date
+    public let timestamp: Date
 
-    public init(id: String, type: String, actor: String, ts: Date) {
+    public init(id: String, type: String, actor: String, timestamp: Date) {
         self.id = id
         self.type = type
         self.actor = actor
-        self.ts = ts
+        self.timestamp = timestamp
     }
+
+    private enum CodingKeys: String, CodingKey { case id, type, actor; case timestamp = "ts" }
 }
 
 public struct OrderTimelineStep: Equatable, Sendable {
@@ -708,7 +935,7 @@ public enum OrderTimelineBuilder {
 
     public static func build(events: [OrderLedgerEvent]) -> [OrderTimelineStep] {
         let times: [Date?] = steps.map { step in
-            events.filter { step.events.contains($0.type) }.map(\.ts).min()
+            events.filter { step.events.contains($0.type) }.map(\.timestamp).min()
         }
         let firstPending = times.firstIndex(where: { $0 == nil }) ?? times.count
         return steps.enumerated().map { index, step in
@@ -1253,6 +1480,21 @@ public struct CourierDelivery: Decodable, Identifiable, Sendable {
             .reduce(0) { $0 + max(0, $1.amount) }
         return max(0, total - settled)
     }
+
+    /// Empty items mean an older server response: the start command remains
+    /// server-authoritative. When lines are present, native can explain a
+    /// fail-closed preflight before the server repeats the same validation.
+    public var readinessReasons: [String] {
+        guard !items.isEmpty else { return [] }
+        return items.compactMap { item in
+            guard !["ready", "handed_over", "customer_cancelled", "cancelled"]
+                .contains(item.fulfillmentStatus ?? "") else { return nil }
+            return "\(item.sku): \(item.fulfillmentStatus ?? "статус не получен")"
+        }
+    }
+
+    public var nativeReadinessKnown: Bool { !items.isEmpty }
+    public var canStartByNativePreflight: Bool { !nativeReadinessKnown || readinessReasons.isEmpty }
 }
 
 /// Метки Evidence, которые сервер сверяет побайтово.

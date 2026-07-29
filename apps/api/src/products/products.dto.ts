@@ -64,6 +64,42 @@ export class ProductBundleComponentDto {
   qty!: number;
 }
 
+export class CreateProductSupplierOfferDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(64)
+  supplierId!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  supplierSku?: string;
+
+  @ApiProperty({ minimum: 0 })
+  @IsInt()
+  @Min(0)
+  unitCost!: number;
+
+  @ApiProperty({ minimum: 0 })
+  @IsInt()
+  @Min(0)
+  availableQty!: number;
+
+  @ApiProperty({ minimum: 1, maximum: 180 })
+  @IsInt()
+  @Min(1)
+  @Max(180)
+  leadDays!: number;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 168, default: 24 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(168)
+  validForHours?: number;
+}
+
 export class CreateProductDto {
   @ApiProperty({ example: 'IPHONE-15-128-BLK' })
   @IsString()
@@ -114,6 +150,24 @@ export class CreateProductDto {
   @IsOptional()
   @IsIn(['serialized', 'quantity'])
   trackingMode?: 'serialized' | 'quantity';
+
+  @ApiPropertyOptional({ enum: ['own_stock', 'to_order'], default: 'own_stock' })
+  @IsOptional()
+  @IsIn(['own_stock', 'to_order'])
+  supplyMode?: 'own_stock' | 'to_order';
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 180 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(180)
+  supplyLeadDays?: number;
+
+  @ApiPropertyOptional({ type: () => CreateProductSupplierOfferDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CreateProductSupplierOfferDto)
+  supplierOffer?: CreateProductSupplierOfferDto;
 
   @ApiPropertyOptional({
     type: 'object',
@@ -177,6 +231,24 @@ export class UpdateProductDto {
   @IsOptional()
   @IsIn(['serialized', 'quantity'])
   trackingMode?: 'serialized' | 'quantity';
+
+  @ApiPropertyOptional({ enum: ['own_stock', 'to_order'] })
+  @IsOptional()
+  @IsIn(['own_stock', 'to_order'])
+  supplyMode?: 'own_stock' | 'to_order';
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 180, example: 7, description: 'Срок поставки под заказ, дней' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(180)
+  supplyLeadDays?: number;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Поставщик. Внутреннее поле, в публичный каталог не попадает.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  supplierId?: string;
 
   @ApiPropertyOptional({
     type: 'object',

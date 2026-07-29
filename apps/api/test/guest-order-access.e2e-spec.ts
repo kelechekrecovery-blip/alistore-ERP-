@@ -17,6 +17,8 @@ describe('Guest order-scoped status and receipt access', () => {
   const run = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   let customerId = '';
   let productId = '';
+  let pointId = '';
+  let fulfillmentLocation = '';
   const orderIds: string[] = [];
   const jwt = new JwtService({ secret: process.env.JWT_SECRET ?? 'dev-insecure-change-me' });
 
@@ -28,6 +30,19 @@ describe('Guest order-scoped status and receipt access', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
     prisma = moduleRef.get(PrismaService);
+    const point = await prisma.storePoint.create({
+      data: {
+        code: `guest-${run}`.toLowerCase(),
+        name: 'Guest access fixture',
+        address: 'Test address',
+        inventoryLocation: `GUEST-${run}`.toUpperCase(),
+        hours: '10:00–20:00',
+        createdBy: 'guest-order-test',
+        idempotencyKey: `guest-order-point-${run}`,
+      },
+    });
+    pointId = point.id;
+    fulfillmentLocation = point.inventoryLocation;
   });
 
   afterAll(async () => {
@@ -40,6 +55,7 @@ describe('Guest order-scoped status and receipt access', () => {
       await prisma.product.deleteMany({ where: { id: productId } });
     }
     if (customerId) await prisma.customer.deleteMany({ where: { id: customerId } });
+    if (pointId) await prisma.storePoint.deleteMany({ where: { id: pointId } });
     await app.close();
   });
 
@@ -49,14 +65,14 @@ describe('Guest order-scoped status and receipt access', () => {
     const product = await prisma.product.create({
       data: {
         sku: `GUEST-${run}`.toUpperCase(), name: 'Guest receipt phone', price: 25_000, cost: 20_000,
-        category: 'phones', attrs: {}, trackingMode: 'quantity', balances: { create: { location: 'BISHKEK-1', onHand: 5 } },
+        category: 'phones', attrs: {}, trackingMode: 'quantity', balances: { create: { location: fulfillmentLocation, onHand: 5 } },
       },
     });
     productId = product.id;
     const checkoutCapability = issueGuestCheckoutCapability(customer.id);
     const created = await request(app.getHttpServer()).post('/orders')
       .set('x-guest-capability', checkoutCapability).set('Idempotency-Key', `guest-order-${run}`)
-      .send({ customerId: customer.id, channel: 'web', fulfillmentType: 'courier', deliveryAddress: 'Бишкек, ул. Киевская 10, кв. 5', total: 1, items: [{ sku: product.sku, qty: 1, price: 1 }] })
+      .send({ customerId: customer.id, channel: 'web', fulfillmentType: 'courier', storePointId: pointId, deliveryAddress: 'Бишкек, ул. Киевская 10, кв. 5', total: 1, items: [{ sku: product.sku, qty: 1, price: 1 }] })
       .expect(201);
     orderIds.push(created.body.id);
     expect(created.body.guestAccess).toMatchObject({ expiresIn: 604800 });

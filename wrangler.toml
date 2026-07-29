@@ -1,0 +1,135 @@
+name = "alistore-api"
+main = "cloudflare/worker.js"
+compatibility_date = "2026-07-25"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CommandCoordinator"]
+
+[env.local]
+name = "alistore-api-local"
+vars = { APP_ENV = "local", API_VERSION = "cloudflare-foundation-v1" }
+
+[[env.local.d1_databases]]
+binding = "DB"
+database_name = "ali-local"
+database_id = "local"
+migrations_dir = "migrations"
+
+[[env.local.r2_buckets]]
+binding = "MEDIA"
+bucket_name = "ali-media-local"
+
+[[env.local.durable_objects.bindings]]
+name = "COMMAND_COORDINATOR"
+class_name = "CommandCoordinator"
+
+[[env.local.queues.producers]]
+binding = "OUTBOX_QUEUE"
+queue = "ali-outbox-local"
+
+[[env.local.queues.consumers]]
+queue = "ali-outbox-local"
+max_batch_size = 10
+max_batch_timeout = 5
+
+[env.local.triggers]
+crons = ["*/5 * * * *"]
+
+[env.staging]
+name = "alistore-api-staging"
+vars = { APP_ENV = "staging", API_VERSION = "cloudflare-foundation-v1" }
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "ali-staging"
+database_id = "e1053d18-c4a8-470e-99db-c5b6b9d274c0"
+migrations_dir = "migrations"
+
+[[env.staging.r2_buckets]]
+binding = "MEDIA"
+bucket_name = "ali-media-staging"
+
+[[env.staging.durable_objects.bindings]]
+name = "COMMAND_COORDINATOR"
+class_name = "CommandCoordinator"
+
+[[env.staging.queues.producers]]
+binding = "OUTBOX_QUEUE"
+queue = "ali-outbox-staging"
+
+[[env.staging.queues.consumers]]
+queue = "ali-outbox-staging"
+max_batch_size = 10
+max_batch_timeout = 5
+
+[env.staging.triggers]
+crons = ["*/5 * * * *"]
+
+[env.review]
+name = "alistore-api-review"
+vars = { APP_ENV = "review", API_VERSION = "cloudflare-foundation-v1" }
+
+[[env.review.d1_databases]]
+binding = "DB"
+database_name = "ali-review"
+database_id = "48b39732-444e-4bbd-a5b5-9eb09a954bf9"
+migrations_dir = "migrations"
+
+[[env.review.r2_buckets]]
+binding = "MEDIA"
+bucket_name = "ali-media-review"
+
+[[env.review.durable_objects.bindings]]
+name = "COMMAND_COORDINATOR"
+class_name = "CommandCoordinator"
+
+[[env.review.queues.producers]]
+binding = "OUTBOX_QUEUE"
+queue = "ali-outbox-review"
+
+[[env.review.queues.consumers]]
+queue = "ali-outbox-review"
+max_batch_size = 10
+max_batch_timeout = 5
+
+# The account currently has room for one AliStore cron trigger. Staging owns it
+# during migration rehearsal; review remains request/queue driven. At production
+# cutover, move the staging schedule to production instead of adding a sixth
+# account-level trigger.
+
+[env.production]
+name = "alistore-api-production"
+vars = { APP_ENV = "production", API_VERSION = "cloudflare-foundation-v1" }
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "ali-production"
+database_id = "a76744e9-981a-40e0-98b7-52260f93fa64"
+migrations_dir = "migrations"
+
+[[env.production.r2_buckets]]
+binding = "MEDIA"
+bucket_name = "alistore-media-prod"
+
+[[env.production.durable_objects.bindings]]
+name = "COMMAND_COORDINATOR"
+class_name = "CommandCoordinator"
+
+[[env.production.queues.producers]]
+binding = "OUTBOX_QUEUE"
+queue = "ali-outbox-production"
+
+[[env.production.queues.consumers]]
+queue = "ali-outbox-production"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "ali-outbox-production-dlq"
+
+[env.production.triggers]
+crons = ["*/5 * * * *"]

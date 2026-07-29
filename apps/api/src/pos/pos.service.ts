@@ -10,6 +10,7 @@ import { ApprovalsService } from '../approvals/approvals.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
+import { resolveActiveStorePoint } from '../common/store-point-identity';
 import { PosSaleDto } from './pos.dto';
 import { evaluateMarginControl, MarginControlResult, saleTotal } from './margin-control';
 import { issuePosCustomerBinding, requirePosCustomerBinding } from './pos-customer-binding';
@@ -85,44 +86,13 @@ export class PosService {
   }
 
   async findCustomer(rawPhone: string | undefined, staffId: string, point: string, clientSaleId: string) {
-    const requestedPoint = point.trim();
-    const knownCode = requestedPoint === 'alistore-center' || requestedPoint === 'AliStore Центр'
-      ? 'center'
-      : requestedPoint.toLowerCase();
-    const storePoint = await this.prisma.storePoint.findFirst({
-      where: {
-        active: true,
-        OR: [
-          { id: requestedPoint },
-          { code: knownCode },
-          { inventoryLocation: requestedPoint.toUpperCase() },
-        ],
-      },
-      select: { id: true, inventoryLocation: true },
-    });
-    if (!storePoint) {
-      throw new ValidationError('store_point_unavailable', 'Точка кассы недоступна или отключена');
-    }
+    const storePoint = await resolveActiveStorePoint(this.prisma, point, 'Точка кассы недоступна или отключена');
     const staff = await this.prisma.staffUser.findUnique({
       where: { id: staffId },
       select: { point: true },
     });
     if (staff) {
-      const staffPointAlias = staff.point.trim();
-      const staffPointCode = staffPointAlias === 'alistore-center' || staffPointAlias === 'AliStore Центр'
-        ? 'center'
-        : staffPointAlias.toLowerCase();
-      const assignedPoint = await this.prisma.storePoint.findFirst({
-        where: {
-          active: true,
-          OR: [
-            { id: staffPointAlias },
-            { code: staffPointCode },
-            { inventoryLocation: staffPointAlias.toUpperCase() },
-          ],
-        },
-        select: { id: true },
-      });
+      const assignedPoint = await resolveActiveStorePoint(this.prisma, staff.point, 'Точка сотрудника недоступна или отключена');
       if (!assignedPoint || assignedPoint.id !== storePoint.id) {
         throw new ForbiddenError('staff_point_mismatch', 'Кассир не назначен на выбранную точку');
       }
@@ -163,21 +133,7 @@ export class PosService {
 
   async sale(dto: PosSaleDto) {
     const actor = dto.staffId;
-    const requestedPoint = dto.point.trim();
-    const knownCode = requestedPoint === 'alistore-center' || requestedPoint === 'AliStore Центр' ? 'center' : requestedPoint.toLowerCase();
-    const storePoint = await this.prisma.storePoint.findFirst({
-      where: {
-        active: true,
-        OR: [
-          { id: requestedPoint },
-          { code: knownCode },
-          { inventoryLocation: requestedPoint.toUpperCase() },
-        ],
-      },
-    });
-    if (!storePoint) {
-      throw new ValidationError('store_point_unavailable', 'Точка кассы недоступна или отключена');
-    }
+    const storePoint = await resolveActiveStorePoint(this.prisma, dto.point, 'Точка кассы недоступна или отключена');
     const explicitTxnId = dto.clientSaleId ? `pos:${dto.clientSaleId}` : undefined;
     const existingPayment = explicitTxnId
       ? await this.payments.findByTxnId(explicitTxnId)
@@ -200,21 +156,7 @@ export class PosService {
     });
     if (staff) {
       if (!staff.active) throw new ForbiddenError('staff_inactive', 'Учётная запись сотрудника отключена');
-      const staffPointAlias = staff.point.trim();
-      const staffPointCode = staffPointAlias === 'alistore-center' || staffPointAlias === 'AliStore Центр'
-        ? 'center'
-        : staffPointAlias.toLowerCase();
-      const staffPoint = await this.prisma.storePoint.findFirst({
-        where: {
-          active: true,
-          OR: [
-            { id: staffPointAlias },
-            { code: staffPointCode },
-            { inventoryLocation: staffPointAlias.toUpperCase() },
-          ],
-        },
-        select: { id: true },
-      });
+      const staffPoint = await resolveActiveStorePoint(this.prisma, staff.point, 'Точка сотрудника недоступна или отключена');
       if (!staffPoint || staffPoint.id !== storePoint.id) {
         throw new ForbiddenError('staff_point_mismatch', 'Кассир не назначен на выбранную точку');
       }

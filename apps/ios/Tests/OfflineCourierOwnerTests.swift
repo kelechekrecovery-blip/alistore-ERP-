@@ -9,16 +9,16 @@ import XCTest
 /// оставляет только свои и legacy-записи без владельца.
 final class OfflineCourierOwnerTests: XCTestCase {
     private func mutation(owner: String?, state: String = "queued") -> PendingMutation {
-        let m = PendingMutation(endpoint: "courier/orders/o-1/deliver", method: "POST", body: Data("{}".utf8), owner: owner)
-        m.state = state
-        return m
+        let mutation = PendingMutation(endpoint: "courier/orders/o-1/deliver", method: "POST", body: Data("{}".utf8), owner: owner)
+        mutation.state = state
+        return mutation
     }
 
     func testOwnedShowsOnlyOwnAndLegacyCommands() {
         let all = [
             mutation(owner: "courier-a"),
             mutation(owner: "courier-b"),
-            mutation(owner: nil), // до появления поля владельца
+            mutation(owner: nil) // до появления поля владельца
         ]
 
         let forB = OfflineCourierQueue.owned(all, by: "courier-b")
@@ -46,9 +46,9 @@ final class OfflineCourierOwnerTests: XCTestCase {
 /// to say a command is already pending before they send another.
 final class CourierPendingCommandTests: XCTestCase {
     private func mutation(endpoint: String, state: String = "queued", owner: String? = "courier-1") -> PendingMutation {
-        let m = PendingMutation(endpoint: endpoint, method: "POST", body: Data("{}".utf8), idempotencyKey: endpoint, owner: owner)
-        m.state = state
-        return m
+        let mutation = PendingMutation(endpoint: endpoint, method: "POST", body: Data("{}".utf8), idempotencyKey: endpoint, owner: owner)
+        mutation.state = state
+        return mutation
     }
 
     func testFindsAQueuedCommandForTheOrder() {

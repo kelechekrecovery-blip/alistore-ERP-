@@ -20,7 +20,21 @@ export interface CartItem {
   price: number;
   qty: number;
   stockLimit: number;
+  /** `to_order` lines skip the stock gate server-side — see SUPPLY-TO-ORDER-PLAN.md срез 2. */
+  supplyMode: 'own_stock' | 'to_order';
+  supplyLeadDays: number | null;
 }
+
+/**
+ * A to-order line has no stock ceiling — nothing physical to run out of before
+ * it is even ordered from the supplier — so `stockLimit` can't come from
+ * `availableUnits` (always 0) the way it does for own-stock items. The cap
+ * below is not a stock guard; it is a sanity ceiling against a fat-fingered or
+ * runaway single-request quantity. Ten units is generous for a walk-in request
+ * (e.g. a handful of accessories for a small team); a genuinely larger order
+ * goes through staff, not the storefront `+` button.
+ */
+export const TO_ORDER_CART_QTY_CAP = 10;
 
 interface CartContextValue {
   items: CartItem[];
@@ -38,6 +52,8 @@ interface CartContextValue {
   bonusDiscount: number;
   discount: number;
   hydrated: boolean;
+  /** Supply mode of what is currently in the cart, or `null` when empty. */
+  cartSupplyMode: 'own_stock' | 'to_order' | null;
   add: (item: Omit<CartItem, 'qty'>, qty?: number) => void;
   setQty: (id: string, qty: number) => void;
   remove: (id: string) => void;
@@ -45,7 +61,13 @@ interface CartContextValue {
   clearPromo: () => void;
   toggleBonus: () => void;
   clear: () => void;
-  reconcileAvailability: (products: Array<{ id: string; price: number; availableUnits: number }>) => void;
+  reconcileAvailability: (products: Array<{
+    id: string;
+    price: number;
+    availableUnits: number;
+    supplyMode?: 'own_stock' | 'to_order';
+    supplyLeadDays?: number | null;
+  }>) => void;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -70,11 +92,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as Array<Partial<CartItem>>;
-        setItems(parsed.filter((item) => item.id && item.sku && item.name && Number.isFinite(item.price) && Number.isFinite(item.qty)).map((item) => ({
-          id: item.id!, sku: item.sku!, name: item.name!, price: item.price!,
-          stockLimit: Math.max(0, Number.isFinite(item.stockLimit) ? item.stockLimit! : item.qty!),
-          qty: Math.max(1, Math.min(item.qty!, Number.isFinite(item.stockLimit) ? item.stockLimit! : item.qty!)),
-        })));
+        // Tolerant migration, no STORAGE_KEY version bump: a cart saved before
+        // supply-mode carts shipped has no `supplyMode`/`supplyLeadDays` at
+        // all. Every such cart was, by construction, own-stock — defaulting a
+        // missing field to 'own_stock' reproduces exactly the old behaviour
+        // instead of crashing the page or inventing a to-order line no one
+        // asked for.
+        setItems(parsed.filter((item) => item.id && item.sku && item.name && Number.isFinite(item.price) && Number.isFinite(item.qty)).map((item) => {
+          const supplyMode: CartItem['supplyMode'] = item.supplyMode === 'to_order' ? 'to_order' : 'own_stock';
+          const stockLimit = Math.max(0, Number.isFinite(item.stockLimit) ? item.stockLimit! : item.qty!);
+          return {
+            id: item.id!, sku: item.sku!, name: item.name!, price: item.price!,
+            stockLimit,
+            supplyMode,
+            supplyLeadDays: supplyMode === 'to_order' && Number.isFinite(item.supplyLeadDays) ? item.supplyLeadDays! : null,
+            qty: Math.max(1, Math.min(item.qty!, stockLimit)),
+          };
+        }));
       }
       // fixtures-allowed: корзина — клиентское состояние; при испорченном JSON восстанавливать её неоткуда, пустая корзина здесь и есть правда, а не подменённые данные
     } catch {
@@ -145,6 +179,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (existing) {
         return prev.map((x) => (x.id === item.id ? { ...x, ...item, qty: Math.min(x.qty + qty, item.stockLimit) } : x));
       }
+      // Mixed carts are intentional: the server creates separate receivables
+      // for stock, deposit and supply balance.
       return item.stockLimit > 0 ? [...prev, { ...item, qty: Math.min(qty, item.stockLimit) }] : prev;
     });
   }, []);
@@ -226,14 +262,40 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setBonusApplied(false);
   }, []);
 
-  const reconcileAvailability = useCallback((products: Array<{ id: string; price: number; availableUnits: number }>) => {
+  const reconcileAvailability = useCallback((products: Array<{
+    id: string;
+    price: number;
+    availableUnits: number;
+    supplyMode?: 'own_stock' | 'to_order';
+    supplyLeadDays?: number | null;
+  }>) => {
     const byId = new Map(products.map((product) => [product.id, product]));
     setItems((current) => current.flatMap((item) => {
       const product = byId.get(item.id);
-      if (!product || product.availableUnits <= 0) return [];
-      return [{ ...item, price: product.price, stockLimit: product.availableUnits, qty: Math.min(item.qty, product.availableUnits) }];
+      if (!product) return [];
+      const isToOrder = product.supplyMode === 'to_order';
+      // A to-order line has `availableUnits === 0` by definition — it must
+      // survive this reconcile even though an own-stock line at 0 must not
+      // (over-selling our own stock stays impossible; that clamp is
+      // unchanged below).
+      if (!isToOrder && product.availableUnits <= 0) return [];
+      const stockLimit = isToOrder ? TO_ORDER_CART_QTY_CAP : product.availableUnits;
+      return [{
+        ...item,
+        price: product.price,
+        stockLimit,
+        supplyMode: isToOrder ? 'to_order' : 'own_stock',
+        supplyLeadDays: isToOrder ? (product.supplyLeadDays ?? null) : null,
+        qty: Math.min(item.qty, stockLimit),
+      }];
     }));
   }, []);
+
+  /** First line mode for legacy presentation code; mixed carts are allowed. */
+  const cartSupplyMode = useMemo<'own_stock' | 'to_order' | null>(
+    () => items[0]?.supplyMode ?? null,
+    [items],
+  );
 
   const count = useMemo(() => items.reduce((s, x) => s + x.qty, 0), [items]);
   const subtotal = useMemo(
@@ -261,6 +323,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       bonusDiscount,
       discount,
       hydrated,
+      cartSupplyMode,
       add,
       setQty,
       remove,
@@ -286,6 +349,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       bonusDiscount,
       discount,
       hydrated,
+      cartSupplyMode,
       add,
       setQty,
       remove,

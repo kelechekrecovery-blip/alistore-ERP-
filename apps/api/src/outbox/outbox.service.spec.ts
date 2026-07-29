@@ -1,6 +1,29 @@
 import { OutboxService } from './outbox.service';
 
 describe('OutboxService retry policy', () => {
+  it('uses an immutable upsert for a stable business dedup key', async () => {
+    const upsert = jest.fn().mockResolvedValue({});
+    const prisma = { outboxMessage: { upsert } };
+    const service = new OutboxService(
+      prisma as never,
+      { deliver: jest.fn() } as never,
+    );
+    const input = {
+      channel: 'sms' as const,
+      recipient: '+996700000001',
+      template: 'supply_ready',
+      dedupKey: 'supply:supply_ready:event-1',
+      payload: { orderId: 'order-1' },
+    };
+
+    await service.enqueue(input);
+    await service.enqueue(input);
+
+    expect(upsert).toHaveBeenCalledTimes(2);
+    expect(upsert.mock.calls[0][0].where.id).toBe(upsert.mock.calls[1][0].where.id);
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ update: {} }));
+  });
+
   it('does not claim a push message sent when the recipient has no device', async () => {
     const transport = { deliver: jest.fn().mockRejectedValue(new Error('push_recipient_unavailable')) };
     const update = jest.fn().mockResolvedValue(undefined);

@@ -1,3 +1,5 @@
+// JSON wire fixtures are intentionally kept inline and exceed generic structural limits.
+// swiftlint:disable line_length type_body_length
 import AliStoreCore
 import Foundation
 import SwiftData

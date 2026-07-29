@@ -396,6 +396,12 @@ const refund: ActionExecutor = async (tx, payload, approver, approvalId, events)
   await tx.$queryRaw`SELECT id FROM "Refund" WHERE id = ${refundId} FOR UPDATE`;
   const aggregate = await tx.refund.findUnique({ where: { id: refundId } });
   if (!aggregate) throw new ValidationError('refund_not_found', 'Refund не найден');
+  if (aggregate.purpose !== 'return_sale' || !aggregate.returnId) {
+    throw new ConflictError(
+      'refund_approval_purpose_invalid',
+      'Эта approval-команда предназначена только для возврата продажи',
+    );
+  }
   if (aggregate.approvalId !== approvalId || aggregate.status !== 'requested') {
     throw new ConflictError('refund_approval_snapshot_changed', 'Refund больше не ожидает это согласование');
   }
@@ -423,6 +429,12 @@ const reject_refund: ActionRejectionExecutor = async (tx, payload, approver, app
   const aggregate = await tx.refund.findUnique({ where: { id: refundId } });
   if (!aggregate || aggregate.approvalId !== approvalId || aggregate.status !== 'requested') {
     throw new ConflictError('refund_approval_snapshot_changed', 'Refund больше не ожидает это согласование');
+  }
+  if (aggregate.purpose !== 'return_sale' || !aggregate.returnId) {
+    throw new ConflictError(
+      'refund_approval_purpose_invalid',
+      'Эта approval-команда предназначена только для возврата продажи',
+    );
   }
   await tx.refund.update({ where: { id: refundId }, data: { status: 'rejected', approver } });
   await tx.return.update({ where: { id: aggregate.returnId }, data: { status: 'rejected' } });

@@ -9,6 +9,7 @@ import { ApplySupplierAdvanceDto, CreateLandedCostDto, CreatePurchaseOrderDto, C
 import { assertCanCancel, assertCanReceive, assertCanSend } from './purchase-order-state';
 import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
+import { resolveActiveStorePoint } from '../common/store-point-identity';
 
 const DETAIL_INCLUDE = {
   supplier: { select: { id: true, name: true, contact: true } },
@@ -46,7 +47,11 @@ export class ProcurementService {
   }
 
   async create(dto: CreatePurchaseOrderDto, actor: string) {
-    const location = dto.location.trim();
+    const location = (await resolveActiveStorePoint(
+      this.prisma,
+      dto.location,
+      'Склад назначения не соответствует активной точке',
+    )).inventoryLocation;
     const note = dto.note?.trim() || null;
     if (!location) {
       throw new ValidationError('purchase_order_location_required', 'Укажите склад назначения');
@@ -122,10 +127,46 @@ export class ProcurementService {
       const order = await tx.purchaseOrder.findUnique({ where: { id } });
       if (!order) throw new ValidationError('purchase_order_not_found', `PO ${id} не найден`);
       assertCanSend(order.status);
+      const linkedSupplies = await tx.orderLineSupply.findMany({
+        where: { purchaseOrderItem: { purchaseOrderId: id } },
+        include: { orderItem: { select: { orderId: true } } },
+      });
+      const invalidSupply = linkedSupplies.find((supply) => supply.status !== 'procurement_draft');
+      if (invalidSupply) {
+        throw new ConflictError(
+          'purchase_order_supply_state_invalid',
+          `Строка ${invalidSupply.orderItemId} не готова к отправке поставщику`,
+        );
+      }
       const updated = await tx.purchaseOrder.update({ where: { id }, data: { status: 'sent', sentAt: new Date() }, include: DETAIL_INCLUDE });
+      if (linkedSupplies.length > 0) {
+        await tx.orderLineSupply.updateMany({
+          where: { id: { in: linkedSupplies.map((supply) => supply.id) }, status: 'procurement_draft' },
+          data: { status: 'ordered', actor },
+        });
+        await tx.orderItem.updateMany({
+          where: { id: { in: linkedSupplies.map((supply) => supply.orderItemId) } },
+          data: { fulfillmentStatus: 'supplier_ordered' },
+        });
+      }
       return {
         result: updated,
-        events: [{ type: EventType.PurchaseOrderSent, actor, payload: { purchaseOrderId: id, number: order.number }, refs: [id, order.supplierId] }],
+        events: [
+          { type: EventType.PurchaseOrderSent, actor, payload: { purchaseOrderId: id, number: order.number }, refs: [id, order.supplierId] },
+          ...linkedSupplies.map((supply) => ({
+            type: EventType.OrderLineSupplyOrdered,
+            actor,
+            payload: {
+              orderId: supply.orderItem.orderId,
+              orderItemId: supply.orderItemId,
+              purchaseOrderId: id,
+              purchaseOrderItemId: supply.purchaseOrderItemId,
+              supplierId: order.supplierId,
+              expectedAt: supply.expectedAt?.toISOString() ?? null,
+            },
+            refs: [supply.orderItem.orderId, supply.orderItemId, id, order.supplierId],
+          })),
+        ],
       };
     });
   }
@@ -149,10 +190,20 @@ export class ProcurementService {
     if (new Set(itemIds).size !== itemIds.length) {
       throw new ValidationError('duplicate_purchase_order_item', 'Строка PO повторяется в приёмке');
     }
-    const normalizedLines = dto.lines.map((line) => ({ ...line, imeis: line.imeis.map((imei) => imei.trim()).filter(Boolean) }));
+    const normalizedLines = dto.lines.map((line) => ({
+      ...line,
+      imeis: (line.imeis ?? []).map((imei) => imei.trim()).filter(Boolean),
+      qty: line.qty ?? null,
+    }));
     const allImeis = normalizedLines.flatMap((line) => line.imeis);
-    if (normalizedLines.some((line) => line.imeis.length === 0) || new Set(allImeis).size !== allImeis.length) {
-      throw new ValidationError('duplicate_or_empty_imei', 'IMEI должны быть непустыми и уникальными в приёмке');
+    if (
+      normalizedLines.some((line) => (line.imeis.length > 0) === (line.qty !== null))
+      || new Set(allImeis).size !== allImeis.length
+    ) {
+      throw new ValidationError(
+        'invalid_purchase_receipt_quantity',
+        'Для каждой строки укажите либо уникальные IMEI, либо количество qty',
+      );
     }
     if (allImeis.length > 200) {
       throw new ValidationError('purchase_receipt_too_large', 'За одну приёмку можно принять не более 200 устройств');
@@ -172,14 +223,26 @@ export class ProcurementService {
           return { result: { ...replayed, idempotent: true, receiptId: existing.id }, events: [] };
         }
 
-        const order = await tx.purchaseOrder.findUnique({ where: { id }, include: { items: true } });
+        const order = await tx.purchaseOrder.findUnique({
+          where: { id },
+          include: {
+            items: {
+              include: {
+                orderLineSupply: {
+                  include: { orderItem: { select: { orderId: true } } },
+                },
+              },
+            },
+          },
+        });
         if (!order) throw new ValidationError('purchase_order_not_found', `PO ${id} не найден`);
         assertCanReceive(order.status);
         const byId = new Map(order.items.map((item) => [item.id, item]));
         for (const line of normalizedLines) {
           const item = byId.get(line.itemId);
           if (!item) throw new ValidationError('purchase_order_item_not_found', `Строка ${line.itemId} не принадлежит PO`);
-          if (item.receivedQty + line.imeis.length > item.orderedQty) {
+          const receiptQty = line.qty ?? line.imeis.length;
+          if (item.receivedQty + receiptQty > item.orderedQty) {
             throw new ConflictError('purchase_order_over_receipt', `По строке ${line.itemId} принято больше заказанного`);
           }
         }
@@ -193,16 +256,40 @@ export class ProcurementService {
         // легко на первом же наполнении магазина.
         const products = await tx.product.findMany({
           where: { id: { in: [...new Set(normalizedLines.map((line) => byId.get(line.itemId)!.productId))] } },
-          select: { id: true, sku: true, name: true, trackingMode: true },
+          select: { id: true, sku: true, name: true, trackingMode: true, supplyMode: true },
         });
-        const quantityTracked = products.filter((product) => product.trackingMode !== 'serialized');
-        if (quantityTracked.length > 0) {
-          throw new ValidationError(
-            'product_not_serialized',
-            `Приёмка по IMEI доступна только для серийного учёта. Товар в количественном учёте: `
-              + `${quantityTracked.map((product) => `${product.sku} (${product.name})`).join(', ')}. `
-              + 'Укажите «серийный» в колонке «тип учёта» при импорте или смените тип у товара.',
-          );
+        const productById = new Map(products.map((product) => [product.id, product]));
+        for (const line of normalizedLines) {
+          const item = byId.get(line.itemId)!;
+          const product = productById.get(item.productId)!;
+          const supply = item.orderLineSupply;
+          const serialized = product.trackingMode === 'serialized';
+          if (serialized !== (line.imeis.length > 0)) {
+            throw new ValidationError(
+              serialized ? 'serialized_receipt_requires_imei' : 'product_not_serialized',
+              serialized
+                ? `Для серийного товара ${product.sku} нужны IMEI`
+                : `Для количественного товара ${product.sku} нужно поле qty`,
+            );
+          }
+          if (!serialized && !supply) {
+            throw new ConflictError(
+              'quantity_to_order_receipt_requires_allocation',
+              `Количественную строку ${product.sku} этим маршрутом можно принять только в клиентскую поставочную аллокацию`,
+            );
+          }
+          if (product.supplyMode === 'to_order' && !supply) {
+            throw new ConflictError(
+              'to_order_receipt_requires_allocation',
+              `Заказной товар ${product.sku} нельзя принять в свободный склад без клиентской аллокации`,
+            );
+          }
+          if (supply && !['in_transit', 'late'].includes(supply.status)) {
+            throw new ConflictError(
+              'order_line_supply_not_in_transit',
+              `Поставка строки ${supply.orderItemId} должна находиться в пути перед приёмкой`,
+            );
+          }
         }
         const duplicateUnits = await tx.deviceUnit.findMany({ where: { imei: { in: allImeis } }, select: { imei: true } });
         if (duplicateUnits.length) {
@@ -217,19 +304,90 @@ export class ProcurementService {
         const nextReceived = new Map(order.items.map((item) => [item.id, item.receivedQty]));
         for (const line of normalizedLines) {
           const item = byId.get(line.itemId)!;
-          receiptValue += line.imeis.length * item.unitCost;
-          await tx.purchaseOrderItem.update({ where: { id: item.id }, data: { receivedQty: { increment: line.imeis.length } } });
+          const product = productById.get(item.productId)!;
+          const receiptQty = line.qty ?? line.imeis.length;
+          receiptValue += receiptQty * item.unitCost;
+          await tx.purchaseOrderItem.update({ where: { id: item.id }, data: { receivedQty: { increment: receiptQty } } });
           const movement = await tx.inventoryMovement.create({
-            data: { productId: item.productId, qty: line.imeis.length, type: 'received', to: order.location, reason: order.number, unitCost: item.unitCost, totalValue: line.imeis.length * item.unitCost },
+            data: { productId: item.productId, qty: receiptQty, type: 'received', to: order.location, reason: order.number, unitCost: item.unitCost, totalValue: receiptQty * item.unitCost },
           });
-          await tx.deviceUnit.createMany({
-            data: line.imeis.map((imei) => ({ imei, productId: item.productId, status: 'in_stock', location: order.location, grade: (line.grade ?? null) as Grade | null, acquisitionCost: item.unitCost })),
-          });
-          nextReceived.set(item.id, item.receivedQty + line.imeis.length);
+          if (product.trackingMode === 'serialized') {
+            await tx.deviceUnit.createMany({
+              data: line.imeis.map((imei) => ({
+                imei,
+                productId: item.productId,
+                status: item.orderLineSupply ? 'reserved' : 'in_stock',
+                orderId: item.orderLineSupply?.orderItem.orderId ?? null,
+                location: order.location,
+                grade: (line.grade ?? null) as Grade | null,
+                acquisitionCost: item.unitCost,
+              })),
+            });
+          } else if (item.orderLineSupply) {
+            await tx.supplyQuantityAllocation.create({
+              data: {
+                orderLineSupplyId: item.orderLineSupply.id,
+                purchaseReceiptId: receipt.id,
+                productId: item.productId,
+                location: order.location,
+                qty: receiptQty,
+                unitCost: item.unitCost,
+              },
+            });
+          }
+          const receivedQty = item.receivedQty + receiptQty;
+          nextReceived.set(item.id, receivedQty);
+          if (item.orderLineSupply) {
+            const supplyComplete = receivedQty === item.orderedQty;
+            await tx.orderLineSupply.update({
+              where: { id: item.orderLineSupply.id },
+              data: {
+                receivedQty,
+                ...(supplyComplete ? { status: 'received', actor } : {}),
+              },
+            });
+            if (supplyComplete) {
+              await tx.orderItem.update({
+                where: { id: item.orderLineSupply.orderItemId },
+                data: {
+                  fulfillmentStatus: 'received',
+                  ...(product.trackingMode === 'serialized' && line.imeis.length === 1
+                    ? { imei: line.imeis[0] }
+                    : {}),
+                },
+              });
+              events.push({
+                type: EventType.OrderLineSupplyReceived,
+                actor,
+                payload: {
+                  orderId: item.orderLineSupply.orderItem.orderId,
+                  orderItemId: item.orderLineSupply.orderItemId,
+                  purchaseOrderId: id,
+                  purchaseOrderItemId: item.id,
+                  receivedQty,
+                },
+                refs: [
+                  item.orderLineSupply.orderItem.orderId,
+                  item.orderLineSupply.orderItemId,
+                  id,
+                  item.id,
+                ],
+              });
+            }
+          }
           events.push({
             type: EventType.StockReceived,
             actor,
-            payload: { purchaseOrderId: id, receiptId: receipt.id, productId: item.productId, qty: line.imeis.length, location: order.location, movementId: movement.id },
+            payload: {
+              purchaseOrderId: id,
+              receiptId: receipt.id,
+              productId: item.productId,
+              qty: receiptQty,
+              location: order.location,
+              movementId: movement.id,
+              availability: item.orderLineSupply ? 'customer_reserved' : 'free_stock',
+              orderId: item.orderLineSupply?.orderItem.orderId ?? null,
+            },
             refs: [id, receipt.id, item.productId, movement.id],
           });
           events.push(...line.imeis.map((imei) => ({
@@ -273,7 +431,12 @@ export class ProcurementService {
         events.push({
           type: complete ? EventType.PurchaseOrderReceived : EventType.PurchaseOrderReceiving,
           actor,
-          payload: { purchaseOrderId: id, receiptId: receipt.id, status, units: allImeis.length },
+          payload: {
+            purchaseOrderId: id,
+            receiptId: receipt.id,
+            status,
+            units: normalizedLines.reduce((sum, line) => sum + (line.qty ?? line.imeis.length), 0),
+          },
           refs: [id, receipt.id, order.supplierId, ...allImeis],
         });
         return { result: { ...updated, idempotent: false, receiptId: receipt.id }, events };
@@ -1077,6 +1240,7 @@ function receiptPayloadFingerprint(payload: unknown): string {
       itemId: typeof line.itemId === 'string' ? line.itemId : '',
       grade: typeof line.grade === 'string' ? line.grade : null,
       imeis: Array.isArray(line.imeis) ? line.imeis.filter((imei): imei is string => typeof imei === 'string') : [],
+      qty: typeof line.qty === 'number' ? line.qty : null,
     };
   }));
 }

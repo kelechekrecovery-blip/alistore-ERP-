@@ -43,8 +43,6 @@ import {
   type StaffSession,
 } from '@/lib/staff-session';
 
-const POINT = 'BISHKEK-1';
-const SHOP = 'AliStore Центр';
 const DISCOUNTS = [0, 5, 10, 15];
 
 export default function PosPage() {
@@ -111,6 +109,8 @@ export default function PosPage() {
   const count = lines.reduce((s, l) => s + l.qty, 0);
   const queueSummary = offlineQueueStats(queue);
   const cashier = session?.username || session?.role || 'staff';
+  const point = session?.point ?? '';
+  const shop = session?.storePoint.name ?? '';
 
   function flash(m: string) {
     setToast(m);
@@ -174,7 +174,7 @@ export default function PosPage() {
   function buildPayload(clientSaleId: string, salePayments: PosPayment[]): OfflinePosPayload {
     return {
       staffId: session?.staffId ?? '',
-      point: POINT,
+      point,
       method: salePayments[0]?.method ?? method ?? 'cash',
       payments: salePayments.length > 1 ? salePayments : undefined,
       discountPct: discPct,
@@ -195,8 +195,8 @@ export default function PosPage() {
       clientSaleId,
       localReceiptNo: createLocalReceiptNo(clientSaleId),
       cashier,
-      shop: SHOP,
-      point: POINT,
+      shop,
+      point,
       method: salePayments.length > 1 ? 'split' : salePayments[0]?.method ?? method ?? 'cash',
       payments: salePayments.length > 1 ? salePayments : undefined,
       subtotal,
@@ -279,7 +279,7 @@ export default function PosPage() {
     rememberActiveClientSaleId(clientSaleId);
     setCustomerBusy(true);
     try {
-      const found = await findPosCustomer(query, POINT, clientSaleId, session.accessToken);
+      const found = await findPosCustomer(query, point, clientSaleId, session.accessToken);
       if (!found) {
         setCustomer(null);
         flash('Клиент не найден');
@@ -402,7 +402,7 @@ export default function PosPage() {
       >
         <PosCatalog
           cashier={cashier}
-          shop={SHOP}
+          shop={shop}
           online={online}
           queueSummary={queueSummary}
           scanCode={scanCode}

@@ -492,6 +492,7 @@ describe('POST /refunds/:id/resolve RBAC (LOGIC-007)', () => {
         username: `resolve-${role}-${RUN}-${Math.random()}`,
         passwordHash: await argon2.hash('pass'),
         role,
+        point: 'BISHKEK-1',
       },
     });
     return { accessToken: jwt.sign({ sub: staff.id, typ: 'staff', role }), staffId: staff.id };

@@ -29,6 +29,62 @@
 
 Легенда: ✅ готово · 🟡 частично · ⛔ ждёт внешних доступов (ключи/аккаунты/железо)
 
+## Живая проверка интеграций — 2026-07-27 (вызовами к работающему API, не по конфигу)
+
+Снято с процесса, который сейчас слушает `:4000` (`apps/api/dist/main.js`, БД `alistore_dev`,
+uptime ~40 ч). Каждая строка — ответ реального вызова, а не чтение кода. **Платёжные сервисы
+исключены по прямой просьбе владельца.** Машинный источник той же правды —
+`GET /api/health/integrations` (owner-JWT): сейчас `blocked`, `ready 1 / missing 11 / manual 1`.
+
+| Сервис | Где в коде | Что вернул живой вызов | Что нужно от владельца |
+|---|---|---|---|
+| **AI: текст** (описания карточек) | `apps/api/src/ai/describe` | ✅ `POST /ai/describe` → `source: openrouter:openai/gpt-4o-mini`, живой русский текст | **Работает.** Ключ OpenRouter активен в `apps/api/.env` |
+| **AI: зрение** (оценка Б/У по фото) | `apps/api/src/ai/grading` | ✅ `POST /ai/grade-photos` → `grade: B`, `confidence: 0.7`, дефекты и чек-лист от `openrouter:openai/gpt-4o-mini` | **Работает.** Ничего не нужно |
+| **AI: категоризация** | `apps/api/src/ai/categorize` | ✅ `Наушники Sony WH-1000XM5` → `Аудио`, `confidence 0.9` (keyless rule-engine, LLM не требуется) | Ничего |
+| **Поиск каталога** | `apps/api/src/search` | ✅ `GET /catalog/products?q=iphone` → `source: postgres` (Meilisearch на `:7700` не поднят — честный fallback) | Опционально: поднять Meilisearch ради ранжирования. Postgres уже отвечает |
+| **OTP / вход по телефону** | `apps/api/src/auth` | ✅ `POST /auth/otp/request` → `devCode` (dev-echo), `otp/verify` выдал реальный accessToken+refreshToken | Контракт SMS-провайдера **или** Meta Business (WhatsApp + одобренный шаблон). В проде без этого API намеренно не стартует |
+| **Соц-вход Telegram** | `apps/api/src/auth` | ✅ `422 social_provider_not_configured` — честно закрыт, не притворяется | `TELEGRAM_BOT_TOKEN` (один токен даёт вход + бота + канал рассылок) |
+| **Соц-вход Apple** | `apps/api/src/auth` | ✅ `422 social_provider_not_configured` | `APPLE_CLIENT_ID` + ключи Apple |
+| **Медиа / евиденция** | `apps/api/src/media` | ✅ PNG 64×64 → `webp` 90 байт на диске; мусорный файл отклонён `422 not_an_image` | Cloudflare R2 / S3 (`S3_ENDPOINT`, `MINIO_*`) для прода: локальный диск раздаёт паспорта из скупки публично |
+| **SMTP (почта)** | `apps/api/src/outbox/transports/email` | ✅ `nodemailer.verify()` к `smtp.gmail.com:587` → соединение и логин **приняты** | **Работает.** Для боевых объёмов — домен-отправитель вместо Gmail |
+| **Redis** | инфра | ✅ `PONG` на `127.0.0.1:6379` | `REDIS_URL` в проде (блюпринт Render поднимает сам) |
+| **Витрина (Next.js)** | `apps/web` | ✅ `:3000` → `200`, `<title>AliStore — электроника с гарантией в Кыргызстане</title>` | Ничего |
+| **Outbox / рассылки** | `apps/api/src/outbox` | 🟡 транспорт = лог-заглушка (`NOTIFICATION_TRANSPORT` не задан — вне прода это штатно), **релей выключен**: `pending 57`, старейшее висит **28 ч**, `workers: []` | `NOTIFICATION_TRANSPORT=channels` + `OUTBOX_RELAY_ENABLED=true`. Иначе транзакционные уведомления копятся и не уходят |
+| **Sentry / алерты** | `apps/api/src/observability` | 🟡 `sentry.enabled: false`, `alerting.enabled: false`; два необработанных `PrismaClientKnownRequestError` на `POST /hr/payroll/runs` лежат в памяти с `delivered: false` | `SENTRY_DSN` + `ALERT_TELEGRAM_BOT_TOKEN`/`ALERT_TELEGRAM_CHAT_ID` |
+| **WhatsApp Business** | `apps/api/src/outbox/transports` | ⛔ не сконфигурирован | `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN` |
+| **Android FCM push** | `apps/api` | ⛔ не проверить без физического устройства | `FCM_SERVICE_ACCOUNT_JSON` + живой телефон |
+| **Фискализация (ОФД/ККМ)** | `apps/api` | ⛔ чек пока информационный, не фискальный | Контракт ОФД + `FISCAL_*`. Розница в КГ по закону требует фискального чека |
+| **POS-железо** | — | ⛔ ручная сертификация на месте | сканер, чек-принтер, терминал |
+
+**Вывод.** Из того, что вообще можно проверить без внешних аккаунтов, **всё работает или
+честно закрыто**: AI живой (текст и зрение), медиа-конвейер кладёт webp и отбивает мусор,
+почта реально логинится на SMTP, поиск честно называет источник `postgres`, соц-входы
+отвечают `422`, а не молчат. Единственная находка, которую стоит чинить сегодня, —
+**outbox не разгружается**: 57 сообщений висят 28 часов, потому что `OUTBOX_RELAY_ENABLED`
+не выставлен; это конфиг, не дефект кода.
+
+> Отличие от среза 2026-07-18 (`alistore-erp-meta`, коммит `af80622`): там AI отвечал
+> `kimi:kimi-for-coding`, здесь — `openrouter:openai/gpt-4o-mini`. Оба живые; расходятся
+> `.env` двух деревьев, а не код.
+
+### Полнота перечня: все исходящие адресаты в коде
+
+Список сверен не на память, а `grep` по `https://` в `apps/api/src` и по SDK-зависимостям —
+чтобы ни одна интеграция не осталась неупомянутой. Сверх таблицы выше есть ещё четыре
+запасных пути; все они **не сконфигурированы и потому неактивны**, ни один не подменяет
+собой работающий:
+
+| Адресат | Роль | Состояние |
+|---|---|---|
+| `api.novu.co` | альтернативный транспорт уведомлений вместо `channels` | `NOVU_API_KEY` не задан → селектор в dev даёт лог-заглушку, в проде бросает |
+| `exp.host` (Expo Push) | легаси-push, оставлен как справочное поведение | `EXPO_PUBLIC_EAS_PROJECT_ID` не задан |
+| Anthropic SDK | второй AI-провайдер вместо OpenRouter | `ANTHROPIC_API_KEY` не задан; активен OpenRouter |
+| `api.sms-gate.app` | мост OTP через Android-телефон (`SMS_PROVIDER=android_gateway`) | `SMS_GATEWAY_*` не заданы; не сертифицированный A2P-канал |
+
+Также не заданы `JOB_BACKEND` (значит, задачи идут в процессе, а не через BullMQ/Redis),
+`MEILI_HOST`, `SENTRY_DSN` и `S3_ENDPOINT` — это те же строки, что уже отмечены выше.
+Собственные домены `ali.kg` / `cdn.ali.kg` / `media.ali.kg` внешними интеграциями не считаются.
+
 ## Готовность по фазам
 
 | Фаза | Что | Статус |

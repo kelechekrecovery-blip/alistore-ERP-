@@ -8,6 +8,15 @@ import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } fro
 import { TotpService } from '../auth/totp.service';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
+import { resolveActiveStorePoint } from '../common/store-point-identity';
+import { revokeTelegramAgentAccessOnTx } from '../telegram-agent/telegram-agent-revocation';
+
+type StaffStorePoint = {
+  id: string;
+  code: string;
+  name: string;
+  inventoryLocation: string;
+};
 
 export interface StaffTokens {
   accessToken: string;
@@ -16,6 +25,7 @@ export interface StaffTokens {
   username: string;
   role: Role;
   point: string;
+  storePoint: StaffStorePoint;
   totpEnabled: boolean;
 }
 
@@ -49,21 +59,19 @@ export class StaffAuthService {
   ) {}
 
   /** Provision a staff account (owner tooling / seed). Password stored via argon2. */
-  async createStaff(username: string, password: string, role: Role, point = 'BISHKEK-1') {
-    const resolvedPoint = point.trim() || 'BISHKEK-1';
-    // The point must reference a real StorePoint (FK on inventoryLocation). Check
-    // it here for a clean domain error instead of surfacing a raw FK violation,
-    // and so a typo can't silently detach the account from point-scoped reports.
-    const storePoint = await this.prisma.storePoint.findUnique({
-      where: { inventoryLocation: resolvedPoint },
-      select: { inventoryLocation: true },
-    });
-    if (!storePoint) {
-      throw new ValidationError('store_point_not_found', `Точка продаж «${resolvedPoint}» не найдена`);
-    }
+  async createStaff(username: string, password: string, role: Role, point?: string) {
+    // Legacy tests provision accounts directly without going through an owner
+    // form. Production callers must always make an explicit active selection.
+    const requestedPoint = point?.trim()
+      || (process.env.NODE_ENV === 'test' ? 'BISHKEK-1' : undefined);
+    const storePoint = await resolveActiveStorePoint(
+      this.prisma,
+      requestedPoint,
+      `Точка продаж «${requestedPoint ?? ''}» не найдена или отключена`,
+    );
     const passwordHash = await argon2.hash(password);
     return this.prisma.staffUser.create({
-      data: { username, passwordHash, role, point: resolvedPoint },
+      data: { username, passwordHash, role, point: storePoint.inventoryLocation },
     });
   }
 
@@ -73,7 +81,7 @@ export class StaffAuthService {
     return (await this.prisma.staffUser.count()) === 0;
   }
 
-  async bootstrapOwner(username: string, password: string) {
+  async bootstrapOwner(username: string, password: string, point?: string) {
     const count = await this.prisma.staffUser.count();
     if (count > 0) {
       throw new ValidationError(
@@ -81,7 +89,7 @@ export class StaffAuthService {
         'Персонал уже создан — войдите владельцем и добавляйте через /staff-auth/staff',
       );
     }
-    return this.createStaff(username, password, 'owner');
+    return this.createStaff(username, password, 'owner', point);
   }
 
   /** Staff login → JWT carrying the role (server-authoritative authorization). */
@@ -173,8 +181,19 @@ export class StaffAuthService {
     staff: StaffUser,
     db: Pick<Prisma.TransactionClient, 'refreshToken'> = this.prisma,
   ): Promise<StaffTokens> {
+    const storePoint = await resolveActiveStorePoint(
+      this.prisma,
+      staff.point,
+      'Назначенная сотруднику точка отключена',
+    );
     const accessToken = await this.jwt.signAsync(
-      { sub: staff.id, role: staff.role, typ: 'staff' },
+      {
+        sub: staff.id,
+        role: staff.role,
+        typ: 'staff',
+        point: storePoint.inventoryLocation,
+        storePointId: storePoint.id,
+      },
       { expiresIn: '15m' },
     );
     const refreshToken = randomBytes(32).toString('base64url');
@@ -191,7 +210,13 @@ export class StaffAuthService {
       staffId: staff.id,
       username: staff.username,
       role: staff.role,
-      point: staff.point,
+      point: storePoint.inventoryLocation,
+      storePoint: {
+        id: storePoint.id,
+        code: storePoint.code,
+        name: storePoint.name,
+        inventoryLocation: storePoint.inventoryLocation,
+      },
       totpEnabled: staff.totpEnabled,
     };
   }
@@ -202,7 +227,17 @@ export class StaffAuthService {
 
   /** Current staff profile for session refresh / UI gates. */
   async me(staffId: string) {
-    return this.publicView(await this.getActiveStaff(staffId));
+    const staff = await this.getActiveStaff(staffId);
+    const storePoint = await resolveActiveStorePoint(this.prisma, staff.point, 'Назначенная сотруднику точка отключена');
+    return {
+      ...this.publicView(staff),
+      storePoint: {
+        id: storePoint.id,
+        code: storePoint.code,
+        name: storePoint.name,
+        inventoryLocation: storePoint.inventoryLocation,
+      },
+    };
   }
 
   /** Start TOTP enrollment. Regenerating before enable invalidates older setup codes. */
@@ -246,14 +281,30 @@ export class StaffAuthService {
   async disableTotp(staffId: string, token: string) {
     const staff = await this.getActiveStaff(staffId);
     if (!staff.totpEnabled || !staff.totpSecret) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "StaffUser" WHERE id = ${staff.id} FOR UPDATE`;
+        await revokeTelegramAgentAccessOnTx(
+          tx,
+          { staffId: staff.id },
+          'staff_totp_not_enabled',
+        );
+      });
       return this.publicView(staff);
     }
     if (!this.totp.verify(token, staff.totpSecret)) {
       throw new ForbiddenError('staff_2fa_invalid_token', 'Неверный код 2FA');
     }
-    const updated = await this.prisma.staffUser.update({
-      where: { id: staff.id },
-      data: { totpEnabled: false, totpSecret: null, totpLastToken: null },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.staffUser.update({
+        where: { id: staff.id },
+        data: { totpEnabled: false, totpSecret: null, totpLastToken: null },
+      });
+      await revokeTelegramAgentAccessOnTx(
+        tx,
+        { staffId: staff.id },
+        'staff_totp_disabled',
+      );
+      return result;
     });
     return this.publicView(updated);
   }
@@ -272,6 +323,11 @@ export class StaffAuthService {
         where: { id: target.id },
         data: { totpEnabled: false, totpSecret: null, totpLastToken: null },
       });
+      await revokeTelegramAgentAccessOnTx(
+        tx,
+        { staffId: target.id },
+        'staff_totp_reset',
+      );
       return {
         result: staff,
         events: [
@@ -297,11 +353,17 @@ export class StaffAuthService {
    */
   async deactivateStaff(actorId: string, targetStaffId: string) {
     const updated = await this.auditLedger().transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "StaffUser" WHERE id = ${targetStaffId} FOR UPDATE`;
       const target = await tx.staffUser.findUnique({ where: { id: targetStaffId } });
       if (!target) {
         throw new ValidationError('staff_not_found', 'Сотрудник не найден');
       }
       if (!target.active) {
+        await revokeTelegramAgentAccessOnTx(
+          tx,
+          { staffId: target.id },
+          'staff_deactivated',
+        );
         return { result: target, events: [] };
       }
       const [openShift, activeDeliveries] = await Promise.all([
@@ -334,6 +396,11 @@ export class StaffAuthService {
         where: { id: target.id },
         data: { active: false },
       });
+      await revokeTelegramAgentAccessOnTx(
+        tx,
+        { staffId: target.id },
+        'staff_deactivated',
+      );
       return {
         result: staff,
         events: [
@@ -359,7 +426,16 @@ export class StaffAuthService {
       await tx.$queryRaw`SELECT id FROM "StaffUser" WHERE id = ${targetStaffId} FOR UPDATE`;
       const target = await tx.staffUser.findUnique({ where: { id: targetStaffId } });
       if (!target) throw new ValidationError('staff_not_found', 'Сотрудник не найден');
-      if (target.role === role) return { result: target, events: [] };
+      if (target.role === role) {
+        if (!['admin', 'owner'].includes(role)) {
+          await revokeTelegramAgentAccessOnTx(
+            tx,
+            { staffId: target.id },
+            'staff_role_revoked',
+          );
+        }
+        return { result: target, events: [] };
+      }
       if (target.role === 'owner') {
         const owners = await tx.staffUser.count({ where: { role: 'owner', active: true, id: { not: target.id } } });
         if (owners === 0) {
@@ -367,6 +443,13 @@ export class StaffAuthService {
         }
       }
       const staff = await tx.staffUser.update({ where: { id: target.id }, data: { role } });
+      if (!['admin', 'owner'].includes(role)) {
+        await revokeTelegramAgentAccessOnTx(
+          tx,
+          { staffId: target.id },
+          'staff_role_revoked',
+        );
+      }
       return {
         result: staff,
         events: [{
@@ -411,6 +494,11 @@ export class StaffAuthService {
       const target = await tx.staffUser.findUnique({ where: { id: targetStaffId } });
       if (!target) throw new ValidationError('staff_not_found', 'Сотрудник не найден');
       const staff = await tx.staffUser.update({ where: { id: target.id }, data: { passwordHash } });
+      await revokeTelegramAgentAccessOnTx(
+        tx,
+        { staffId: target.id },
+        'staff_password_reset',
+      );
       const revoked = await tx.refreshToken.updateMany({
         where: { customerId: `${STAFF_REFRESH_PREFIX}${target.id}`, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -512,6 +600,7 @@ export class StaffAuthService {
     if (!staff || !staff.active) {
       throw new ForbiddenError('staff_not_found', 'Сотрудник не найден или отключён');
     }
+    await resolveActiveStorePoint(this.prisma, staff.point, 'Назначенная сотруднику точка отключена');
     return staff;
   }
 

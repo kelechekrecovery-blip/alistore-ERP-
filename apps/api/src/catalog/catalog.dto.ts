@@ -70,6 +70,14 @@ export class CatalogProductDto {
   @ApiProperty({ example: 109900 }) price!: number;
   @ApiProperty({ example: 'phones' }) category!: string;
   @ApiProperty({ enum: ['serialized', 'quantity'] }) trackingMode!: 'serialized' | 'quantity';
+  @ApiProperty({ enum: ['own_stock', 'to_order'] }) supplyMode!: 'own_stock' | 'to_order';
+  @ApiPropertyOptional({ nullable: true, example: 7 }) supplyLeadDays!: number | null;
+  @ApiProperty() orderable!: boolean;
+  @ApiProperty({ enum: ['in_stock', 'to_order', 'unavailable'] })
+  availabilityKind!: 'in_stock' | 'to_order' | 'unavailable';
+  @ApiPropertyOptional({ nullable: true, example: 7 }) leadTimeDays!: number | null;
+  @ApiPropertyOptional({ nullable: true, example: '2026-08-05' })
+  estimatedDeliveryDate!: string | null;
   @ApiProperty({ type: 'object', additionalProperties: true }) attrs!: Prisma.JsonValue;
   @ApiProperty({ type: 'array', items: { type: 'object' } })
   bundleComponents!: Array<{ productId: string; sku: string; name: string; qty: number }>;

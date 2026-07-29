@@ -43,7 +43,7 @@ export class StaffAuthController {
     this.assertBootstrapAvailable();
     assertStrongPassword(dto.password);
     return this.publicView(
-      await this.staffAuth.bootstrapOwner(dto.username, dto.password),
+      await this.staffAuth.bootstrapOwner(dto.username, dto.password, dto.point),
     );
   }
 

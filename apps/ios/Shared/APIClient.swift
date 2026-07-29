@@ -27,14 +27,14 @@ public enum EvidenceMultipart {
     ) -> (body: Data, contentType: String) {
         var body = Data()
         func field(_ name: String, _ value: String) {
-            body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n".data(using: .utf8)!)
+            body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n".utf8))
         }
         field("entityType", entityType)
         field("entityId", entityId)
         if let label, !label.isEmpty { field("label", label) }
-        body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"evidence.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"evidence.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n".utf8))
         body.append(imageData)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
         return (body, "multipart/form-data; boundary=\(boundary)")
     }
 }
@@ -211,7 +211,10 @@ public actor APIClient {
             throw APIError.rejected(status: http.statusCode, message: payload?.message ?? "Ошибка сервера \(http.statusCode)")
         }
         if Response.self == EmptyResponse.self, data.isEmpty {
-            return EmptyResponse() as! Response
+            guard let emptyResponse = EmptyResponse() as? Response else {
+                throw APIError.decoding("Empty response type mismatch")
+            }
+            return emptyResponse
         }
         do {
             return try decoder.decode(type, from: data)

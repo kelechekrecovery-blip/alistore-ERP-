@@ -69,4 +69,6 @@ private fun StaffPrincipal.session(token: String) = StaffSession(
   username = username,
   role = role,
   totpEnabled = totpEnabled,
+  point = point,
+  capabilities = capabilities,
 )

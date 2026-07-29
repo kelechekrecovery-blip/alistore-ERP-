@@ -15,6 +15,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { ProductCard, productImage, productImages, productSpecEntries } from "@/components/ProductCard";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { StatusPill } from "@/components/ui/Badge";
 import MobileProduct from "@/components/mobile/MobileProduct";
 import {
   createProductReview,
@@ -25,10 +26,10 @@ import {
 } from "@/lib/api";
 import { track } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth";
-import { useCart } from "@/lib/cart";
+import { TO_ORDER_CART_QTY_CAP, useCart } from "@/lib/cart";
 import { useCompare } from "@/lib/compare";
 import { useFavorites } from "@/lib/favorites";
-import { conditionLabel, som } from "@/lib/format";
+import { conditionLabel, som, supplyLeadLabel } from "@/lib/format";
 
 export default function ProductPage({ params }: { params: { id: string } }) {
   const { add } = useCart();
@@ -95,6 +96,12 @@ export default function ProductPage({ params }: { params: { id: string } }) {
     );
 
   const inStock = product.availableUnits > 0;
+  const toOrder = !inStock && product.supplyMode === "to_order" && product.orderable;
+  const buyable = product.orderable;
+  // A to-order line has no stock ceiling — the `+` control must not clamp to
+  // `availableUnits` (always 0 for it). Cap at `TO_ORDER_CART_QTY_CAP`
+  // instead (see its doc comment in lib/cart.tsx for why 10).
+  const qtyCap = toOrder ? TO_ORDER_CART_QTY_CAP : product.availableUnits;
   const condition = conditionLabel(product.attrs);
   const specs = productSpecEntries(product);
   const reviewLabel = reviews?.count
@@ -103,13 +110,16 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
   function addToCart() {
     if (!product || typeof product === "string") return;
+    if (!buyable) return;
     add(
       {
         id: product.id,
         sku: product.sku,
         name: product.name,
         price: product.price,
-        stockLimit: product.availableUnits,
+        stockLimit: qtyCap,
+        supplyMode: toOrder ? "to_order" : "own_stock",
+        supplyLeadDays: toOrder ? product.supplyLeadDays : null,
       },
       qty,
     );
@@ -210,16 +220,21 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 {som(product.price)}
               </div>
               {typeof product.attrs?.financingText === "string" && <div className="mt-2 text-sm text-[#c6ff3d]">{product.attrs.financingText}</div>}
-              <div
-                className={`mt-5 flex items-center gap-2 text-sm font-semibold ${inStock ? "text-success" : "text-warn"}`}
-              >
-                <span
-                  className={`h-2 w-2 rounded-full ${inStock ? "bg-success shadow-[0_0_10px_#2e7d46]" : "bg-warn"}`}
-                />
-                {inStock
-                  ? `В наличии · ${product.availableUnits} шт.`
-                  : "Доступен под заказ"}
-              </div>
+              {inStock ? (
+                <div className="mt-5 flex items-center gap-2 text-sm font-semibold text-success">
+                  <span className="h-2 w-2 rounded-full bg-success shadow-[0_0_10px_#2e7d46]" />
+                  {`В наличии · ${product.availableUnits} шт.`}
+                </div>
+              ) : product.supplyMode === "to_order" && product.supplyLeadDays ? (
+                <div className="mt-5">
+                  <StatusPill status="info">{supplyLeadLabel(product.supplyLeadDays)}</StatusPill>
+                </div>
+              ) : (
+                <div className="mt-5 flex items-center gap-2 text-sm font-semibold text-warn">
+                  <span className="h-2 w-2 rounded-full bg-warn" />
+                  Доступен под заказ
+                </div>
+              )}
 
               {variants.length > 0 && (
                 <div className="mt-6">
@@ -279,8 +294,8 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   </span>
                   <button
                     type="button"
-                    disabled={qty >= product.availableUnits}
-                    onClick={() => setQty((value) => Math.min(product.availableUnits, value + 1))}
+                    disabled={qty >= qtyCap}
+                    onClick={() => setQty((value) => Math.min(qtyCap, value + 1))}
                     className="grid h-11 w-11 place-items-center rounded-btn hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40"
                     aria-label="Увеличить количество"
                   >
@@ -290,11 +305,12 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 <button
                   type="button"
                   onClick={addToCart}
-                  disabled={!inStock}
+                  disabled={!buyable}
+                  data-testid="pdp-add-to-cart"
                   className={`flex items-center justify-center gap-2 rounded-[12px] px-5 font-semibold transition disabled:bg-linen disabled:text-subtle ${added ? "bg-success text-white" : "bg-coral text-white hover:bg-deep"}`}
                 >
                   <ShoppingBag size={18} />
-                  {added ? "Добавлено" : "В корзину"}
+                  {added ? "Добавлено" : toOrder ? "Заказать" : "В корзину"}
                 </button>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-3">

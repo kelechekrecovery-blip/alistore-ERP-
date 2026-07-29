@@ -83,8 +83,14 @@ export class ProductsController {
     return this.products.create(dto, user.customerId);
   }
 
-  @ApiOperation({ summary: 'Get a product' })
+  // Отдаёт внутреннюю карточку товара: закупочную цену, поставщика, политику
+  // поставки. Публичная витрина ходит в /catalog/products/:id и этот роут не
+  // потребляет — поэтому он закрыт тем же правом, что и список для персонала.
+  @ApiOperation({ summary: 'Get a product for staff management' })
+  @ApiBearerAuth()
   @ApiNotFoundResponse({ description: 'Product does not exist.' })
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('products', 'read')
   @Get(':id')
   async get(@Param('id') id: string) {
     const product = await this.products.get(id);

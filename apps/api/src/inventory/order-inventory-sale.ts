@@ -59,6 +59,41 @@ export function resolveOrderInventorySnapshot(
 }
 
 /**
+ * Guard for the supply-to-order invariant (docs/SUPPLY-TO-ORDER-PLAN.md, slice 3).
+ *
+ * Re-keyed from slice 2's "product is `to_order`" to "this order line's supply
+ * has not yet been received": once a supplier delivers the goods behind a
+ * to-order line (`OrderLineSupply.status` reaches `received`/`handed_over`),
+ * it IS our stock and must sell through the ordinary path — keeping the
+ * product-level check would block that sale forever. Every caller that can
+ * walk an order toward reserve/fulfill/pay/COD-delivery
+ * (`OrdersService.reserve`, `OrdersService.fulfill`, `PaymentsService.pay`,
+ * `CourierService.completeDelivery`) calls this first, using product and
+ * supply rows it already loaded — no silent no-op.
+ */
+export function assertOrderLineSupplyReceived(
+  orderId: string,
+  items: Array<{ id: string; sku: string }>,
+  productsBySku: Map<string, { supplyMode: string }>,
+  supplyByOrderItemId: Map<string, { status: string }>,
+): void {
+  const blockedSkus = [...new Set(
+    items
+      .filter((item) => productsBySku.get(item.sku)?.supplyMode === 'to_order')
+      .filter((item) => {
+        const supply = supplyByOrderItemId.get(item.id);
+        return supply?.status !== 'received' && supply?.status !== 'handed_over';
+      })
+      .map((item) => item.sku),
+  )];
+  if (blockedSkus.length === 0) return;
+  throw new ConflictError(
+    'to_order_not_reservable',
+    `Заказ ${orderId} содержит товар "под заказ" (${blockedSkus.join(', ')}), поставка которого ещё не получена от поставщика — резерв и продажа стока недоступны`,
+  );
+}
+
+/**
  * Convert every active order reservation into an immutable sale. Payment and COD
  * delivery share this boundary so stock, consignment and COGS cannot diverge.
  */
@@ -176,6 +211,197 @@ export async function finalizeOrderInventorySaleOnTx(
   });
 
   return { serialized: reservedUnits.length, quantityAllocations: quantityAllocations.length };
+}
+
+/**
+ * Convert only one order line's reservation footprint into a sale.
+ *
+ * Mixed pickup uses this boundary so handing over an own-stock line cannot
+ * consume the reservations of supplier-backed lines (or other own-stock
+ * lines) that remain in progress.
+ */
+export async function finalizeOrderItemInventorySaleOnTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    orderId: string;
+    orderItemId: string;
+    actor: string;
+    units: UnitsService;
+    events: AuditInput[];
+  },
+) {
+  const item = await tx.orderItem.findFirst({
+    where: { id: input.orderItemId, orderId: input.orderId },
+    select: { id: true, imei: true },
+  });
+  if (!item) {
+    throw new ConflictError('order_item_not_found', `Строка ${input.orderItemId} не найдена`);
+  }
+
+  const bundleAllocations = await tx.orderBundleAllocation.findMany({
+    where: { orderId: input.orderId, orderItemId: input.orderItemId, active: true },
+    orderBy: { imei: 'asc' },
+  });
+  const imeis = [...new Set([
+    ...(item.imei ? [item.imei] : []),
+    ...bundleAllocations.map((allocation) => allocation.imei),
+  ])].sort();
+  const reservations = imeis.length > 0
+    ? await tx.reservation.findMany({
+      where: { orderId: input.orderId, active: true, imei: { in: imeis } },
+      select: { id: true, imei: true },
+      orderBy: { imei: 'asc' },
+    })
+    : [];
+  const reservedImeis = new Set(reservations.flatMap((reservation) => (
+    reservation.imei ? [reservation.imei] : []
+  )));
+  if (imeis.some((imei) => !reservedImeis.has(imei))) {
+    throw new ConflictError(
+      'order_item_reservation_incomplete',
+      `Серийный резерв строки ${input.orderItemId} неполон`,
+    );
+  }
+
+  for (const imei of imeis) {
+    const valuation = await input.units.sellOnTx(tx, imei, input.orderId, input.actor);
+    if (valuation?.entry) {
+      input.events.push({
+        type: EventType.AccountingEntryPosted,
+        actor: input.actor,
+        payload: {
+          accountingEntryId: valuation.entry.id,
+          sourceType: 'inventory.cogs',
+          sourceRef: valuation.issue.id,
+          amount: valuation.issue.totalCost,
+          orderItemId: input.orderItemId,
+        },
+        refs: [valuation.entry.id, valuation.issue.id, input.orderId, input.orderItemId, imei],
+      });
+    }
+    input.events.push({
+      type: EventType.UnitSold,
+      actor: input.actor,
+      payload: { orderId: input.orderId, orderItemId: input.orderItemId, imei },
+      refs: [input.orderId, input.orderItemId, imei],
+    });
+  }
+  await accrueConsignmentSalesOnTx(tx, {
+    orderId: input.orderId,
+    imeis,
+    actor: input.actor,
+    events: input.events,
+  });
+
+  const quantityAllocations = await tx.orderQuantityAllocation.findMany({
+    where: { orderId: input.orderId, orderItemId: input.orderItemId, active: true },
+    orderBy: [{ balanceId: 'asc' }, { id: 'asc' }],
+  });
+  const quantityAllocationIds = quantityAllocations.map((allocation) => allocation.id);
+  const quantityReservations = quantityAllocationIds.length > 0
+    ? await tx.reservation.findMany({
+      where: {
+        orderId: input.orderId,
+        active: true,
+        quantityAllocationId: { in: quantityAllocationIds },
+      },
+      select: { quantityAllocationId: true },
+    })
+    : [];
+  const reservedQuantityAllocationIds = new Set(quantityReservations.flatMap((reservation) => (
+    reservation.quantityAllocationId ? [reservation.quantityAllocationId] : []
+  )));
+  if (quantityAllocationIds.some((id) => !reservedQuantityAllocationIds.has(id))) {
+    throw new ConflictError(
+      'order_item_reservation_incomplete',
+      `Количественный резерв строки ${input.orderItemId} неполон`,
+    );
+  }
+  await lockInventoryBalancesOnTx(tx, quantityAllocations.map((allocation) => allocation.balanceId));
+  for (const allocation of quantityAllocations) {
+    const quantityConsignments = await tx.quantityConsignmentAllocation.findMany({
+      where: { orderQuantityAllocationId: allocation.id, status: 'active' },
+      select: { qty: true },
+    });
+    const consignedQty = quantityConsignments.reduce((sum, row) => sum + row.qty, 0);
+    if (consignedQty > allocation.qty) {
+      throw new ConflictError(
+        'quantity_consignment_allocation_invalid',
+        `Комиссионный резерв ${allocation.id} превышает продажу`,
+      );
+    }
+    const ownedQty = allocation.qty - consignedQty;
+    const totalCost = ownedQty > 0
+      ? await consumeQuantityValuationOnTx(tx, {
+        orderId: input.orderId,
+        allocationId: allocation.id,
+        productId: allocation.productId,
+        balanceId: allocation.balanceId,
+        quantity: ownedQty,
+        actor: input.actor,
+      })
+      : 0;
+    const consumed = await tx.inventoryBalance.updateMany({
+      where: {
+        id: allocation.balanceId,
+        onHand: { gte: allocation.qty },
+        reserved: { gte: allocation.qty },
+        inventoryValue: { gte: totalCost },
+      },
+      data: {
+        onHand: { decrement: allocation.qty },
+        reserved: { decrement: allocation.qty },
+        inventoryValue: { decrement: totalCost },
+      },
+    });
+    if (consumed.count !== 1) {
+      throw new ConflictError('quantity_allocation_invalid', `Резерв ${allocation.id} больше недоступен`);
+    }
+    await tx.orderQuantityAllocation.update({
+      where: { id: allocation.id },
+      data: { active: false, consumedAt: new Date() },
+    });
+    input.events.push({
+      type: EventType.StockSold,
+      actor: input.actor,
+      payload: {
+        orderId: input.orderId,
+        orderItemId: input.orderItemId,
+        sku: allocation.sku,
+        qty: allocation.qty,
+        allocationId: allocation.id,
+      },
+      refs: [input.orderId, input.orderItemId, allocation.productId, allocation.id],
+    });
+  }
+  await accrueQuantityConsignmentSalesOnTx(tx, {
+    orderId: input.orderId,
+    orderQuantityAllocationIds: quantityAllocations.map((allocation) => allocation.id),
+    actor: input.actor,
+    events: input.events,
+  });
+
+  await tx.orderBundleAllocation.updateMany({
+    where: { orderId: input.orderId, orderItemId: input.orderItemId, active: true },
+    data: { active: false, consumedAt: new Date() },
+  });
+  if (reservations.length > 0 || quantityAllocationIds.length > 0) {
+    await tx.reservation.updateMany({
+      where: {
+        orderId: input.orderId,
+        active: true,
+        OR: [
+          ...(imeis.length > 0 ? [{ imei: { in: imeis } }] : []),
+          ...(quantityAllocationIds.length > 0
+            ? [{ quantityAllocationId: { in: quantityAllocationIds } }]
+            : []),
+        ],
+      },
+      data: { active: false },
+    });
+  }
+
+  return { serialized: imeis.length, quantityAllocations: quantityAllocations.length };
 }
 
 /**

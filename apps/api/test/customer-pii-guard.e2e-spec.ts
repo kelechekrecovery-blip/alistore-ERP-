@@ -41,6 +41,7 @@ describe('Customer PII read policy (required JWT + masking)', () => {
         username: `pii-${role}-${RUN}`,
         passwordHash: 'not-used',
         role: role as 'seller' | 'admin',
+        point: 'BISHKEK-1',
       },
       update: { active: true, role: role as 'seller' | 'admin' },
     })));

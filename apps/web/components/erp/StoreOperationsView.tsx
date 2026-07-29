@@ -14,6 +14,7 @@ import {
   type StoreIncident,
   type StoreOperationsOverview,
 } from '@/lib/api';
+import { OperationalStorePointSelect, useOperationalStorePoint } from '@/lib/use-operational-store-point';
 
 type Props = { accessToken: string };
 
@@ -26,7 +27,7 @@ function newKey(scope: string) { return `erp-store-${scope}-${crypto.randomUUID(
 
 export function StoreOperationsView({ accessToken }: Props) {
   const [date, setDate] = useState(today);
-  const [point, setPoint] = useState('BISHKEK-1');
+  const { points, point, setPoint, canSelect } = useOperationalStorePoint(accessToken);
   const [data, setData] = useState<StoreOperationsOverview | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -40,6 +41,7 @@ export function StoreOperationsView({ accessToken }: Props) {
   const commandKeys = useRef(new Map<string, string>());
 
   const reload = useCallback(async () => {
+    if (!point) return;
     setMessage(''); setError('');
     try { setData(await fetchStoreOperationsOverview(date, point, accessToken)); }
     catch (cause) {
@@ -156,7 +158,7 @@ export function StoreOperationsView({ accessToken }: Props) {
       <p className="text-[10px] uppercase tracking-[0.12em] text-subtle">Точка продаж</p>
       <div className="flex flex-wrap gap-2">
         <label className="text-[10px] text-subtle">Дата<input aria-label="Дата операций точки" type="date" value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 block h-9 rounded-[6px] border border-line bg-surface px-2 text-xs text-white" /></label>
-        <label className="text-[10px] text-subtle">Код точки<input aria-label="Код операционной точки" value={point} onChange={(event) => setPoint(event.target.value)} className="mt-1 block h-9 w-36 rounded-[6px] border border-line bg-surface px-2 font-mono text-xs text-white" /></label>
+        <OperationalStorePointSelect points={points} point={point} setPoint={setPoint} canSelect={canSelect} label="Операционная точка" />
       </div>
     </div>
     {message && <div role="alert" className="rounded-[6px] border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-coral-tint">{message}</div>}

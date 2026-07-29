@@ -10,9 +10,9 @@ import XCTest
 /// включать `syncing` (как уже сделано в POS-очереди).
 final class OfflineOrderReplayTests: XCTestCase {
     private func mutation(state: String, endpoint: String = "orders/mine") -> PendingMutation {
-        let m = PendingMutation(endpoint: endpoint, method: "POST", body: Data("{}".utf8))
-        m.state = state
-        return m
+        let mutation = PendingMutation(endpoint: endpoint, method: "POST", body: Data("{}".utf8))
+        mutation.state = state
+        return mutation
     }
 
     func testReplayableIncludesSyncingSoKilledMidSendOrdersRecover() {
@@ -20,7 +20,7 @@ final class OfflineOrderReplayTests: XCTestCase {
             mutation(state: "queued"),
             mutation(state: "failed"),
             mutation(state: "syncing"),
-            mutation(state: "conflict"),
+            mutation(state: "conflict")
         ]
 
         let states = Set(OfflineOrderQueue.replayable(all).map(\.state))
@@ -34,7 +34,7 @@ final class OfflineOrderReplayTests: XCTestCase {
     func testReplayableIgnoresOtherEndpoints() {
         let all = [
             mutation(state: "syncing", endpoint: "orders/mine"),
-            mutation(state: "syncing", endpoint: "pos/sale"),
+            mutation(state: "syncing", endpoint: "pos/sale")
         ]
 
         XCTAssertEqual(OfflineOrderQueue.replayable(all).count, 1)

@@ -11,6 +11,7 @@ import { CreateCustomerAddressDto, UpdateCustomerAddressDto, UpdateCustomerSetti
 import { buildCustomerOverview, CustomerOverview } from './customer-overview';
 import { warrantyCoverage } from './warranty-coverage';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
+import { revokeTelegramAgentAccessOnTx } from '../telegram-agent/telegram-agent-revocation';
 
 /**
  * Customers for storefront/guest checkout. Phone is the natural key (unique), so
@@ -288,14 +289,22 @@ export class CustomersService {
    * anonymized in place: name/phone become non-reversible placeholders and the
    * unique phone is freed, so the same number can OTP-register again as a fresh
    * customer. Addresses, social identities, push tokens and the notification
-   * inbox are erased; every refresh session is revoked. One transaction with the
-   * customer.deleted ledger event (and consent_changed when consent flips off).
+   * inbox and Telegram-agent access traces are erased; every refresh session is
+   * revoked. One transaction with the customer.deleted ledger event (and
+   * consent_changed when consent flips off).
    */
   async deleteAccount(customerId: string) {
     return this.audit.transaction(async (tx) => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'customer-delete:' + customerId}))::text AS locked`;
+      await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${customerId} FOR UPDATE`;
       const customer = await tx.customer.findUnique({ where: { id: customerId } });
       if (!customer) throw new ValidationError('customer_not_found', `Клиент ${customerId} не найден`);
+      await revokeTelegramAgentAccessOnTx(
+        tx,
+        { customerId },
+        'customer_account_deleted',
+        true,
+      );
       if (isAnonymized(customer)) return { result: { id: customer.id, deleted: true }, events: [] };
 
       // Строго до переименования: challenge'ы связаны с клиентом только телефоном

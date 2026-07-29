@@ -31,7 +31,42 @@ export interface CreatedOrder {
   deliveryZoneId?: string | null;
   deliverySlotId?: string | null;
   pickupCode?: string | null;
+  items?: CustomerOrderItem[];
+  paymentSchedule?: OrderReceivableView[];
+  initialDue?: number;
+  balanceDue?: number;
   guestAccess?: { capability: string; expiresIn: number };
+}
+
+export interface OrderReceivableView {
+  id: string;
+  orderItemId: string | null;
+  kind: 'supply_deposit' | 'stock_sale' | 'supply_balance' | 'delivery';
+  amount: number;
+  settledAmount: number;
+  status: 'open' | 'partially_settled' | 'settled' | 'cancelled';
+  dueAt?: string | null;
+}
+
+export interface CustomerOrderItem {
+  id: string;
+  sku: string;
+  qty: number;
+  price: number;
+  discountAmount?: number;
+  supplyModeSnapshot?: 'own_stock' | 'to_order';
+  supplyLeadDaysSnapshot?: number | null;
+  promisedDate?: string | null;
+  fulfillmentStatus?: string;
+  readyAt?: string | null;
+  handedOverAt?: string | null;
+  imei?: string | null;
+  orderLineSupply?: {
+    status: string;
+    expectedAt?: string | null;
+    orderedQty: number;
+    receivedQty: number;
+  } | null;
 }
 
 /**
@@ -155,8 +190,40 @@ export interface OrderDetail {
   status: string;
   total: number;
   createdAt: string;
-  items: { sku: string; qty: number; price: number; imei?: string | null }[];
+  items: CustomerOrderItem[];
+  receivables?: OrderReceivableView[];
   payments: { amount: number; method: string; status: string }[];
+}
+
+export interface OrderCancellationPreview {
+  orderId: string;
+  canCancel: boolean;
+  blockedReason: string | null;
+  policy: 'automatic_full' | 'owner_resolution';
+  purchaseOrderSent: boolean;
+  depositPaid: number;
+  estimatedRefundAmount: number;
+  supplierExpenseDeduction: number;
+  ownerReviewRequired: boolean;
+  note: string;
+  requestEnabled: boolean;
+  automaticRefundEnabled: boolean;
+}
+
+export interface OrderCancellationRequest {
+  id: string;
+  orderId: string;
+  status: 'requested' | 'awaiting_owner' | 'approved' | 'refund_queued'
+    | 'refund_processing' | 'refunded' | 'rejected' | 'refund_failed' | 'cancelled';
+  policySnapshot: 'automatic_full' | 'owner_resolution';
+  purchaseOrderSentSnapshot: boolean;
+  depositPaidSnapshot: number;
+  requestedRefundAmount: number;
+  approvedRefundAmount: number | null;
+  customerReason: string;
+  refundId: string | null;
+  createdAt: string;
+  completedAt: string | null;
 }
 
 export interface GuestOrderView {
@@ -193,6 +260,27 @@ export async function fetchOrder(id: string, accessToken: string): Promise<Order
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`order ${res.status}`);
   return (await res.json()) as OrderDetail;
+}
+
+export function fetchOrderCancellationPreview(
+  id: string,
+  accessToken: string,
+): Promise<OrderCancellationPreview> {
+  return getJson(`/orders/mine/${encodeURIComponent(id)}/cancellation-preview`, accessToken);
+}
+
+export function requestOrderCancellation(
+  id: string,
+  reason: string,
+  accessToken: string,
+  idempotencyKey: string,
+): Promise<OrderCancellationRequest> {
+  return postAuthJson(
+    `/orders/mine/${encodeURIComponent(id)}/cancellations`,
+    { reason },
+    accessToken,
+    { 'idempotency-key': idempotencyKey },
+  );
 }
 
 export function fetchOrderLedger(id: string, accessToken: string): Promise<LedgerEvent[]> {

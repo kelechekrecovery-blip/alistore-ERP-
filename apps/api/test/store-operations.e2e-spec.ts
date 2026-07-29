@@ -19,6 +19,7 @@ describe('Store Operations checklists and incidents', () => {
   const point = `STORE-OPS-${run}`;
   const businessDate = '2026-07-17';
   const usernames: string[] = [];
+  let pointId = '';
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -28,11 +29,23 @@ describe('Store Operations checklists and incidents', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
     prisma = moduleRef.get(PrismaService);
+    const storePoint = await prisma.storePoint.create({
+      data: {
+        code: `store-ops-${run}`,
+        name: 'Store operations fixture',
+        address: 'Test address',
+        inventoryLocation: point,
+        hours: '10:00–20:00',
+        createdBy: 'store-operations-test',
+        idempotencyKey: `store-operations-point-${run}`,
+      },
+    });
+    pointId = storePoint.id;
     const auth = moduleRef.get(StaffAuthService);
     const session = async (role: 'owner' | 'seller', label: string) => {
       const username = `${role}-store-ops-${label}-${run}`;
       usernames.push(username);
-      const staff = await auth.createStaff(username, 'pass', role);
+      const staff = await auth.createStaff(username, 'pass', role, point);
       return { id: staff.id, token: (await auth.login(username, 'pass')).accessToken };
     };
     ownerToken = (await session('owner', 'owner')).token;
@@ -51,6 +64,7 @@ describe('Store Operations checklists and incidents', () => {
     await prisma.storeIncident.deleteMany({ where: { point } });
     await prisma.auditEvent.deleteMany({ where: { refs: { has: point } } });
     await prisma.staffUser.deleteMany({ where: { username: { in: usernames } } });
+    if (pointId) await prisma.storePoint.deleteMany({ where: { id: pointId } });
     await app.close();
   });
 

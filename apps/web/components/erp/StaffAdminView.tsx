@@ -8,11 +8,13 @@ import {
   createStaffAccount,
   deactivateStaffAccount,
   fetchStaffAccounts,
+  fetchCheckoutOptions,
   reactivateStaffAccount,
   resetStaffPassword,
   resetStaffTotp,
   type StaffAccountRow,
   type StaffRole,
+  type StorePoint,
 } from '@/lib/api';
 
 type PendingAction =
@@ -34,12 +36,19 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
   const [busy, setBusy] = useState('');
   const [pending, setPending] = useState<PendingAction>(null);
   const [newPassword, setNewPassword] = useState('');
-  const [form, setForm] = useState({ username: '', password: '', role: 'seller' as StaffRole, point: 'BISHKEK-1' });
+  const [form, setForm] = useState({ username: '', password: '', role: 'seller' as StaffRole, point: '' });
+  const [points, setPoints] = useState<StorePoint[]>([]);
 
   const reload = useCallback(() => {
     setMessage('');
-    fetchStaffAccounts(accessToken)
-      .then(setStaff)
+    Promise.all([
+      fetchStaffAccounts(accessToken),
+      fetchCheckoutOptions(new Date().toISOString().slice(0, 10)),
+    ])
+      .then(([accounts, options]) => {
+        setStaff(accounts);
+        setPoints(options.pickupPoints);
+      })
       .catch((error) => { setStaff(null); setMessage(error instanceof Error ? error.message : 'Не удалось загрузить учётки'); });
   }, [accessToken]);
   useEffect(() => reload(), [reload]);
@@ -117,7 +126,10 @@ export function StaffAdminView({ accessToken }: { accessToken: string }) {
         <select aria-label="Роль" value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as StaffRole }))} className="h-9 rounded-[6px] border border-line bg-surface px-2 text-xs text-white">
           {STAFF_ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
         </select>
-        <input aria-label="Точка" placeholder="Точка" required value={form.point} onChange={(event) => setForm((current) => ({ ...current, point: event.target.value }))} className="h-9 rounded-[6px] border border-line bg-surface px-2 text-xs text-white" />
+        <select aria-label="Точка" required value={form.point} onChange={(event) => setForm((current) => ({ ...current, point: event.target.value }))} className="h-9 rounded-[6px] border border-line bg-surface px-2 text-xs text-white">
+          <option value="" disabled>Выберите точку</option>
+          {points.map((point) => <option key={point.id} value={point.id}>{point.name} · {point.inventoryLocation}</option>)}
+        </select>
         <button type="submit" disabled={busy === 'create'} className="h-9 rounded-[6px] bg-lime px-4 text-xs font-bold text-[#1A2300] disabled:opacity-60">{busy === 'create' ? '…' : 'Создать'}</button>
       </form>
 

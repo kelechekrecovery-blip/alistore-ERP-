@@ -47,11 +47,18 @@ describe('Finance AR aging and primary-document drilldown', () => {
     // The API suite shares one isolated database, so remove any debt fixture
     // left by an earlier suite before asserting an unfiltered AR snapshot.
     const staleDebts = await prisma.debtPlan.findMany({ select: { id: true } });
-    const staleOrders = await prisma.order.findMany({ where: { channel: 'ar-test' }, select: { id: true } });
-    const staleCustomers = await prisma.customer.findMany({ where: { phone: { startsWith: '+996799' } }, select: { id: true } });
+    const staleOrders = await prisma.order.findMany({
+      where: { channel: 'ar-test' },
+      select: { id: true, customerId: true },
+    });
     const debtIds = [...new Set([...ownedDebtIds, ...staleDebts.map((debt) => debt.id)])];
     const orderIds = [...new Set([...ownedOrderIds, ...staleOrders.map((order) => order.id)])];
-    const customerIds = [...new Set([...ownedCustomerIds, ...staleCustomers.map((customer) => customer.id)])];
+    // A phone prefix is shared by unrelated suites. Delete only customers that
+    // are proven to own this suite's `ar-test` orders.
+    const customerIds = [...new Set([
+      ...ownedCustomerIds,
+      ...staleOrders.map((order) => order.customerId),
+    ])];
     await prisma.payment.deleteMany({ where: { idempotencyKey: { startsWith: 'ar-' } } });
     if (debtIds.length > 0) {
       await prisma.$transaction(async (tx) => {

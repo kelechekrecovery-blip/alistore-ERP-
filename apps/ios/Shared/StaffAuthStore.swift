@@ -48,7 +48,15 @@ public final class StaffAuthStore {
         guard let token = try? tokens.read() else { return }
         do {
             let principal: StaffPrincipal = try await api.get("staff-auth/me", token: token)
-            session = StaffSession(accessToken: token, staffId: principal.id, username: principal.username, role: principal.role)
+            session = StaffSession(
+                accessToken: token,
+                staffId: principal.id,
+                username: principal.username,
+                role: principal.role,
+                point: principal.point,
+                totpEnabled: principal.totpEnabled,
+                capabilities: principal.capabilities
+            )
             requiresQuickUnlock = true
         } catch {
             try? tokens.clear()

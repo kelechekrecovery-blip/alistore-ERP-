@@ -72,7 +72,7 @@ describe('Channel notification transports', () => {
     );
   });
 
-  it('falls back to log transport when a channel credential is missing', async () => {
+  it('keeps the development log fallback when a channel credential is missing', async () => {
     const fetchMock = jest.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -85,6 +85,27 @@ describe('Channel notification transports', () => {
         payload: { message: 'No provider yet' },
       }),
     ).resolves.toBeUndefined();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed in production when a channel provider is missing', async () => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const transport = new ChannelNotificationTransport(
+      config({ NODE_ENV: 'production' }),
+    );
+    await expect(
+      transport.deliver({
+        channel: 'push',
+        recipient: 'customer-1',
+        template: 'order_ready',
+        payload: { orderId: 'order-1' },
+      }),
+    ).rejects.toThrow(
+      'No production notification provider configured for channel: push',
+    );
 
     expect(fetchMock).not.toHaveBeenCalled();
   });

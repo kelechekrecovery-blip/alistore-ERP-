@@ -121,6 +121,13 @@ const CHECKS: CheckDefinition[] = [
     },
   },
   {
+    id: 'email_otp_delivery',
+    area: 'auth',
+    title: 'Email verification delivery',
+    requiredEnv: ['SMTP_HOST', 'SMTP_FROM'],
+    note: 'Configure a transactional SMTP host and a verified AliStore sender before exposing email verification in production.',
+  },
+  {
     id: 'reservation_sweep',
     area: 'jobs',
     title: 'Reservation expiry sweep enabled',
@@ -210,17 +217,27 @@ const CHECKS: CheckDefinition[] = [
     id: 'media_storage',
     area: 'security',
     title: 'Evidence media on signed object storage',
-    requiredEnv: ['MEDIA_STORAGE'],
+    requiredEnv: [
+      'MEDIA_STORAGE',
+      'S3_ENDPOINT',
+      'MINIO_BUCKET',
+      'MINIO_ROOT_USER',
+      'MINIO_ROOT_PASSWORD',
+    ],
     // `LocalDiskStorage` (дефолт) отдаёт `getReadUrl` как публичный путь, а
     // `main.ts` раздаёт весь ./uploads через `useStaticAssets` без auth. В проде
     // это значит, что паспорт продавца при скупке публично скачивается по
     // угадываемому ключу `evidence/tradein/<id>/...`. Только `s3` отдаёт evidence
     // подписанными ссылками с коротким TTL, поэтому в проде оно обязательно.
-    note: 'MEDIA_STORAGE=s3 обязателен в проде: локальный диск раздаёт доказательства (паспорта) публично без подписи.',
+    note: 'MEDIA_STORAGE=s3 и полный набор S3/R2 credentials обязательны: локальный диск раздаёт доказательства (паспорта) публично без подписи.',
     evaluate: (env) => {
       const mode = env('MEDIA_STORAGE')?.trim().toLowerCase();
       if (!mode) return 'missing';
-      return mode === 's3' ? 'ready' : 'unsafe';
+      if (mode !== 's3') return 'unsafe';
+      return ['S3_ENDPOINT', 'MINIO_BUCKET', 'MINIO_ROOT_USER', 'MINIO_ROOT_PASSWORD']
+        .every((name) => Boolean(env(name)?.trim()))
+        ? 'ready'
+        : 'missing';
     },
   },
   {
@@ -236,8 +253,10 @@ const CHECKS: CheckDefinition[] = [
       if (backend !== 'bullmq') return 'unsafe';
       try {
         const parsed = new URL(redisUrl);
+        const loopbackHosts = new Set(['127.0.0.1', 'localhost', '[::1]']);
+        const isLoopback = loopbackHosts.has(parsed.hostname);
         return (parsed.protocol === 'redis:' || parsed.protocol === 'rediss:') &&
-          Boolean(parsed.hostname) && Boolean(parsed.password)
+          Boolean(parsed.hostname) && (isLoopback || Boolean(parsed.password))
           ? 'ready'
           : 'unsafe';
       } catch {

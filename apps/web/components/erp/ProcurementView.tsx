@@ -18,6 +18,7 @@ import {
   type SupplierSummary,
 } from '@/lib/api';
 import { som } from '@/lib/format';
+import { OperationalStorePointSelect, useOperationalStorePoint } from '@/lib/use-operational-store-point';
 
 type DraftLine = { productId: string; qty: string; unitCost: string };
 const emptyLine = (): DraftLine => ({ productId: '', qty: '1', unitCost: '' });
@@ -34,11 +35,12 @@ const STATUS_META: Record<PurchaseOrder['status'], { label: string; color: strin
 const inputClass = 'h-10 w-full rounded-[8px] border border-surface-3 bg-ink-dark px-3 text-sm text-white outline-none focus:border-faint';
 
 export function ProcurementView({ accessToken }: { accessToken: string }) {
+  const { points, point, setPoint, canSelect } = useOperationalStorePoint(accessToken);
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierSummary[]>([]);
   const [scorecard, setScorecard] = useState<SupplierScore[]>([]);
   const [products, setProducts] = useState<AdminProduct[]>([]);
-  const [form, setForm] = useState({ idempotencyKey: requestKey('erp-po'), supplierId: '', location: 'BISHKEK-1', note: '', items: [emptyLine()] });
+  const [form, setForm] = useState({ idempotencyKey: requestKey('erp-po'), supplierId: '', location: '', note: '', items: [emptyLine()] });
   const [receive, setReceive] = useState({ idempotencyKey: requestKey('erp-receipt'), orderId: '', itemId: '', grade: 'A' as 'A' | 'B' | 'C', imeis: '' });
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
@@ -63,6 +65,9 @@ export function ProcurementView({ accessToken }: { accessToken: string }) {
   useEffect(() => {
     refresh().catch(() => setError('Не удалось загрузить Purchase Orders'));
   }, [refresh]);
+  useEffect(() => {
+    setForm((current) => ({ ...current, location: point }));
+  }, [point]);
 
   const receivableOrders = useMemo(() => orders.filter((order) => order.status === 'sent' || order.status === 'receiving'), [orders]);
   const selectedOrder = receivableOrders.find((order) => order.id === receive.orderId) ?? receivableOrders[0];
@@ -190,7 +195,7 @@ export function ProcurementView({ accessToken }: { accessToken: string }) {
             <option value="">Поставщик</option>
             {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
           </select>
-          <input aria-label="Склад назначения" value={form.location} onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))} className={inputClass} placeholder="Склад назначения" />
+          <OperationalStorePointSelect points={points} point={point} setPoint={setPoint} canSelect={canSelect} label="Склад назначения" />
         </div>
         <div className="mt-3 space-y-2">
           {form.items.map((line, index) => (

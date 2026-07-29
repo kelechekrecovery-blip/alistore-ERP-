@@ -1,3 +1,5 @@
+// Dense declarative view declarations intentionally exceed the generic line limit.
+// swiftlint:disable line_length
 import AliStoreCore
 import SwiftUI
 
@@ -262,27 +264,36 @@ private struct StaffTasksView: View {
     private static var fixtureTasks: [StaffTask] {
         let now = Date()
         return [
-            fixtureTask(id: "task-accessories", title: "Предлагать аксессуары к телефонам", description: "Цель AI: +18 аксессуаров до конца смены.", status: "open", priority: "high", dueAt: now.addingTimeInterval(3600)),
-            fixtureTask(id: "task-prices", title: "Обновить ценники на витрине", description: "Проверить iPhone, Watch и AirPods.", status: "in_progress", priority: "normal", dueAt: now.addingTimeInterval(5400)),
-            fixtureTask(id: "task-training", title: "Пройти тест по новым тарифам", description: "Короткий тест перед вечерним потоком.", status: "completed", priority: "low", dueAt: now.addingTimeInterval(-1800)),
-            fixtureTask(id: "task-stock", title: "Проверить остатки Apple Watch", description: "Сверить витрину и складской остаток.", status: "open", priority: "urgent", dueAt: now.addingTimeInterval(1800)),
-        ]
+            TaskFixture(id: "task-accessories", title: "Предлагать аксессуары к телефонам", description: "Цель AI: +18 аксессуаров до конца смены.", status: "open", priority: "high", dueAt: now.addingTimeInterval(3600)),
+            TaskFixture(id: "task-prices", title: "Обновить ценники на витрине", description: "Проверить iPhone, Watch и AirPods.", status: "in_progress", priority: "normal", dueAt: now.addingTimeInterval(5400)),
+            TaskFixture(id: "task-training", title: "Пройти тест по новым тарифам", description: "Короткий тест перед вечерним потоком.", status: "completed", priority: "low", dueAt: now.addingTimeInterval(-1800)),
+            TaskFixture(id: "task-stock", title: "Проверить остатки Apple Watch", description: "Сверить витрину и складской остаток.", status: "open", priority: "urgent", dueAt: now.addingTimeInterval(1800))
+        ].map(fixtureTask)
     }
 
-    private static func fixtureTask(id: String, title: String, description: String, status: String, priority: String, dueAt: Date) -> StaffTask {
+    private struct TaskFixture {
+        let id: String
+        let title: String
+        let description: String
+        let status: String
+        let priority: String
+        let dueAt: Date
+    }
+
+    private static func fixtureTask(_ fixture: TaskFixture) -> StaffTask {
         StaffTask(
-            id: id,
-            title: title,
-            description: description,
-            status: status,
-            priority: priority,
+            id: fixture.id,
+            title: fixture.title,
+            description: fixture.description,
+            status: fixture.status,
+            priority: fixture.priority,
             assigneeId: "staff-ui-test",
-            dueAt: dueAt,
+            dueAt: fixture.dueAt,
             relatedType: nil,
             relatedId: nil,
             createdAt: Date(timeIntervalSince1970: 1_785_000_000),
             updatedAt: Date(timeIntervalSince1970: 1_785_000_000),
-            completedAt: status == "completed" ? dueAt : nil
+            completedAt: fixture.status == "completed" ? fixture.dueAt : nil
         )
     }
 }
@@ -581,7 +592,7 @@ private struct StaffSupportView: View {
                 status: "in_progress",
                 assignee: "staff-ui-test",
                 createdAt: base
-            ),
+            )
         ]
     }
 }

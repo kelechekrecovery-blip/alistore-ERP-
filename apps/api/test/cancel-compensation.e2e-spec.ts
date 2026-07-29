@@ -176,7 +176,7 @@ describe('Cancel compensation (integration)', () => {
     // …and the same guard once the settled order is dispatched with a courier.
     await orders.transition(inFlight.order.id, 'packed', 'warehouse');
     const staff = await prisma.staffUser.create({
-      data: { username: `cancel-comp-courier-${++seq}`, passwordHash: 'test-only', role: 'courier' },
+      data: { username: `cancel-comp-courier-${++seq}`, passwordHash: 'test-only', role: 'courier', point: 'BISHKEK-1' },
     });
     await prisma.order.update({ where: { id: inFlight.order.id }, data: { fulfillmentType: 'courier' } });
     await courier.createRun({ courierId: staff.id, codTotal: 0, orderIds: [inFlight.order.id] }, 'dispatcher', `assign-prepaid-${seq}`);
@@ -303,7 +303,7 @@ describe('Cancel compensation (integration)', () => {
 
   it('subtracts the cancelled COD order from its courier run codTotal', async () => {
     const staff = await prisma.staffUser.create({
-      data: { username: `cancel-comp-courier-${++seq}`, passwordHash: 'test-only', role: 'courier' },
+      data: { username: `cancel-comp-courier-${++seq}`, passwordHash: 'test-only', role: 'courier', point: 'BISHKEK-1' },
     });
     const { order } = await webOrder({
       total: 5000,

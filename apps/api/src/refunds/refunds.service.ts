@@ -216,14 +216,22 @@ export class RefundsService {
         data: { status: 'failed', lastError: `operator_cancelled:${dto.reason.trim()}`, lockedAt: null, nextAttemptAt: null },
       });
       const result = await tx.refund.update({ where: { id }, data: { status: 'rejected' } });
-      await tx.return.update({ where: { id: refund.returnId }, data: { status: 'rejected' } });
+      if (refund.returnId) {
+        await tx.return.update({ where: { id: refund.returnId }, data: { status: 'rejected' } });
+      } else {
+        await tx.orderCancellation.updateMany({
+          where: { refundId: refund.id },
+          data: { status: 'refund_failed' },
+        });
+      }
       return {
         result,
         events: [{
           type: EventType.RefundCancelled,
           actor,
           payload: { refundId: id, reason: dto.reason.trim(), requestHash },
-          refs: [id, refund.returnId, refund.orderId, idempotencyRef],
+          refs: [id, refund.returnId, refund.orderId, idempotencyRef]
+            .filter((ref): ref is string => Boolean(ref)),
         }],
       };
     });

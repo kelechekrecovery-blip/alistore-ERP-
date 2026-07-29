@@ -20,6 +20,13 @@ export function loadStaffSession(): StaffSession | null {
       staffId: parsed.staffId ?? '',
       username: parsed.username ?? parsed.role,
       role: parsed.role,
+      point: parsed.point ?? '',
+      storePoint: parsed.storePoint ?? {
+        id: '',
+        code: '',
+        name: '',
+        inventoryLocation: parsed.point ?? '',
+      },
       totpEnabled: Boolean(parsed.totpEnabled),
     };
     return memorySession;
@@ -54,6 +61,8 @@ export async function restoreStaffSession(): Promise<StaffSession | null> {
       staffId: profile.id,
       username: profile.username,
       role: profile.role,
+      point: profile.point,
+      storePoint: profile.storePoint,
       totpEnabled: profile.totpEnabled,
     };
     saveStaffSession(session);

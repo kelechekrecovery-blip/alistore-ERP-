@@ -23,7 +23,7 @@ struct StaffInventoryView: View {
     @State private var products: [Product] = []
     @State private var mode: Mode = .count
     @State private var selectedProductId = ""
-    @State private var location = "BISHKEK-1"
+    @State private var location: String
     @State private var countedText = ""
     @State private var reasonText = ""
     @State private var isLoadingCatalog = false
@@ -33,6 +33,7 @@ struct StaffInventoryView: View {
         self.session = session
         self.environment = environment
         _store = State(initialValue: StaffInventoryStore(environment: environment, token: session.accessToken))
+        _location = State(initialValue: session.point ?? "")
     }
 
     private var counted: Int? {

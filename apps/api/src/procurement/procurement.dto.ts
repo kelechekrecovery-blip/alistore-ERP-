@@ -34,7 +34,10 @@ export class CreatePurchaseOrderDto {
 
 export class ReceivePurchaseOrderLineDto {
   @IsString() @MaxLength(64) itemId!: string;
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(200) @ArrayUnique() @IsString({ each: true }) @MaxLength(64, { each: true }) imeis!: string[];
+  /** Serialized receipt. Mutually exclusive with qty. */
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(200) @ArrayUnique() @IsString({ each: true }) @MaxLength(64, { each: true }) imeis?: string[];
+  /** Quantity-tracked customer allocation receipt. Mutually exclusive with imeis. */
+  @IsOptional() @IsInt() @Min(1) qty?: number;
   @IsOptional() @IsIn(['A', 'B', 'C']) grade?: 'A' | 'B' | 'C';
 }
 

@@ -1,7 +1,8 @@
 import XCTest
 
+@MainActor
 final class AliStorePOSUITests: XCTestCase {
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         continueAfterFailure = false
         terminateOtherAliStoreApps()
     }
@@ -82,7 +83,7 @@ final class AliStorePOSUITests: XCTestCase {
         app.launchArguments = [
             "--ui-testing-signed-in",
             "--ui-testing-role=cashier",
-            "--ui-testing-cash-shift",
+            "--ui-testing-cash-shift"
         ]
         app.launch()
 
@@ -111,7 +112,7 @@ final class AliStorePOSUITests: XCTestCase {
         app.launchArguments = [
             "--ui-testing-signed-in",
             "--ui-testing-role=cashier",
-            "--ui-testing-visual-evidence",
+            "--ui-testing-visual-evidence"
         ]
         app.launch()
 

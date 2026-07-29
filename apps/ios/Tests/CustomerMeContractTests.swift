@@ -1,3 +1,5 @@
+// JSON wire fixtures stay inline so the asserted contract is visible beside each test.
+// swiftlint:disable line_length
 import AliStoreCore
 import Foundation
 import XCTest

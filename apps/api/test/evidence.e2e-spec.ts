@@ -156,10 +156,10 @@ describe('Evidence Vault (integration)', () => {
       data: { phone: `+996700ORDER${suffix}`, name: 'Order evidence owner' },
     });
     const courier = await prisma.staffUser.create({
-      data: { username: `order-evidence-courier-${suffix}`, passwordHash: 'x', role: 'courier' },
+      data: { username: `order-evidence-courier-${suffix}`, passwordHash: 'x', role: 'courier', point: 'BISHKEK-1' },
     });
     const foreignCourier = await prisma.staffUser.create({
-      data: { username: `order-evidence-foreign-${suffix}`, passwordHash: 'x', role: 'courier' },
+      data: { username: `order-evidence-foreign-${suffix}`, passwordHash: 'x', role: 'courier', point: 'BISHKEK-1' },
     });
     const order = await prisma.order.create({
       data: {

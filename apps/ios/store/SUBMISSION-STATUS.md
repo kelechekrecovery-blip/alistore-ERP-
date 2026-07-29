@@ -12,7 +12,7 @@ Public App Store scope confirmed by the owner on 2026-07-19:
 The original Client-only npm/store pipeline remains Client-only. Staff, Courier
 and POS use the separate ecosystem metadata and screenshot scripts.
 
-_Last updated: 2026-07-26. Every line below was read back from the App Store
+_Last updated: 2026-07-28. Every line below was read back from the App Store
 Connect API or from the uploaded `.ipa` files themselves. Nothing here is
 inferred from the repository — the previous revision of this file claimed build
 `1.0.0 (2)` and "no review submission exists", and both were wrong._
@@ -21,10 +21,10 @@ inferred from the repository — the previous revision of this file claimed buil
 
 | App | Build | Uploaded | Version state |
 |---|---|---|---|
-| AliStore KG | **4** `VALID`, attached to `1.0.0` | 2026-07-25 | `PREPARE_FOR_SUBMISSION` |
-| AliStore Staff | **4** `VALID`, attached to `1.0.0` | 2026-07-24 | `PREPARE_FOR_SUBMISSION` |
-| AliStore Courier | **4** `VALID`, attached to `1.0.0` | 2026-07-24 | `PREPARE_FOR_SUBMISSION` |
-| AliStore POS | **4** `VALID`, attached to `1.0.0` | 2026-07-24 | `PREPARE_FOR_SUBMISSION` |
+| AliStore KG | **4** `VALID`, attached to `1.0.0` | 2026-07-25 | `WAITING_FOR_REVIEW` |
+| AliStore Staff | **4** `VALID`, attached to `1.0.0` | 2026-07-24 | `WAITING_FOR_REVIEW` |
+| AliStore Courier | **4** `VALID`, attached to `1.0.0` | 2026-07-24 | `WAITING_FOR_REVIEW` |
+| AliStore POS | **4** `VALID`, attached to `1.0.0` | 2026-07-24 | `WAITING_FOR_REVIEW` |
 
 The `Sign in with Apple` provisioning blocker that held the Client back is
 resolved; Client was archived, exported and uploaded on 2026-07-25.
@@ -54,31 +54,22 @@ open is App Store Connect metadata or owner input, not binary content.
 | Screenshots | Uploaded and `COMPLETE`: Client 10+10+10, Staff 4+4+4, Courier 3+3+3, POS 3+3+3 |
 | Review URLs | `https://ali.kg/`, `/privacy`, `/support` and `https://api.ali.kg/api/health` all return `200` from outside the build machine |
 
-## Blocked before App Review submission
+## App Review submission completed
 
-Nothing here can be closed from the repository — each item needs the owner in
-App Store Connect or in the ERP.
+All four `1.0.0` versions are now in `WAITING_FOR_REVIEW` with release type
+`AFTER_APPROVAL`. This live App Store Connect state proves that the versions
+were attached and submitted; the earlier empty-submission blockers are no
+longer current.
 
-1. **App Review contact is empty for all four.** `contactFirstName`,
-   `contactLastName`, `contactEmail` and `contactPhone` are all `null`.
-2. **Demo accounts are empty for all four** while `demoAccountRequired = true`.
-   See the sign-in section below — the mechanism differs between Client and the
-   other three.
-3. **App Privacy** data-usage answers must be completed and published. This is
-   web-interface only — confirmed by introspecting the `apps` resource, which
-   exposes no data-usage or privacy relationship at all, so no script can read or
-   set it. The truthful basis for the answers is the shipped `PrivacyInfo.xcprivacy`:
-   phone number, physical address, purchase history, photos or videos and other
-   data — all `Linked`, purpose `AppFunctionality`, no tracking.
-4. **Review submissions exist but are empty.** All four have a `reviewSubmission`
-   in state `READY_FOR_REVIEW` with `submittedDate = null` **and an empty `items`
-   list** — no version is attached, so nothing has been submitted. Submitting from
-   the web interface attaches the version.
-5. **Review-visible data.** The production catalog currently returns
-   `total: 4` and every product has `availableUnits: 0`, so a reviewer cannot
-   complete a purchase — a Guideline 2.1 risk.
+The public catalog probe on 2026-07-28 returned `200`, `total: 4`, with all
+four products reporting purchasable stock. Do not replace build 4 while review
+is pending unless Apple reports a binary defect.
 
-## Owner checklist
+## Completed submission checklist (reference only)
+
+The steps below describe how the current submissions were prepared. They are
+retained for a future version or a rejection response; they are not outstanding
+actions for the four versions already waiting for review.
 
 ### 1. Sign-in for the reviewer
 

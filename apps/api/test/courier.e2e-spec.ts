@@ -41,12 +41,15 @@ describe('Courier COD handover (integration)', () => {
     // раньше них.
     await prisma.cashDrawerMovement.deleteMany();
     await prisma.auditEvent.deleteMany();
+    await prisma.paymentReceivableAllocation.deleteMany();
+    await prisma.orderReceivable.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.reservation.deleteMany();
     await prisma.$transaction([
       prisma.accountingJournalLine.deleteMany({
         where: { entry: { OR: [
           { sourceType: { startsWith: 'cod.' } },
+          { sourceType: { in: ['order_item.handover', 'order_line.handover'] } },
           { sourceType: 'inventory.cogs', sourceRef: { in: issueIds } },
           { sourceType: 'quantity-consignment.sale', sourceRef: { in: quantityConsignmentRefs } },
         ] } },
@@ -54,11 +57,13 @@ describe('Courier COD handover (integration)', () => {
       prisma.accountingJournalEntry.deleteMany({
         where: { OR: [
           { sourceType: { startsWith: 'cod.' } },
+          { sourceType: { in: ['order_item.handover', 'order_line.handover'] } },
           { sourceType: 'inventory.cogs', sourceRef: { in: issueIds } },
           { sourceType: 'quantity-consignment.sale', sourceRef: { in: quantityConsignmentRefs } },
         ] },
       }),
     ]);
+    await prisma.supplyQuantityAllocation.deleteMany();
     await prisma.$transaction(async (tx) => {
       await tx.inventoryValuationReversal.deleteMany({ where: { issueId: { in: issueIds } } });
       await tx.inventoryValuationIssue.deleteMany({ where: { id: { in: issueIds } } });
@@ -67,6 +72,8 @@ describe('Courier COD handover (integration)', () => {
     await prisma.quantityConsignmentAllocation.deleteMany();
     await prisma.quantityConsignmentLot.deleteMany();
     await prisma.orderQuantityAllocation.deleteMany({ where: { productId: { in: productIds } } });
+    await prisma.orderLineSupply.deleteMany();
+    await prisma.purchaseOrder.deleteMany({ where: { number: { startsWith: 'COD-LINE-PO-' } } });
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.courierRun.deleteMany();
@@ -74,6 +81,7 @@ describe('Courier COD handover (integration)', () => {
     await prisma.deviceUnit.deleteMany({ where: { productId: { in: productIds } } });
     await prisma.inventoryBalance.deleteMany({ where: { productId: { in: productIds } } });
     await prisma.product.deleteMany({ where: { id: { in: productIds } } });
+    await prisma.supplier.deleteMany({ where: { name: { startsWith: 'COD line supplier ' } } });
     await prisma.customer.deleteMany();
     await prisma.staffUser.deleteMany({ where: { username: { startsWith: 'courier-integration-' } } });
     // Сдача COD попадает в кассовую смену принявшего кассира
@@ -102,6 +110,7 @@ describe('Courier COD handover (integration)', () => {
         username: `courier-integration-${seq}`,
         passwordHash: 'test-only',
         role: 'courier',
+        point: 'BISHKEK-1',
       },
     });
   };
@@ -233,6 +242,283 @@ describe('Courier COD handover (integration)', () => {
       courierId: null,
       courierRunId: null,
     });
+  });
+
+  it('keeps a supply order away from courier until every line is ready and its deposit is settled', async () => {
+    const staff = await createCourier();
+    seq += 1;
+    const customer = await prisma.customer.create({
+      data: { phone: `+9967028${seq.toString().padStart(3, '0')}`, name: 'Supply courier gate' },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'web',
+        fulfillmentType: 'courier',
+        paymentMode: 'cod',
+        paymentModeExplicit: true,
+        total: 5000,
+        status: 'packed',
+      },
+    });
+    const item = await prisma.orderItem.create({
+      data: {
+        orderId: order.id,
+        lineNumber: 1,
+        sku: `SUPPLY-COURIER-${seq}`,
+        qty: 1,
+        price: 5000,
+        supplyModeSnapshot: 'to_order',
+        fulfillmentStatus: 'in_transit',
+      },
+    });
+    const deposit = await prisma.orderReceivable.create({
+      data: { orderId: order.id, orderItemId: item.id, kind: 'supply_deposit', amount: 1000 },
+    });
+
+    await expect(courier.createRun(
+      { courierId: staff.id, codTotal: 5000, orderIds: [order.id] },
+      'dispatcher',
+      `assign-supply-incomplete-${order.id}`,
+    )).rejects.toMatchObject({ code: 'courier_order_not_fully_ready' });
+
+    await prisma.orderItem.update({ where: { id: item.id }, data: { fulfillmentStatus: 'ready' } });
+    await expect(courier.createRun(
+      { courierId: staff.id, codTotal: 5000, orderIds: [order.id] },
+      'dispatcher',
+      `assign-supply-unpaid-${order.id}`,
+    )).rejects.toMatchObject({ code: 'courier_supply_deposit_unsettled' });
+
+    const payment = await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        amount: 1000,
+        method: 'card',
+        status: 'received',
+        txnId: `supply-courier-deposit-${seq}`,
+      },
+    });
+    await prisma.paymentReceivableAllocation.create({
+      data: { paymentId: payment.id, receivableId: deposit.id, amount: 1000 },
+    });
+    await prisma.orderReceivable.update({
+      where: { id: deposit.id },
+      data: { settledAmount: 1000, status: 'settled' },
+    });
+
+    const run = await courier.createRun(
+      { courierId: staff.id, codTotal: 4000, orderIds: [order.id] },
+      'dispatcher',
+      `assign-supply-ready-${order.id}`,
+    );
+    expect(run.orderIds).toEqual([order.id]);
+  });
+
+  it('revalidates line readiness after assignment and again before completion', async () => {
+    const staff = await createCourier();
+    seq += 1;
+    const customer = await prisma.customer.create({
+      data: { phone: `+9967037${seq.toString().padStart(3, '0')}`, name: 'Courier readiness degradation' },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'web',
+        fulfillmentType: 'courier',
+        paymentMode: 'prepaid',
+        total: 2_000,
+        status: 'packed',
+        items: {
+          create: {
+            lineNumber: 1,
+            sku: `SUPPLY-REVALIDATE-${seq}`,
+            qty: 1,
+            price: 2_000,
+            supplyModeSnapshot: 'to_order',
+            fulfillmentStatus: 'ready',
+          },
+        },
+        payments: {
+          create: { amount: 2_000, method: 'card', status: 'received', txnId: `supply-revalidate-${seq}` },
+        },
+      },
+      include: { items: true },
+    });
+    await courier.createRun(
+      { courierId: staff.id, codTotal: 0, orderIds: [order.id] },
+      'dispatcher',
+      `assign-supply-revalidate-${seq}`,
+    );
+
+    await prisma.orderItem.update({
+      where: { id: order.items[0].id },
+      data: { fulfillmentStatus: 'in_transit' },
+    });
+    await expect(courier.startDelivery(
+      order.id,
+      staff.id,
+      `start-supply-degraded-${seq}`,
+    )).rejects.toMatchObject({ code: 'courier_order_not_fully_ready' });
+    expect(await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
+      .toMatchObject({ status: 'courier_assigned' });
+
+    await prisma.orderItem.update({
+      where: { id: order.items[0].id },
+      data: { fulfillmentStatus: 'ready' },
+    });
+    await courier.startDelivery(order.id, staff.id, `start-supply-ready-${seq}`);
+    await prisma.orderItem.update({
+      where: { id: order.items[0].id },
+      data: { fulfillmentStatus: 'in_transit' },
+    });
+    await expect(courier.completeDelivery(
+      order.id,
+      { codAmount: 0 },
+      staff.id,
+      `deliver-supply-degraded-${seq}`,
+    )).rejects.toMatchObject({ code: 'courier_order_not_fully_ready' });
+    expect(await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
+      .toMatchObject({ status: 'out_for_delivery' });
+  });
+
+  it('hands over mixed stock and supply lines transactionally with split liability and COD', async () => {
+    const staff = await createCourier();
+    seq += 1;
+    const customer = await prisma.customer.create({
+      data: { phone: `+9967036${seq.toString().padStart(3, '0')}`, name: 'Courier line accounting' },
+    });
+    const stock = await prisma.product.create({
+      data: { sku: `COD-STOCK-LINE-OWN-${seq}`, name: 'Own line', price: 2000, cost: 1200, category: 'phones', taxCode: 'none', taxRateBps: 0, attrs: {} },
+    });
+    const supplyProduct = await prisma.product.create({
+      data: {
+        sku: `COD-STOCK-LINE-SUPPLY-${seq}`,
+        name: 'Supply line',
+        price: 4000,
+        cost: 2500,
+        category: 'phones',
+        trackingMode: 'quantity',
+        taxCode: 'none',
+        taxRateBps: 0,
+        attrs: {},
+      },
+    });
+    const ownImei = `COD-STOCK-LINE-OWN-${seq}-IMEI`;
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'web',
+        fulfillmentType: 'courier',
+        paymentMode: 'cod',
+        paymentModeExplicit: true,
+        total: 6300,
+        deliveryFee: 300,
+        taxBaseAmount: 6000,
+        taxAmount: 0,
+        status: 'packed',
+        items: {
+          create: [
+            {
+              lineNumber: 1, productId: stock.id, sku: stock.sku, qty: 1, price: 2000,
+              taxCode: 'none', taxRateBps: 0, taxBaseAmount: 2000, taxAmount: 0,
+              fulfillmentStatus: 'ready', imei: ownImei,
+              inventorySnapshot: { productId: stock.id, trackingMode: 'serialized', components: [] },
+            },
+            {
+              lineNumber: 2, productId: supplyProduct.id, sku: supplyProduct.sku, qty: 1, price: 4000,
+              taxCode: 'none', taxRateBps: 0, taxBaseAmount: 4000, taxAmount: 0,
+              supplyModeSnapshot: 'to_order', supplyLeadDaysSnapshot: 5, fulfillmentStatus: 'ready',
+              inventorySnapshot: { productId: supplyProduct.id, trackingMode: 'quantity', components: [] },
+            },
+          ],
+        },
+      },
+      include: { items: { orderBy: { lineNumber: 'asc' } } },
+    });
+    const supplier = await prisma.supplier.create({ data: { name: `COD line supplier ${seq}` } });
+    const po = await prisma.purchaseOrder.create({
+      data: {
+        number: `COD-LINE-PO-${seq}`, supplierId: supplier.id, sourceOrderId: order.id,
+        status: 'received', location: 'BISHKEK-1', createdBy: 'test', receivedAt: new Date(),
+        items: { create: { productId: supplyProduct.id, orderedQty: 1, receivedQty: 1, unitCost: 2500 } },
+      },
+      include: { items: true },
+    });
+    const lineSupply = await prisma.orderLineSupply.create({
+      data: {
+        orderItemId: order.items[1].id, purchaseOrderItemId: po.items[0].id,
+        status: 'ready', orderedQty: 1, receivedQty: 1, actor: 'warehouse',
+      },
+    });
+    const receipt = await prisma.purchaseReceipt.create({
+      data: {
+        purchaseOrderId: po.id,
+        idempotencyKey: `cod-line-receipt-${seq}`,
+        actor: 'warehouse',
+        payload: [{ itemId: po.items[0].id, qty: 1 }],
+      },
+    });
+    await prisma.supplyQuantityAllocation.create({
+      data: {
+        orderLineSupplyId: lineSupply.id,
+        purchaseReceiptId: receipt.id,
+        productId: supplyProduct.id,
+        location: 'BISHKEK-1',
+        qty: 1,
+        unitCost: 2500,
+      },
+    });
+    await prisma.deviceUnit.create({
+      data: { imei: ownImei, productId: stock.id, status: 'reserved', location: 'BISHKEK-1', orderId: order.id, acquisitionCost: 1200 },
+    });
+    await prisma.reservation.create({
+      data: { orderId: order.id, imei: ownImei, active: true, expiresAt: new Date(Date.now() + 60_000) },
+    });
+    const ownReceivable = await prisma.orderReceivable.create({
+      data: { orderId: order.id, orderItemId: order.items[0].id, kind: 'stock_sale', amount: 2000 },
+    });
+    const deposit = await prisma.orderReceivable.create({
+      data: { orderId: order.id, orderItemId: order.items[1].id, kind: 'supply_deposit', amount: 1000, settledAmount: 1000, status: 'settled' },
+    });
+    await prisma.orderReceivable.create({
+      data: { orderId: order.id, orderItemId: order.items[1].id, kind: 'supply_balance', amount: 3000 },
+    });
+    await prisma.orderReceivable.create({
+      data: { orderId: order.id, kind: 'delivery', amount: 300 },
+    });
+    const payment = await prisma.payment.create({
+      data: { orderId: order.id, amount: 1000, method: 'card', status: 'received', txnId: `cod-line-deposit-${seq}` },
+    });
+    await prisma.paymentReceivableAllocation.create({
+      data: { paymentId: payment.id, receivableId: deposit.id, amount: 1000 },
+    });
+
+    await courier.createRun({ courierId: staff.id, codTotal: 5300, orderIds: [order.id] }, 'dispatcher', `cod-line-assign-${seq}`);
+    await courier.startDelivery(order.id, staff.id, `cod-line-start-${seq}`);
+    const delivered = await courier.completeDelivery(order.id, { codAmount: 5300 }, staff.id, `cod-line-deliver-${seq}`);
+    const replay = await courier.completeDelivery(order.id, { codAmount: 5300 }, staff.id, `cod-line-deliver-${seq}`);
+    expect(replay).toMatchObject({ id: delivered.id, status: delivered.status });
+    expect(await prisma.orderItem.count({ where: { orderId: order.id, fulfillmentStatus: 'handed_over' } })).toBe(2);
+    const entries = await prisma.accountingJournalEntry.findMany({
+      where: { sourceType: { in: ['order_item.handover', 'order_line.handover'] }, sourceRef: { in: order.items.map((item) => item.id) } },
+      include: { lines: true },
+    });
+    expect(entries).toHaveLength(2);
+    expect(entries.flatMap((entry) => entry.lines).reduce((sum, line) => sum + (line.accountCode === '2400' ? line.debit : 0), 0)).toBe(1000);
+    expect(entries.flatMap((entry) => entry.lines).reduce((sum, line) => sum + (line.accountCode === '1100' ? line.debit : 0), 0)).toBe(5000);
+    const deliveryEntry = await prisma.accountingJournalEntry.findFirstOrThrow({
+      where: { sourceType: 'order.delivery.handover', sourceRef: order.id },
+      include: { lines: true },
+    });
+    expect(deliveryEntry.documentAmount).toBe(300);
+    expect(deliveryEntry.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ accountCode: '1100', debit: 300, credit: 0 }),
+      expect.objectContaining({ accountCode: '4000', debit: 0, credit: 300 }),
+    ]));
+    expect(await prisma.accountingJournalEntry.count({ where: { sourceType: 'cod.receivable', sourceRef: order.id } })).toBe(0);
+    expect(await prisma.inventoryValuationIssue.count({ where: { orderId: order.id } })).toBe(2);
+    expect(await prisma.inventoryBalance.count({ where: { productId: supplyProduct.id } })).toBe(0);
+    expect(ownReceivable.status).toBe('open');
   });
 
   it('delivers prepaid and fully settled COD orders after payment finalized inventory', async () => {

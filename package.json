@@ -31,6 +31,8 @@
     "deploy:review": "node scripts/cloudflare-remote-command.mjs deploy review",
     "deploy:production": "node scripts/cloudflare-remote-command.mjs deploy production",
     "release:gate": "node scripts/cloudflare-release-gate.mjs",
+    "release:gate:supply": "node scripts/supply-release-gate.mjs",
+    "release:gate:supply:plan": "node scripts/supply-release-gate.mjs --plan",
     "e2e": "playwright test",
     "web:route-audit": "playwright test e2e/web-route-audit.spec.ts",
     "e2e:cross-browser": "E2E_BROWSERS=chromium,webkit,firefox playwright test e2e/web-checkout.spec.ts e2e/checkout-consent.spec.ts",
@@ -64,6 +66,7 @@
     "android:ui": "cd apps/android && JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew --no-parallel --max-workers=1 :core:connectedDebugAndroidTest :app:connectedDebugAndroidTest :staff:connectedDebugAndroidTest :courier:connectedDebugAndroidTest :pos:connectedDebugAndroidTest",
     "android:ui:all": "npm run android:ui",
     "launch:check": "npm run launch:preflight:strict && npm run launch:readiness:strict",
+    "launch:activate:api": "node scripts/activate-production-api.mjs",
     "launch:preflight": "npm run preflight -w @alistore/api -- --env-file .env.production",
     "launch:preflight:strict": "npm run preflight -w @alistore/api -- --env-file .env.production --strict",
     "launch:readiness": "npm run readiness -w @alistore/api -- --env-file .env.production",
@@ -110,8 +113,10 @@
     "node": ">=20"
   },
   "overrides": {
-    "postcss": "8.5.16",
-    "qs": "6.15.2",
+    "brace-expansion": "5.0.8",
+    "postcss": "$postcss",
+    "qs": "6.15.3",
+    "sharp": "0.35.3",
     "tmp": "0.2.7",
     "uuid": "11.1.1",
     "fast-uri": "3.1.4"
@@ -122,6 +127,7 @@
     "@playwright/test": "^1.61.1",
     "@stryker-mutator/core": "^9.6.1",
     "fast-check": "^4.9.0",
+    "postcss": "^8.5.24",
     "testcontainers": "^12.0.4"
   },
   "dependencies": {

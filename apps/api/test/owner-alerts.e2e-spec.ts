@@ -21,16 +21,16 @@ describe('OwnerAlertsService.sweep', () => {
     await prisma.$connect();
     alerts = new OwnerAlertsService(prisma);
     const owner = await prisma.staffUser.create({
-      data: { username: `${RUN}-owner`, passwordHash: 'x', role: 'owner' },
+      data: { username: `${RUN}-owner`, passwordHash: 'x', role: 'owner', point: 'BISHKEK-1' },
     });
     ownerId = owner.id;
     // An inactive owner and a non-owner must never receive alerts.
     const fired = await prisma.staffUser.create({
-      data: { username: `${RUN}-fired-owner`, passwordHash: 'x', role: 'owner', active: false },
+      data: { username: `${RUN}-fired-owner`, passwordHash: 'x', role: 'owner', point: 'BISHKEK-1', active: false },
     });
     firedOwnerId = fired.id;
     const seller = await prisma.staffUser.create({
-      data: { username: `${RUN}-seller`, passwordHash: 'x', role: 'seller' },
+      data: { username: `${RUN}-seller`, passwordHash: 'x', role: 'seller', point: 'BISHKEK-1' },
     });
     sellerId = seller.id;
   });

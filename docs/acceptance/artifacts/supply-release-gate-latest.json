@@ -1,0 +1,202 @@
+{
+  "title": "AliStore supply release gate evidence",
+  "overall": "BLOCKED",
+  "startedAt": "2026-07-29T10:00:52.212Z",
+  "endedAt": "2026-07-29T10:00:52.214Z",
+  "durationSeconds": 0,
+  "planOnly": true,
+  "deploymentPerformed": false,
+  "storeReleasePerformed": false,
+  "git": {
+    "head": "bd8f009e458c58817e626c739e4b3ed541f57611",
+    "status": "M .claude/launch.json\n M .gitignore\n M .gitleaks.toml\n M PROGRESS.md\n M apps/android/README.md\n M apps/android/app/build.gradle.kts\n M apps/android/build.gradle.kts\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSessionManager.kt\n M apps/android/courier/build.gradle.kts\n M apps/android/staff/build.gradle.kts\n M apps/api/.env.example\n M apps/api/prisma/schema.prisma\n M apps/api/src/app.module.ts\n M apps/api/src/approvals/action-executors.ts\n M apps/api/src/audit/event-types.ts\n M apps/api/src/auth/jwt.strategy.ts\n M apps/api/src/authz/authz.model.ts\n M apps/api/src/catalog/catalog.dto.ts\n M apps/api/src/catalog/catalog.service.ts\n M apps/api/src/courier/courier.service.ts\n M apps/api/src/finance/accounting-journal.ts\n M apps/api/src/health/production-preflight.ts\n M apps/api/src/hr/hr.service.ts\n M apps/api/src/inventory/inventory-valuation.ts\n M apps/api/src/inventory/inventory.service.ts\n M apps/api/src/inventory/order-inventory-sale.ts\n M apps/api/src/logistics/logistics.service.ts\n M apps/api/src/orders/order-state-machine.ts\n M apps/api/src/orders/orders.controller.ts\n M apps/api/src/orders/orders.module.ts\n M apps/api/src/orders/orders.service.ts\n M apps/api/src/outbox/customer-notifications.ts\n M apps/api/src/outbox/outbox.service.spec.ts\n M apps/api/src/outbox/outbox.service.ts\n M apps/api/src/outbox/outbox.types.ts\n M apps/api/src/outbox/transports/channel.transport.ts\n M apps/api/src/outbox/transports/message-text.ts\n M apps/api/src/payments/payments.controller.ts\n M apps/api/src/payments/payments.dto.ts\n M apps/api/src/payments/payments.service.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/procurement/procurement.dto.ts\n M apps/api/src/procurement/procurement.module.ts\n M apps/api/src/procurement/procurement.service.ts\n M apps/api/src/products/products.controller.ts\n M apps/api/src/products/products.dto.ts\n M apps/api/src/products/products.service.ts\n M apps/api/src/refunds/refunds.processor.ts\n M apps/api/src/refunds/refunds.service.ts\n M apps/api/src/reservations/reservations.service.ts\n M apps/api/src/returns/returns.service.ts\n M apps/api/src/staff-auth/staff-auth.controller.ts\n M apps/api/src/staff-auth/staff-auth.dto.ts\n M apps/api/src/staff-auth/staff-auth.service.ts\n M apps/api/src/store-operations/store-operations.service.ts\n M apps/api/test/accounting-ar-aging.e2e-spec.ts\n M apps/api/test/approvals-jwt-guard.e2e-spec.ts\n M apps/api/test/cancel-compensation.e2e-spec.ts\n M apps/api/test/channel-transport.spec.ts\n M apps/api/test/courier-run-deadlock.e2e-spec.ts\n M apps/api/test/courier.e2e-spec.ts\n M apps/api/test/customer-pii-guard.e2e-spec.ts\n M apps/api/test/db-test-cleanup.ts\n M apps/api/test/evidence.e2e-spec.ts\n M apps/api/test/fcm-push-transport.spec.ts\n M apps/api/test/guest-order-access.e2e-spec.ts\n M apps/api/test/hr-payroll-actor-prefix.e2e-spec.ts\n M apps/api/test/hr-payroll-run.e2e-spec.ts\n M apps/api/test/hr.e2e-spec.ts\n M apps/api/test/logistics.e2e-spec.ts\n M apps/api/test/notifications-push-tokens.spec.ts\n M apps/api/test/observability-status.e2e-spec.ts\n M apps/api/test/orders-account.e2e-spec.ts\n M apps/api/test/owner-alerts.e2e-spec.ts\n M apps/api/test/production-preflight.spec.ts\n M apps/api/test/public-rate-limit.e2e-spec.ts\n M apps/api/test/push-sandbox-guard.e2e-spec.ts\n M apps/api/test/refund-provider-stale.e2e-spec.ts\n M apps/api/test/reports.e2e-spec.ts\n M apps/api/test/reservation-expiry.spec.ts\n M apps/api/test/shifts.e2e-spec.ts\n M apps/api/test/staff-point-fk.e2e-spec.ts\n M apps/api/test/store-operations.e2e-spec.ts\n M apps/api/test/store-point-guard.e2e-spec.ts\n M apps/api/test/store-points-fulfillment.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/Client/DesignSystem/Design3Primitives.swift\n M apps/ios/Client/Features/ClientDebugFeature.swift\n M apps/ios/Client/Features/InstallmentView.swift\n M apps/ios/Client/Features/OrderTrackingView.swift\n M apps/ios/Client/Features/SmartSearch.swift\n M apps/ios/Client/Features/StoriesViewer.swift\n M apps/ios/Client/Features/SupportChatView.swift\n M apps/ios/Client/Features/SystemStatesView.swift\n M apps/ios/Client/Features/WaitlistView.swift\n M apps/ios/Courier/CourierOperationsView.swift\n M apps/ios/POS/AliStorePOSApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/POS/POSSaleView.swift\n M apps/ios/Shared/APIClient.swift\n M apps/ios/Shared/AppleSignInNonce.swift\n M apps/ios/Shared/Design3.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/QuickUnlock.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/StaffAuthStore.swift\n M apps/ios/Shared/StaffLoginView.swift\n M apps/ios/Staff/AliStoreStaffApp.swift\n M apps/ios/Staff/StaffInventoryView.swift\n M apps/ios/Staff/StaffScannerView.swift\n M apps/ios/Staff/StaffWorkView.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CheckoutContractTests.swift\n M apps/ios/Tests/CustomerMeContractTests.swift\n M apps/ios/Tests/DesignContrastTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/Tests/MoneyTests.swift\n M apps/ios/Tests/OfflineCourierOwnerTests.swift\n M apps/ios/Tests/OfflineOrderReplayTests.swift\n M apps/ios/Tests/OrderTimelineContractTests.swift\n M apps/ios/Tests/POSMoneyTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/ios/UITests/Courier/AliStoreCourierUITests.swift\n M apps/ios/UITests/POS/AliStorePOSUITests.swift\n M apps/ios/UITests/Staff/AliStoreStaffUITests.swift\n M apps/ios/store/SUBMISSION-STATUS.md\n M apps/mobile/.env.production.example\n M apps/mobile/package-lock.json\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/b2b/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/compare/page.tsx\n M apps/web/app/erp/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/pos/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/app/staff/page.tsx\n M apps/web/components/AddToCartButton.tsx\n M apps/web/components/ConsignmentOps.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/StaffSessionLogin.tsx\n M apps/web/components/WarehouseOps.tsx\n M apps/web/components/erp/HrView.tsx\n M apps/web/components/erp/ProcurementView.tsx\n M apps/web/components/erp/ReorderView.tsx\n M apps/web/components/erp/StaffAdminView.tsx\n M apps/web/components/erp/StoreOperationsView.tsx\n M apps/web/components/mobile/MobileFavorites.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/catalog.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/api/procurement.ts\n M apps/web/lib/api/staff-auth.ts\n M apps/web/lib/cart.tsx\n M apps/web/lib/format.ts\n M apps/web/lib/staff-session.ts\n M apps/web/package.json\n M apps/web/tsconfig.json\n M docs/READINESS.md\n M e2e/print-ui.spec.ts\n M e2e/storefront-motion.spec.ts\n M package-lock.json\n M package.json\n M playwright.config.ts\n M scripts/__tests__/apply-ios-store-metadata.test.mjs\n M scripts/apply-ios-store-metadata.mjs\n M scripts/com.alistore.api.plist\n M scripts/run-isolated-api-tests.mjs\n M scripts/validate-canonical-api-base.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n?? apps/android/core/src/main/java/kg/alistore/core/SupplyParityGateway.kt\n?? apps/android/core/src/test/java/kg/alistore/core/NativeSupplyPolicyTest.kt\n?? apps/api/prisma/migrations/20260728120000_product_supply_mode/\n?? apps/api/prisma/migrations/20260729090000_order_line_supply/\n?? apps/api/prisma/migrations/20260729140000_supplier_price_import/\n?? apps/api/prisma/migrations/20260729170000_order_line_supply_statuses/\n?? apps/api/prisma/migrations/20260729180000_supply_commerce_foundation/\n?? apps/api/prisma/migrations/20260729190000_order_cancellation_domain/\n?? apps/api/prisma/migrations/20260729200000_refund_customer_prepayment/\n?? apps/api/prisma/migrations/20260729210000_customer_prepayment_refund_invariants/\n?? apps/api/prisma/migrations/20260729220000_order_cancellation_owner_resolution/\n?? apps/api/prisma/migrations/20260729221000_order_cancellation_snapshot_guards/\n?? apps/api/prisma/migrations/20260729230000_supply_quarantine_resolution/\n?? apps/api/prisma/migrations/20260729240000_staff_point_no_default/\n?? apps/api/prisma/migrations/20260729250000_supply_quantity_allocation/\n?? apps/api/prisma/migrations/20260729251000_supply_quantity_allocation_returns/\n?? apps/api/src/common/store-point-identity.ts\n?? apps/api/src/config/runtime-env-files.ts\n?? apps/api/src/orders/order-cancellation-resolution.dto.ts\n?? apps/api/src/orders/order-cancellation-resolution.service.ts\n?? apps/api/src/orders/order-cancellations.dto.ts\n?? apps/api/src/orders/order-cancellations.service.ts\n?? apps/api/src/orders/order-item-handover-on-tx.ts\n?? apps/api/src/orders/order-item-handover.service.ts\n?? apps/api/src/orders/order-item-reservation.service.ts\n?? apps/api/src/orders/order-no-show.scheduler.ts\n?? apps/api/src/orders/supply-feature-flags.spec.ts\n?? apps/api/src/outbox/customer-notifications.spec.ts\n?? apps/api/src/procurement/order-line-supply-state.ts\n?? apps/api/src/procurement/order-line-supply.controller.ts\n?? apps/api/src/procurement/order-line-supply.dto.ts\n?? apps/api/src/procurement/order-line-supply.service.ts\n?? apps/api/src/procurement/price-import/\n?? apps/api/src/procurement/supplier-offers.controller.ts\n?? apps/api/src/procurement/supplier-offers.dto.ts\n?? apps/api/src/procurement/supplier-offers.service.ts\n?? apps/api/src/procurement/supply-operations.controller.ts\n?? apps/api/src/procurement/supply-operations.service.spec.ts\n?? apps/api/src/procurement/supply-operations.service.ts\n?? apps/api/src/procurement/supply-quarantine.controller.ts\n?? apps/api/src/procurement/supply-quarantine.dto.ts\n?? apps/api/src/procurement/supply-quarantine.service.ts\n?? apps/api/test/inventory-store-point-identity.e2e-spec.ts\n?? apps/api/test/order-item-handover.e2e-spec.ts\n?? apps/api/test/order-line-supply-state.spec.ts\n?? apps/api/test/order-line-supply.e2e-spec.ts\n?? apps/api/test/order-to-order-request.e2e-spec.ts\n?? apps/api/test/product-supply-mode.e2e-spec.ts\n?? apps/api/test/runtime-env-files.spec.ts\n?? apps/api/test/smtp-email-otp.sender.spec.ts\n?? apps/api/test/supplier-offers.e2e-spec.ts\n?? apps/api/test/supplier-price-import.e2e-spec.ts\n?? apps/api/test/supply-quarantine.e2e-spec.ts\n?? apps/web/components/erp/SupplyOperationsQueue.tsx\n?? apps/web/lib/api/supply-operations.test.ts\n?? apps/web/lib/use-operational-store-point.tsx\n?? cloudflare/\n?? docs/AUDIT-CONTINUATION-PROMPT.md\n?? docs/EMAIL_SMTP_SETUP_TZ.md\n?? docs/PRODUCTION-ENGINEERING-MASTER-PROMPT.md\n?? docs/SUPPLY-TO-ORDER-PLAN.md\n?? docs/SUPPLY-TO-ORDER-REMAINING-IMPLEMENTATION-PLAN.md\n?? docs/acceptance/RELEASE-READINESS-2026-07-28.md\n?? docs/acceptance/SUPPLY-RELEASE-GATE.md\n?? docs/acceptance/SUPPLY-TO-ORDER-EVIDENCE-2026-07-29.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-29T09-02-01-198Z.json\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-29T09-08-46-461Z.json\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-29T09-21-12-846Z.json\n?? docs/acceptance/artifacts/supply-release-gate-latest.json\n?? e2e/checkout-store-identity.spec.ts\n?? e2e/checkout-to-order.spec.ts\n?? e2e/storefront-supply-mode.spec.ts\n?? functions/\n?? migrations/\n?? pnpm-lock.yaml\n?? scripts/__tests__/activate-production-api.test.mjs\n?? scripts/__tests__/cloudflare-canonical-api-base.test.mjs\n?? scripts/__tests__/cloudflare-config.test.mjs\n?? scripts/__tests__/cloudflare-route-coverage.test.mjs\n?? scripts/__tests__/contest-judge.test.mjs\n?? scripts/__tests__/contest-raffle.test.mjs\n?? scripts/__tests__/contest-site.test.mjs\n?? scripts/__tests__/supply-release-gate-db.test.mjs\n?? scripts/activate-production-api.mjs\n?? scripts/cloudflare-api-contract-matrix.mjs\n?? scripts/cloudflare-config.mjs\n?? scripts/cloudflare-data-transfer.mjs\n?? scripts/cloudflare-local-smoke.mjs\n?? scripts/cloudflare-release-gate.mjs\n?? scripts/cloudflare-remote-command.mjs\n?? scripts/cloudflare-restore-drill.mjs\n?? scripts/cloudflare-route-coverage.mjs\n?? scripts/contest-demo/\n?? scripts/contest-judge.mjs\n?? scripts/contest-judge/\n?? scripts/contest-raffle.mjs\n?? scripts/contest-raffle/\n?? scripts/contest-site/\n?? scripts/supply-release-gate-db.mjs\n?? scripts/supply-release-gate.mjs\n?? wrangler.toml"
+  },
+  "results": [
+    {
+      "id": "supply_feature_flags",
+      "status": "PASS",
+      "detail": "all release-sensitive supply flags are false/unset",
+      "command": null
+    },
+    {
+      "id": "prisma_validate",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm exec -w @alistore/api -- prisma validate"
+    },
+    {
+      "id": "api_full_pass_1",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "node scripts/run-isolated-api-tests.mjs"
+    },
+    {
+      "id": "api_full_pass_2",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "node scripts/run-isolated-api-tests.mjs"
+    },
+    {
+      "id": "web_tests",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run test -w @alistore/web"
+    },
+    {
+      "id": "web_build",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run build -w @alistore/web"
+    },
+    {
+      "id": "playwright_cross_browser",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "playwright test"
+    },
+    {
+      "id": "production_preflight_strict",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run launch:preflight:strict"
+    },
+    {
+      "id": "production_readiness_strict",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run launch:readiness:strict"
+    },
+    {
+      "id": "secret_scan",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "gitleaks dir --redact --no-banner ."
+    },
+    {
+      "id": "dependency_scan",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "osv-scanner scan source -r ."
+    },
+    {
+      "id": "ios_xcode_prerequisite",
+      "status": "BLOCKED",
+      "detail": "not probed in --plan mode",
+      "command": "xcodebuild -version"
+    },
+    {
+      "id": "ios_swiftlint_prerequisite",
+      "status": "BLOCKED",
+      "detail": "not probed in --plan mode",
+      "command": "swiftlint version"
+    },
+    {
+      "id": "ios_build",
+      "status": "BLOCKED",
+      "detail": "Xcode prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "ios_test",
+      "status": "BLOCKED",
+      "detail": "Xcode prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "ios_ui",
+      "status": "BLOCKED",
+      "detail": "Xcode prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "ios_lint",
+      "status": "BLOCKED",
+      "detail": "swiftlint prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "android_java_prerequisite",
+      "status": "BLOCKED",
+      "detail": "not probed in --plan mode",
+      "command": "/opt/homebrew/opt/openjdk@17/bin/java -version"
+    },
+    {
+      "id": "android_build",
+      "status": "BLOCKED",
+      "detail": "Java 17 prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "android_test_lint",
+      "status": "BLOCKED",
+      "detail": "Java 17 prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "android_ui",
+      "status": "BLOCKED",
+      "detail": "Java 17 prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "external_payment_gateway",
+      "status": "BLOCKED",
+      "detail": "PAYMENT_PROVIDER_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_refund_webhook",
+      "status": "BLOCKED",
+      "detail": "REFUND_WEBHOOK_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_smtp",
+      "status": "BLOCKED",
+      "detail": "SMTP_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_sms",
+      "status": "BLOCKED",
+      "detail": "SMS_PROVIDER_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_fcm",
+      "status": "BLOCKED",
+      "detail": "FCM_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_apns",
+      "status": "BLOCKED",
+      "detail": "APNS_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_object_storage",
+      "status": "BLOCKED",
+      "detail": "OBJECT_STORAGE_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_fiscal_ofd",
+      "status": "BLOCKED",
+      "detail": "FISCAL_OFD_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_monitoring",
+      "status": "BLOCKED",
+      "detail": "MONITORING_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_pos_hardware",
+      "status": "BLOCKED",
+      "detail": "POS_HARDWARE_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    }
+  ]
+}

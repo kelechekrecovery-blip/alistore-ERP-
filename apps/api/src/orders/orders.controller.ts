@@ -36,6 +36,13 @@ import { RequirePermission } from '../authz/require-permission.decorator';
 import { AuthzService } from '../authz/authz.service';
 import { guestOrderCapabilityTtlSeconds, issueGuestOrderCapability, requireGuestCapability } from '../auth/guest-capability';
 import { ReceiptsService } from '../receipts/receipts.service';
+import { OrderCancellationsService } from './order-cancellations.service';
+import { CreateOrderCancellationDto } from './order-cancellations.dto';
+import { ValidationError } from '../common/errors';
+import { OrderCancellationResolutionService } from './order-cancellation-resolution.service';
+import { ResolveOrderCancellationDto } from './order-cancellation-resolution.dto';
+import { OrderItemHandoverService } from './order-item-handover.service';
+import { OrderItemReservationService } from './order-item-reservation.service';
 
 @ApiTags('orders')
 @Controller('orders')
@@ -45,7 +52,52 @@ export class OrdersController {
     private readonly staffAuth: StaffAuthService,
     private readonly authz: AuthzService,
     private readonly receipts: ReceiptsService,
+    private readonly cancellations: OrderCancellationsService,
+    private readonly cancellationResolutions: OrderCancellationResolutionService,
+    private readonly itemHandovers: OrderItemHandoverService,
+    private readonly itemReservations: OrderItemReservationService,
   ) {}
+
+  @Post(':id/items/:itemId/reserve')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('orders', 'fulfill')
+  async reserveItem(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Headers('idempotency-key') key: string | undefined,
+  ) {
+    return this.itemReservations.reserve(id, itemId, await requireActiveStaff(user, this.staffAuth), key ?? '');
+  }
+
+  @Post(':id/items/:itemId/ready')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('orders', 'fulfill')
+  async readyItem(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Headers('idempotency-key') key: string | undefined,
+  ) {
+    return this.itemReservations.ready(id, itemId, await requireActiveStaff(user, this.staffAuth), key ?? '');
+  }
+
+  @ApiOperation({ summary: 'Hand over one paid own-stock line of a pickup order' })
+  @ApiBearerAuth()
+  @ApiOkResponse({ description: 'The line inventory and revenue are finalized exactly once.' })
+  @ApiConflictResponse({ description: 'Line is unpaid, not ready, already handed over, or supplier-backed.' })
+  @Post(':id/items/:itemId/handover')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('orders', 'fulfill')
+  async handOverItem(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+  ) {
+    const actor = await requireActiveStaff(user, this.staffAuth);
+    return this.itemHandovers.handOver(id, itemId, actor, idempotencyKey ?? '');
+  }
 
   @ApiOperation({ summary: 'Orders of the authenticated customer (personal account)' })
   @ApiBearerAuth()
@@ -54,6 +106,112 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   mine(@CurrentUser() user: AuthPrincipal) {
     return this.orders.listByCustomer(user.customerId);
+  }
+
+  @ApiOperation({ summary: 'Preview cancellation and deposit refund policy for a customer order' })
+  @ApiBearerAuth()
+  @ApiParam({ name: 'id', description: 'Customer-owned order id' })
+  @ApiOkResponse({ description: 'Cancellation eligibility and estimated refund.' })
+  @ApiNotFoundResponse({ description: 'Order does not exist or belongs to another customer.' })
+  @Get('mine/:id/cancellation-preview')
+  @UseGuards(JwtAuthGuard)
+  async cancellationPreview(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    if (user.typ !== 'customer') throw new ForbiddenException('Доступно только покупателю');
+    const preview = await this.cancellations.preview(id, user.customerId);
+    if (!preview) throw new NotFoundException(`Заказ ${id} не найден`);
+    return preview;
+  }
+
+  @ApiOperation({ summary: 'Request cancellation of a customer-owned supply order' })
+  @ApiBearerAuth()
+  @ApiCreatedResponse({ description: 'Cancellation request created or idempotently replayed.' })
+  @Post('mine/:id/cancellations')
+  @UseGuards(JwtAuthGuard)
+  async requestCancellation(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: CreateOrderCancellationDto,
+  ) {
+    if (user.typ !== 'customer') throw new ForbiddenException('Доступно только покупателю');
+    const key = idempotencyKey?.trim();
+    if (!key || key.length > 128) {
+      throw new ValidationError(
+        'idempotency_key_required',
+        'Требуется Idempotency-Key длиной до 128 символов',
+      );
+    }
+    return this.cancellations.request(id, user.customerId, dto.reason, key);
+  }
+
+  @ApiOperation({ summary: 'Read the latest cancellation request for a customer-owned order' })
+  @ApiBearerAuth()
+  @ApiOkResponse({ description: 'Latest cancellation request or null.' })
+  @Get('mine/:id/cancellations/current')
+  @UseGuards(JwtAuthGuard)
+  async currentCancellation(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    if (user.typ !== 'customer') throw new ForbiddenException('Доступно только покупателю');
+    const order = await this.orders.getForCustomer(id, user.customerId);
+    if (!order) throw new NotFoundException(`Заказ ${id} не найден`);
+    return this.cancellations.current(id, user.customerId);
+  }
+
+  @ApiOperation({ summary: 'Preview an owner/admin decision for a post-PO cancellation' })
+  @ApiBearerAuth()
+  @ApiOkResponse({ description: 'Immutable cancellation snapshot and resolution policy.' })
+  @ApiNotFoundResponse({ description: 'Cancellation does not exist for this order.' })
+  @Get(':id/cancellations/:cancellationId/owner-preview')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('approvals', 'read')
+  async cancellationOwnerPreview(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Param('cancellationId') cancellationId: string,
+  ) {
+    await requireActiveStaff(user, this.staffAuth);
+    const preview = await this.cancellationResolutions.preview(
+      id,
+      cancellationId,
+      user.role!,
+    );
+    if (!preview) throw new NotFoundException(`Заявка отмены ${cancellationId} не найдена`);
+    return preview;
+  }
+
+  @ApiOperation({
+    summary: 'Resolve a post-PO cancellation with owner/admin TOTP step-up',
+  })
+  @ApiBearerAuth()
+  @ApiOkResponse({ description: 'Decision recorded; approved refund queued idempotently.' })
+  @ApiConflictResponse({ description: 'Cancellation already resolved or refund already exists.' })
+  @Post(':id/cancellations/:cancellationId/owner-resolution')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('approvals', 'read')
+  async resolveCancellationAsOwner(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Param('cancellationId') cancellationId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: ResolveOrderCancellationDto,
+  ) {
+    const staffId = await requireActiveStaff(user, this.staffAuth);
+    const key = idempotencyKey?.trim();
+    if (!key || key.length > 128) {
+      throw new ValidationError(
+        'idempotency_key_required',
+        'Требуется Idempotency-Key длиной до 128 символов',
+      );
+    }
+    const { totpToken, ...decision } = dto;
+    return this.cancellationResolutions.resolve(
+      id,
+      cancellationId,
+      staffId,
+      user.role!,
+      decision,
+      key,
+      totpToken,
+    );
   }
 
   @ApiOperation({ summary: 'Create an order for the authenticated customer' })
@@ -121,20 +279,18 @@ export class OrdersController {
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async get(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
-    let order = await this.orders.get(id);
-    if (!order) throw new NotFoundException(`Заказ ${id} не найден`);
     if (user.typ === 'customer') {
-      if (order.customerId !== user.customerId) {
-        throw new NotFoundException(`Заказ ${id} не найден`);
-      }
-    } else {
-      const staffId = await requireActiveStaff(user, this.staffAuth);
-      if (!user.role || !(await this.authz.can(user.role, 'orders', 'queue'))) {
-        throw new ForbiddenException('Недостаточно прав для просмотра заказа');
-      }
-      order = await this.orders.getForStaff(id, staffId);
+      const customerOrder = await this.orders.getForCustomer(id, user.customerId);
+      if (!customerOrder) throw new NotFoundException(`Заказ ${id} не найден`);
+      return customerOrder;
     }
-    return order;
+    const staffId = await requireActiveStaff(user, this.staffAuth);
+    if (!user.role || !(await this.authz.can(user.role, 'orders', 'queue'))) {
+      throw new ForbiddenException('Недостаточно прав для просмотра заказа');
+    }
+    const staffOrder = await this.orders.getForStaff(id, staffId);
+    if (!staffOrder) throw new NotFoundException(`Заказ ${id} не найден`);
+    return staffOrder;
   }
 
   @ApiOperation({ summary: 'Render a paid receipt for the authenticated customer' })

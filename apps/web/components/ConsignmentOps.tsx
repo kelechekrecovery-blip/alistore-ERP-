@@ -18,8 +18,10 @@ import {
   type QuantityConsignmentLot,
 } from '@/lib/api';
 import { som } from '@/lib/format';
+import { useOperationalStorePoint } from '@/lib/use-operational-store-point';
 
 export function ConsignmentOps({ accessToken, role }: { accessToken: string; role: string }) {
+  const { points, point, canSelect, error: pointError, loading: pointsLoading } = useOperationalStorePoint(accessToken);
   const canPayout = role === 'owner' || role === 'admin';
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [items, setItems] = useState<ConsignmentItem[]>([]);
@@ -29,7 +31,10 @@ export function ConsignmentOps({ accessToken, role }: { accessToken: string; rol
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
-  const [form, setForm] = useState({ mode: 'serialized', productId: '', imei: '', quantity: '1', location: 'BISHKEK-1', ownerName: '', ownerContact: '', commissionPct: '10', grade: 'B' });
+  const [form, setForm] = useState({ mode: 'serialized', productId: '', imei: '', quantity: '1', location: '', ownerName: '', ownerContact: '', commissionPct: '10', grade: 'B' });
+  useEffect(() => {
+    setForm((current) => ({ ...current, location: point }));
+  }, [point]);
 
   const load = useCallback(async () => {
     const [catalog, consignments, quantityRows, payoutRows, adjustmentRows] = await Promise.all([
@@ -148,11 +153,11 @@ export function ConsignmentOps({ accessToken, role }: { accessToken: string; rol
           <select aria-label="Комиссионный товар" value={form.productId} onChange={(event) => setForm({ ...form, productId: event.target.value })} className={inputClass}>
             {products.filter((product) => product.trackingMode === form.mode).map((product) => <option key={product.id} value={product.id}>{product.name} · {product.sku}</option>)}
           </select>
-          <div className="grid grid-cols-2 gap-2">{form.mode === 'serialized' ? <input aria-label="IMEI комиссионного товара" value={form.imei} onChange={(event) => setForm({ ...form, imei: event.target.value })} placeholder="IMEI / SN" className={inputClass} /> : <input aria-label="Количество в комиссионной партии" inputMode="numeric" value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value.replace(/\D/g, '') })} placeholder="Количество" className={inputClass} />}<input aria-label="Склад комиссионного товара" value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} placeholder="Склад" className={inputClass} /></div>
+          <div className="grid grid-cols-2 gap-2">{form.mode === 'serialized' ? <input aria-label="IMEI комиссионного товара" value={form.imei} onChange={(event) => setForm({ ...form, imei: event.target.value })} placeholder="IMEI / SN" className={inputClass} /> : <input aria-label="Количество в комиссионной партии" inputMode="numeric" value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value.replace(/\D/g, '') })} placeholder="Количество" className={inputClass} />}<select aria-label="Склад комиссионного товара" required disabled={!canSelect || pointsLoading} value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} className={`${inputClass} disabled:opacity-70`}><option value="" disabled>Выберите склад</option>{points.map((item) => <option key={item.id} value={item.inventoryLocation}>{item.name} · {item.inventoryLocation}</option>)}</select></div>
           <input aria-label="Владелец комиссионного товара" value={form.ownerName} onChange={(event) => setForm({ ...form, ownerName: event.target.value })} placeholder="Владелец" className={inputClass} />
           <input aria-label="Контакт владельца" value={form.ownerContact} onChange={(event) => setForm({ ...form, ownerContact: event.target.value })} placeholder="Телефон / реквизиты" className={inputClass} />
           <div className="grid grid-cols-2 gap-2"><input aria-label="Комиссия, процент" inputMode="decimal" value={form.commissionPct} onChange={(event) => setForm({ ...form, commissionPct: event.target.value.replace(/[^\d.]/g, '') })} placeholder="Комиссия, %" className={inputClass} />{form.mode === 'serialized' && <select aria-label="Грейд комиссионного товара" value={form.grade} onChange={(event) => setForm({ ...form, grade: event.target.value })} className={inputClass}><option>A</option><option>B</option><option>C</option></select>}</div>
-          <button type="button" onClick={submitReceive} disabled={busy === 'receive'} className="w-full rounded-btn bg-coral px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Принять на комиссию</button>
+          <button type="button" onClick={submitReceive} disabled={busy === 'receive' || !form.location || Boolean(pointError)} className="w-full rounded-btn bg-coral px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Принять на комиссию</button>
         </div>
 
         <div className="min-w-0 overflow-x-auto">

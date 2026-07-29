@@ -88,6 +88,11 @@ enum RefundStatus {
   rejected
 }
 
+enum RefundPurpose {
+  return_sale
+  customer_prepayment
+}
+
 enum RefundAllocationStatus {
   queued
   processing
@@ -129,6 +134,8 @@ enum CashIncassationStatus {
 enum UnitStatus {
   in_stock
   reserved
+  quarantined
+  returned_supplier
   sold
   returned
   in_repair
@@ -167,6 +174,78 @@ enum LoanerLoanStatus {
 enum StockTrackingMode {
   serialized
   quantity
+}
+
+// Политика поставки товара. own_stock — наш склад, продаём из остатков.
+// to_order — под заказ: остатка нет, товар закупается у поставщика под
+// конкретный заказ, покупателю показывается срок supplyLeadDays.
+// Инвариант: to_order НЕ участвует в резервировании и списании стока.
+enum SupplyMode {
+  own_stock
+  to_order
+}
+
+enum SupplyQuarantineStatus {
+  pending
+  resolved
+}
+
+enum SupplyQuarantineDisposition {
+  return_to_supplier
+  convert_to_own_stock
+}
+
+// Слайс 3 плана SUPPLY-TO-ORDER: жизненный цикл поставки одной строки заказа
+// от подтверждения у поставщика до выдачи покупателю. `cancelled` достижим из
+// любого нетерминального состояния — сорванная поставка не редкий путь.
+enum OrderLineSupplyStatus {
+  awaiting_deposit
+  awaiting_supplier
+  procurement_draft
+  ordered
+  in_transit
+  received
+  quality_check
+  ready
+  handed_over
+  supplier_rejected
+  late
+  customer_cancelled
+  quarantined
+  cancelled
+}
+
+enum OrderLineFulfillmentStatus {
+  pending_payment
+  reserved
+  ready
+  awaiting_deposit
+  procurement_draft
+  supplier_ordered
+  in_transit
+  received
+  quality_check
+  handed_over
+  reservation_expired
+  supplier_rejected
+  late
+  customer_cancelled
+  quarantined
+  cancelled
+}
+
+enum OrderReceivableKind {
+  supply_deposit
+  stock_sale
+  supply_balance
+  delivery
+}
+
+enum OrderReceivableStatus {
+  open
+  partially_settled
+  settled
+  cancelled
 }
 
 enum ConsignmentStatus {
@@ -288,6 +367,36 @@ enum PurchaseOrderStatus {
   receiving
   received
   cancelled
+}
+
+enum OrderCancellationStatus {
+  requested
+  awaiting_owner
+  approved
+  refund_queued
+  refund_processing
+  refunded
+  rejected
+  refund_failed
+  cancelled
+}
+
+enum OrderCancellationPolicy {
+  automatic_full
+  owner_resolution
+}
+
+enum OrderCancellationFaultParty {
+  customer
+  supplier
+  alistore
+  unknown
+}
+
+enum OrderCancellationResolutionAction {
+  approve_full
+  approve_partial
+  reject
 }
 
 enum SupplierInvoiceStatus {
@@ -472,29 +581,30 @@ enum CampaignCreativeType {
 
 // ---------- CORE ----------
 model Customer {
-  id                   String                @id @default(cuid())
-  phone                String                @unique // PII — маскировать младшим ролям
+  id                      String                  @id @default(cuid())
+  phone                   String                  @unique // PII — маскировать младшим ролям
   // Второй канал входа в тот же аккаунт, а не вторая личность: телефон остаётся
   // первичным идентификатором (доставка и COD без него не работают). Хранится
   // нормализованным в нижнем регистре, поэтому @unique ловит и Ivan@… и ivan@….
-  email                String?               @unique // PII — маскировать младшим ролям
-  emailVerifiedAt      DateTime? // set when the OTP attach flow confirms ownership
-  name                 String
-  consent              Boolean               @default(false) // маркетинг только при true
-  segments             String[]
-  ltv                  Int                   @default(0)
-  identities           CustomerIdentity[]
-  pushTokens           PushToken[]
-  addresses            CustomerAddress[]
-  preferences          CustomerPreferences?
-  loyaltyEntries       LoyaltyEntry[]
-  coupons              CustomerCoupon[]
-  promotionRedemptions PromotionRedemption[]
-  campaignRecipients   CampaignRecipient[]
-  notifications        CustomerNotification[]
-  orders               Order[]
-  tradeIns             TradeInDevice[]
-  createdAt            DateTime              @default(now())
+  email                   String?                 @unique // PII — маскировать младшим ролям
+  emailVerifiedAt         DateTime? // set when the OTP attach flow confirms ownership
+  name                    String
+  consent                 Boolean                 @default(false) // маркетинг только при true
+  segments                String[]
+  ltv                     Int                     @default(0)
+  identities              CustomerIdentity[]
+  pushTokens              PushToken[]
+  addresses               CustomerAddress[]
+  preferences             CustomerPreferences?
+  loyaltyEntries          LoyaltyEntry[]
+  coupons                 CustomerCoupon[]
+  promotionRedemptions    PromotionRedemption[]
+  campaignRecipients      CampaignRecipient[]
+  notifications           CustomerNotification[]
+  telegramAgentIdentities TelegramAgentIdentity[]
+  orders                  Order[]
+  tradeIns                TradeInDevice[]
+  createdAt               DateTime                @default(now())
   // SupportTicket ссылается на customerId строкой (как WarrantyCase/DebtPlan) —
   // без @relation, чтобы очистка в тестах не каскадила через FK.
 }
@@ -526,17 +636,17 @@ model CustomerPreferences {
 
 // Durable customer-owned inbox projected from the transactional outbox.
 model CustomerNotification {
-  id           String    @id @default(cuid())
-  customerId   String
-  customer     Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  template     String
-  title        String
-  detail       String
-  symbol       String    @default("bell.fill")
-  route        String    @default("account")
-  referenceId  String?
-  createdAt    DateTime  @default(now())
-  readAt       DateTime?
+  id          String    @id @default(cuid())
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  template    String
+  title       String
+  detail      String
+  symbol      String    @default("bell.fill")
+  route       String    @default("account")
+  referenceId String?
+  createdAt   DateTime  @default(now())
+  readAt      DateTime?
 
   @@index([customerId, createdAt])
   @@index([customerId, readAt])
@@ -623,6 +733,11 @@ model Product {
   taxCode                     String                       @default("vat_standard")
   taxRateBps                  Int                          @default(1200)
   trackingMode                StockTrackingMode            @default(serialized)
+  supplyMode                  SupplyMode                   @default(own_stock)
+  supplyLeadDays              Int? // обязателен при supplyMode=to_order, 1..180 (CHECK в миграции)
+  supplierId                  String? // внутренние данные: НЕ проецировать в публичный каталог
+  supplier                    Supplier?                    @relation(fields: [supplierId], references: [id])
+  supplierOffers              SupplierOffer[]
   attrs                       Json
   archived                    Boolean                      @default(false) // soft-delete: НЕ удалять физически
   updatedAt                   DateTime                     @default(now()) @updatedAt
@@ -630,6 +745,7 @@ model Product {
   movements                   InventoryMovement[]
   balances                    InventoryBalance[]
   quantityAllocations         OrderQuantityAllocation[]
+  supplyQuantityAllocations   SupplyQuantityAllocation[]
   purchaseOrderItems          PurchaseOrderItem[]
   bundleComponents            ProductBundleComponent[]     @relation("BundleProduct")
   includedInBundles           ProductBundleComponent[]     @relation("BundleComponentProduct")
@@ -642,11 +758,15 @@ model Product {
   valuationReversals          InventoryValuationReversal[]
   landedCostAllocations       LandedCostAllocation[]
   exchangeReplacementRequests ExchangeRequest[]            @relation("ExchangeReplacementProduct")
+  orderItems                  OrderItem[]
+  supplyQuarantineResolutions SupplyQuarantineResolution[]
 
   @@index([category])
   @@index([variantGroup])
   @@index([archived])
   @@index([updatedAt])
+  @@index([supplyMode])
+  @@index([supplierId])
 }
 
 model InventoryBalance {
@@ -703,29 +823,32 @@ model ProductReview {
 }
 
 model DeviceUnit {
-  id                          String                    @id @default(cuid())
-  imei                        String                    @unique // один IMEI нельзя продать дважды
-  product                     Product                   @relation(fields: [productId], references: [id])
-  productId                   String
-  status                      UnitStatus                @default(in_stock)
-  grade                       Grade?
-  location                    String
-  acquisitionCost             Int?
-  orderId                     String?
-  updatedAt                   DateTime                  @default(now()) @updatedAt
-  consignmentItem             ConsignmentItem?
-  serviceReplacement          ServiceWorkOrder?         @relation("ServiceReplacementUnit")
-  loanerProfile               LoanerDevice?
-  valuationIssues             InventoryValuationIssue[]
-  quarantineCases             InventoryQuarantineCase[]
-  exchangeReturnRequests      ExchangeRequest[]         @relation("ExchangeReturnedUnit")
-  exchangeReplacementRequests ExchangeRequest[]         @relation("ExchangeReplacementUnit")
-  landedCostAllocations       LandedCostAllocation[]
+  id                           String                      @id @default(cuid())
+  imei                         String                      @unique // один IMEI нельзя продать дважды
+  product                      Product                     @relation(fields: [productId], references: [id])
+  productId                    String
+  status                       UnitStatus                  @default(in_stock)
+  grade                        Grade?
+  location                     String
+  acquisitionCost              Int?
+  orderId                      String?
+  updatedAt                    DateTime                    @default(now()) @updatedAt
+  consignmentItem              ConsignmentItem?
+  serviceReplacement           ServiceWorkOrder?           @relation("ServiceReplacementUnit")
+  loanerProfile                LoanerDevice?
+  valuationIssues              InventoryValuationIssue[]
+  quarantineCases              InventoryQuarantineCase[]
+  exchangeReturnRequests       ExchangeRequest[]           @relation("ExchangeReturnedUnit")
+  exchangeReplacementRequests  ExchangeRequest[]           @relation("ExchangeReplacementUnit")
+  landedCostAllocations        LandedCostAllocation[]
+  supplyQuarantineResolution   SupplyQuarantineResolution? @relation(fields: [supplyQuarantineResolutionId], references: [id], onDelete: Restrict)
+  supplyQuarantineResolutionId String?
   // повтор IMEI в trade-in + продаже → risk-флаг (проверка на сервере)
 
   @@index([productId])
   @@index([status])
   @@index([orderId])
+  @@index([supplyQuarantineResolutionId])
   @@index([updatedAt])
 }
 
@@ -761,22 +884,23 @@ model InventoryQuarantineCase {
 }
 
 model StorePoint {
-  id                 String              @id @default(cuid())
-  code               String              @unique
-  name               String
-  address            String
-  inventoryLocation  String              @unique
-  hours              String
-  pickupInstructions String?
-  active             Boolean             @default(true)
-  sortOrder          Int                 @default(100)
-  createdBy          String
-  idempotencyKey     String              @unique
-  orders             Order[]
-  commands           StorePointCommand[]
-  staff              StaffUser[]
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  id                          String                       @id @default(cuid())
+  code                        String                       @unique
+  name                        String
+  address                     String
+  inventoryLocation           String                       @unique
+  hours                       String
+  pickupInstructions          String?
+  active                      Boolean                      @default(true)
+  sortOrder                   Int                          @default(100)
+  createdBy                   String
+  idempotencyKey              String                       @unique
+  orders                      Order[]
+  commands                    StorePointCommand[]
+  staff                       StaffUser[]
+  supplyQuarantineResolutions SupplyQuarantineResolution[]
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
 
   @@index([active, sortOrder])
 }
@@ -970,12 +1094,15 @@ model Order {
   total                    Int
   piiConsentAt             DateTime? // согласие с офертой и обработкой ПДн на витрине
   items                    OrderItem[]
+  receivables              OrderReceivable[]
+  purchaseOrders           PurchaseOrder[]                 @relation("CustomerOrderPurchaseOrders")
   bundleAllocations        OrderBundleAllocation[]
   quantityAllocations      OrderQuantityAllocation[]
   consignmentSales         ConsignmentItem[]               @relation("ConsignmentSaleOrder")
   quantityConsignmentSales QuantityConsignmentAllocation[] @relation("QuantityConsignmentSaleOrder")
   payments                 Payment[]
   refunds                  Refund[]
+  cancellationRequests     OrderCancellation[]
   attribution              OrderAttribution?
   returns                  Return[]
   exchangeSourceRequests   ExchangeRequest[]               @relation("ExchangeOriginalOrder")
@@ -1069,7 +1196,7 @@ model ConsignmentPayout {
   ownerAmount         Int
   status              ConsignmentPayoutStatus         @default(created)
   paymentKey          String?                         @unique
-  paymentMethod       PaymentMethod                    @default(cash)
+  paymentMethod       PaymentMethod                   @default(cash)
   createdBy           String
   paidBy              String?
   paidAt              DateTime?
@@ -1226,55 +1353,103 @@ model OrderBundleAllocation {
 }
 
 model OrderItem {
-  id                String       @id @default(cuid())
-  order             Order        @relation(fields: [orderId], references: [id])
-  orderId           String
-  lineNumber        Int          @default(0)
-  sku               String
-  qty               Int
-  price             Int
-  unitCost          Int          @default(0)
-  discountAmount    Int          @default(0)
-  taxCode           String       @default("vat_standard")
-  taxRateBps        Int          @default(1200)
-  taxBaseAmount     Int          @default(0)
-  taxAmount         Int          @default(0)
-  imei              String?
-  inventorySnapshot Json?
-  returnItems       ReturnItem[]
+  id                     String                     @id @default(cuid())
+  order                  Order                      @relation(fields: [orderId], references: [id])
+  orderId                String
+  product                Product?                   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId              String?
+  lineNumber             Int                        @default(0)
+  sku                    String
+  qty                    Int
+  price                  Int
+  unitCost               Int                        @default(0)
+  discountAmount         Int                        @default(0)
+  taxCode                String                     @default("vat_standard")
+  taxRateBps             Int                        @default(1200)
+  taxBaseAmount          Int                        @default(0)
+  taxAmount              Int                        @default(0)
+  supplyModeSnapshot     SupplyMode                 @default(own_stock)
+  supplierIdSnapshot     String?
+  supplyLeadDaysSnapshot Int?
+  promisedDate           DateTime?                  @db.Date
+  fulfillmentStatus      OrderLineFulfillmentStatus @default(pending_payment)
+  readyAt                DateTime?
+  handedOverAt           DateTime?
+  imei                   String?
+  inventorySnapshot      Json?
+  returnItems            ReturnItem[]
+  orderLineSupply        OrderLineSupply?
+  receivables            OrderReceivable[]
 
   @@index([orderId])
   @@index([orderId, lineNumber])
+  @@index([productId])
+  @@index([fulfillmentStatus])
+}
+
+model OrderCancellation {
+  id                        String                             @id @default(cuid())
+  order                     Order                              @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderId                   String
+  customerIdSnapshot        String
+  status                    OrderCancellationStatus            @default(requested)
+  policySnapshot            OrderCancellationPolicy
+  purchaseOrderSentSnapshot Boolean
+  depositPaidSnapshot       Int
+  requestedRefundAmount     Int
+  approvedRefundAmount      Int?
+  supplierExpenseAmount     Int                                @default(0)
+  faultParty                OrderCancellationFaultParty?
+  customerReason            String
+  ownerReason               String?
+  evidence                  Json?
+  resolutionAction          OrderCancellationResolutionAction?
+  resolutionIdempotencyKey  String?                            @unique
+  resolutionRequestHash     String?
+  idempotencyKey            String                             @unique
+  requestHash               String
+  requestedBy               String
+  resolvedBy                String?
+  refundId                  String?                            @unique
+  refund                    Refund?                            @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  createdAt                 DateTime                           @default(now())
+  resolvedAt                DateTime?
+  completedAt               DateTime?
+  updatedAt                 DateTime                           @updatedAt
+
+  @@index([orderId, status])
+  @@index([status, createdAt])
 }
 
 model Payment {
-  id                  String                  @id @default(cuid())
-  order               Order?                  @relation(fields: [orderId], references: [id])
-  orderId             String?
-  serviceWorkOrder    ServiceWorkOrder?       @relation(fields: [serviceWorkOrderId], references: [id], onDelete: Restrict)
-  serviceWorkOrderId  String?
-  originalPayment     Payment?                @relation("PaymentRefunds", fields: [originalPaymentId], references: [id], onDelete: Restrict)
-  originalPaymentId   String?
-  refunds             Payment[]               @relation("PaymentRefunds")
-  refundAllocations   RefundAllocation[]      @relation("RefundOriginalPayment")
-  refundExecution     RefundAllocation?       @relation("RefundExecutionPayment")
-  giftCard            GiftCard?               @relation(fields: [giftCardId], references: [id], onDelete: Restrict)
-  giftCardId          String?
-  giftCardTransaction GiftCardTransaction?
-  amount              Int // отрицательное = возврат
-  method              PaymentMethod
-  status              PaymentStatus           @default(pending)
-  shift               CashShift?              @relation(fields: [shiftId], references: [id])
-  shiftId             String?
-  account             AccountingAccount?      @relation(fields: [accountCode], references: [code], onDelete: Restrict)
-  accountCode         String?
-  accountingEntry     AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
-  accountingEntryId   String?                 @unique
-  idempotencyKey      String?                 @unique
-  receivedBy          String?
-  point               String?
-  txnId               String?                 @unique // идемпотентность webhook (dedup)
-  createdAt           DateTime                @default(now())
+  id                    String                        @id @default(cuid())
+  order                 Order?                        @relation(fields: [orderId], references: [id])
+  orderId               String?
+  serviceWorkOrder      ServiceWorkOrder?             @relation(fields: [serviceWorkOrderId], references: [id], onDelete: Restrict)
+  serviceWorkOrderId    String?
+  originalPayment       Payment?                      @relation("PaymentRefunds", fields: [originalPaymentId], references: [id], onDelete: Restrict)
+  originalPaymentId     String?
+  refunds               Payment[]                     @relation("PaymentRefunds")
+  refundAllocations     RefundAllocation[]            @relation("RefundOriginalPayment")
+  refundExecution       RefundAllocation?             @relation("RefundExecutionPayment")
+  giftCard              GiftCard?                     @relation(fields: [giftCardId], references: [id], onDelete: Restrict)
+  giftCardId            String?
+  giftCardTransaction   GiftCardTransaction?
+  receivableAllocations PaymentReceivableAllocation[]
+  amount                Int // отрицательное = возврат
+  method                PaymentMethod
+  status                PaymentStatus                 @default(pending)
+  shift                 CashShift?                    @relation(fields: [shiftId], references: [id])
+  shiftId               String?
+  account               AccountingAccount?            @relation(fields: [accountCode], references: [code], onDelete: Restrict)
+  accountCode           String?
+  accountingEntry       AccountingJournalEntry?       @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId     String?                       @unique
+  idempotencyKey        String?                       @unique
+  receivedBy            String?
+  point                 String?
+  txnId                 String?                       @unique // идемпотентность webhook (dedup)
+  createdAt             DateTime                      @default(now())
 
   @@index([orderId])
   @@index([serviceWorkOrderId])
@@ -1284,6 +1459,38 @@ model Payment {
   @@index([accountCode, createdAt])
   @@index([point, createdAt])
   @@index([status, createdAt]) // dashboards/KPI/payroll filter by status + date window
+}
+
+model OrderReceivable {
+  id            String                        @id @default(cuid())
+  order         Order                         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderId       String
+  orderItem     OrderItem?                    @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  orderItemId   String?
+  kind          OrderReceivableKind
+  amount        Int
+  settledAmount Int                           @default(0)
+  status        OrderReceivableStatus         @default(open)
+  dueAt         DateTime?
+  createdAt     DateTime                      @default(now())
+  updatedAt     DateTime                      @updatedAt
+  allocations   PaymentReceivableAllocation[]
+
+  @@index([orderId, status])
+  @@index([orderItemId, kind])
+}
+
+model PaymentReceivableAllocation {
+  id           String          @id @default(cuid())
+  payment      Payment         @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  paymentId    String
+  receivable   OrderReceivable @relation(fields: [receivableId], references: [id], onDelete: Restrict)
+  receivableId String
+  amount       Int
+  createdAt    DateTime        @default(now())
+
+  @@unique([paymentId, receivableId])
+  @@index([receivableId, createdAt])
 }
 
 model OnlinePaymentIntentCommand {
@@ -1328,16 +1535,16 @@ model GiftCard {
 }
 
 model CashShift {
-  id                  String             @id @default(cuid())
+  id                  String               @id @default(cuid())
   staffId             String
   point               String
   openCash            Int
   closeCash           Int?
   closeReason         String?
-  openIdempotencyKey  String?            @unique
-  closeIdempotencyKey String?            @unique
+  openIdempotencyKey  String?              @unique
+  closeIdempotencyKey String?              @unique
   diff                Int? // расхождение → approval + Risk
-  openedAt            DateTime           @default(now())
+  openedAt            DateTime             @default(now())
   closedAt            DateTime?
   payments            Payment[]
   refundAllocations   RefundAllocation[]
@@ -1427,20 +1634,21 @@ model CashShiftHandover {
 }
 
 model InventoryMovement {
-  id             String       @id @default(cuid())
-  idempotencyKey String?      @unique
-  product        Product      @relation(fields: [productId], references: [id])
-  productId      String
-  qty            Int
-  type           String // received | moved | write_off | adjust | count
-  from           String?
-  to             String?
-  reason         String?
-  unitCost       Int?
-  totalValue     Int?
-  valuationQty   Int?
-  createdAt      DateTime     @default(now())
-  servicePart    ServicePart?
+  id                         String                      @id @default(cuid())
+  idempotencyKey             String?                     @unique
+  product                    Product                     @relation(fields: [productId], references: [id])
+  productId                  String
+  qty                        Int
+  type                       String // received | moved | write_off | adjust | count
+  from                       String?
+  to                         String?
+  reason                     String?
+  unitCost                   Int?
+  totalValue                 Int?
+  valuationQty               Int?
+  createdAt                  DateTime                    @default(now())
+  servicePart                ServicePart?
+  supplyQuarantineResolution SupplyQuarantineResolution?
   // write_off / adjust → owner approval + evidence
 
   @@index([productId])
@@ -1470,23 +1678,24 @@ model InventoryValuationLayer {
 }
 
 model InventoryValuationIssue {
-  id          String                       @id @default(cuid())
-  product     Product                      @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId   String
-  layer       InventoryValuationLayer?     @relation(fields: [layerId], references: [id], onDelete: Cascade)
-  layerId     String?
-  unit        DeviceUnit?                  @relation(fields: [imei], references: [imei], onDelete: Cascade)
-  imei        String?
-  orderId     String?
-  sourceType  String
-  sourceRef   String
-  location    String
-  quantity    Int
-  reversedQty Int                          @default(0)
-  unitCost    Int
-  totalCost   Int
-  createdAt   DateTime                     @default(now())
-  reversals   InventoryValuationReversal[]
+  id                       String                       @id @default(cuid())
+  product                  Product                      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId                String
+  layer                    InventoryValuationLayer?     @relation(fields: [layerId], references: [id], onDelete: Cascade)
+  layerId                  String?
+  unit                     DeviceUnit?                  @relation(fields: [imei], references: [imei], onDelete: Cascade)
+  imei                     String?
+  orderId                  String?
+  sourceType               String
+  sourceRef                String
+  location                 String
+  quantity                 Int
+  reversedQty              Int                          @default(0)
+  unitCost                 Int
+  totalCost                Int
+  createdAt                DateTime                     @default(now())
+  reversals                InventoryValuationReversal[]
+  supplyQuantityAllocation SupplyQuantityAllocation?
 
   @@unique([sourceType, sourceRef])
   @@index([productId, createdAt])
@@ -1571,8 +1780,10 @@ model ReturnItem {
 
 model Refund {
   id             String             @id @default(cuid())
-  return         Return             @relation(fields: [returnId], references: [id], onDelete: Restrict)
-  returnId       String             @unique
+  purpose        RefundPurpose      @default(return_sale)
+  return         Return?            @relation(fields: [returnId], references: [id], onDelete: Restrict)
+  returnId       String?            @unique
+  cancellation   OrderCancellation?
   order          Order              @relation(fields: [orderId], references: [id], onDelete: Restrict)
   orderId        String
   approval       Approval?          @relation(fields: [approvalId], references: [id], onDelete: Restrict)
@@ -1818,20 +2029,82 @@ model WarrantyOpenCommand {
   @@index([imei])
 }
 
+// Слайс 4 плана SUPPLY-TO-ORDER: прайс-лист поставщика — файл/строки поступают
+// от партнёра без API (WhatsApp), поэтому импорт всегда двухшаговый:
+// preview (stage, ничего в Product не пишет) → apply (явное решение сотрудника).
+// rows хранит уже классифицированные строки, посчитанные один раз на этапе
+// stage — apply читает их как есть, а не парсит файл заново, иначе preview и
+// apply могли бы разойтись.
+model SupplierPriceImportBatch {
+  id          String                          @id @default(cuid())
+  supplier    Supplier                        @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId  String
+  mapping     Json
+  rows        Json
+  summary     Json
+  createdBy   String
+  createdAt   DateTime                        @default(now())
+  application SupplierPriceImportApplication?
+
+  @@index([supplierId])
+  @@index([createdAt])
+}
+
+// Одна строка на батч — применить дважды нельзя даже гонкой: второй apply
+// упирается в @@unique([batchId]), а не в проверку «если уже применено»
+// в коде до записи.
+model SupplierPriceImportApplication {
+  id        String                   @id @default(cuid())
+  batch     SupplierPriceImportBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  batchId   String                   @unique
+  appliedBy String
+  appliedAt DateTime                 @default(now())
+  summary   Json
+
+  @@index([appliedAt])
+}
+
 // Поставщик техники. Scorecard считается из связанных RMA.
 model Supplier {
-  id             String               @id @default(cuid())
-  name           String               @unique
-  contact        String?
-  rmas           SupplierRma[]
-  purchaseOrders PurchaseOrder[]
-  invoices       SupplierInvoice[]
-  creditNotes    SupplierCreditNote[]
-  advances       SupplierAdvance[]
-  statements     SupplierStatement[]
-  landedCosts    LandedCost[]
-  expenses       Expense[]
-  createdAt      DateTime             @default(now())
+  id                 String                     @id @default(cuid())
+  name               String                     @unique
+  contact            String?
+  rmas               SupplierRma[]
+  purchaseOrders     PurchaseOrder[]
+  invoices           SupplierInvoice[]
+  creditNotes        SupplierCreditNote[]
+  advances           SupplierAdvance[]
+  statements         SupplierStatement[]
+  landedCosts        LandedCost[]
+  expenses           Expense[]
+  products           Product[]
+  offers             SupplierOffer[]
+  priceImportBatches SupplierPriceImportBatch[]
+  createdAt          DateTime                   @default(now())
+}
+
+model SupplierOffer {
+  id           String            @id @default(cuid())
+  product      Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId    String
+  supplier     Supplier          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId   String
+  supplierSku  String?
+  unitCost     Int
+  availableQty Int
+  leadDays     Int
+  currency     String            @default("KGS")
+  checkedAt    DateTime
+  validUntil   DateTime
+  active       Boolean           @default(true)
+  updatedBy    String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  supplies     OrderLineSupply[]
+
+  @@index([productId, active])
+  @@index([supplierId, active])
+  @@index([validUntil, active])
 }
 
 model Expense {
@@ -2251,6 +2524,10 @@ model PurchaseOrder {
   idempotencyKey String?             @unique
   supplier       Supplier            @relation(fields: [supplierId], references: [id])
   supplierId     String
+  sourceOrder    Order?              @relation("CustomerOrderPurchaseOrders", fields: [sourceOrderId], references: [id], onDelete: Restrict)
+  sourceOrderId  String?
+  sourceKey      String?             @unique
+  sourceVersion  Int                 @default(1)
   status         PurchaseOrderStatus @default(draft)
   location       String
   note           String?
@@ -2266,6 +2543,7 @@ model PurchaseOrder {
 
   @@index([supplierId, createdAt])
   @@index([status, createdAt])
+  @@index([sourceOrderId, supplierId, status])
 }
 
 model PurchaseOrderItem {
@@ -2278,20 +2556,114 @@ model PurchaseOrderItem {
   receivedQty     Int           @default(0)
   unitCost        Int
 
+  orderLineSupply OrderLineSupply?
+
   @@unique([purchaseOrderId, productId])
   @@index([productId])
 }
 
+// Слайс 3 плана SUPPLY-TO-ORDER: связка «строка клиентского заказа» ↔
+// «строка заказа поставщику». Прямой FK Order → PurchaseOrder был бы неверен —
+// один PO поставщику агрегирует строки нескольких клиентских заказов, поэтому
+// связь идёт через отдельную запись на КАЖДУЮ строку заказа (orderItemId
+// уникален: одна запись поставки на строку). purchaseOrderItemId остаётся
+// NULL, пока PO поставщику не размещён — на awaiting_supplier его физически
+// не существует.
+model OrderLineSupply {
+  id                   String                      @id @default(cuid())
+  orderItem            OrderItem                   @relation(fields: [orderItemId], references: [id])
+  orderItemId          String                      @unique
+  purchaseOrderItem    PurchaseOrderItem?          @relation(fields: [purchaseOrderItemId], references: [id])
+  purchaseOrderItemId  String?                     @unique
+  supplierOffer        SupplierOffer?              @relation(fields: [supplierOfferId], references: [id], onDelete: Restrict)
+  supplierOfferId      String?
+  status               OrderLineSupplyStatus       @default(awaiting_supplier)
+  orderedQty           Int                         @default(1)
+  receivedQty          Int                         @default(0)
+  expectedAt           DateTime?
+  actor                String
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  quarantineResolution SupplyQuarantineResolution?
+  quantityAllocations  SupplyQuantityAllocation[]
+
+  @@index([status])
+  @@index([supplierOfferId, status])
+}
+
+// Количественный товар, принятый под конкретную клиентскую строку. Это
+// отдельный субрегистр: запись не увеличивает свободный InventoryBalance и
+// может быть списана только через связанную OrderLineSupply.
+model SupplyQuantityAllocation {
+  id                String                   @id @default(cuid())
+  orderLineSupply   OrderLineSupply          @relation(fields: [orderLineSupplyId], references: [id], onDelete: Restrict)
+  orderLineSupplyId String
+  purchaseReceipt   PurchaseReceipt          @relation(fields: [purchaseReceiptId], references: [id], onDelete: Restrict)
+  purchaseReceiptId String
+  product           Product                  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId         String
+  location          String
+  qty               Int
+  returnedQty       Int                      @default(0)
+  unitCost          Int
+  active            Boolean                  @default(true)
+  consumedAt        DateTime?
+  valuationIssue    InventoryValuationIssue? @relation(fields: [valuationIssueId], references: [id], onDelete: Restrict)
+  valuationIssueId  String?                  @unique
+  createdAt         DateTime                 @default(now())
+
+  @@unique([purchaseReceiptId, orderLineSupplyId])
+  @@index([orderLineSupplyId, active])
+  @@index([productId, active])
+}
+
+model SupplyQuarantineResolution {
+  id                        String                       @id @default(cuid())
+  orderLineSupply           OrderLineSupply              @relation(fields: [orderLineSupplyId], references: [id], onDelete: Restrict)
+  orderLineSupplyId         String                       @unique
+  product                   Product                      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId                 String
+  storePoint                StorePoint                   @relation(fields: [storePointId], references: [id], onDelete: Restrict)
+  storePointId              String
+  inventoryLocationSnapshot String
+  trackingModeSnapshot      StockTrackingMode
+  quarantinedQty            Int
+  unitCostSnapshot          Int
+  imeis                     Json?
+  status                    SupplyQuarantineStatus       @default(pending)
+  disposition               SupplyQuarantineDisposition?
+  proposalReason            String
+  proposalEvidence          Json
+  proposedBy                String
+  proposalIdempotencyKey    String                       @unique
+  proposalHash              String
+  resolutionReason          String?
+  resolutionEvidence        Json?
+  resolvedBy                String?
+  resolutionIdempotencyKey  String?                      @unique
+  resolutionHash            String?
+  inventoryMovement         InventoryMovement?           @relation(fields: [inventoryMovementId], references: [id], onDelete: Restrict)
+  inventoryMovementId       String?                      @unique
+  units                     DeviceUnit[]
+  createdAt                 DateTime                     @default(now())
+  resolvedAt                DateTime?
+
+  @@index([status, createdAt])
+  @@index([storePointId, status])
+  @@index([productId, status])
+}
+
 model PurchaseReceipt {
-  id                String                  @id @default(cuid())
-  purchaseOrder     PurchaseOrder           @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  purchaseOrderId   String
-  idempotencyKey    String
-  actor             String
-  payload           Json
-  accountingEntryId String?                 @unique
-  accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
-  createdAt         DateTime                @default(now())
+  id                  String                     @id @default(cuid())
+  purchaseOrder       PurchaseOrder              @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrderId     String
+  idempotencyKey      String
+  actor               String
+  payload             Json
+  accountingEntryId   String?                    @unique
+  accountingEntry     AccountingJournalEntry?    @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  quantityAllocations SupplyQuantityAllocation[]
+  createdAt           DateTime                   @default(now())
 
   @@unique([purchaseOrderId, idempotencyKey])
   @@index([purchaseOrderId, createdAt])
@@ -2714,22 +3086,22 @@ model AuditEvent {
 // The stored asset is returned on retry and the EvidenceAttached ledger event
 // is emitted exactly once.
 model EvidenceUpload {
-  id             String   @id @default(cuid())
-  idempotencyKey String   @unique
-  actor          String
-  entityType     String
-  entityId       String
-  label          String?
-  fingerprint    String
-  asset          Json
-  isPii          Boolean  @default(false)
-  retentionUntil DateTime?
+  id               String    @id @default(cuid())
+  idempotencyKey   String    @unique
+  actor            String
+  entityType       String
+  entityId         String
+  label            String?
+  fingerprint      String
+  asset            Json
+  isPii            Boolean   @default(false)
+  retentionUntil   DateTime?
   purgeRequestedAt DateTime?
-  purgeAttempts  Int      @default(0)
-  nextPurgeAt    DateTime?
-  purgedAt       DateTime?
-  purgeReason    String?
-  createdAt      DateTime @default(now())
+  purgeAttempts    Int       @default(0)
+  nextPurgeAt      DateTime?
+  purgedAt         DateTime?
+  purgeReason      String?
+  createdAt        DateTime  @default(now())
 
   @@index([entityType, entityId])
   @@index([isPii, purgedAt, retentionUntil, nextPurgeAt])
@@ -2922,6 +3294,68 @@ model SupportTicket {
   @@index([status])
 }
 
+// Telegram AI agent identity. A Telegram account is linked either to one
+// customer or to one active staff account; the database CHECK enforces XOR.
+model TelegramAgentIdentity {
+  id             String                 @id @default(cuid())
+  telegramUserId String                 @unique
+  chatId         String
+  kind           String // customer | staff
+  customerId     String?                @unique
+  customer       Customer?              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  staffId        String?                @unique
+  staff          StaffUser?             @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  displayName    String?
+  active         Boolean                @default(true)
+  lastSeenAt     DateTime               @default(now())
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  messages       TelegramAgentMessage[]
+
+  @@index([customerId, active])
+  @@index([staffId, active])
+  @@index([chatId, active])
+}
+
+// One-time staff pairing secret. Only its SHA-256 hash is persisted.
+model TelegramAgentPairing {
+  id        String    @id @default(cuid())
+  codeHash  String    @unique
+  staffId   String
+  staff     StaffUser @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([staffId, expiresAt])
+  @@index([expiresAt, usedAt])
+}
+
+// Durable, idempotent webhook inbox and response trace. Secrets, provider keys
+// and tool payloads are never stored here.
+model TelegramAgentMessage {
+  id             String                 @id @default(cuid())
+  externalKey    String                 @unique
+  identityId     String?
+  identity       TelegramAgentIdentity? @relation(fields: [identityId], references: [id], onDelete: SetNull)
+  telegramUserId String
+  chatId         String
+  direction      String // inbound | outbound
+  text           String
+  intent         String?
+  status         String                 @default("received") // received | processing | answered | failed
+  attempts       Int                    @default(0)
+  leaseUntil     DateTime?
+  responseText   String?
+  createdAt      DateTime               @default(now())
+  expiresAt      DateTime
+
+  @@index([identityId, createdAt])
+  @@index([telegramUserId, createdAt])
+  @@index([status, createdAt])
+  @@index([expiresAt])
+}
+
 // Business buyer profile is customer-owned but intentionally stores customerId
 // without a foreign key, matching SupportTicket/WarrantyCase test isolation.
 model BusinessBuyerProfile {
@@ -3008,7 +3442,7 @@ enum OtpChannel {
 
 // One-time login code (phone+OTP). Code stored hashed; short-lived; attempt-capped.
 model OtpChallenge {
-  id String @id @default(cuid())
+  id         String     @id @default(cuid())
   // Ровно одно из двух заполнено — какое именно, говорит `channel`. Телефон стал
   // необязательным вместе с появлением email-канала; исторические строки при
   // миграции получили channel = sms и сохранили свой phone.
@@ -3052,19 +3486,19 @@ enum OutboxStatus {
 // webhook follow-ups). Producers write a message in the SAME transaction as the
 // business change (invariant #10); a pg-boss relay delivers it with retries.
 model OutboxMessage {
-  id         String       @id @default(cuid())
-  campaign   Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  campaignId String?
-  channel    String // sms | email | push | telegram | webhook
-  recipient  String
-  template   String
-  payload    Json
-  status     OutboxStatus @default(pending)
-  attempts   Int          @default(0)
-  lastError  String?
-  nextAttemptAt DateTime?  @default(now())
-  createdAt  DateTime     @default(now())
-  sentAt     DateTime?
+  id            String       @id @default(cuid())
+  campaign      Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignId    String?
+  channel       String // sms | email | push | telegram | webhook
+  recipient     String
+  template      String
+  payload       Json
+  status        OutboxStatus @default(pending)
+  attempts      Int          @default(0)
+  lastError     String?
+  nextAttemptAt DateTime?    @default(now())
+  createdAt     DateTime     @default(now())
+  sentAt        DateTime?
 
   @@index([status])
   @@index([status, nextAttemptAt])
@@ -3123,29 +3557,31 @@ model AnalyticsEvent {
 // Staff login carries a role in the JWT so dangerous actions are authorized on
 // the server (Role Permission Matrix), not trusted from the request body.
 model StaffUser {
-  id                  String               @id @default(cuid())
-  username            String               @unique
-  passwordHash        String
-  role                Role
+  id                      String                  @id @default(cuid())
+  username                String                  @unique
+  passwordHash            String
+  role                    Role
   // Store point the account works at. References StorePoint.inventoryLocation
   // (@unique), the value `point` has always carried — a typo can no longer detach
   // an employee from every point-scoped report.
-  point               String               @default("BISHKEK-1")
-  storePoint          StorePoint           @relation(fields: [point], references: [inventoryLocation], onDelete: Restrict, onUpdate: Cascade)
-  active              Boolean              @default(true)
-  totpSecret          String?
-  totpEnabled         Boolean              @default(false)
-  totpLastToken       String? // last used TOTP code — single-use guard (anti-replay)
-  pushTokens          PushToken[]
-  assignedTasks       StaffTask[]          @relation("StaffTaskAssignee")
-  createdTasks        StaffTask[]          @relation("StaffTaskCreator")
-  courierOrders       Order[]              @relation("OrderCourier")
-  hrSchedules         HrSchedule[]
-  hrAttendances       HrAttendance[]
-  hrAbsences          HrAbsence[]
-  hrPayrollLines      HrPayrollLine[]
-  accountableAdvances AccountableAdvance[]
-  createdAt           DateTime             @default(now())
+  point                   String
+  storePoint              StorePoint              @relation(fields: [point], references: [inventoryLocation], onDelete: Restrict, onUpdate: Cascade)
+  active                  Boolean                 @default(true)
+  totpSecret              String?
+  totpEnabled             Boolean                 @default(false)
+  totpLastToken           String? // last used TOTP code — single-use guard (anti-replay)
+  pushTokens              PushToken[]
+  telegramAgentIdentities TelegramAgentIdentity[]
+  telegramAgentPairings   TelegramAgentPairing[]
+  assignedTasks           StaffTask[]             @relation("StaffTaskAssignee")
+  createdTasks            StaffTask[]             @relation("StaffTaskCreator")
+  courierOrders           Order[]                 @relation("OrderCourier")
+  hrSchedules             HrSchedule[]
+  hrAttendances           HrAttendance[]
+  hrAbsences              HrAbsence[]
+  hrPayrollLines          HrPayrollLine[]
+  accountableAdvances     AccountableAdvance[]
+  createdAt               DateTime                @default(now())
 
   @@index([role])
   @@index([point])

@@ -9,6 +9,7 @@ import { postAccountingEntryOnTx } from '../finance/accounting-journal';
 import { PrismaService } from '../prisma/prisma.service';
 import { sellerRevenueWhere, soldBy } from '../reports/seller-revenue';
 import { CreateHrScheduleDto, RequestHrAbsenceDto, UpdateHrScheduleDto } from './hr.dto';
+import { resolveActiveStorePoint } from '../common/store-point-identity';
 
 const DAY_MS = 86_400_000;
 /**
@@ -88,7 +89,7 @@ export class HrService {
 
   private async calculatePayroll(tx: Prisma.TransactionClient, period: string, rawPoint: string) {
     const PAYROLL_CONFIG = await this.payrollConfig();
-    const point = payrollPoint(rawPoint);
+    const point = (await resolveActiveStorePoint(tx, payrollPoint(rawPoint))).inventoryLocation;
     const { start, end } = payrollBounds(period);
     const [schedules, absences, payments] = await Promise.all([
       tx.hrSchedule.findMany({
@@ -150,15 +151,15 @@ export class HrService {
     return this.prisma.$transaction((tx) => this.calculatePayroll(tx, period, point));
   }
 
-  payrollRuns(period: string, rawPoint: string) {
-    const point = payrollPoint(rawPoint);
+  async payrollRuns(period: string, rawPoint: string) {
+    const point = (await resolveActiveStorePoint(this.prisma, payrollPoint(rawPoint))).inventoryLocation;
     payrollBounds(period);
     return this.prisma.hrPayrollRun.findMany({ where: { period, point }, include: { lines: { orderBy: { username: 'asc' } } }, orderBy: { createdAt: 'desc' } });
   }
 
   async postPayroll(period: string, rawPoint: string, actor: string, rawKey?: string) {
     const key = requireKey(rawKey);
-    const point = payrollPoint(rawPoint);
+    const point = (await resolveActiveStorePoint(this.prisma, payrollPoint(rawPoint))).inventoryLocation;
     payrollBounds(period);
     const request = { period, point };
     return this.audit.transaction(async (tx) => {
@@ -282,6 +283,7 @@ export class HrService {
 
   async createSchedule(dto: CreateHrScheduleDto, actor: string, rawKey?: string) {
     const key = requireKey(rawKey);
+    const point = (await resolveActiveStorePoint(this.prisma, dto.point)).inventoryLocation;
     const { shiftDate, startsAt, endsAt } = scheduleWindow(dto.shiftDate, dto.startsAt, dto.endsAt);
     return this.audit.transaction(async (tx) => {
       const replay = await tx.hrSchedule.findUnique({ where: { idempotencyKey: key } });
@@ -295,7 +297,7 @@ export class HrService {
       if (absence) throw new ConflictError('hr_approved_absence', 'На эту дату утверждено отсутствие');
       const existing = await tx.hrSchedule.findUnique({ where: { staffId_shiftDate: { staffId: dto.staffId, shiftDate } } });
       if (existing) throw new ConflictError('hr_schedule_exists', 'На эту дату смена уже назначена');
-      const schedule = await tx.hrSchedule.create({ data: { staffId: dto.staffId, point: dto.point.trim(), shiftDate, startsAt, endsAt, createdBy: actor, idempotencyKey: key } });
+      const schedule = await tx.hrSchedule.create({ data: { staffId: dto.staffId, point, shiftDate, startsAt, endsAt, createdBy: actor, idempotencyKey: key } });
       return { result: schedule, events: [{ type: EventType.HrScheduleCreated, actor, payload: { scheduleId: schedule.id, staffId: schedule.staffId, point: schedule.point, startsAt, endsAt }, refs: [schedule.id, schedule.staffId] }] };
     });
   }
@@ -303,7 +305,8 @@ export class HrService {
   async updateSchedule(id: string, dto: UpdateHrScheduleDto, actor: string, rawKey?: string) {
     const key = requireKey(rawKey);
     const window = scheduleWindow(dto.shiftDate, dto.startsAt, dto.endsAt);
-    const request = { point: dto.point.trim(), shiftDate: dto.shiftDate.slice(0, 10), startsAt: window.startsAt.toISOString(), endsAt: window.endsAt.toISOString() };
+    const point = (await resolveActiveStorePoint(this.prisma, dto.point)).inventoryLocation;
+    const request = { point, shiftDate: dto.shiftDate.slice(0, 10), startsAt: window.startsAt.toISOString(), endsAt: window.endsAt.toISOString() };
     return this.audit.transaction(async (tx) => {
       const replay = await tx.hrScheduleCommand.findUnique({ where: { idempotencyKey: key } });
       if (replay) {

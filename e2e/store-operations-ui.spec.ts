@@ -11,7 +11,7 @@ test('owner opens and closes store operations checklists and resolves an inciden
   const businessDate = new Date().toISOString().slice(0, 10);
 
   await prisma.staffUser.create({
-    data: { username, passwordHash: await argon2.hash(password), role: 'owner' },
+    data: { username, passwordHash: await argon2.hash(password), role: 'owner', point: 'BISHKEK-1' },
   });
 
   await page.goto('/erp');

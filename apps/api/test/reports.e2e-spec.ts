@@ -38,6 +38,11 @@ describe('Reports (integration)', () => {
     await prisma.approval.deleteMany();
     await prisma.tradeInDevice.deleteMany();
     await prisma.debtPlan.deleteMany();
+    // Payroll runs own RESTRICT references to their accrual/payout journal
+    // entries. Remove the aggregate before the shared journal cleanup; deleting
+    // entries first would correctly fail the deferred accounting/FK checks.
+    await prisma.hrPayrollCommand.deleteMany();
+    await prisma.hrPayrollRun.deleteMany();
     await prisma.$transaction(async (tx) => {
       // Journal-line balance is a deferred constraint: remove dependent lines
       // and entries in one transaction so the deleted entries are absent when
@@ -328,8 +333,8 @@ describe('Reports (integration)', () => {
     // сотрудникам (F-03), покупательский платёж отдельным «продавцом» не висит.
     await prisma.staffUser.createMany({
       data: [
-        { id: 'kpi-seller-direct', username: `kpi-direct-${Date.now()}`, passwordHash: 'x', role: 'seller' },
-        { id: 'kpi-seller-shift', username: `kpi-shift-${Date.now()}`, passwordHash: 'x', role: 'seller' },
+        { id: 'kpi-seller-direct', username: `kpi-direct-${Date.now()}`, passwordHash: 'x', role: 'seller', point: 'BISHKEK-1' },
+        { id: 'kpi-seller-shift', username: `kpi-shift-${Date.now()}`, passwordHash: 'x', role: 'seller', point: 'BISHKEK-1' },
       ],
       skipDuplicates: true,
     });

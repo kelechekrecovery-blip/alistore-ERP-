@@ -48,6 +48,7 @@ describe('Observability status dashboard', () => {
         username: `observe-${role}-${RUN}-${Math.random()}`,
         passwordHash: await argon2.hash('pass'),
         role,
+        point: 'BISHKEK-1',
       },
     });
     return jwt.sign({ sub: staff.id, typ: 'staff', role });

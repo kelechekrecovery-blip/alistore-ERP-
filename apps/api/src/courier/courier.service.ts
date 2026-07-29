@@ -12,12 +12,14 @@ import { postAccountingEntryOnTx, postOrderReceivableOnTx } from '../finance/acc
 import { recordCashDrawerMovementOnTx } from '../shifts/cash-drawer';
 import { UnitsService } from '../units/units.service';
 import {
+  assertOrderLineSupplyReceived,
   assertOrderInventoryFinalizedOnTx,
   assertOrderReservationCoverageOnTx,
   finalizeOrderInventorySaleOnTx,
   orderHasTrackedInventoryOnTx,
 } from '../inventory/order-inventory-sale';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
+import { handOverReadyOrderItemOnTx } from '../orders/order-item-handover-on-tx';
 
 const ASSIGNABLE_STATUSES = ['paid', 'packed'] as const;
 const REMOVABLE_FROM_RUN_STATUSES = ['courier_assigned', 'out_for_delivery'] as const;
@@ -95,7 +97,11 @@ export class CourierService {
       const orders = orderIds.length > 0
         ? await tx.order.findMany({
           where: { id: { in: orderIds } },
-          include: { payments: true },
+          include: {
+            payments: true,
+            items: { select: { id: true, supplyModeSnapshot: true, fulfillmentStatus: true } },
+            receivables: { select: { kind: true, status: true, amount: true, settledAmount: true } },
+          },
           orderBy: { id: 'asc' },
         })
         : [];
@@ -110,6 +116,7 @@ export class CourierService {
         if (!(ASSIGNABLE_STATUSES as readonly string[]).includes(order.status)) {
           throw new ConflictError('order_not_assignable', `Заказ ${order.id} нельзя назначить из статуса ${order.status}`);
         }
+        assertCourierLifecycleReady(order);
         if (order.paymentMode !== 'cod' && outstandingAmount(order) > 0) {
           throw new ConflictError('order_payment_unsettled', `Предоплаченный заказ ${order.id} нельзя назначить до полной оплаты`);
         }
@@ -162,6 +169,7 @@ export class CourierService {
       if (order.status !== 'courier_assigned') {
         throw new ConflictError('delivery_not_assigned', `Заказ ${orderId} имеет статус ${order.status}`);
       }
+      assertCourierLifecycleReady(order);
       const updated = await tx.order.updateMany({
         where: { id: orderId, courierId, status: 'courier_assigned' },
         data: { status: 'out_for_delivery' },
@@ -186,6 +194,7 @@ export class CourierService {
       if (order.status !== 'out_for_delivery') {
         throw new ConflictError('delivery_not_out', `Заказ ${orderId} имеет статус ${order.status}`);
       }
+      assertCourierLifecycleReady(order);
       const expectedCod = outstandingAmount(order);
       const reason = dto.reason?.trim() || null;
       if (dto.codAmount > expectedCod) {
@@ -207,8 +216,60 @@ export class CourierService {
       }
       const receivedBefore = settledAmount(order);
       const inventoryEvents: AuditInput[] = [];
-      if (receivedBefore < order.total) {
+      const lineLifecycle = order.items.some((item) => (
+        item.supplyModeSnapshot === 'to_order' || item.fulfillmentStatus !== 'pending_payment'
+      ));
+      if (lineLifecycle) {
+        const readyItems = await tx.orderItem.findMany({
+          where: { orderId, fulfillmentStatus: 'ready' },
+          select: { id: true },
+          orderBy: { lineNumber: 'asc' },
+        });
+        for (const item of readyItems) {
+          await handOverReadyOrderItemOnTx(tx, {
+            orderId,
+            orderItemId: item.id,
+            paymentMode: order.paymentMode,
+            actor: courierId,
+            units: this.units,
+            events: inventoryEvents,
+          });
+        }
+        await recognizeDeliveryFeeOnTx(tx, {
+          orderId,
+          deliveryFee: order.deliveryFee,
+          paymentMode: order.paymentMode,
+          point: order.fulfillmentLocation,
+          actor: courierId,
+          events: inventoryEvents,
+        });
+      } else if (receivedBefore < order.total) {
         if (await orderHasTrackedInventoryOnTx(tx, orderId)) {
+          // Четвёртый вход в списание склада (docs/SUPPLY-TO-ORDER-PLAN.md, срез 3).
+          // До среза 3 заказ «под заказ» сюда не доходил: out_for_delivery был
+          // достижим только через reserved/paid, а оба были закрыты для
+          // to_order-строк безусловно. Срез 3 снял безусловный запрет — строка
+          // с полученной поставкой (`OrderLineSupply.status='received'`) идёт
+          // обычным путём, поэтому этот COD-путь теперь реально достижим, и
+          // гвард здесь — не страховка на будущее, а действующая проверка.
+          const codLines = await tx.orderItem.findMany({
+            where: { orderId },
+            select: { id: true, sku: true },
+          });
+          const codProducts = await tx.product.findMany({
+            where: { sku: { in: codLines.map((line) => line.sku) } },
+            select: { sku: true, supplyMode: true },
+          });
+          const codSupplyByOrderItemId = await tx.orderLineSupply.findMany({
+            where: { orderItemId: { in: codLines.map((line) => line.id) } },
+            select: { orderItemId: true, status: true },
+          });
+          assertOrderLineSupplyReceived(
+            orderId,
+            codLines,
+            new Map(codProducts.map((product) => [product.sku, product])),
+            new Map(codSupplyByOrderItemId.map((row) => [row.orderItemId, row])),
+          );
           await assertOrderReservationCoverageOnTx(tx, orderId, new Date(), { enforceExpiry: false });
           await finalizeOrderInventorySaleOnTx(tx, {
             orderId,
@@ -222,7 +283,7 @@ export class CourierService {
           await assertOrderInventoryFinalizedOnTx(tx, orderId);
         }
       }
-      const receivableEntry = expectedCod > 0
+      const receivableEntry = expectedCod > 0 && !lineLifecycle
         ? await postOrderReceivableOnTx(tx, {
           idempotencyKey: `accounting:cod.receivable:${order.id}`,
           sourceType: 'cod.receivable',
@@ -445,8 +506,30 @@ export class CourierService {
             where: { sourceType: 'cod.receivable', sourceRef: { in: run.orders.map((order) => order.id) } },
             select: { sourceRef: true, documentAmount: true },
           });
+          const deliveredItems = await tx.orderItem.findMany({
+            where: { orderId: { in: deliveredOrderIds } },
+            select: { id: true, orderId: true },
+          });
+          const orderIdByItemId = new Map(deliveredItems.map((item) => [item.id, item.orderId]));
+          const lineRecognized = deliveredItems.length > 0
+            ? await tx.accountingJournalEntry.findMany({
+              where: {
+                sourceType: { in: ['order_item.handover', 'order_line.handover'] },
+                sourceRef: { in: deliveredItems.map((item) => item.id) },
+              },
+              include: { lines: { where: { accountCode: '1100' } } },
+            })
+            : [];
           const covered = new Set(recognized.map((entry) => entry.sourceRef));
-          const recognizedTotal = recognized.reduce((sum, entry) => sum + (entry.documentAmount ?? 0), 0);
+          for (const entry of lineRecognized) {
+            const orderId = orderIdByItemId.get(entry.sourceRef);
+            if (orderId) covered.add(orderId);
+          }
+          const recognizedTotal = recognized.reduce((sum, entry) => sum + (entry.documentAmount ?? 0), 0)
+            + lineRecognized.reduce(
+              (sum, entry) => sum + entry.lines.reduce((lineSum, line) => lineSum + line.debit, 0),
+              0,
+            );
 
           // Не допускаем ручного разблокирования полностью недоставленного
           // рейса. Частичный рейс после failed-delivery остаётся допустимым:
@@ -574,7 +657,18 @@ export class CourierService {
           where: { id: orderId },
           include: {
             payments: { select: { amount: true, status: true } },
-            items: { select: { taxCode: true, taxRateBps: true, taxAmount: true } },
+            items: {
+              select: {
+                taxCode: true,
+                taxRateBps: true,
+                taxAmount: true,
+                supplyModeSnapshot: true,
+                fulfillmentStatus: true,
+              },
+            },
+            receivables: {
+              select: { kind: true, status: true, amount: true, settledAmount: true },
+            },
           },
         });
         if (!order) throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
@@ -602,9 +696,135 @@ export class CourierService {
 type CourierOrder = Prisma.OrderGetPayload<{
   include: {
     payments: { select: { amount: true; status: true } };
-    items: { select: { taxCode: true; taxRateBps: true; taxAmount: true } };
+    items: {
+      select: {
+        taxCode: true;
+        taxRateBps: true;
+        taxAmount: true;
+        supplyModeSnapshot: true;
+        fulfillmentStatus: true;
+      };
+    };
+    receivables: {
+      select: { kind: true; status: true; amount: true; settledAmount: true };
+    };
   };
 }>;
+
+function assertCourierLifecycleReady(order: {
+  id: string;
+  paymentMode: string;
+  items: Array<{ supplyModeSnapshot: string; fulfillmentStatus: string }>;
+  receivables: Array<{ kind: string; status: string; amount: number; settledAmount: number }>;
+}): void {
+  const lifecycleAware = order.items.some((item) => (
+    item.supplyModeSnapshot === 'to_order' || item.fulfillmentStatus !== 'pending_payment'
+  ));
+  if (lifecycleAware) {
+    const active = order.items.filter((item) => (
+      !['cancelled', 'customer_cancelled', 'handed_over'].includes(item.fulfillmentStatus)
+    ));
+    const incomplete = active.filter((item) => item.fulfillmentStatus !== 'ready');
+    if (incomplete.length > 0) {
+      throw new ConflictError(
+        'courier_order_not_fully_ready',
+        `Заказ ${order.id} нельзя передать курьеру: не готовы ${incomplete.length} строк`,
+      );
+    }
+  }
+  const unsettled = order.receivables.filter((receivable) => (
+    receivable.status !== 'settled'
+    && receivable.status !== 'cancelled'
+    && receivable.settledAmount < receivable.amount
+  ));
+  if (unsettled.some((receivable) => receivable.kind === 'supply_deposit')) {
+    throw new ConflictError(
+      'courier_supply_deposit_unsettled',
+      `Заказ ${order.id} нельзя передать курьеру до подтверждения задатка`,
+    );
+  }
+  const allowedCodKinds = new Set(['stock_sale', 'supply_balance', 'delivery']);
+  if (order.paymentMode === 'cod') {
+    const unsupported = unsettled.find((receivable) => !allowedCodKinds.has(receivable.kind));
+    if (unsupported) {
+      throw new ConflictError(
+        'courier_receivable_not_collectable',
+        `Начисление ${unsupported.kind} нельзя собирать курьеру`,
+      );
+    }
+  } else if (unsettled.length > 0) {
+    throw new ConflictError(
+      'order_payment_unsettled',
+      `Предоплаченный заказ ${order.id} нельзя передать до закрытия начислений`,
+    );
+  }
+}
+
+async function recognizeDeliveryFeeOnTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    orderId: string;
+    deliveryFee: number;
+    paymentMode: string;
+    point: string | null;
+    actor: string;
+    events: AuditInput[];
+  },
+): Promise<void> {
+  const receivables = await tx.orderReceivable.findMany({
+    where: { orderId: input.orderId, kind: 'delivery' },
+    include: { allocations: true },
+  });
+  if (input.deliveryFee === 0) {
+    if (receivables.length > 0) {
+      throw new ConflictError('delivery_receivable_unexpected', 'У заказа без доставки найдено начисление доставки');
+    }
+    return;
+  }
+  if (receivables.length !== 1 || receivables[0].amount !== input.deliveryFee) {
+    throw new ConflictError('delivery_receivable_invalid', 'Начисление доставки не совпадает со стоимостью доставки заказа');
+  }
+  const receivable = receivables[0];
+  const liability = receivable.allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
+  if (liability !== receivable.settledAmount || liability > receivable.amount) {
+    throw new ConflictError('delivery_payment_allocation_invalid', 'Платёжные аллокации доставки повреждены');
+  }
+  if (input.paymentMode !== 'cod' && receivable.status !== 'settled') {
+    throw new ConflictError('delivery_receivable_unpaid', 'Перед доставкой необходимо закрыть стоимость доставки');
+  }
+  const codReceivable = receivable.amount - liability;
+  const entry = await postAccountingEntryOnTx(tx, {
+    idempotencyKey: `accounting:order.delivery.handover:${input.orderId}`,
+    sourceType: 'order.delivery.handover',
+    sourceRef: input.orderId,
+    description: `Признание выручки доставки заказа ${input.orderId}`,
+    point: input.point,
+    documentAmount: receivable.amount,
+    baseAmount: receivable.amount,
+    taxCode: 'none',
+    taxRateBps: 0,
+    taxAmount: 0,
+    occurredAt: new Date(),
+    createdBy: input.actor,
+    lines: [
+      ...(liability > 0 ? [{ accountCode: '2400', debit: liability, memo: 'Погашение предоплаты доставки' }] : []),
+      ...(codReceivable > 0 ? [{ accountCode: '1100', debit: codReceivable, memo: 'Дебиторская задолженность COD за доставку' }] : []),
+      { accountCode: '4000', credit: receivable.amount, memo: 'Выручка за выполненную доставку' },
+    ],
+  });
+  input.events.push({
+    type: EventType.AccountingEntryPosted,
+    actor: input.actor,
+    payload: {
+      accountingEntryId: entry.id,
+      sourceType: 'order.delivery.handover',
+      sourceRef: input.orderId,
+      liability,
+      codReceivable,
+    },
+    refs: [entry.id, input.orderId, receivable.id],
+  });
+}
 
 type RemoveFromRunResult = {
   orderId: string;

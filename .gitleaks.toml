@@ -11,8 +11,11 @@ paths = [
   '''(^|/)build-output/''',
   '''(^|/)apps/android/[^/]+/build/''',
   '''(^|/)apps/ios/build/''',
+  '''^apps/api/dist/''',
   '''^apps/api/\.env$''',
+  '''^apps/api/\.env\.production$''',
   '''^apps/web/build-courier/''',
+  '''^\.agents/skills/ruflo/''',
   '''(^|/)docs/acceptance/artifacts/''',
 ]
 

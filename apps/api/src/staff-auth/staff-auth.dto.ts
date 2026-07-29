@@ -22,6 +22,9 @@ export class StaffLoginDto {
 export class BootstrapOwnerDto {
   @IsString() @IsNotEmpty() @MaxLength(80) username!: string;
   @IsString() @MinLength(8) @MaxLength(200) password!: string;
+  // Optional in the wire schema for old setup clients; StaffAuthService rejects
+  // an absent point outside the test harness, so production still fails closed.
+  @IsOptional() @IsString() @IsNotEmpty() @MaxLength(80) point?: string;
 }
 
 export class CreateStaffDto {

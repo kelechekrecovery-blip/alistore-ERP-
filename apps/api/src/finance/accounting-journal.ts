@@ -122,6 +122,64 @@ export async function postPaymentEntryOnTx(
   return entry;
 }
 
+/**
+ * Refund of a customer prepayment. The deposit was posted to liability 2400,
+ * so returning it must release that liability rather than reverse revenue/tax.
+ */
+export async function postCustomerPrepaymentRefundOnTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    payment: {
+      id: string;
+      amount: number;
+      method: PaymentMethod;
+      createdAt: Date;
+    };
+    idempotencyKey: string;
+    point?: string | null;
+    actor: string;
+    receivedBy?: string | null;
+  },
+) {
+  if (input.payment.amount >= 0) {
+    throw new ValidationError(
+      'customer_prepayment_refund_sign_invalid',
+      'Возврат предоплаты должен быть отрицательным платежом',
+    );
+  }
+  const amount = Math.abs(input.payment.amount);
+  const accountCode = paymentAccountCode(input.payment.method);
+  const entry = await postAccountingEntryOnTx(tx, {
+    idempotencyKey: `accounting:${input.idempotencyKey}`,
+    sourceType: 'customer_prepayment.refund',
+    sourceRef: input.payment.id,
+    description: `Возврат предоплаты ${input.payment.id}`,
+    point: input.point,
+    documentAmount: amount,
+    baseAmount: amount,
+    taxCode: 'none',
+    taxRateBps: 0,
+    taxAmount: 0,
+    occurredAt: input.payment.createdAt,
+    createdBy: input.actor,
+    lines: [
+      { accountCode: '2400', debit: amount, memo: 'Погашение обязательства по предоплате' },
+      { accountCode, credit: amount, memo: 'Возврат денежных средств покупателю' },
+    ],
+  });
+  await tx.payment.update({
+    where: { id: input.payment.id },
+    data: {
+      accountCode,
+      accountingEntryId: entry.id,
+      idempotencyKey: input.idempotencyKey,
+      point: input.point?.trim() || null,
+      receivedBy: input.receivedBy ?? input.actor,
+    },
+  });
+  return entry;
+}
+
 export async function postOrderReceivableOnTx(
   tx: Prisma.TransactionClient,
   input: {

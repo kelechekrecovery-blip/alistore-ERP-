@@ -36,7 +36,7 @@ describe('FcmPushTransport', () => {
     const staff = await prisma.staffUser.upsert({
       where: { username: 'fcm-transport-staff' },
       update: { active: true },
-      create: { username: 'fcm-transport-staff', passwordHash: 'unused', role: 'seller' },
+      create: { username: 'fcm-transport-staff', passwordHash: 'unused', role: 'seller', point: 'BISHKEK-1' },
     });
     await prisma.pushToken.create({ data: {
       token, platform: 'android', deviceId: 'install-1', appScope: 'staff', staffId: staff.id,

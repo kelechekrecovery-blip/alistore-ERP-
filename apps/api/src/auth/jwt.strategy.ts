@@ -16,6 +16,8 @@ export interface JwtPayload {
   phone?: string;
   typ: string;
   role?: string; // staff tokens carry a role for authorization
+  point?: string;
+  storePointId?: string;
 }
 
 /** What `request.user` becomes after a valid access token. */
@@ -24,6 +26,8 @@ export interface AuthPrincipal {
   phone?: string;
   typ: string;
   role?: string;
+  point?: string;
+  storePointId?: string;
 }
 
 @Injectable()
@@ -55,6 +59,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       phone: payload.phone,
       typ: payload.typ,
       role: payload.role,
+      point: payload.point,
+      storePointId: payload.storePointId,
     };
   }
 }

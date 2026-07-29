@@ -59,6 +59,18 @@ Keep the keystore and its passwords **outside** the repository — in
 `*.keystore`, `keystore.properties` and `apps/android/local.properties` are
 git-ignored; never commit them and never paste passwords into a build file.
 
+The local release machine was provisioned on 2026-07-28:
+
+- keystore: `~/.config/alistore/android/alistore-upload.jks`;
+- alias: `alistore-upload`;
+- password: macOS Keychain item
+  `service=com.alistore.android.release`, `account=alistore-upload`;
+- SHA-256 certificate fingerprint:
+  `30:EA:C1:B1:C7:0D:EA:CF:39:EC:7F:43:52:B0:73:DE:6B:20:6E:16:77:8B:75:C5:D1:8F:84:34:38:D8:81:0A`.
+
+The keystore still requires an encrypted offline backup before the first Play
+Console upload. The Keychain copy alone is not a disaster-recovery backup.
+
 ```bash
 cd apps/android
 ./gradlew :app:assembleRelease :staff:assembleRelease \
@@ -87,9 +99,8 @@ owner or injected by CI. Placeholder files are not acceptable — FCM registrati
 silently target the wrong project. `:pos` has no Firebase dependency and builds a
 release without one.
 
-Also owner-owned and still outstanding for the store release: the release keystore
-itself (generate once, back it up — losing it means losing the ability to update the
-listing) and Play Console app signing enrollment.
+Still owner-owned and outstanding for the store release: an encrypted offline
+backup of the generated upload keystore and Play Console app-signing enrollment.
 
 The Client authenticates through phone OTP, stores the access/refresh pair encrypted
 with Android Keystore, refreshes an expired access token during process restore, and

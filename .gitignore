@@ -55,6 +55,9 @@ playwright-web.png
 .playwright-mcp/
 .claude/autonomous/
 .artifacts/
+.wrangler/
+backups/d1/
+backups/postgres-cloudflare/
 apps/api/uploads/
 .serena/cache/
 .serena/memories/
@@ -113,3 +116,6 @@ skills-lock.json
 .claude/skills/verification-quality/
 .claude/.proven-config-version
 .claude/proven-config.json
+
+# Раффл: секретный сид до раскрытия — публикуется только его хеш
+.raffle-seed.json

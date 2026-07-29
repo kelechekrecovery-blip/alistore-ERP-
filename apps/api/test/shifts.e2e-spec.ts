@@ -220,8 +220,8 @@ describe('Cash shift reconciliation (integration)', () => {
 
   it('atomically hands counted cash to a new staff shift without rewriting old sales', async () => {
     const suffix = `${Date.now()}-${++seq}`;
-    const sourceStaff = await prisma.staffUser.create({ data: { username: `handover-test-source-${suffix}`, passwordHash: 'x', role: 'seller' } });
-    const targetStaff = await prisma.staffUser.create({ data: { username: `handover-test-target-${suffix}`, passwordHash: 'x', role: 'cashier' } });
+    const sourceStaff = await prisma.staffUser.create({ data: { username: `handover-test-source-${suffix}`, passwordHash: 'x', role: 'seller', point: 'BISHKEK-1' } });
+    const targetStaff = await prisma.staffUser.create({ data: { username: `handover-test-target-${suffix}`, passwordHash: 'x', role: 'cashier', point: 'BISHKEK-1' } });
     const source = await shifts.open({ staffId: sourceStaff.id, point: 'BISHKEK-1', openCash: 5000 }, sourceStaff.id, `handover-open-${suffix}`);
     await prisma.payment.create({ data: { amount: 100000, method: 'cash', status: 'received', shiftId: source.id } });
 
@@ -241,8 +241,8 @@ describe('Cash shift reconciliation (integration)', () => {
 
   it('commits a self-handover blind count once instead of exposing a reusable variance oracle', async () => {
     const suffix = `${Date.now()}-${++seq}`;
-    const sourceStaff = await prisma.staffUser.create({ data: { username: `handover-test-blind-source-${suffix}`, passwordHash: 'x', role: 'cashier' } });
-    const targetStaff = await prisma.staffUser.create({ data: { username: `handover-test-blind-target-${suffix}`, passwordHash: 'x', role: 'seller' } });
+    const sourceStaff = await prisma.staffUser.create({ data: { username: `handover-test-blind-source-${suffix}`, passwordHash: 'x', role: 'cashier', point: 'BISHKEK-1' } });
+    const targetStaff = await prisma.staffUser.create({ data: { username: `handover-test-blind-target-${suffix}`, passwordHash: 'x', role: 'seller', point: 'BISHKEK-1' } });
     const source = await shifts.open({ staffId: sourceStaff.id, point: 'BISHKEK-1', openCash: 5_000 }, sourceStaff.id, `handover-blind-open-${suffix}`);
     await prisma.payment.create({ data: { amount: 100_000, method: 'cash', status: 'received', shiftId: source.id } });
 

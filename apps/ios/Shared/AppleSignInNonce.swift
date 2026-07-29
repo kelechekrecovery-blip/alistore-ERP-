@@ -19,8 +19,9 @@ public enum AppleSignInNonce {
         // смещения — каждый символ равновероятен.
         let alphabet = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-._")
         var bytes = [UInt8](repeating: 0, count: length)
-        let status = bytes.withUnsafeMutableBytes {
-            SecRandomCopyBytes(kSecRandomDefault, length, $0.baseAddress!)
+        let status = bytes.withUnsafeMutableBytes { buffer -> OSStatus in
+            guard let baseAddress = buffer.baseAddress else { return errSecParam }
+            return SecRandomCopyBytes(kSecRandomDefault, length, baseAddress)
         }
         // Молчаливый провал здесь опаснее краша: при не-успехе байты остались бы
         // нулями и nonce стал бы предсказуемым — сломав анти-replay Sign in with

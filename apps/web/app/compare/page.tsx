@@ -127,6 +127,8 @@ export default function ComparePage() {
                         name: product.name,
                         price: product.price,
                         stockLimit: product.availableUnits,
+                        supplyMode: 'own_stock',
+                        supplyLeadDays: null,
                       })
                     }
                     className="mt-4 flex w-full items-center justify-center gap-2 rounded-[8px] bg-coral py-2.5 text-sm font-bold text-white hover:bg-deep disabled:bg-linen disabled:text-faint"

@@ -19,7 +19,10 @@ export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   awaiting_confirmation: ['confirmed', 'cancelled'],
   confirmed: ['reserved', 'cancelled'],
   reserved: ['awaiting_payment', 'paid', 'picking', 'cancelled'],
-  awaiting_payment: ['paid', 'cancelled'],
+  // A to-order checkout enters awaiting_payment before procurement exists.
+  // Confirming its deposit creates draft POs and returns the aggregate order to
+  // confirmed while line-level states carry the remaining payment timeline.
+  awaiting_payment: ['confirmed', 'paid', 'cancelled'],
   paid: ['picking', 'ready_for_pickup', 'courier_assigned', 'return_requested', 'refunded', 'exchanged'],
   picking: ['packed', 'cancelled'],
   packed: ['ready_for_pickup', 'courier_assigned'],

@@ -163,6 +163,13 @@ export default function ErpPage() {
   }, []);
 
   useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('route');
+    if (requested && [...CORE_NAV, ...EXTENDED_NAV].some((item) => item.id === requested)) {
+      setRoute(requested as Route);
+    }
+  }, []);
+
+  useEffect(() => {
     const media = window.matchMedia('(max-width: 639px)');
     const syncNavigationMode = () => setMobileNavigation(media.matches);
     syncNavigationMode();

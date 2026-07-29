@@ -23,9 +23,8 @@
   отвечает — это работа сторожа scripts/keep-site-up.mjs, который бьёт по
   health-check и делает launchctl kickstart.
 
-  Установить:
-    cp scripts/com.alistore.api.plist ~/Library/LaunchAgents/
-    launchctl load ~/Library/LaunchAgents/com.alistore.api.plist
+  Активировать только через readiness gate:
+    npm run launch:activate:api
 
   Снять:
     launchctl unload ~/Library/LaunchAgents/com.alistore.api.plist
@@ -52,6 +51,10 @@
 
   <key>EnvironmentVariables</key>
   <dict>
+    <!-- Required for production-only security guards and strict startup
+         preflight. Never expose api.ali.kg from a non-production process. -->
+    <key>NODE_ENV</key>
+    <string>production</string>
     <key>PATH</key>
     <string>/Users/alistore/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     <!-- Так же, как в npm-скрипте start:prod. -->

@@ -1,6 +1,46 @@
 import { getJson, postAuthJson } from './http';
 
 export type PurchaseOrderStatus = 'draft' | 'sent' | 'receiving' | 'received' | 'cancelled';
+export type SupplyOperationQueueKey =
+  | 'awaiting_deposit'
+  | 'draft_po'
+  | 'late'
+  | 'received'
+  | 'ready'
+  | 'cancellation_awaiting_owner'
+  | 'refund_failed';
+
+export interface SupplyOperationRow {
+  id: string;
+  queue: SupplyOperationQueueKey;
+  orderId: string;
+  purchaseOrderId: string | null;
+  purchaseOrderNumber: string | null;
+  status: string;
+  amount: number | null;
+  expectedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  sku: string | null;
+  quantity: number | null;
+  detailHref: string;
+}
+
+export interface SupplyOperationsReport {
+  generatedAt: string;
+  flags: {
+    checkoutEnabled: boolean;
+    cancellationEnabled: boolean;
+    autoRefundEnabled: boolean;
+    ownerResolutionEnabled: boolean;
+  };
+  capabilities: {
+    financialQueuesVisible: boolean;
+    ownerResolutionAvailable: boolean;
+  };
+  counts: Record<SupplyOperationQueueKey, number>;
+  queues: Record<SupplyOperationQueueKey, SupplyOperationRow[]>;
+}
 
 export interface SupplierSummary {
   id: string;
@@ -38,6 +78,23 @@ export const fetchSuppliers = (accessToken: string) => getJson<SupplierSummary[]
 
 export const fetchPurchaseOrders = (accessToken: string) =>
   getJson<PurchaseOrder[]>('/procurement/purchase-orders', accessToken);
+
+export const fetchSupplyOperations = (accessToken: string) =>
+  getJson<SupplyOperationsReport>('/procurement/supply-operations', accessToken);
+
+export function visibleSupplyOperationRows(
+  report: SupplyOperationsReport,
+  queue: SupplyOperationQueueKey,
+  search: string,
+): SupplyOperationRow[] {
+  const query = search.trim().toLowerCase();
+  if (!query) return report.queues[queue];
+  return report.queues[queue].filter((row) => (
+    row.orderId.toLowerCase().includes(query)
+    || row.purchaseOrderNumber?.toLowerCase().includes(query)
+    || row.sku?.toLowerCase().includes(query)
+  ));
+}
 
 export const createPurchaseOrder = (
   input: {

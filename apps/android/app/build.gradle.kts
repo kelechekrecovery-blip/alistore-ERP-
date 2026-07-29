@@ -4,7 +4,13 @@ plugins {
 }
 
 // Версии, подпись, R8 и требование HTTPS для release заданы в apps/android/build.gradle.kts.
-val releaseRequested = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) || it == "build" }
+val releaseRequested = gradle.startParameter.taskNames.any { requestedTask ->
+    val normalized = requestedTask.removePrefix(":")
+    val modulePrefix = "${project.path.removePrefix(":")}:"
+    val taskName = normalized.substringAfterLast(":")
+    (normalized.startsWith(modulePrefix) || !normalized.contains(":")) &&
+        (taskName.contains("release", ignoreCase = true) || taskName == "build")
+}
 val firebaseConfigured = file("google-services.json").isFile
 if (firebaseConfigured) apply(plugin = "com.google.gms.google-services")
 require(!releaseRequested || firebaseConfigured) { "Client Release requires apps/android/app/google-services.json" }

@@ -48,9 +48,6 @@ import {
   type StaffSession,
 } from '@/lib/staff-session';
 
-const POINT = 'BISHKEK-1';
-const SHOP = 'AliStore Центр';
-
 type Tab = StaffAppTab | 'debts' | 'cards';
 const NAV: { id: StaffAppTab; icon: string; label: string }[] = [
   { id: 'home', icon: '⌂', label: 'Главная' },
@@ -283,7 +280,7 @@ export default function StaffPage() {
     const operationStaffId = session.staffId;
     setBusy('shift');
     try {
-      const opened = await openShift({ staffId: session.staffId, point: POINT, openCash: 0 }, session.accessToken);
+      const opened = await openShift({ staffId: session.staffId, point: session.point, openCash: 0 }, session.accessToken);
       if (!sessionIsCurrent(operationStaffId, operationVersion)) return;
       const evidence = openShiftFiles.length
         ? await uploadEvidenceImages({
@@ -539,7 +536,7 @@ export default function StaffPage() {
           </span>
           <div className="flex-1">
             <div className="font-display text-base font-bold">{session.username}</div>
-            <div className="text-xs text-[#8A7F76]">{session.role} · {SHOP}</div>
+            <div className="text-xs text-[#8A7F76]">{session.role} · {session.storePoint.name}</div>
           </div>
           <span className={`rounded-chip px-3 py-1.5 text-xs font-semibold ${shift ? 'bg-lime/10 text-lime' : 'bg-[#221E19] text-[#8A7F76]'}`}>
             {shift ? '● на смене' : '○ вне смены'}

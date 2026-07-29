@@ -68,6 +68,8 @@ public enum Design3 {
     }
 
     // MARK: - Spacing (4pt grid)
+    // Public design-token names deliberately match the compact xs/s/m/l/xl scale.
+    // swiftlint:disable identifier_name
     public enum Space {
         public static let xs: CGFloat = 4
         public static let s: CGFloat = 8
@@ -76,6 +78,7 @@ public enum Design3 {
         public static let xl: CGFloat = 20
         public static let xxl: CGFloat = 24
     }
+    // swiftlint:enable identifier_name
 
     // MARK: - Typography
     // Manrope = headings/prices · Golos Text = body/UI · JetBrains Mono = numbers/SKU/IMEI/codes.

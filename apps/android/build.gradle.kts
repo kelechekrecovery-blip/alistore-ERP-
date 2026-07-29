@@ -45,7 +45,7 @@ val signingReady = keystoreFile != null &&
 
 if (releaseRequested) {
   require(alistoreApiBaseUrl.startsWith("https://")) {
-    "Release требует -PALISTORE_API_BASE_URL=https://api.example.com/api " +
+    "Release требует -PALISTORE_API_BASE_URL=https://ali.kg/api " +
       "(или переменную окружения ALISTORE_API_BASE_URL)"
   }
   require(signingReady) {

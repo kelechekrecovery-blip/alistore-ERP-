@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable, Optional } from '@nestjs/common';
-import { Prisma, type Payment } from '@prisma/client';
+import { PaymentMethod, Prisma, type Payment } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -9,13 +10,14 @@ import { assertTransition } from '../orders/order-state-machine';
 import { OrdersService } from '../orders/orders.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { GiftcardsService, normalizeCode } from '../giftcards/giftcards.service';
-import { PayDto, VoidPaymentDto } from './payments.dto';
+import { PayDto, SettleOrderReceivableDto, VoidPaymentDto } from './payments.dto';
 import { CampaignAttributionService } from '../campaigns/campaign-attribution.service';
 import { OutboxService } from '../outbox/outbox.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
-import { paymentAccountCode, postPaymentEntryOnTx } from '../finance/accounting-journal';
+import { paymentAccountCode, postAccountingEntryOnTx, postPaymentEntryOnTx } from '../finance/accounting-journal';
 import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
 import {
+  assertOrderLineSupplyReceived,
   assertOrderReservationCoverageOnTx,
   finalizeOrderInventorySaleOnTx,
   orderHasTrackedInventoryOnTx,
@@ -53,6 +55,177 @@ export class PaymentsService {
 
   get(id: string) {
     return this.prisma.payment.findUnique({ where: { id } });
+  }
+
+  /**
+   * Takes a customer deposit against one receivable without recognizing sales
+   * revenue. The money is posted to customer-deposit liability 2400. Once every
+   * deposit receivable is settled, this same transaction claims the supplier
+   * quotes and creates one draft PO per supplier.
+   */
+  settleReceivable(
+    receivableId: string,
+    dto: SettleOrderReceivableDto,
+    actor: string,
+    context: { staffId: string; idempotencyKey?: string },
+  ) {
+    const idempotencyKey = context.idempotencyKey?.trim();
+    if (!idempotencyKey) {
+      throw new ValidationError('idempotency_key_required', 'Для платежа обязателен Idempotency-Key');
+    }
+    // Keeping installment out of this prepayment path avoids turning an
+    // installment promise into received cash.
+    if (dto.method === 'gift_card' || dto.method === 'installment') {
+      throw new ValidationError(
+        'receivable_payment_method_forbidden',
+        'Начисление нельзя оплатить подарочной картой или рассрочкой',
+      );
+    }
+    return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'receivable-payment:' + receivableId}))::text AS locked`;
+      const replay = await tx.payment.findUnique({
+        where: { idempotencyKey },
+        include: { receivableAllocations: true },
+      });
+      if (replay) {
+        const allocation = replay.receivableAllocations.find((row) => row.receivableId === receivableId);
+        if (
+          !allocation
+          || replay.amount !== dto.amount
+          || replay.method !== dto.method
+          || (dto.txnId && replay.txnId !== dto.txnId)
+        ) {
+          throw new ConflictError(
+            'payment_idempotency_conflict',
+            'Idempotency-Key уже использован для другого платежа',
+          );
+        }
+        return { result: { payment: replay, allocation, idempotent: true }, events: [] };
+      }
+
+      await tx.$queryRaw`SELECT id FROM "OrderReceivable" WHERE id = ${receivableId} FOR UPDATE`;
+      const receivable = await tx.orderReceivable.findUnique({
+        where: { id: receivableId },
+        include: {
+          order: {
+            include: {
+              storePoint: { select: { inventoryLocation: true } },
+            },
+          },
+        },
+      });
+      if (!receivable) {
+        throw new ValidationError('order_receivable_not_found', `Начисление ${receivableId} не найдено`);
+      }
+      if (receivable.status === 'cancelled' || receivable.status === 'settled') {
+        throw new ConflictError('receivable_not_open', 'Начисление уже закрыто');
+      }
+      const remaining = receivable.amount - receivable.settledAmount;
+      if (dto.amount > remaining) {
+        throw new ValidationError('payment_exceeds_receivable', 'Сумма превышает остаток начисления');
+      }
+      const point = receivable.order.fulfillmentLocation?.trim()
+        || receivable.order.storePoint?.inventoryLocation.trim();
+      if (!point) {
+        throw new ValidationError('payment_point_required', 'У заказа должна быть определена точка исполнения');
+      }
+      const cashShift = dto.method === 'cash'
+        ? await this.resolveCashShiftOnTx(tx, dto.shiftId, context.staffId, point)
+        : null;
+      const accountCode = paymentAccountCode(dto.method);
+      const payment = await tx.payment.create({
+        data: {
+          orderId: receivable.orderId,
+          amount: dto.amount,
+          method: dto.method,
+          status: 'received',
+          txnId: dto.txnId?.trim() || null,
+          shiftId: cashShift?.id ?? null,
+          accountCode,
+          idempotencyKey,
+          receivedBy: actor,
+          point,
+        },
+      });
+      const accountingEntry = await postAccountingEntryOnTx(tx, {
+        idempotencyKey: `accounting:${idempotencyKey}`,
+        sourceType: 'customer_prepayment.receipt',
+        sourceRef: payment.id,
+        description: `Получение предоплаты ${receivable.kind} по заказу ${receivable.orderId}`,
+        point,
+        documentAmount: dto.amount,
+        baseAmount: dto.amount,
+        occurredAt: payment.createdAt,
+        createdBy: actor,
+        lines: [
+          { accountCode, debit: dto.amount, memo: `Поступление оплаты ${receivable.kind}` },
+          { accountCode: '2400', credit: dto.amount, memo: 'Обязательство перед покупателем' },
+        ],
+      });
+      const postedPayment = await tx.payment.update({
+        where: { id: payment.id },
+        data: { accountingEntryId: accountingEntry.id },
+      });
+      const allocation = await tx.paymentReceivableAllocation.create({
+        data: { paymentId: payment.id, receivableId, amount: dto.amount },
+      });
+      const settledAmount = receivable.settledAmount + dto.amount;
+      const status = settledAmount === receivable.amount ? 'settled' : 'partially_settled';
+      await tx.orderReceivable.update({
+        where: { id: receivableId },
+        data: { settledAmount, status },
+      });
+
+      const events: AuditInput[] = [
+        {
+          type: EventType.PaymentReceived,
+          actor,
+          payload: {
+            orderId: receivable.orderId,
+            receivableId,
+            kind: receivable.kind,
+            amount: dto.amount,
+            method: dto.method,
+            accountCode,
+            accountingEntryId: accountingEntry.id,
+          },
+          refs: [receivable.orderId, receivableId, payment.id],
+        },
+        {
+          type: EventType.AccountingEntryPosted,
+          actor,
+          payload: {
+            accountingEntryId: accountingEntry.id,
+            sourceType: 'customer_prepayment.receipt',
+            sourceRef: payment.id,
+          },
+          refs: [accountingEntry.id, payment.id, receivable.orderId],
+        },
+      ];
+      if (status === 'settled') {
+        events.push({
+          type: EventType.OrderReceivableSettled,
+          actor,
+          payload: { orderId: receivable.orderId, receivableId, kind: receivable.kind },
+          refs: [receivable.orderId, receivableId],
+        });
+      }
+
+      const openDeposits = await tx.orderReceivable.count({
+        where: {
+          orderId: receivable.orderId,
+          kind: 'supply_deposit',
+          status: { not: 'settled' },
+        },
+      });
+      if (receivable.kind === 'supply_deposit' && openDeposits === 0) {
+        await this.activateSupplyProcurementOnTx(tx, receivable.orderId, actor, events);
+      }
+      return {
+        result: { payment: postedPayment, allocation, idempotent: false },
+        events,
+      };
+    });
   }
 
   async voidPending(paymentId: string, reason: VoidPaymentDto['reason'], actor: string, idempotencyKey: string) {
@@ -367,6 +540,12 @@ export class PaymentsService {
           `Демо-заказ ${order.id} не создаёт платёж и не меняет остатки`,
         );
       }
+      if (await tx.orderReceivable.count({ where: { orderId: order.id } }) > 0) {
+        throw new ConflictError(
+          'order_uses_receivable_schedule',
+          'Этот заказ оплачивается по отдельным начислениям; используйте receivable payment',
+        );
+      }
 
       // Invariant: no paid without an active reservation.
       if (!PAYABLE_STATUSES.has(order.status)) {
@@ -375,6 +554,25 @@ export class PaymentsService {
           `Заказ ${order.id} нельзя оплатить без резерва (статус: ${order.status})`,
         );
       }
+      // Defense-in-depth for the supply-to-order invariant: `reserve()`/`fulfill()`
+      // already refuse a `to_order` line before the order can reach a payable
+      // status, so this should be unreachable in practice — but money must not
+      // move for a line we don't stock, even if that upstream gate is ever
+      // bypassed (e.g. a direct DB write, a future caller). Checked before any
+      // Payment row is created.
+      const supplyModeBySku = new Map(
+        (await tx.product.findMany({
+          where: { sku: { in: [...new Set(order.items.map((item) => item.sku))] } },
+          select: { sku: true, supplyMode: true },
+        })).map((product) => [product.sku, product]),
+      );
+      const supplyByOrderItemId = new Map(
+        (await tx.orderLineSupply.findMany({
+          where: { orderItemId: { in: order.items.map((item) => item.id) } },
+          select: { orderItemId: true, status: true },
+        })).map((row) => [row.orderItemId, row]),
+      );
+      assertOrderLineSupplyReceived(order.id, order.items, supplyModeBySku, supplyByOrderItemId);
 
       let point = order.fulfillmentLocation?.trim() || order.storePoint?.inventoryLocation.trim();
       if (!point) {
@@ -545,6 +743,181 @@ export class PaymentsService {
     }
   }
 
+  private async activateSupplyProcurementOnTx(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    actor: string,
+    events: AuditInput[],
+  ) {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'order-supply:' + orderId}))::text AS locked`;
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: {
+        storePoint: { select: { inventoryLocation: true } },
+        items: {
+          where: { supplyModeSnapshot: 'to_order' },
+          include: {
+            orderLineSupply: {
+              include: { supplierOffer: true },
+            },
+          },
+          orderBy: { lineNumber: 'asc' },
+        },
+      },
+    });
+    if (!order || order.items.length === 0) {
+      throw new ConflictError('supply_order_missing', 'В заказе нет строк для закупки');
+    }
+    if (order.items.every((item) => item.orderLineSupply?.status === 'procurement_draft')) {
+      return;
+    }
+    if (order.items.some((item) => item.orderLineSupply?.status !== 'awaiting_deposit')) {
+      throw new ConflictError(
+        'supply_activation_state_invalid',
+        'Строки заказа находятся в несовместимых состояниях закупки',
+      );
+    }
+    const point = order.fulfillmentLocation?.trim()
+      || order.storePoint?.inventoryLocation.trim();
+    if (!point) {
+      throw new ValidationError('purchase_order_location_required', 'У заказа не определён склад назначения');
+    }
+
+    const now = new Date();
+    const quantityByOffer = new Map<string, number>();
+    for (const item of order.items) {
+      const supply = item.orderLineSupply;
+      const offer = supply?.supplierOffer;
+      if (
+        !item.productId
+        || !item.supplierIdSnapshot
+        || !item.supplyLeadDaysSnapshot
+        || !supply
+        || !offer
+        || offer.supplierId !== item.supplierIdSnapshot
+      ) {
+        throw new ConflictError(
+          'supply_snapshot_incomplete',
+          `Строка ${item.id} не содержит полного снимка поставки`,
+        );
+      }
+      if (!offer.active || offer.validUntil <= now) {
+        throw new ConflictError('supplier_quote_expired', `Цена поставщика для ${item.sku} устарела`);
+      }
+      const netSale = item.price * item.qty - item.discountAmount;
+      const purchaseCost = offer.unitCost * item.qty;
+      if (netSale <= 0 || (netSale - purchaseCost) * 10_000 < netSale * 1_000) {
+        throw new ConflictError(
+          'supplier_margin_approval_required',
+          `Маржа по ${item.sku} ниже 10%; требуется одобрение владельца`,
+        );
+      }
+      quantityByOffer.set(offer.id, (quantityByOffer.get(offer.id) ?? 0) + item.qty);
+    }
+
+    for (const [offerId, quantity] of quantityByOffer) {
+      const claimed = await tx.supplierOffer.updateMany({
+        where: {
+          id: offerId,
+          active: true,
+          validUntil: { gt: now },
+          availableQty: { gte: quantity },
+        },
+        data: { availableQty: { decrement: quantity } },
+      });
+      if (claimed.count !== 1) {
+        throw new ConflictError(
+          'supplier_offer_unavailable',
+          'Поставщик больше не подтверждает нужное количество; задаток не принят',
+        );
+      }
+    }
+
+    const itemsBySupplier = new Map<string, typeof order.items>();
+    for (const item of order.items) {
+      const supplierId = item.supplierIdSnapshot as string;
+      const group = itemsBySupplier.get(supplierId) ?? [];
+      group.push(item);
+      itemsBySupplier.set(supplierId, group);
+    }
+    for (const [supplierId, items] of itemsBySupplier) {
+      const sourceVersion = 1;
+      const sourceKey = `customer-order:${order.id}:supplier:${supplierId}:v${sourceVersion}`;
+      const purchaseOrder = await tx.purchaseOrder.create({
+        data: {
+          number: purchaseOrderNumber(),
+          idempotencyKey: sourceKey,
+          supplierId,
+          sourceOrderId: order.id,
+          sourceKey,
+          sourceVersion,
+          location: point,
+          note: `Заказ покупателя ${order.id}; проверить цену перед отправкой`,
+          createdBy: actor,
+        },
+      });
+      for (const item of items) {
+        const offer = item.orderLineSupply!.supplierOffer!;
+        const purchaseOrderItem = await tx.purchaseOrderItem.create({
+          data: {
+            purchaseOrderId: purchaseOrder.id,
+            productId: item.productId as string,
+            orderedQty: item.qty,
+            unitCost: offer.unitCost,
+          },
+        });
+        const promisedDate = bishkekPromisedDate(now, item.supplyLeadDaysSnapshot as number);
+        await tx.orderLineSupply.update({
+          where: { orderItemId: item.id },
+          data: {
+            purchaseOrderItemId: purchaseOrderItem.id,
+            status: 'procurement_draft',
+            expectedAt: promisedDate,
+            actor,
+          },
+        });
+        await tx.orderItem.update({
+          where: { id: item.id },
+          data: {
+            promisedDate,
+            fulfillmentStatus: 'procurement_draft',
+          },
+        });
+      }
+      events.push({
+        type: EventType.PurchaseOrderCreated,
+        actor,
+        payload: {
+          purchaseOrderId: purchaseOrder.id,
+          number: purchaseOrder.number,
+          sourceOrderId: order.id,
+          supplierId,
+          status: 'draft',
+          items: items.length,
+        },
+        refs: [purchaseOrder.id, order.id, supplierId, ...items.map((item) => item.id)],
+      });
+    }
+
+    if (order.status !== 'confirmed') {
+      assertTransition(order.status, 'confirmed');
+      await tx.order.update({ where: { id: order.id }, data: { status: 'confirmed' } });
+    }
+    events.push({
+      type: EventType.SupplyDepositConfirmed,
+      actor,
+      payload: {
+        orderId: order.id,
+        promisedDates: order.items.map((item) => ({
+          orderItemId: item.id,
+          leadDays: item.supplyLeadDaysSnapshot,
+        })),
+        purchaseOrders: itemsBySupplier.size,
+      },
+      refs: [order.id, ...order.items.map((item) => item.id)],
+    });
+  }
+
   private async resolveCashShiftOnTx(
     tx: Prisma.TransactionClient,
     requestedShiftId: string | undefined,
@@ -566,4 +939,26 @@ export class PaymentsService {
     if (shift.point !== point) throw new ConflictError('cash_shift_wrong_point', 'Кассовая смена открыта в другой точке');
     return shift;
   }
+}
+
+function purchaseOrderNumber() {
+  const date = new Date().toISOString().slice(0, 10).replaceAll('-', '');
+  return `PO-${date}-${randomUUID().slice(0, 6).toUpperCase()}`;
+}
+
+function bishkekPromisedDate(receivedAt: Date, leadDays: number) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bishkek',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(receivedAt);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const localDate = new Date(Date.UTC(
+    Number(value.year),
+    Number(value.month) - 1,
+    Number(value.day) + leadDays,
+    12,
+  ));
+  return localDate;
 }

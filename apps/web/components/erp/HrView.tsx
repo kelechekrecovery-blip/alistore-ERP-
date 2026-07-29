@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { cancelHrSchedule, createHrSchedule, decideHrAbsence, fetchHrHandovers, fetchHrPayrollPreview, fetchHrPayrollRuns, fetchHrWeek, handoverHrShift, payHrPayroll, postHrPayroll, updateHrSchedule, type HrHandoverOverview, type HrPayrollPreview, type HrPayrollRun, type HrSchedule, type HrWeek } from '@/lib/api';
 import { som } from '@/lib/format';
 import type { HrStaff } from '@/lib/api/hr';
+import { OperationalStorePointSelect, useOperationalStorePoint } from '@/lib/use-operational-store-point';
 
 type Tab = 'schedule' | 'timesheet' | 'payroll' | 'profile' | 'handover';
 const TABS: { id: Tab; label: string }[] = [
@@ -44,7 +45,7 @@ function hours(minutes: number) { return `${Math.floor(minutes / 60)}ч ${minute
 export function HrView({ accessToken }: { accessToken: string }) {
   const [tab, setTab] = useState<Tab>('schedule');
   const [weekStart, setWeekStart] = useState(mondayIso);
-  const [point, setPoint] = useState('BISHKEK-1');
+  const { points, point, setPoint, canSelect } = useOperationalStorePoint(accessToken);
   const [data, setData] = useState<HrWeek | null>(null);
   const [selectedStaff, setSelectedStaff] = useState('');
   const [shiftDate, setShiftDate] = useState(mondayIso);
@@ -70,6 +71,7 @@ export function HrView({ accessToken }: { accessToken: string }) {
   const [payrollRef, setPayrollRef] = useState('');
 
   const reload = useCallback(() => {
+    if (!point) return;
     setMessage('');
     fetchHrWeek(weekStart, point, accessToken).then((result) => {
       setData(result);
@@ -78,6 +80,7 @@ export function HrView({ accessToken }: { accessToken: string }) {
   }, [accessToken, point, weekStart]);
   useEffect(() => reload(), [reload]);
   const reloadHandovers = useCallback(() => {
+    if (!point) return;
     fetchHrHandovers(point, accessToken).then((result) => {
       setHandovers(result);
       const source = result.shifts.find((shift) => shift.id === sourceShiftId) ?? result.shifts[0];
@@ -180,7 +183,7 @@ export function HrView({ accessToken }: { accessToken: string }) {
         </div>
         <div className="flex gap-2">
           <label className="text-[10px] text-subtle">Неделя<input aria-label="Неделя HR" type="date" value={weekStart} onChange={(event) => setWeekStart(event.target.value)} className="mt-1 block h-9 rounded-[6px] border border-line bg-surface px-2 text-xs text-white" /></label>
-          <label className="text-[10px] text-subtle">Точка<input aria-label="Точка HR" value={point} onChange={(event) => setPoint(event.target.value)} className="mt-1 block h-9 w-32 rounded-[6px] border border-line bg-surface px-2 text-xs text-white" /></label>
+          <OperationalStorePointSelect points={points} point={point} setPoint={setPoint} canSelect={canSelect} label="Точка HR" />
         </div>
       </div>
       {message && <div role="alert" className="rounded-[6px] border border-coral-soft/40 bg-coral-soft/10 px-3 py-2 text-xs text-coral-tint">{message}</div>}

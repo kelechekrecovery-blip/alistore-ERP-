@@ -120,7 +120,7 @@ describe('SEC-011 push token ownership guard', () => {
 
   it('rejects cross-scope rebinding: a customer JWT cannot take a staff token', async () => {
     const staff = await prisma.staffUser.create({
-      data: { username: `sec011-${RUN}-staff`, passwordHash: 'not-used', role: 'seller' },
+      data: { username: `sec011-${RUN}-staff`, passwordHash: 'not-used', role: 'seller', point: 'BISHKEK-1' },
     });
     const staffToken = jwt.sign({ sub: staff.id, typ: 'staff', role: staff.role });
     const intruder = await createCustomer(4);

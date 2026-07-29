@@ -10,7 +10,7 @@ import org.json.JSONObject
 class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, CustomerOrdersGateway, CustomerDevicesGateway,
   CustomerSupportGateway, CustomerReturnsGateway, CustomerTradeInsGateway, CustomerEvidenceGateway, CustomerAccountGateway,
   StaffAuthGateway, StaffOperationsGateway, StaffEvidenceGateway, StaffCustomerGateway, StaffTaskGateway,
-  PushRegistrationGateway, CourierGateway, PosGateway {
+  PushRegistrationGateway, CourierGateway, PosGateway, SupplyParityGateway {
   init { require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) { "A valid API_BASE_URL is required" } }
 
   suspend fun catalog(): List<Product> = withContext(Dispatchers.IO) {
@@ -197,6 +197,131 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
 
   override suspend fun staffMe(accessToken: String): StaffPrincipal =
     request("staff-auth/me", "GET", token = accessToken).staffPrincipal()
+
+  override suspend fun cancellationPreview(orderId: String, token: String): OrderCancellationPreview =
+    request("orders/mine/$orderId/cancellation-preview", "GET", token = token).orderCancellationPreview()
+
+  override suspend fun currentCancellation(orderId: String, token: String): OrderCancellation? =
+    requestObjectOrNull("orders/mine/$orderId/cancellations/current", token)?.orderCancellation()
+
+  override suspend fun requestCancellation(
+    orderId: String,
+    reason: String,
+    token: String,
+    idempotencyKey: String,
+  ): OrderCancellation = request(
+    "orders/mine/$orderId/cancellations",
+    "POST",
+    JSONObject().put("reason", reason),
+    token,
+    idempotencyKey = idempotencyKey,
+  ).orderCancellation()
+
+  override suspend fun supplyOperations(token: String): SupplyOperationsResponse =
+    request("procurement/supply-operations", "GET", token = token).supplyOperations()
+
+  override suspend fun ownerCancellationPreview(
+    orderId: String,
+    cancellationId: String,
+    token: String,
+  ): OwnerCancellationPreview = request(
+    "orders/$orderId/cancellations/$cancellationId/owner-preview",
+    "GET",
+    token = token,
+  ).ownerCancellationPreview()
+
+  override suspend fun resolveOwnerCancellation(
+    orderId: String,
+    cancellationId: String,
+    action: String,
+    refundAmount: Int?,
+    supplierExpenseAmount: Int?,
+    faultParty: String?,
+    reason: String,
+    evidenceIds: List<String>,
+    totp: String,
+    token: String,
+    idempotencyKey: String,
+  ): OrderCancellation = request(
+    "orders/$orderId/cancellations/$cancellationId/owner-resolution",
+    "POST",
+    JSONObject()
+      .put("action", action)
+      .putOpt("refundAmount", refundAmount)
+      .putOpt("supplierExpenseAmount", supplierExpenseAmount)
+      .putOpt("faultParty", faultParty)
+      .put("ownerReason", reason)
+      .put("evidenceIds", org.json.JSONArray(evidenceIds))
+      .put("totpToken", totp),
+    token,
+    idempotencyKey = idempotencyKey,
+  ).orderCancellation()
+
+  override suspend fun proposeSupplyQuarantine(
+    orderItemId: String,
+    reason: String,
+    evidence: Map<String, String>,
+    imeis: List<String>,
+    token: String,
+    idempotencyKey: String,
+  ): SupplyQuarantineResolution = request(
+    "procurement/supply-quarantines/order-items/$orderItemId",
+    "POST",
+    JSONObject()
+      .put("reason", reason)
+      .put("evidence", JSONObject(evidence))
+      .apply { if (imeis.isNotEmpty()) put("imeis", org.json.JSONArray(imeis)) },
+    token,
+    idempotencyKey = idempotencyKey,
+  ).supplyQuarantineResolution()
+
+  override suspend fun resolveSupplyQuarantine(
+    resolutionId: String,
+    disposition: String,
+    reason: String,
+    evidence: Map<String, String>,
+    token: String,
+    idempotencyKey: String,
+  ): SupplyQuarantineResolution = request(
+    "procurement/supply-quarantines/$resolutionId/resolve",
+    "POST",
+    JSONObject().put("disposition", disposition).put("reason", reason).put("evidence", JSONObject(evidence)),
+    token,
+    idempotencyKey = idempotencyKey,
+  ).supplyQuarantineResolution()
+
+  override suspend fun settleReceivable(
+    receivableId: String,
+    method: String,
+    amount: Int,
+    txnId: String?,
+    shiftId: String?,
+    token: String,
+    idempotencyKey: String,
+  ) {
+    request(
+      "payments/receivables/$receivableId/settle",
+      "POST",
+      JSONObject().put("method", method).put("amount", amount).putOpt("txnId", txnId).putOpt("shiftId", shiftId),
+      token,
+      idempotencyKey = idempotencyKey,
+    )
+  }
+
+  override suspend fun handOverOrderItem(
+    orderId: String,
+    itemId: String,
+    token: String,
+    idempotencyKey: String,
+  ) {
+    request(
+      "orders/$orderId/items/$itemId/handover",
+      "POST",
+      JSONObject(),
+      token,
+      idempotencyKey = idempotencyKey,
+    )
+  }
 
   override suspend fun currentShift(token: String): CashShift? {
     val current = requestObjectOrNull("shifts/current", token) ?: return null
@@ -629,6 +754,11 @@ private fun JSONObject.product(): Product {
     category = getString("category"),
     availableUnits = getInt("availableUnits"),
     imageUrls = imageUrls,
+    supplyMode = nullableString("supplyMode"),
+    orderable = if (has("orderable")) getBoolean("orderable") else null,
+    availabilityKind = nullableString("availabilityKind"),
+    leadTimeDays = if (has("leadTimeDays") && !isNull("leadTimeDays")) getInt("leadTimeDays") else null,
+    estimatedDeliveryDate = nullableString("estimatedDeliveryDate"),
   )
 }
 
@@ -653,22 +783,150 @@ private fun JSONObject.order() = CustomerOrder(
     buildList {
       for (index in 0 until array.length()) {
         val item = array.getJSONObject(index)
-        add(CustomerOrderItem(item.getString("sku"), item.getInt("qty"), item.getInt("price"), item.nullableString("imei")))
+        add(CustomerOrderItem(
+          sku = item.getString("sku"),
+          qty = item.getInt("qty"),
+          price = item.getInt("price"),
+          imei = item.nullableString("imei"),
+          id = item.nullableString("id"),
+          supplyModeSnapshot = item.nullableString("supplyModeSnapshot"),
+          supplyLeadDaysSnapshot = if (item.has("supplyLeadDaysSnapshot") && !item.isNull("supplyLeadDaysSnapshot")) item.getInt("supplyLeadDaysSnapshot") else null,
+          promisedDate = item.nullableString("promisedDate"),
+          fulfillmentStatus = item.nullableString("fulfillmentStatus"),
+          readyAt = item.nullableString("readyAt"),
+          handedOverAt = item.nullableString("handedOverAt"),
+        ))
       }
     }
   }.orEmpty(),
   createdAt = nullableString("createdAt"),
   channel = optString("channel", "web"),
+  paymentSchedule = optJSONArray("paymentSchedule")?.let { array ->
+    buildList {
+      for (index in 0 until array.length()) {
+        val receivable = array.getJSONObject(index)
+        add(OrderReceivable(
+          id = receivable.getString("id"),
+          orderItemId = receivable.nullableString("orderItemId"),
+          kind = receivable.getString("kind"),
+          amount = receivable.getInt("amount"),
+          settledAmount = receivable.getInt("settledAmount"),
+          status = receivable.getString("status"),
+          dueAt = receivable.nullableString("dueAt"),
+        ))
+      }
+    }
+  }.orEmpty(),
+  initialDue = if (has("initialDue") && !isNull("initialDue")) getInt("initialDue") else null,
+  balanceDue = if (has("balanceDue") && !isNull("balanceDue")) getInt("balanceDue") else null,
 )
 
 private fun JSONObject.staffSession() = StaffSession(
   accessToken = getString("accessToken"), staffId = getString("staffId"), username = getString("username"),
   role = getString("role"), totpEnabled = optBoolean("totpEnabled"),
+  point = nullableString("point"), capabilities = stringSet("capabilities"),
 )
 
 private fun JSONObject.staffPrincipal() = StaffPrincipal(
   id = getString("id"), username = getString("username"), role = getString("role"), active = getBoolean("active"),
   totpEnabled = optBoolean("totpEnabled"), type = optString("typ", "staff"),
+  point = nullableString("point"), capabilities = stringSet("capabilities"),
+)
+
+internal fun JSONObject.orderCancellationPreview() = OrderCancellationPreview(
+  orderId = getString("orderId"),
+  canCancel = optBoolean("canCancel"),
+  blockedReason = nullableString("blockedReason"),
+  policy = getString("policy"),
+  purchaseOrderSent = optBoolean("purchaseOrderSent"),
+  depositPaid = optInt("depositPaid"),
+  estimatedRefundAmount = optInt("estimatedRefundAmount"),
+  supplierExpenseDeduction = optInt("supplierExpenseDeduction"),
+  ownerReviewRequired = optBoolean("ownerReviewRequired"),
+  note = optString("note"),
+  requestEnabled = optBoolean("requestEnabled"),
+  automaticRefundEnabled = optBoolean("automaticRefundEnabled"),
+)
+
+internal fun JSONObject.orderCancellation() = OrderCancellation(
+  id = getString("id"),
+  orderId = getString("orderId"),
+  status = getString("status"),
+  policySnapshot = getString("policySnapshot"),
+  requestedRefundAmount = optInt("requestedRefundAmount"),
+  approvedRefundAmount = if (has("approvedRefundAmount") && !isNull("approvedRefundAmount")) getInt("approvedRefundAmount") else null,
+  customerReason = optString("customerReason"),
+  ownerReason = nullableString("ownerReason"),
+  refundId = nullableString("refundId"),
+)
+
+internal fun JSONObject.ownerCancellationPreview() = OwnerCancellationPreview(
+  id = getString("id"),
+  orderId = getString("orderId"),
+  status = getString("status"),
+  depositPaidSnapshot = optInt("depositPaidSnapshot"),
+  requestedRefundAmount = optInt("requestedRefundAmount"),
+  canResolve = optBoolean("canResolve"),
+  fullRefundAmount = optInt("fullRefundAmount"),
+)
+
+internal fun JSONObject.supplyOperations(): SupplyOperationsResponse {
+  val flags = getJSONObject("flags")
+  val capabilities = getJSONObject("capabilities")
+  val countsJson = getJSONObject("counts")
+  val queuesJson = getJSONObject("queues")
+  val counts = countsJson.keys().asSequence().associateWith { countsJson.optInt(it) }
+  val queues = queuesJson.keys().asSequence().associateWith { key ->
+    val rows = queuesJson.optJSONArray(key)
+    buildList {
+      if (rows != null) for (index in 0 until rows.length()) {
+        val row = rows.getJSONObject(index)
+        add(SupplyOperationRow(
+          id = row.getString("id"),
+          queue = row.getString("queue"),
+          orderId = row.getString("orderId"),
+          purchaseOrderId = row.nullableString("purchaseOrderId"),
+          purchaseOrderNumber = row.nullableString("purchaseOrderNumber"),
+          status = row.getString("status"),
+          amount = if (row.has("amount") && !row.isNull("amount")) row.getInt("amount") else null,
+          expectedAt = row.nullableString("expectedAt"),
+          sku = row.nullableString("sku"),
+          quantity = if (row.has("quantity") && !row.isNull("quantity")) row.getInt("quantity") else null,
+          detailHref = row.optString("detailHref"),
+        ))
+      }
+    }
+  }
+  return SupplyOperationsResponse(
+    flags = SupplyOperationFlags(
+      checkoutEnabled = flags.optBoolean("checkoutEnabled"),
+      cancellationEnabled = flags.optBoolean("cancellationEnabled"),
+      autoRefundEnabled = flags.optBoolean("autoRefundEnabled"),
+      ownerResolutionEnabled = flags.optBoolean("ownerResolutionEnabled"),
+    ),
+    capabilities = SupplyOperationCapabilities(
+      financialQueuesVisible = capabilities.optBoolean("financialQueuesVisible"),
+      ownerResolutionAvailable = capabilities.optBoolean("ownerResolutionAvailable"),
+    ),
+    counts = counts,
+    queues = queues,
+  )
+}
+
+internal fun JSONObject.supplyQuarantineResolution() = SupplyQuarantineResolution(
+  id = getString("id"),
+  orderLineSupplyId = getString("orderLineSupplyId"),
+  productId = getString("productId"),
+  storePointId = getString("storePointId"),
+  inventoryLocationSnapshot = getString("inventoryLocationSnapshot"),
+  trackingModeSnapshot = getString("trackingModeSnapshot"),
+  quarantinedQty = getInt("quarantinedQty"),
+  imeis = optJSONArray("imeis")?.let { array ->
+    buildList { for (index in 0 until array.length()) add(array.getString(index)) }
+  }.orEmpty(),
+  status = getString("status"),
+  disposition = nullableString("disposition"),
+  inventoryMovementId = nullableString("inventoryMovementId"),
 )
 
 private fun JSONObject.courierDelivery(): CourierDelivery {
@@ -687,7 +945,19 @@ private fun JSONObject.courierDelivery(): CourierDelivery {
       ?: CourierCustomer("Клиент", ""),
     items = optJSONArray("items")?.let { array -> buildList {
       for (index in 0 until array.length()) array.getJSONObject(index).let { item ->
-        add(CustomerOrderItem(item.getString("sku"), item.getInt("qty"), item.getInt("price"), item.nullableString("imei")))
+        add(CustomerOrderItem(
+          sku = item.getString("sku"),
+          qty = item.getInt("qty"),
+          price = item.getInt("price"),
+          imei = item.nullableString("imei"),
+          id = item.nullableString("id"),
+          supplyModeSnapshot = item.nullableString("supplyModeSnapshot"),
+          supplyLeadDaysSnapshot = if (item.has("supplyLeadDaysSnapshot") && !item.isNull("supplyLeadDaysSnapshot")) item.getInt("supplyLeadDaysSnapshot") else null,
+          promisedDate = item.nullableString("promisedDate"),
+          fulfillmentStatus = item.nullableString("fulfillmentStatus"),
+          readyAt = item.nullableString("readyAt"),
+          handedOverAt = item.nullableString("handedOverAt"),
+        ))
       }
     } }.orEmpty(),
     outstandingCod = (getInt("total") - paid).coerceAtLeast(0),
@@ -934,6 +1204,14 @@ private fun JSONObject.customerSettings() = CustomerSettings(
 
 private fun JSONObject.nullableString(key: String): String? =
   if (isNull(key)) null else optString(key).takeIf(String::isNotBlank)
+
+private fun JSONObject.stringSet(key: String): Set<String> = optJSONArray(key)?.let { array ->
+  buildSet {
+    for (index in 0 until array.length()) {
+      array.optString(index).takeIf(String::isNotBlank)?.let(::add)
+    }
+  }
+}.orEmpty()
 
 /**
  * `code` — машинный код домена (`DomainError.code` на сервере). Он есть далеко

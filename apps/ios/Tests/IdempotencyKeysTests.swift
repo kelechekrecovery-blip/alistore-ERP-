@@ -81,9 +81,9 @@ final class InventoryWriteOffKeyTests: XCTestCase {
     }
 
     func testSameWriteOffOnTheSameDayIsTheSameKey() throws {
-        let a = try IdempotencyKeys.inventoryWriteOff(request(qty: 2), on: day("2026-07-26T09:00:00Z"))
-        let b = try IdempotencyKeys.inventoryWriteOff(request(qty: 2), on: day("2026-07-26T18:30:00Z"))
-        XCTAssertEqual(a, b)
+        let morningKey = try IdempotencyKeys.inventoryWriteOff(request(qty: 2), on: day("2026-07-26T09:00:00Z"))
+        let eveningKey = try IdempotencyKeys.inventoryWriteOff(request(qty: 2), on: day("2026-07-26T18:30:00Z"))
+        XCTAssertEqual(morningKey, eveningKey)
     }
 
     func testTheSameWriteOffOnAnotherDayIsANewOperation() throws {

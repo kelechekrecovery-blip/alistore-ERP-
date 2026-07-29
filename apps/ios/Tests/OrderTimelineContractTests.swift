@@ -18,9 +18,9 @@ final class OrderTimelineContractTests: XCTestCase {
         XCTAssertEqual(events[0].id, "evt-2")
         XCTAssertEqual(events[0].type, "payment.received")
         XCTAssertEqual(events[0].actor, "customer-1")
-        XCTAssertEqual(events[0].ts.timeIntervalSince1970, 1_784_351_401.5, accuracy: 0.001)
+        XCTAssertEqual(events[0].timestamp.timeIntervalSince1970, 1_784_351_401.5, accuracy: 0.001)
         XCTAssertEqual(events[1].type, "order.created")
-        XCTAssertEqual(events[1].ts.timeIntervalSince1970, 1_784_351_380, accuracy: 0.001)
+        XCTAssertEqual(events[1].timestamp.timeIntervalSince1970, 1_784_351_380, accuracy: 0.001)
         XCTAssertEqual(OrderTimelineMockURLProtocol.lastRequest?.url?.path, "/api/orders/order-1/ledger")
         XCTAssertEqual(OrderTimelineMockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer access-1")
     }
@@ -30,8 +30,8 @@ final class OrderTimelineContractTests: XCTestCase {
         let paid = Date(timeIntervalSince1970: 1_784_351_401)
         // Ledger arrives newest-first; the builder must not depend on input order.
         let events = [
-            OrderLedgerEvent(id: "evt-2", type: "payment.received", actor: "customer-1", ts: paid),
-            OrderLedgerEvent(id: "evt-1", type: "order.created", actor: "customer-1", ts: created)
+            OrderLedgerEvent(id: "evt-2", type: "payment.received", actor: "customer-1", timestamp: paid),
+            OrderLedgerEvent(id: "evt-1", type: "order.created", actor: "customer-1", timestamp: created)
         ]
 
         let steps = OrderTimelineBuilder.build(events: events)
@@ -58,11 +58,11 @@ final class OrderTimelineContractTests: XCTestCase {
     func testCompletedOrderMarksEveryStepDone() {
         let base = Date(timeIntervalSince1970: 1_784_351_380)
         let events = [
-            OrderLedgerEvent(id: "evt-1", type: "order.created", actor: "customer-1", ts: base),
-            OrderLedgerEvent(id: "evt-2", type: "order.paid", actor: "customer-1", ts: base.addingTimeInterval(60)),
-            OrderLedgerEvent(id: "evt-3", type: "order.reserved", actor: "staff-1", ts: base.addingTimeInterval(120)),
-            OrderLedgerEvent(id: "evt-4", type: "order.ready_for_pickup", actor: "staff-1", ts: base.addingTimeInterval(180)),
-            OrderLedgerEvent(id: "evt-5", type: "order.completed", actor: "staff-1", ts: base.addingTimeInterval(240))
+            OrderLedgerEvent(id: "evt-1", type: "order.created", actor: "customer-1", timestamp: base),
+            OrderLedgerEvent(id: "evt-2", type: "order.paid", actor: "customer-1", timestamp: base.addingTimeInterval(60)),
+            OrderLedgerEvent(id: "evt-3", type: "order.reserved", actor: "staff-1", timestamp: base.addingTimeInterval(120)),
+            OrderLedgerEvent(id: "evt-4", type: "order.ready_for_pickup", actor: "staff-1", timestamp: base.addingTimeInterval(180)),
+            OrderLedgerEvent(id: "evt-5", type: "order.completed", actor: "staff-1", timestamp: base.addingTimeInterval(240))
         ]
 
         let steps = OrderTimelineBuilder.build(events: events)

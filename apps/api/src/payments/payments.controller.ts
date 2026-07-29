@@ -13,7 +13,7 @@ import {
 } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { PaymentsService } from './payments.service';
-import { PayDto, RefundDto, VoidPaymentDto } from './payments.dto';
+import { PayDto, RefundDto, SettleOrderReceivableDto, VoidPaymentDto } from './payments.dto';
 import { PaymentIntentsService } from './payment-intents.service';
 import { CreatePaymentIntentDto, PaymentWebhookDto } from './payment-intents.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -114,6 +114,27 @@ export class PaymentsController {
     }
     const guest = requireGuestCapability(capability, 'payments:gift_card');
     return this.payments.payForCustomer(guest.sub, dto, `guest:${guest.sub}`);
+  }
+
+  @ApiOperation({ summary: 'Take a POS deposit against an order receivable' })
+  @ApiCreatedResponse({ description: 'Deposit recorded as a liability; draft POs may be created.' })
+  @Post('receivables/:id/settle')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('payments', 'take_deposit')
+  async settleReceivable(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') receivableId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: SettleOrderReceivableDto,
+  ) {
+    const staffId = await requireActiveStaff(user, this.staffAuth);
+    return this.payments.settleReceivable(
+      receivableId,
+      dto,
+      `staff:${staffId}`,
+      { staffId, idempotencyKey },
+    );
   }
 
   @ApiOperation({

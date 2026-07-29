@@ -21,6 +21,7 @@ describe('Store point fulfillment contract', () => {
   const orderIds: string[] = [];
   const productIds: string[] = [];
   let pointId = '';
+  let deliveryPointId = '';
   let staffId = '';
   let customerId = '';
 
@@ -51,6 +52,7 @@ describe('Store point fulfillment contract', () => {
       await prisma.storePointCommand.deleteMany({ where: { storePointId: pointId } });
       await prisma.storePoint.delete({ where: { id: pointId } });
     }
+    if (deliveryPointId) await prisma.storePoint.deleteMany({ where: { id: deliveryPointId } });
     if (customerId) await prisma.customer.deleteMany({ where: { id: customerId } });
     await prisma.staffUser.deleteMany({ where: { id: staffId } });
     await app.close();
@@ -126,12 +128,24 @@ describe('Store point fulfillment contract', () => {
     expect(replay.body.id).toBe(orderResponse.body.id);
     await request(app.getHttpServer()).post('/orders/mine').set('Authorization', `Bearer ${customerToken}`).set('Idempotency-Key', `disabled-${run}`).send({ ...base, storePointId: pointId }).expect(422);
 
+    const deliveryPoint = await prisma.storePoint.create({
+      data: {
+        code: `ful-delivery-${suffix}`.toLowerCase(),
+        name: 'Delivery fulfillment fixture',
+        address: 'Test address',
+        inventoryLocation: `FUL-DELIVERY-${suffix}`,
+        hours: '10:00–20:00',
+        createdBy: 'store-points-test',
+        idempotencyKey: `store-points-delivery-${suffix}`,
+      },
+    });
+    deliveryPointId = deliveryPoint.id;
     const deliveryProduct = await prisma.product.create({
-      data: { sku: `FUL-DELIVERY-${suffix}`, name: 'Delivery case', price: 1000, cost: 400, category: 'accessories', attrs: {}, trackingMode: 'quantity', balances: { create: { location: 'BISHKEK-1', onHand: 2 } } },
+      data: { sku: `FUL-DELIVERY-${suffix}`, name: 'Delivery case', price: 1000, cost: 400, category: 'accessories', attrs: {}, trackingMode: 'quantity', balances: { create: { location: deliveryPoint.inventoryLocation, onHand: 2 } } },
     });
     productIds.push(deliveryProduct.id);
     const exactAddress = 'Бишкек, ул. Токтогула 125/1, кв. 42, домофон 17';
-    const delivery = await request(app.getHttpServer()).post('/orders/mine').set('Authorization', `Bearer ${customerToken}`).set('Idempotency-Key', `delivery-${run}`).send({ channel: 'web', fulfillmentType: 'courier', deliveryAddress: exactAddress, total: 1, items: [{ sku: deliveryProduct.sku, qty: 1, price: 1 }] }).expect(201);
+    const delivery = await request(app.getHttpServer()).post('/orders/mine').set('Authorization', `Bearer ${customerToken}`).set('Idempotency-Key', `delivery-${run}`).send({ channel: 'web', fulfillmentType: 'courier', storePointId: deliveryPoint.id, deliveryAddress: exactAddress, total: 1, items: [{ sku: deliveryProduct.sku, qty: 1, price: 1 }] }).expect(201);
     orderIds.push(delivery.body.id);
     expect(delivery.body.deliveryAddress).toBe(exactAddress);
   });

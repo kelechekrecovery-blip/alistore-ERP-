@@ -8,6 +8,7 @@ import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
+import { randomUUID } from 'node:crypto';
 
 /**
  * F-03 — payroll 500 из-за формата actor в `Payment.receivedBy`.
@@ -30,9 +31,10 @@ describe('F-03: payroll устойчив к формату receivedBy', () => {
   let ownerToken: string;
   let sellerId: string;
   let customerId: string;
-  const run = Math.floor(Math.random() * 1_000_000);
+  const run = `${Date.now().toString(36)}-${process.pid}-${randomUUID().slice(0, 8)}`;
   const point = `HR-F03-${run}`;
   const period = '2026-07';
+  let pointId = '';
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -42,12 +44,24 @@ describe('F-03: payroll устойчив к формату receivedBy', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
     prisma = moduleRef.get(PrismaService);
+    const storePoint = await prisma.storePoint.create({
+      data: {
+        code: `hr-f03-${run}`,
+        name: 'HR F03 fixture',
+        address: 'Test address',
+        inventoryLocation: point,
+        hours: '10:00–20:00',
+        createdBy: 'hr-payroll-test',
+        idempotencyKey: `hr-payroll-point-${run}`,
+      },
+    });
+    pointId = storePoint.id;
     const auth = moduleRef.get(StaffAuthService);
     ownerToken = (await auth.login(
-      (await auth.createStaff(`owner-f03-${run}`, 'pass', 'owner')).username,
+      (await auth.createStaff(`owner-f03-${run}`, 'pass', 'owner', point)).username,
       'pass',
     )).accessToken;
-    const seller = await auth.createStaff(`seller-f03-${run}`, 'pass', 'seller');
+    const seller = await auth.createStaff(`seller-f03-${run}`, 'pass', 'seller', point);
     sellerId = seller.id;
     const customer = await prisma.customer.create({
       data: { phone: `+99670F03${run}`.slice(0, 15), name: 'F03 customer' },
@@ -65,6 +79,7 @@ describe('F-03: payroll устойчив к формату receivedBy', () => {
     await prisma.customer.deleteMany({ where: { id: customerId } });
     await prisma.staffUser.deleteMany({ where: { id: sellerId } });
     await prisma.staffUser.deleteMany({ where: { username: `owner-f03-${run}` } });
+    if (pointId) await prisma.storePoint.deleteMany({ where: { id: pointId } });
     await app.close();
   });
 
