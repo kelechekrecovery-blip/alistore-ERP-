@@ -50,7 +50,7 @@ const SERVICES = [
   // Витрина проверяется по /healthz, а не по '/': главная тянет каталог из API,
   // и при мёртвом API отдала бы не-200 — сторож принялся бы перезапускать
   // исправную витрину. /healthz отвечает за сам процесс Next и ни за что больше.
-  { label: 'com.alistore.web', name: 'витрина (3000)', url: 'http://127.0.0.1:3000/healthz', repair: () => repairStorefrontBuild() },
+  { label: 'com.alistore.web', name: 'витрина (3000)', url: 'http://127.0.0.1:3000/healthz' },
 ];
 
 // Публичные адреса проверяются отдельно: процессы могут быть живы, а сайт всё
@@ -127,10 +127,9 @@ export async function repairDanglingExternals(externalsDir, flatModulesDir) {
 }
 
 // Сколько подряд неудачных рестартов считаем доказательством, что рестарт не
-// поможет. Один-два — обычная перезагрузка процесса; три подряд означают, что
-// сервис поднимается и сразу же снова не отвечает, то есть сломан артефакт, а
-// не процесс.
-const REVIVALS_BEFORE_REPAIR = 3;
+// поможет. Один-два — обычная перезагрузка процесса; десять подряд означают,
+// что сервис поднимается и сразу же снова не отвечает, то есть сломан артефакт,
+// а не процесс, и разбирать это должен человек.
 const REVIVALS_BEFORE_ESCALATION = 10;
 const failedRevivals = new Map();
 
@@ -153,7 +152,7 @@ async function repairStorefrontBuild() {
 // Возвращает сервис launchd, а не запускает копию мимо него. -k шлёт SIGKILL
 // текущему процессу, если он ещё жив: зависший процесс держит порт, и без этого
 // новый экземпляр не поднялся бы.
-async function revive({ label, name, repair }) {
+async function revive({ label, name }) {
   if (!(await agentLoaded(label))) {
     await log(`ВНИМАНИЕ: агент ${label} не загружен — ${name} поднять некому.`);
     await log(`         установите: cp scripts/${label}.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/${label}.plist`);
@@ -164,9 +163,9 @@ async function revive({ label, name, repair }) {
   failedRevivals.set(label, attempt);
 
   // Молчаливый бесконечный рестарт — худшее из поведений: журнал заполняется
-  // одинаковыми строками, а диагноза в нём нет. Поэтому сначала пробуем
-  // починить известную поломку, потом — говорим вслух, что рестарт не помогает.
-  if (repair && attempt === REVIVALS_BEFORE_REPAIR) await repair();
+  // одинаковыми строками, а диагноза в нём нет. Известную поломку сборки чинит
+  // проверка целостности в checkOnce (каждый цикл), здесь остаётся сказать
+  // вслух, что рестарт не помогает и дальше нужен человек.
   if (attempt === REVIVALS_BEFORE_ESCALATION) {
     await log(`ЭСКАЛАЦИЯ: ${name} не поднимается ${attempt} перезапусков подряд — рестарт не лечит причину.`);
     await log('           смотрите /tmp/alistore-web-prod.err.log и /tmp/alistore-api-prod.err.log');
@@ -230,6 +229,18 @@ async function checkSleepGuard() {
 }
 
 async function checkOnce() {
+  // Целостность сборки проверяем ПЕРВОЙ и каждый цикл, а не после серии
+  // неудачных рестартов. Проверка стоит один readdir и несколько stat — на этом
+  // фоне бесплатна, зато ловит поломку в пределах минуты после `npm install`,
+  // а не через три минуты падений. Чинить на месте мало: Next грузит модуль на
+  // каждый запрос и продолжит отдавать 500, пока процесс не перезапустят, —
+  // поэтому сразу за ремонтом идёт kickstart.
+  if (await repairStorefrontBuild()) {
+    await log('витрина перезапускается после ремонта сборки');
+    await run('/bin/launchctl', ['kickstart', '-k', `${DOMAIN}/com.alistore.web`]).catch(() => {});
+    failedRevivals.delete('com.alistore.web');
+  }
+
   for (const service of SERVICES) {
     const up = await isUp(service.url);
     if (up) failedRevivals.delete(service.label);
