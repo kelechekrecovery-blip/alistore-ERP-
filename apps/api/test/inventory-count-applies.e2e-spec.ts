@@ -118,6 +118,7 @@ describe('Inventory count approval invariant', () => {
     const result = await inventory.count(
       { productId: product.id, location: 'BISHKEK-1', counted: 2 },
       requester,
+      `count-observation-${run}-${seq}`,
     );
 
     expect(result).toMatchObject({ expected: 5, counted: 2, diff: -3 });
@@ -138,12 +139,55 @@ describe('Inventory count approval invariant', () => {
     })).toBeTruthy();
   });
 
+  it('replays the exact count but rejects the same key for another command or actor', async () => {
+    const product = await quantityProduct(5);
+    const otherProduct = await quantityProduct(5);
+    const key = `bound-count-${run}-${seq}`;
+    const command = { productId: product.id, location: 'BISHKEK-1', counted: 2 };
+    const first = await inventory.count(command, requester, key);
+
+    await expect(inventory.count(command, requester, key)).resolves.toEqual(first);
+    await expect(inventory.count(
+      { ...command, counted: 3 },
+      requester,
+      key,
+    )).rejects.toMatchObject({ code: 'idempotency_key_reused' });
+    await expect(inventory.count(
+      { ...command, productId: otherProduct.id },
+      requester,
+      key,
+    )).rejects.toMatchObject({ code: 'idempotency_key_reused' });
+    await expect(inventory.count(
+      { ...command, location: 'BISHKEK-2' },
+      requester,
+      key,
+    )).rejects.toMatchObject({ code: 'idempotency_key_reused' });
+    await expect(inventory.count(
+      command,
+      `${requester}-other`,
+      key,
+    )).rejects.toMatchObject({ code: 'idempotency_key_reused' });
+    expect(await prisma.inventoryMovement.count({
+      where: { idempotencyKey: key, type: 'count' },
+    })).toBe(1);
+    expect(await prisma.auditEvent.count({
+      where: { type: 'inventory.counted', refs: { has: first.movementId } },
+    })).toBe(1);
+  });
+
   it('applies the discrepancy only through one replay-safe, stepped-up four-eyes stock adjustment', async () => {
     const product = await quantityProduct(5);
+    const observationKey = `count-adjust-observation-${run}-${seq}`;
     const count = await inventory.count(
       { productId: product.id, location: 'BISHKEK-1', counted: 2 },
       requester,
+      observationKey,
     );
+    await expect(inventory.count(
+      { productId: product.id, location: 'BISHKEK-1', counted: 2 },
+      requester,
+      observationKey,
+    )).resolves.toEqual(count);
     const key = `count-adjust-${run}-${seq}`;
     const command = {
       productId: product.id,
@@ -183,7 +227,40 @@ describe('Inventory count approval invariant', () => {
     expect(await prisma.auditEvent.findFirst({
       where: { type: 'stock.adjusted', refs: { hasEvery: [requested.approvalId, count.movementId, adjustment.id] } },
     })).toBeTruthy();
+    expect(await prisma.inventoryMovement.count({
+      where: { productId: product.id, type: 'count' },
+    })).toBe(1);
 
+  });
+
+  it('rejects a count-linked command when stock changed after the count but before request', async () => {
+    const product = await quantityProduct(5);
+    const count = await inventory.count(
+      { productId: product.id, location: 'BISHKEK-1', counted: 2 },
+      requester,
+      `count-before-request-race-${run}-${seq}`,
+    );
+    await prisma.inventoryBalance.update({
+      where: { productId_location: { productId: product.id, location: 'BISHKEK-1' } },
+      data: { onHand: 4 },
+    });
+
+    await expect(inventory.movement({
+      productId: product.id,
+      location: 'BISHKEK-1',
+      qty: 3,
+      type: 'adjust',
+      direction: 'decrease',
+      reason: 'stale count command',
+      countMovementId: count.movementId,
+    }, requester, `stale-count-adjust-${run}-${seq}`))
+      .rejects.toMatchObject({ code: 'inventory_count_balance_changed' });
+    expect(await prisma.approval.count({
+      where: {
+        action: 'stock_adjust',
+        evidence: { path: ['payload', 'countMovementId'], equals: count.movementId },
+      },
+    })).toBe(0);
   });
 
   it('fails closed when stock changes after the adjustment snapshot', async () => {
@@ -213,9 +290,11 @@ describe('Inventory count approval invariant', () => {
 
   it('allows at most one adjustment for one count observation across two approval keys', async () => {
     const product = await quantityProduct(5);
+    const observationKey = `count-claim-observation-${run}-${seq}`;
     const count = await inventory.count(
       { productId: product.id, location: 'BISHKEK-1', counted: 2 },
       requester,
+      observationKey,
     );
     const command = {
       productId: product.id,
@@ -250,7 +329,10 @@ describe('Inventory count approval invariant', () => {
     })).toBe(1);
     expect(await prisma.inventoryMovement.findUniqueOrThrow({
       where: { id: count.movementId },
-    })).toMatchObject({ idempotencyKey: expect.stringMatching(/^count-adjustment:/) });
+    })).toMatchObject({ idempotencyKey: observationKey });
+    expect(await prisma.approval.count({
+      where: { sourceRef: `inventory-count:${count.movementId}` },
+    })).toBe(1);
     expect(await prisma.inventoryBalance.findUniqueOrThrow({
       where: { productId_location: { productId: product.id, location: 'BISHKEK-1' } },
     })).toMatchObject({ onHand: 2, inventoryValue: 1600 });
@@ -289,20 +371,65 @@ describe('Inventory count approval invariant', () => {
     });
   });
 
+  it('binds approval idempotency to requester and canonical payload/evidence', async () => {
+    const key = `bound-approval-${run}-${seq}`;
+    const request = {
+      action: 'stock_adjust',
+      requester,
+      reason: 'bound command',
+      idempotencyKey: key,
+      payload: {
+        productId: `bound-product-${run}`,
+        location: 'BISHKEK-1',
+        qty: 1,
+        direction: 'decrease',
+        expectedOnHand: 5,
+      },
+      evidence: { inventoryCountMovementId: `bound-count-${run}` },
+    };
+    const first = await approvals.request(request);
+
+    await expect(approvals.request({
+      ...request,
+      payload: { ...request.payload },
+      evidence: { ...request.evidence },
+    })).resolves.toEqual(first);
+    await expect(approvals.request({
+      ...request,
+      requester: `${requester}-other`,
+    })).rejects.toMatchObject({ code: 'idempotency_key_reused' });
+    await expect(approvals.request({
+      ...request,
+      payload: { ...request.payload, qty: 2 },
+    })).rejects.toMatchObject({ code: 'idempotency_key_reused' });
+    await expect(approvals.request({
+      ...request,
+      payload: { ...request.payload, location: 'BISHKEK-2' },
+    })).rejects.toMatchObject({ code: 'idempotency_key_reused' });
+    await expect(approvals.request({
+      ...request,
+      evidence: { inventoryCountMovementId: `other-count-${run}` },
+    })).rejects.toMatchObject({ code: 'idempotency_key_reused' });
+  });
+
   it('keeps a zero discrepancy harmless and idempotent', async () => {
     const product = await quantityProduct(5);
 
+    const countKey = `zero-count-${run}-${seq}`;
     const first = await inventory.count(
       { productId: product.id, location: 'BISHKEK-1', counted: 5 },
       requester,
+      countKey,
     );
     const second = await inventory.count(
       { productId: product.id, location: 'BISHKEK-1', counted: 5 },
       requester,
+      countKey,
     );
 
     expect(first.diff).toBe(0);
     expect(second.diff).toBe(0);
+    expect(second.movementId).toBe(first.movementId);
     expect(await prisma.inventoryBalance.findUniqueOrThrow({
       where: { productId_location: { productId: product.id, location: 'BISHKEK-1' } },
     })).toMatchObject({ onHand: 5, inventoryValue: 4000 });

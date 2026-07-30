@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { postJson, prisma, resetDb, seedStaffCredentials } from './helpers';
+import { postJson, prisma, resetDb, seedStaffCredentials, selectOperationalPoint } from './helpers';
 
 test.afterEach(async () => resetDb());
 
@@ -24,6 +24,7 @@ test('owner schedules staff, approves absence and sees attendance in HR timeshee
   await page.getByRole('button', { name: 'Войти' }).click();
   await page.getByRole('button', { name: /HR · Смены/ }).click();
   await expect(page.getByTestId('hr-view')).toBeVisible();
+  await selectOperationalPoint(page, 'Точка HR');
   await page.getByLabel('Неделя HR').fill(weekStart);
   await page.getByLabel('Сотрудник HR').selectOption(seller.staffId);
   await page.getByLabel('Дата смены').fill(weekStart);
@@ -58,6 +59,7 @@ test('owner schedules staff, approves absence and sees attendance in HR timeshee
 
   await page.getByRole('button', { name: /Финансы/ }).click();
   await page.getByRole('button', { name: /HR · Смены/ }).click();
+  await selectOperationalPoint(page, 'Точка HR');
   await page.getByRole('tab', { name: 'Табель' }).click();
   await expect(page.getByTestId(`timesheet-${seller.staffId}`)).toContainText('12м');
   await expect(page.getByTestId(`timesheet-${seller.staffId}`)).toContainText('+25м');
@@ -79,6 +81,7 @@ test('owner reconciles and transfers an open cash shift to another active employ
   await page.getByPlaceholder('password').fill(owner.password);
   await page.getByRole('button', { name: 'Войти' }).click();
   await page.getByRole('button', { name: /HR · Смены/ }).click();
+  await selectOperationalPoint(page, 'Точка HR');
   await page.getByRole('tab', { name: 'Передача смены' }).click();
   await expect(page.getByRole('button', { name: new RegExp(seller.username) })).toContainText('6 000');
   await page.getByLabel('Получатель смены').selectOption(cashier.staffId);
@@ -119,6 +122,7 @@ test('owner previews, posts and pays a period payroll from attendance and sales'
   await page.getByPlaceholder('password').fill(owner.password);
   await page.getByRole('button', { name: 'Войти' }).click();
   await page.getByRole('button', { name: /HR · Смены/ }).click();
+  await selectOperationalPoint(page, 'Точка HR');
   await page.getByRole('tab', { name: 'Начисления' }).click();
   await page.getByLabel('Период начисления').fill(period);
   await expect(page.getByTestId(`payroll-${seller.staffId}`)).toContainText('100 000 с');

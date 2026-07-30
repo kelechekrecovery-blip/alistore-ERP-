@@ -20,6 +20,7 @@ import { LogNotificationTransport } from '../src/outbox/transports/log.transport
 import { SandboxPaymentGatewayProvider } from '../src/payments/sandbox-payment-gateway.provider';
 import { EventType } from '../src/audit/event-types';
 import type { PaymentGatewayProvider } from '../src/payments/payment-gateway-provider';
+import { MAX_REFUND_ATTEMPTS } from '../src/refunds/refunds.constants';
 
 /**
  * NOTIF-003 notification coverage: every meaningful operational event enqueues a
@@ -371,8 +372,17 @@ describe('Notification coverage NOTIF-003 (integration)', () => {
     };
     const failingProcessor = new RefundProcessor(prisma, new AuditService(prisma), failingGateway, outbox);
 
-    await expect(failingProcessor.processRefund(requested!.id, 'system:notif-fail'))
-      .rejects.toThrow('provider permanent rejection');
+    for (let attempt = 1; attempt <= MAX_REFUND_ATTEMPTS; attempt += 1) {
+      await expect(failingProcessor.processRefund(requested!.id, 'system:notif-fail'))
+        .rejects.toThrow('provider permanent rejection');
+      if (attempt < MAX_REFUND_ATTEMPTS) {
+        await prisma.refundAllocation.updateMany({
+          where: { refundId: requested!.id },
+          data: { nextAttemptAt: new Date(0) },
+        });
+        expect(await outboxFor('refund_failed')).toHaveLength(0);
+      }
+    }
     expect((await refunds.get(requested!.id))?.status).toBe('failed');
 
     const message = await expectCustomerNotice('refund_failed', f.buyer.id, f.buyer.phone);

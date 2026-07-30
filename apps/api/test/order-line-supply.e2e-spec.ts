@@ -381,6 +381,6 @@ describe('Order-line supply (slice 3)', () => {
     await prisma.order.update({ where: { id: order.id }, data: { status: 'out_for_delivery', courierId: staff.id } });
 
     await expect(courier.completeDelivery(order.id, { codAmount: product.price }, staff.id, `s3-cod-${seq}`))
-      .rejects.toMatchObject({ code: 'to_order_not_reservable' });
+      .rejects.toMatchObject({ code: 'order_reservation_incomplete' });
   });
 });

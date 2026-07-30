@@ -36,6 +36,13 @@ test('POS finds an existing customer and binds the completed sale to that custom
     staffId: staff.staffId,
     username: staff.username,
     role: 'cashier',
+    point: 'BISHKEK-1',
+    storePoint: {
+      id: 'alistore-bishkek-1',
+      code: 'center',
+      name: 'AliStore Центр',
+      inventoryLocation: 'BISHKEK-1',
+    },
     totpEnabled: false,
   });
   await page.goto('/pos');

@@ -126,7 +126,11 @@ test('desktop catalog, product and cart keep the exact shop visual system', asyn
 });
 
 test('remaining desktop customer routes use the shop system through account entry', async ({ page }) => {
-  test.setTimeout(120_000);
+  // This journey intentionally cold-compiles every remaining customer route.
+  // On a single-worker full run that can exceed two minutes before the final
+  // mobile assertion even starts, while each individual navigation remains
+  // healthy and bounded by its own expectation timeout.
+  test.setTimeout(240_000);
   await resetDb();
   await page.setViewportSize({ width: 1440, height: 1000 });
 

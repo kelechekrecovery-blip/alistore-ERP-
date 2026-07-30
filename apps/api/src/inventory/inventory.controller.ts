@@ -163,8 +163,12 @@ export class InventoryController {
   @ApiUnprocessableEntityResponse({ description: 'Unknown product.' })
   @Post('count')
   @RequirePermission('inventory', 'count')
-  async count(@CurrentUser() user: AuthPrincipal, @Body() dto: CountDto) {
-    return this.inventory.count(dto, await requireActiveStaff(user, this.staffAuth));
+  async count(
+    @CurrentUser() user: AuthPrincipal,
+    @Body() dto: CountDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+  ) {
+    return this.inventory.count(dto, await requireActiveStaff(user, this.staffAuth), idempotencyKey);
   }
 
   @ApiOperation({ summary: 'Reconcile owned inventory valuation layers with GL account 1200' })

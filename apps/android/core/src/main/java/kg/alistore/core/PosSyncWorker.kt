@@ -29,7 +29,7 @@ class PosSyncWorker(appContext: Context, params: WorkerParameters) : CoroutineWo
         }
         val response = client.sendResponse(mutation, session.accessToken)
         when (val decision = posReplayDecision(response)) {
-          PosReplayDecision.Sent -> queue.markClaimSent(mutation)
+          PosReplayDecision.Sent -> queue.markContinuationSent(mutation)
           is PosReplayDecision.Conflict -> queue.markClaimState(mutation, "conflict", decision.message)
           is PosReplayDecision.Failed -> queue.markClaimState(mutation, "failed", decision.message)
           PosReplayDecision.Retry -> {
@@ -84,3 +84,6 @@ internal fun approvalIdFromQueueError(error: String?): String? = error
 
 internal fun attachPosApproval(body: String, approvalId: String): String =
   org.json.JSONObject(body).put("approvalId", approvalId).toString()
+
+internal fun posApprovalContinuationKey(originalKey: String, approvalId: String): String =
+  "pos-approval:${payloadFingerprint("CONTINUE", "pos/sale", approvalId, originalKey).take(48)}"

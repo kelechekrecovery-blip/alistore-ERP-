@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { prisma, resetDb, seedStaffCredentials } from './helpers';
+import { prisma, resetDb, seedStaffCredentials, selectOperationalPoint } from './helpers';
 
 test.afterEach(async () => {
   await resetDb();
@@ -50,6 +50,7 @@ test('owner receives consignment stock and reconciles a completed owner payout',
   }, session);
   await page.goto('/warehouse', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Комиссионный товар' })).toBeVisible();
+  await selectOperationalPoint(page, 'Склад комиссионного товара');
 
   await page.getByLabel('Комиссионный товар').selectOption(product.id);
   await page.getByLabel('IMEI комиссионного товара').fill('E2E-CONSIGN-RECEIVED');

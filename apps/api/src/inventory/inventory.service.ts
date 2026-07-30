@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PaymentMethod, Prisma } from '@prisma/client';
+import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -25,12 +26,119 @@ import { recordCashDrawerMovementOnTx } from '../shifts/cash-drawer';
 import { adjustQuantityValuationOnTx, transferQuantityValuationOnTx } from './inventory-valuation';
 import { inventoryValuationRollForward } from './inventory-roll-forward';
 import { resolveActiveStorePoint, storePointIdentityWhere } from '../common/store-point-identity';
+import { isUniqueConstraintViolation } from '../common/prisma-errors';
 
 /** write_off/adjust map to their Approval Rules Matrix action names. */
 const ACTION_BY_TYPE: Record<MovementDto['type'], string> = {
   write_off: 'write_off',
   adjust: 'stock_adjust',
 };
+
+interface InventoryCountSnapshot {
+  version: 1;
+  actor: string;
+  productId: string;
+  location: string;
+  expected: number;
+  counted: number;
+  diff: number;
+  fingerprint: string;
+}
+
+const COUNT_SNAPSHOT_PREFIX = 'inventory-count-snapshot:';
+
+function countFingerprint(
+  input: Pick<
+    InventoryCountSnapshot,
+    'actor' | 'productId' | 'location' | 'expected' | 'counted' | 'diff'
+  >,
+) {
+  return createHash('sha256')
+    .update(JSON.stringify({
+      actor: input.actor,
+      productId: input.productId,
+      location: input.location,
+      expected: input.expected,
+      counted: input.counted,
+      diff: input.diff,
+    }))
+    .digest('hex');
+}
+
+function parseCountSnapshot(reason: string | null): InventoryCountSnapshot | null {
+  if (!reason?.startsWith(COUNT_SNAPSHOT_PREFIX)) return null;
+  try {
+    const parsed = JSON.parse(reason.slice(COUNT_SNAPSHOT_PREFIX.length)) as InventoryCountSnapshot;
+    if (
+      parsed.version !== 1
+      || !parsed.actor
+      || !parsed.productId
+      || !parsed.location
+      || !Number.isSafeInteger(parsed.expected)
+      || !Number.isSafeInteger(parsed.counted)
+      || parsed.diff !== parsed.counted - parsed.expected
+      || parsed.fingerprint !== countFingerprint(parsed)
+    ) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function replayCountMovement(
+  movement: {
+    id: string;
+    idempotencyKey: string | null;
+    productId: string;
+    qty: number;
+    type: string;
+    from: string | null;
+    reason: string | null;
+  },
+  command: Pick<InventoryCountSnapshot, 'actor' | 'productId' | 'location' | 'counted'>,
+) {
+  const snapshot = parseCountSnapshot(movement.reason);
+  if (
+    movement.type !== 'count'
+    || !snapshot
+    || snapshot.actor !== command.actor
+    || snapshot.productId !== command.productId
+    || snapshot.location !== command.location
+    || snapshot.counted !== command.counted
+    || movement.productId !== snapshot.productId
+    || movement.from !== snapshot.location
+    || movement.qty !== snapshot.diff
+  ) {
+    throw new ConflictError(
+      'idempotency_key_reused',
+      'Этот Idempotency-Key уже занят другим пересчётом или сотрудником',
+    );
+  }
+  return {
+    productId: snapshot.productId,
+    location: snapshot.location,
+    expected: snapshot.expected,
+    counted: snapshot.counted,
+    diff: snapshot.diff,
+    movementId: movement.id,
+    fingerprint: snapshot.fingerprint,
+  };
+}
+
+function isDatabaseLockTimeout(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as {
+    code?: unknown;
+    message?: unknown;
+    meta?: { code?: unknown; message?: unknown };
+  };
+  return candidate.code === 'P2028'
+    || candidate.code === '55P03'
+    || (candidate.code === 'P2010' && candidate.meta?.code === '55P03')
+    || String(candidate.message ?? candidate.meta?.message ?? '').includes('lock timeout');
+}
 
 type QuarantineDispositionResult =
   | { approvalId: string; status: 'requested' }
@@ -598,21 +706,43 @@ export class InventoryService {
       select: { onHand: true },
     });
     const countMovementId = dto.countMovementId?.trim() || undefined;
+    let expectedOnHand = balance?.onHand ?? 0;
     if (countMovementId) {
-      const count = await this.prisma.inventoryMovement.findUnique({ where: { id: countMovementId } });
+      const [count, applied] = await Promise.all([
+        this.prisma.inventoryMovement.findUnique({ where: { id: countMovementId } }),
+        this.prisma.approval.findUnique({ where: { sourceRef: `inventory-count:${countMovementId}` } }),
+      ]);
       const signedQty = direction === 'decrease' ? -dto.qty : dto.qty;
+      const snapshot = parseCountSnapshot(count?.reason ?? null);
       if (
         !count
+        || !snapshot
         || count.type !== 'count'
         || count.productId !== dto.productId
         || count.from !== location
         || count.qty !== signedQty
+        || snapshot.productId !== dto.productId
+        || snapshot.location !== location
+        || snapshot.diff !== signedQty
       ) {
         throw new ConflictError(
           'inventory_count_snapshot_mismatch',
           'Корректировка не соответствует зафиксированному пересчёту',
         );
       }
+      if (applied) {
+        throw new ConflictError(
+          'inventory_count_already_applied',
+          'Этот пересчёт уже использован для корректировки',
+        );
+      }
+      if ((balance?.onHand ?? 0) !== snapshot.expected) {
+        throw new ConflictError(
+          'inventory_count_balance_changed',
+          'Остаток изменился после пересчёта; выполните новый пересчёт',
+        );
+      }
+      expectedOnHand = snapshot.expected;
     }
     return this.approvals.request({
       action: ACTION_BY_TYPE[dto.type],
@@ -626,7 +756,7 @@ export class InventoryService {
         direction,
         reason: dto.reason,
         unitCost: direction === 'increase' ? product.cost : undefined,
-        expectedOnHand: balance?.onHand ?? 0,
+        expectedOnHand,
         countMovementId,
       },
       evidence: countMovementId ? { inventoryCountMovementId: countMovementId } : undefined,
@@ -1197,42 +1327,122 @@ export class InventoryService {
    * units on record (inventory.counted). A non-zero diff is recorded for follow-up;
    * the actual correction is a separate approval-gated stock adjustment.
    */
-  async count(dto: CountDto, actor: string) {
-    const location = await this.mutationLocation(actor, dto.location);
-    const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
-    if (!product) {
-      throw new ValidationError('product_not_found', `Товар ${dto.productId} не найден`);
+  async count(dto: CountDto, actor: string, idempotencyKey?: string) {
+    const key = idempotencyKey?.trim();
+    if (!key) {
+      throw new ValidationError(
+        'idempotency_key_required',
+        'Для инвентаризации требуется Idempotency-Key',
+      );
     }
-    const expected = product.trackingMode === 'quantity'
-      ? (await this.prisma.inventoryBalance.findUnique({
-          where: { productId_location: { productId: dto.productId, location } },
-        }))?.onHand ?? 0
-      : await this.prisma.deviceUnit.count({
-          where: { productId: dto.productId, location, status: 'in_stock' },
-        });
-    const diff = dto.counted - expected;
-    return this.audit.transaction(async (tx) => {
-      const movement = await tx.inventoryMovement.create({
-        data: {
-          productId: dto.productId,
-          qty: diff,
-          type: 'count',
-          from: location,
-          reason: `counted ${dto.counted} vs expected ${expected}`,
-        },
-      });
-      return {
-        result: { productId: dto.productId, location, expected, counted: dto.counted, diff, movementId: movement.id },
-        events: [
-          {
-            type: EventType.InventoryCounted,
-            actor,
-            payload: { productId: dto.productId, location, expected, counted: dto.counted, diff },
-            refs: [dto.productId, movement.id],
-          },
-        ],
-      };
+    if (key.length > 128) {
+      throw new ValidationError(
+        'idempotency_key_invalid',
+        'Idempotency-Key не должен превышать 128 символов',
+      );
+    }
+    const location = await this.mutationLocation(actor, dto.location);
+    const command = { actor, productId: dto.productId, location, counted: dto.counted };
+    const replay = await this.prisma.inventoryMovement.findUnique({
+      where: { idempotencyKey: key },
     });
+    if (replay) return replayCountMovement(replay, command);
+    try {
+      return await this.audit.transaction(async (tx) => {
+        await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '3000ms'");
+        await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${dto.productId} FOR SHARE`;
+        const product = await tx.product.findUnique({ where: { id: dto.productId } });
+        if (!product) {
+          throw new ValidationError('product_not_found', `Товар ${dto.productId} не найден`);
+        }
+        if (product.trackingMode === 'quantity') {
+          // A row lock cannot protect the zero-balance case because no row exists yet.
+          // The short-lived SHARE lock serializes the snapshot against every
+          // InventoryBalance insert/update/delete, including creation of that row.
+          await tx.$executeRawUnsafe('LOCK TABLE "InventoryBalance" IN SHARE MODE');
+        } else {
+          // Device units are separate rows and can be inserted or change status while
+          // a count is running. Lock the table for the duration of this short
+          // transaction so the immutable expected count is valid at commit.
+          await tx.$executeRawUnsafe('LOCK TABLE "DeviceUnit" IN SHARE MODE');
+        }
+        const lockedReplay = await tx.inventoryMovement.findUnique({
+          where: { idempotencyKey: key },
+        });
+        if (lockedReplay) {
+          return { result: replayCountMovement(lockedReplay, command), events: [] };
+        }
+        const expected = product.trackingMode === 'quantity'
+          ? (await tx.inventoryBalance.findUnique({
+              where: { productId_location: { productId: dto.productId, location } },
+            }))?.onHand ?? 0
+          : await tx.deviceUnit.count({
+              where: { productId: dto.productId, location, status: 'in_stock' },
+            });
+        const diff = dto.counted - expected;
+        const snapshotBase = {
+          version: 1 as const,
+          ...command,
+          expected,
+          diff,
+        };
+        const snapshot: InventoryCountSnapshot = {
+          ...snapshotBase,
+          fingerprint: countFingerprint(snapshotBase),
+        };
+        const movement = await tx.inventoryMovement.create({
+          data: {
+            idempotencyKey: key,
+            productId: dto.productId,
+            qty: diff,
+            type: 'count',
+            from: location,
+            reason: `${COUNT_SNAPSHOT_PREFIX}${JSON.stringify(snapshot)}`,
+          },
+        });
+        return {
+          result: {
+            productId: dto.productId,
+            location,
+            expected,
+            counted: dto.counted,
+            diff,
+            movementId: movement.id,
+            fingerprint: snapshot.fingerprint,
+          },
+          events: [
+            {
+              type: EventType.InventoryCounted,
+              actor,
+              payload: {
+                productId: dto.productId,
+                location,
+                expected,
+                counted: dto.counted,
+                diff,
+                fingerprint: snapshot.fingerprint,
+                idempotencyKey: key,
+              },
+              refs: [dto.productId, movement.id],
+            },
+          ],
+        };
+      }, { timeout: 10_000, maxWait: 5_000 });
+    } catch (error) {
+      if (isDatabaseLockTimeout(error)) {
+        throw new ConflictError(
+          'inventory_count_busy',
+          'Остаток сейчас изменяется; повторите пересчёт с тем же Idempotency-Key',
+        );
+      }
+      if (isUniqueConstraintViolation(error)) {
+        const racedReplay = await this.prisma.inventoryMovement.findUnique({
+          where: { idempotencyKey: key },
+        });
+        if (racedReplay) return replayCountMovement(racedReplay, command);
+      }
+      throw error;
+    }
   }
 
   /** Move an in_stock unit to another branch/location (stock.moved). */

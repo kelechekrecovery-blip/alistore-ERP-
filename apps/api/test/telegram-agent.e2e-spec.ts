@@ -320,6 +320,10 @@ describe('Telegram AI Agent (integration)', () => {
         recipient: identity.chatId,
         template: 'telegram_agent_reply',
         payload: { message: 'one delivery' },
+        // The full suite intentionally leaves unrelated pending notifications
+        // behind. Make this concurrency probe the first relay candidate instead
+        // of assuming it happens to fall within the default oldest-50 window.
+        createdAt: new Date(0),
       },
     });
 
@@ -362,7 +366,7 @@ describe('Telegram AI Agent (integration)', () => {
     expect(await prisma.outboxMessage.findUniqueOrThrow({
       where: { id: outboxId },
     })).toMatchObject({ status: 'sent' });
-  });
+  }, 90_000);
 });
 
 function update(updateId: number, telegramUserId: string, text: string) {

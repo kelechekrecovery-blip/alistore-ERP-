@@ -46,6 +46,7 @@ class OfflineQueueDb(
       CREATE TABLE pending_mutation (
         id TEXT PRIMARY KEY,
         owner_id TEXT,
+        parent_mutation_id TEXT,
         endpoint TEXT NOT NULL,
         method TEXT NOT NULL,
         body TEXT NOT NULL,
@@ -61,6 +62,7 @@ class OfflineQueueDb(
     """.trimIndent())
     db.execSQL("CREATE INDEX pending_mutation_owner_state ON pending_mutation(owner_id, state, created_at)")
     installImmutableIdentityTriggers(db)
+    installImmutableParentTrigger(db)
   }
 
   override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -71,6 +73,10 @@ class OfflineQueueDb(
       db.execSQL("UPDATE pending_mutation SET updated_at = created_at WHERE updated_at = 0")
     }
     if (oldVersion < 3) migrateToOwnerBoundQueue(db)
+    if (oldVersion < 4) {
+      db.execSQL("ALTER TABLE pending_mutation ADD COLUMN parent_mutation_id TEXT")
+      installImmutableParentTrigger(db)
+    }
   }
 
   override fun enqueue(endpoint: String, method: String, body: String, idempotencyKey: String): String {
@@ -79,6 +85,7 @@ class OfflineQueueDb(
     writableDatabase.insertOrThrow("pending_mutation", null, ContentValues().apply {
       put("id", id)
       put("owner_id", owner.storageKey)
+      putNull("parent_mutation_id")
       put("endpoint", endpoint)
       put("method", method)
       put("body", body)
@@ -110,6 +117,7 @@ class OfflineQueueDb(
           add(PendingMutation(
             id = it.getString(it.getColumnIndexOrThrow("id")),
             ownerId = it.getString(it.getColumnIndexOrThrow("owner_id")),
+            parentMutationId = it.getString(it.getColumnIndexOrThrow("parent_mutation_id")),
             endpoint = it.getString(it.getColumnIndexOrThrow("endpoint")),
             method = it.getString(it.getColumnIndexOrThrow("method")),
             body = it.getString(it.getColumnIndexOrThrow("body")),
@@ -134,6 +142,30 @@ class OfflineQueueDb(
     "id = ? AND owner_id = ? AND state = 'syncing' AND attempts = ?",
     arrayOf(mutation.id, owner.storageKey, mutation.attempts.toString()),
   )
+
+  fun markContinuationSent(mutation: PendingMutation): Int {
+    val parentId = mutation.parentMutationId ?: return markClaimSent(mutation)
+    val db = writableDatabase
+    db.beginTransaction()
+    try {
+      val parentUpdated = db.update("pending_mutation", ContentValues().apply {
+        put("state", "continued")
+        put("last_error", "approval_continuation_sent:${mutation.id}")
+        put("updated_at", System.currentTimeMillis())
+      }, "id = ? AND owner_id = ? AND state = 'conflict'", arrayOf(parentId, owner.storageKey))
+      if (parentUpdated != 1) return 0
+      val continuationDeleted = db.delete(
+        "pending_mutation",
+        "id = ? AND owner_id = ? AND state = 'syncing' AND attempts = ? AND parent_mutation_id = ?",
+        arrayOf(mutation.id, owner.storageKey, mutation.attempts.toString(), parentId),
+      )
+      if (continuationDeleted != 1) return 0
+      db.setTransactionSuccessful()
+      return 1
+    } finally {
+      db.endTransaction()
+    }
+  }
 
   fun markClaimState(mutation: PendingMutation, state: String, error: String? = null): Int =
     writableDatabase.update("pending_mutation", ContentValues().apply {
@@ -189,42 +221,97 @@ class OfflineQueueDb(
     arrayOf<Any>(System.currentTimeMillis(), owner.storageKey, staleBefore),
   )
 
-  fun replaceBodyAndRetry(id: String, body: String): Int {
+  fun enqueueContinuation(originalId: String, body: String, idempotencyKey: String): String {
+    require(idempotencyKey.isNotBlank()) { "Continuation idempotency key is required" }
     val db = writableDatabase
     db.beginTransaction()
     try {
-      val row = db.rawQuery(
+      val original = db.rawQuery(
         """
-        SELECT endpoint, method, idempotency_key, attempts, created_at
+        SELECT endpoint, method, body, payload_fingerprint, idempotency_key, state, parent_mutation_id
         FROM pending_mutation
         WHERE id = ? AND owner_id = ?
         """.trimIndent(),
-        arrayOf(id, owner.storageKey),
+        arrayOf(originalId, owner.storageKey),
       ).use {
-        if (!it.moveToFirst()) return 0
-        arrayOf(it.getString(0), it.getString(1), it.getString(2), it.getInt(3), it.getLong(4))
-      }
-      if (db.delete("pending_mutation", "id = ? AND owner_id = ?", arrayOf(id, owner.storageKey)) != 1) return 0
-      val now = System.currentTimeMillis()
-      db.insertOrThrow("pending_mutation", null, ContentValues().apply {
-        put("id", UUID.randomUUID().toString())
-        put("owner_id", owner.storageKey)
-        put("endpoint", row[0] as String)
-        put("method", row[1] as String)
-        put("body", body)
-        put(
-          "payload_fingerprint",
-          payloadFingerprint(row[1] as String, row[0] as String, body, row[2] as String),
+        require(it.moveToFirst()) { "Original offline command not found" }
+        ContinuationSource(
+          endpoint = it.getString(0),
+          method = it.getString(1),
+          body = it.getString(2),
+          payloadFingerprint = it.getString(3),
+          idempotencyKey = it.getString(4),
+          state = it.getString(5),
+          parentMutationId = it.getString(6),
         )
-        put("idempotency_key", row[2] as String)
-        put("attempts", row[3] as Int)
+      }
+      require(original.state == "conflict") { "Only conflicted commands can continue" }
+      require(original.parentMutationId == null) {
+        "Approval continuation cannot create another continuation"
+      }
+      require(original.idempotencyKey != idempotencyKey) { "Continuation must use a distinct idempotency key" }
+      require(
+        original.payloadFingerprint == payloadFingerprint(
+          original.method,
+          original.endpoint,
+          original.body,
+          original.idempotencyKey,
+        ),
+      ) { "Original offline command fingerprint mismatch" }
+      val continuationFingerprint =
+        payloadFingerprint(original.method, original.endpoint, body, idempotencyKey)
+      val existing = db.rawQuery(
+        """
+        SELECT id, parent_mutation_id, payload_fingerprint, state
+        FROM pending_mutation
+        WHERE owner_id = ? AND idempotency_key = ?
+        """.trimIndent(),
+        arrayOf(owner.storageKey, idempotencyKey),
+      ).use {
+        if (!it.moveToFirst()) null else ContinuationRow(
+          id = it.getString(0),
+          parentMutationId = it.getString(1),
+          payloadFingerprint = it.getString(2),
+          state = it.getString(3),
+        )
+      }
+      if (existing != null) {
+        require(
+          existing.parentMutationId == originalId &&
+            existing.payloadFingerprint == continuationFingerprint &&
+            existing.state != "quarantined",
+        ) {
+          "Continuation idempotency key collision"
+        }
+        if (existing.state == "failed" || existing.state == "conflict") {
+          db.update("pending_mutation", ContentValues().apply {
+            put("state", "queued")
+            putNull("last_error")
+            put("updated_at", System.currentTimeMillis())
+          }, "id = ? AND owner_id = ? AND state = ?", arrayOf(existing.id, owner.storageKey, existing.state))
+        }
+        db.setTransactionSuccessful()
+        return existing.id
+      }
+      val now = System.currentTimeMillis()
+      val continuationId = UUID.randomUUID().toString()
+      db.insertOrThrow("pending_mutation", null, ContentValues().apply {
+        put("id", continuationId)
+        put("owner_id", owner.storageKey)
+        put("parent_mutation_id", originalId)
+        put("endpoint", original.endpoint)
+        put("method", original.method)
+        put("body", body)
+        put("payload_fingerprint", continuationFingerprint)
+        put("idempotency_key", idempotencyKey)
+        put("attempts", 0)
         put("state", "queued")
         putNull("last_error")
-        put("created_at", row[4] as Long)
+        put("created_at", now)
         put("updated_at", now)
       })
       db.setTransactionSuccessful()
-      return 1
+      return continuationId
     } finally {
       db.endTransaction()
     }
@@ -313,6 +400,18 @@ class OfflineQueueDb(
     )
   }
 
+  private fun installImmutableParentTrigger(db: SQLiteDatabase) {
+    db.execSQL(
+      """
+      CREATE TRIGGER pending_mutation_parent_immutable
+      BEFORE UPDATE OF parent_mutation_id ON pending_mutation
+      BEGIN
+        SELECT RAISE(ABORT, 'offline command parent is immutable');
+      END
+      """.trimIndent(),
+    )
+  }
+
   private fun readMutation(db: SQLiteDatabase, id: String): PendingMutation? = db.query(
     "pending_mutation",
     null,
@@ -327,6 +426,7 @@ class OfflineQueueDb(
     PendingMutation(
       id = it.getString(it.getColumnIndexOrThrow("id")),
       ownerId = it.getString(it.getColumnIndexOrThrow("owner_id")),
+      parentMutationId = it.getString(it.getColumnIndexOrThrow("parent_mutation_id")),
       endpoint = it.getString(it.getColumnIndexOrThrow("endpoint")),
       method = it.getString(it.getColumnIndexOrThrow("method")),
       body = it.getString(it.getColumnIndexOrThrow("body")),
@@ -341,9 +441,26 @@ class OfflineQueueDb(
   }
 
   private companion object {
-    const val DATABASE_VERSION = 3
+    const val DATABASE_VERSION = 4
   }
 }
+
+private data class ContinuationSource(
+  val endpoint: String,
+  val method: String,
+  val body: String,
+  val payloadFingerprint: String,
+  val idempotencyKey: String,
+  val state: String,
+  val parentMutationId: String?,
+)
+
+private data class ContinuationRow(
+  val id: String,
+  val parentMutationId: String?,
+  val payloadFingerprint: String,
+  val state: String,
+)
 
 private fun SQLiteDatabase.execSQLUpdate(sql: String, bindArgs: Array<out Any>): Int {
   compileStatement(sql).use { statement ->

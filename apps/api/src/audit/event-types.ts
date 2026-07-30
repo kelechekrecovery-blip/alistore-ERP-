@@ -30,6 +30,7 @@ export const EventType = {
   PaymentParked: 'payment.parked',
   PaymentRefunded: 'payment.refunded',
   PaymentReconciled: 'payment.reconciled',
+  OrderReceivableAllocated: 'order_receivable.allocated',
   CampaignRefundAdjusted: 'campaign.refund_adjusted',
   // stock
   StockReceived: 'stock.received',

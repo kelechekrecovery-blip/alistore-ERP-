@@ -25,6 +25,7 @@ final class StaffInventoryCountTests: XCTestCase {
         let request = InventoryMockURLProtocol.request(for: "/api/inventory/count")
         XCTAssertEqual(request?.httpMethod, "POST")
         XCTAssertEqual(request?.value(forHTTPHeaderField: "Authorization"), "Bearer staff-token")
+        XCTAssertFalse(request?.value(forHTTPHeaderField: "Idempotency-Key")?.isEmpty ?? true)
         let body = InventoryMockURLProtocol.jsonBody(for: "/api/inventory/count")
         XCTAssertEqual(body?["productId"] as? String, "p-1")
         XCTAssertEqual(body?["location"] as? String, "BISHKEK-1")
@@ -47,6 +48,27 @@ final class StaffInventoryCountTests: XCTestCase {
 
         XCTAssertNil(result)
         XCTAssertNotNil(store.errorMessage)
+    }
+
+    func testCountReusesKeyForRetryAndRotatesItWhenPayloadChanges() async {
+        InventoryMockURLProtocol.stub(path: "/api/inventory/count", status: 503, body: """
+        {"message":"Временно недоступно"}
+        """)
+        let store = makeStore(token: "staff-token")
+
+        await store.count(productId: "p-1", location: "BISHKEK-1", counted: 5)
+        let first = InventoryMockURLProtocol.request(for: "/api/inventory/count")?
+            .value(forHTTPHeaderField: "Idempotency-Key")
+
+        await store.count(productId: "p-1", location: "BISHKEK-1", counted: 5)
+        let retry = InventoryMockURLProtocol.request(for: "/api/inventory/count")?
+            .value(forHTTPHeaderField: "Idempotency-Key")
+        XCTAssertEqual(retry, first)
+
+        await store.count(productId: "p-1", location: "BISHKEK-1", counted: 6)
+        let changed = InventoryMockURLProtocol.request(for: "/api/inventory/count")?
+            .value(forHTTPHeaderField: "Idempotency-Key")
+        XCTAssertNotEqual(changed, first)
     }
 
     func testWriteOffPostsQuantityLocationReasonAndSurfacesApproval() async {

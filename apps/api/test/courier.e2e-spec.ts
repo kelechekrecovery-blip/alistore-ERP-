@@ -762,13 +762,16 @@ describe('Courier COD handover (integration)', () => {
       },
       include: { items: true },
     });
-    const schedule = await prisma.orderReceivable.create({
+    const stockSchedule = await prisma.orderReceivable.create({
       data: {
         orderId: order.id,
         orderItemId: order.items[0].id,
         kind: 'stock_sale',
-        amount: order.total,
+        amount: 600,
       },
+    });
+    const deliverySchedule = await prisma.orderReceivable.create({
+      data: { orderId: order.id, kind: 'delivery', amount: 900 },
     });
     const run = await courier.createRun(
       { courierId: staff.id, codTotal: order.total, orderIds: [order.id] },
@@ -779,21 +782,27 @@ describe('Courier COD handover (integration)', () => {
 
     await expect(courier.completeDelivery(
       order.id,
-      { codAmount: 500 },
+      { codAmount: 800 },
       staff.id,
       `deliver-cod-partial-missing-reason-${seq}`,
     )).rejects.toMatchObject({ code: 'delivery_partial_cod_reason_required' });
 
     const delivered = await courier.completeDelivery(
       order.id,
-      { codAmount: 500, reason: 'Клиент внёс часть суммы, остаток подтверждён' },
+      { codAmount: 800, reason: 'Клиент внёс часть суммы, остаток подтверждён' },
+      staff.id,
+      `deliver-cod-partial-${seq}`,
+    );
+    await courier.completeDelivery(
+      order.id,
+      { codAmount: 800, reason: 'Клиент внёс часть суммы, остаток подтверждён' },
       staff.id,
       `deliver-cod-partial-${seq}`,
     );
     expect(delivered).toMatchObject({ status: 'delivered' });
     expect(await prisma.courierRun.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({
       codTotal: 1500,
-      collectedTotal: 500,
+      collectedTotal: 800,
     });
     const receivable = await prisma.accountingJournalEntry.findUniqueOrThrow({
       where: { sourceType_sourceRef: { sourceType: 'cod.receivable', sourceRef: order.id } },
@@ -804,19 +813,63 @@ describe('Courier COD handover (integration)', () => {
       expect.objectContaining({ accountCode: '1100', debit: 1500 }),
     ]));
     const event = await prisma.auditEvent.findFirstOrThrow({ where: { type: 'delivery.delivered', refs: { has: order.id } } });
-    expect(event.payload).toMatchObject({ codAmount: 500, expectedCod: 1500, remainingReceivable: 1000 });
-    expect(await prisma.orderReceivable.findUniqueOrThrow({ where: { id: schedule.id } }))
-      .toMatchObject({ status: 'partially_settled', settledAmount: 500 });
+    expect(event.payload).toMatchObject({ codAmount: 800, expectedCod: 1500, remainingReceivable: 700 });
+    expect(await prisma.orderReceivable.findUniqueOrThrow({ where: { id: stockSchedule.id } }))
+      .toMatchObject({ status: 'settled', settledAmount: 600 });
+    expect(await prisma.orderReceivable.findUniqueOrThrow({ where: { id: deliverySchedule.id } }))
+      .toMatchObject({ status: 'partially_settled', settledAmount: 200 });
+    const allocationEvents = await prisma.auditEvent.findMany({
+      where: { type: 'order_receivable.allocated', refs: { has: run.id } },
+      orderBy: { ts: 'asc' },
+    });
+    expect(allocationEvents).toHaveLength(2);
+    expect(allocationEvents.map((allocation) => allocation.payload)).toEqual([
+      expect.objectContaining({
+        sourceType: 'courier_cod',
+        sourceRef: `${run.id}:deliver-cod-partial-${seq}:0`,
+        courierCommandKey: `deliver-cod-partial-${seq}`,
+        runId: run.id,
+        receivableId: stockSchedule.id,
+        kind: 'stock_sale',
+        allocatedAmount: 600,
+        beforeSettledAmount: 0,
+        afterSettledAmount: 600,
+        ordinal: 0,
+      }),
+      expect.objectContaining({
+        sourceType: 'courier_cod',
+        sourceRef: `${run.id}:deliver-cod-partial-${seq}:1`,
+        courierCommandKey: `deliver-cod-partial-${seq}`,
+        runId: run.id,
+        receivableId: deliverySchedule.id,
+        kind: 'delivery',
+        allocatedAmount: 200,
+        beforeSettledAmount: 0,
+        afterSettledAmount: 200,
+        ordinal: 1,
+      }),
+    ]);
+    expect(allocationEvents.flatMap((allocation) => allocation.refs)).toEqual(expect.arrayContaining([
+      order.id,
+      run.id,
+      `deliver-cod-partial-${seq}`,
+      stockSchedule.id,
+      deliverySchedule.id,
+    ]));
+    expect(allocationEvents.reduce(
+      (sum, allocation) => sum + Number((allocation.payload as { allocatedAmount: number }).allocatedAmount),
+      0,
+    )).toBe((await prisma.courierRun.findUniqueOrThrow({ where: { id: run.id } })).collectedTotal);
 
     await courier.handover(
-      { runId: run.id, amount: 500, reason: 'Остаток остаётся за клиентом' },
+      { runId: run.id, amount: 800, reason: 'Остаток остаётся за клиентом' },
       'cashier',
       undefined,
       `handover-cod-partial-${seq}`,
     );
     const remaining = await payments.settleReceivable(
-      schedule.id,
-      { method: 'card', amount: 1000, txnId: `post-handover-ar-${seq}` },
+      deliverySchedule.id,
+      { method: 'card', amount: 700, txnId: `post-handover-ar-${seq}` },
       'staff:test-cashier',
       { staffId: 'test-cashier', idempotencyKey: `post-handover-ar-${seq}` },
     );
@@ -824,16 +877,16 @@ describe('Courier COD handover (integration)', () => {
       where: { id: remaining.payment.accountingEntryId! },
       include: { lines: true },
     });
-    expect(receipt).toMatchObject({ sourceType: 'order_receivable.receipt', documentAmount: 1000 });
+    expect(receipt).toMatchObject({ sourceType: 'order_receivable.receipt', documentAmount: 700 });
     expect(receipt.lines).toEqual(expect.arrayContaining([
-      expect.objectContaining({ accountCode: '1020', debit: 1000, credit: 0 }),
-      expect.objectContaining({ accountCode: '1100', debit: 0, credit: 1000 }),
+      expect.objectContaining({ accountCode: '1020', debit: 700, credit: 0 }),
+      expect.objectContaining({ accountCode: '1100', debit: 0, credit: 700 }),
     ]));
     expect(receipt.lines).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ accountCode: '2400', credit: 1000 }),
+      expect.objectContaining({ accountCode: '2400', credit: 700 }),
     ]));
-    expect(await prisma.orderReceivable.findUniqueOrThrow({ where: { id: schedule.id } }))
-      .toMatchObject({ status: 'settled', settledAmount: 1500 });
+    expect(await prisma.orderReceivable.findUniqueOrThrow({ where: { id: deliverySchedule.id } }))
+      .toMatchObject({ status: 'settled', settledAmount: 900 });
   });
 
   it('collects COD for mixed stock and service lines while finalizing only tracked inventory', async () => {

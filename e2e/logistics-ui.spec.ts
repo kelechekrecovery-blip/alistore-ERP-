@@ -18,6 +18,13 @@ test('ERP point availability immediately controls public checkout options', asyn
     inventoryLocation: 'E2E-POINT-2',
     hours: 'Ежедневно 10:00–21:00',
   }, owner.accessToken, { 'Idempotency-Key': `e2e-logistics-point-${Date.now()}` });
+  // The active-staff guard deliberately locks staff out when their assigned
+  // point is disabled. Move the owner to the second active point before this
+  // availability scenario toggles the original one.
+  await prisma.staffUser.update({
+    where: { id: owner.staffId },
+    data: { point: 'E2E-POINT-2' },
+  });
   await page.addInitScript(() => {
     localStorage.removeItem('alistore.cart.pricing.v1');
   });
@@ -45,8 +52,8 @@ test('ERP point availability immediately controls public checkout options', asyn
   ]);
 
   await page.goto('/checkout');
-  await expect(page.getByRole('button', { name: /AliStore Asia Mall/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /AliStore Центр Бишкек/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^AliStore Asia Mall Бишкек/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^AliStore Центр Бишкек/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Далее' }).last()).toBeEnabled();
 
   await page.goto('/erp');
@@ -63,7 +70,7 @@ test('ERP point availability immediately controls public checkout options', asyn
   ]));
 
   await page.goto('/checkout');
-  await expect(page.getByRole('button', { name: /AliStore Центр Бишкек/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^AliStore Центр Бишкек/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Далее' }).last()).toBeEnabled();
 });
 

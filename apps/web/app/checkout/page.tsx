@@ -294,7 +294,7 @@ export default function CheckoutPage() {
         channel: 'web',
         fulfillmentType: delivery as 'pickup' | 'courier' | 'express',
         paymentMode: payment === 'cash' && cashAllowed ? 'cod' as const : 'prepaid' as const,
-        storePointId: delivery === 'pickup' ? pickupPoint : undefined,
+        storePointId: pickupPoint,
         deliveryAddress: delivery !== 'pickup' ? deliveryAddress.trim() : undefined,
         deliverySlot: delivery === 'pickup'
           ? selectedPickupPoint?.hours

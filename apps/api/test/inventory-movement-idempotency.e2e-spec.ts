@@ -36,6 +36,7 @@ describe('Inventory movement idempotency (integration)', () => {
     await prisma.auditEvent.deleteMany();
     await prisma.approval.deleteMany();
     await prisma.inventoryBalance.deleteMany();
+    await prisma.deviceUnit.deleteMany();
     await prisma.product.deleteMany();
   });
 

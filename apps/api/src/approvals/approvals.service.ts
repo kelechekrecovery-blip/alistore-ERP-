@@ -75,6 +75,24 @@ export interface DecideInput {
   reason?: string;
 }
 
+function canonicalJson(value: unknown): string {
+  const normalize = (candidate: unknown): unknown => {
+    if (Array.isArray(candidate)) {
+      return candidate.map((item) => item === undefined ? null : normalize(item));
+    }
+    if (candidate && typeof candidate === 'object') {
+      return Object.fromEntries(
+        Object.entries(candidate as Record<string, unknown>)
+          .filter(([, item]) => item !== undefined)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, item]) => [key, normalize(item)]),
+      );
+    }
+    return candidate ?? null;
+  };
+  return JSON.stringify(normalize(value));
+}
+
 /**
  * Approval cycle for dangerous actions (start → action → approval → event → final).
  * A gated action is NOT executed on request — it is parked as an Approval and
@@ -110,7 +128,7 @@ export class ApprovalsService {
   async request(req: ApprovalRequest): Promise<{ approvalId: string; status: 'requested' }> {
     const key = req.idempotencyKey?.trim() || undefined;
     if (key) {
-      const replay = await this.replayApproval(key, req.action);
+      const replay = await this.replayApproval(key, req);
       if (replay) return replay;
     }
     try {
@@ -120,7 +138,7 @@ export class ApprovalsService {
       // lands, so the unique index — not the read above — is what actually
       // decides. Losing that race is a successful replay, not a failure.
       if (key && isUniqueConstraintViolation(error)) {
-        const replay = await this.replayApproval(key, req.action);
+        const replay = await this.replayApproval(key, req);
         if (replay) return replay;
       }
       throw error;
@@ -140,14 +158,23 @@ export class ApprovalsService {
    */
   private async replayApproval(
     key: string,
-    action: string,
+    req: ApprovalRequest,
   ): Promise<{ approvalId: string; status: 'requested' } | null> {
     const existing = await this.prisma.approval.findUnique({ where: { idempotencyKey: key } });
     if (!existing) return null;
-    if (existing.action !== action) {
+    const stored = existing.evidence as {
+      payload?: Record<string, unknown> | null;
+      evidence?: Record<string, unknown> | null;
+    } | null;
+    const sameCommand = existing.action === req.action
+      && existing.requester === req.requester
+      && existing.reason === req.reason
+      && canonicalJson(stored?.payload ?? null) === canonicalJson(req.payload ?? null)
+      && canonicalJson(stored?.evidence ?? null) === canonicalJson(req.evidence ?? null);
+    if (!sameCommand) {
       throw new ConflictError(
         'idempotency_key_reused',
-        'Этот Idempotency-Key уже занят другим действием',
+        'Этот Idempotency-Key уже занят другим инициатором или командой',
       );
     }
     if (existing.status !== 'requested') {

@@ -295,6 +295,8 @@ export class CourierService {
         orderId,
         amount: dto.codAmount,
         actor: courierId,
+        commandKey: idempotencyKey,
+        runId: order.courierRunId,
         events: inventoryEvents,
       });
       const result = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
@@ -780,6 +782,8 @@ async function settleCollectedCodReceivablesOnTx(
     orderId: string;
     amount: number;
     actor: string;
+    commandKey: string;
+    runId: string | null;
     events: AuditInput[];
   },
 ): Promise<void> {
@@ -792,6 +796,17 @@ async function settleCollectedCodReceivablesOnTx(
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
+  const kindOrdinal = new Map([
+    ['stock_sale', 0],
+    ['supply_balance', 1],
+    ['delivery', 2],
+  ]);
+  receivables.sort((left, right) => (
+    (kindOrdinal.get(left.kind) ?? Number.MAX_SAFE_INTEGER)
+    - (kindOrdinal.get(right.kind) ?? Number.MAX_SAFE_INTEGER)
+    || left.createdAt.getTime() - right.createdAt.getTime()
+    || left.id.localeCompare(right.id)
+  ));
   // Orders created before receivable schedules were introduced keep the legacy
   // whole-order COD path. Their cash is still reconciled by cod.handover.
   if (receivables.length === 0) return;
@@ -808,6 +823,8 @@ async function settleCollectedCodReceivablesOnTx(
   }
 
   let remaining = input.amount;
+  let allocatedTotal = 0;
+  let ordinal = 0;
   for (const receivable of receivables) {
     if (remaining === 0) break;
     const openAmount = Math.max(0, receivable.amount - receivable.settledAmount);
@@ -829,6 +846,34 @@ async function settleCollectedCodReceivablesOnTx(
         `Начисление ${receivable.id} изменилось параллельно`,
       );
     }
+    const sourceOwner = input.runId ?? input.orderId;
+    const sourceRef = `${sourceOwner}:${input.commandKey}:${ordinal}`;
+    input.events.push({
+      type: EventType.OrderReceivableAllocated,
+      actor: input.actor,
+      payload: {
+        sourceType: 'courier_cod',
+        sourceRef,
+        courierCommandKey: input.commandKey,
+        runId: input.runId,
+        orderId: input.orderId,
+        receivableId: receivable.id,
+        kind: receivable.kind,
+        allocatedAmount: allocated,
+        beforeSettledAmount: receivable.settledAmount,
+        afterSettledAmount: settledAmount,
+        beforeStatus: receivable.status,
+        afterStatus: status,
+        ordinal,
+      },
+      refs: [...new Set([
+        input.orderId,
+        receivable.id,
+        sourceOwner,
+        input.commandKey,
+        sourceRef,
+      ])],
+    });
     if (status === 'settled') {
       input.events.push({
         type: EventType.OrderReceivableSettled,
@@ -843,6 +888,14 @@ async function settleCollectedCodReceivablesOnTx(
       });
     }
     remaining -= allocated;
+    allocatedTotal += allocated;
+    ordinal += 1;
+  }
+  if (remaining !== 0 || allocatedTotal !== input.amount) {
+    throw new ConflictError(
+      'cod_receivable_allocation_invalid',
+      `Аллокации COD ${allocatedTotal} не совпадают с собранной суммой ${input.amount}`,
+    );
   }
 }
 

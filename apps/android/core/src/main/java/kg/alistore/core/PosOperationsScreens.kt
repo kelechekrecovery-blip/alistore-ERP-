@@ -396,10 +396,14 @@ private fun PosOfflineScreen(queue: OfflineQueueDb, apiBaseUrl: String, modifier
       val approvalId = approvalIdFromQueueError(command.lastError)
       Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
         Text("${command.state} · ${command.idempotencyKey.takeLast(8)} · попыток ${command.attempts}", color = if (command.state == "conflict") PosCoral else Color.White)
-        if (approvalId != null) {
+        if (approvalId != null && command.state == "conflict" && command.parentMutationId == null) {
           Text("Approval #${approvalId.takeLast(8)}", color = PosMuted, fontSize = 11.sp)
           OutlinedButton(onClick = {
-            queue.replaceBodyAndRetry(command.id, attachPosApproval(command.body, approvalId))
+            queue.enqueueContinuation(
+              command.id,
+              attachPosApproval(command.body, approvalId),
+              posApprovalContinuationKey(command.idempotencyKey, approvalId),
+            )
             schedulePosSync(context, apiBaseUrl)
             revision += 1
           }, modifier = Modifier.fillMaxWidth().testTag("pos-approval-retry")) { Text("Повторить после одобрения") }

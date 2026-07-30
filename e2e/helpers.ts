@@ -1,4 +1,4 @@
-import { APIRequestContext, expect } from '@playwright/test';
+import { APIRequestContext, expect, type Page } from '@playwright/test';
 import { PrismaClient, Role } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { sign } from 'jsonwebtoken';
@@ -60,7 +60,9 @@ export async function resetDb() {
   await prisma.debtPlan.deleteMany();
   await prisma.supportTicket.deleteMany();
   await prisma.supplierRma.deleteMany();
+  await prisma.orderLineSupply.deleteMany();
   await prisma.purchaseOrder.deleteMany();
+  await prisma.supplierOffer.deleteMany();
   await prisma.financeBudgetCommand.deleteMany();
   await prisma.financeBudget.deleteMany();
   await prisma.expense.deleteMany();
@@ -76,13 +78,13 @@ export async function resetDb() {
   await prisma.consignmentPayout.deleteMany();
   await prisma.returnItem.deleteMany();
   await prisma.return.deleteMany();
+  await prisma.orderReceivable.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
   await prisma.promotionRedemption.deleteMany();
   await prisma.promotionCode.deleteMany();
   await prisma.storefrontBlock.deleteMany();
   await prisma.storePointCommand.deleteMany();
-  await prisma.storePoint.deleteMany({ where: { id: { not: 'alistore-bishkek-1' } } });
   await prisma.deliverySlot.deleteMany();
   await prisma.deliveryZone.deleteMany();
   await prisma.inventoryMovement.deleteMany();
@@ -98,6 +100,10 @@ export async function resetDb() {
   await prisma.courierRun.deleteMany();
   await prisma.approval.deleteMany();
   await prisma.staffUser.deleteMany();
+  // StaffUser.point is a restrictive FK to StorePoint.inventoryLocation.
+  // Clear staff first so a review/demo account on a temporary point cannot
+  // make every Playwright reset fail before the scenario even starts.
+  await prisma.storePoint.deleteMany({ where: { id: { not: 'alistore-bishkek-1' } } });
   await prisma.storePoint.upsert({
     where: { id: 'alistore-bishkek-1' },
     update: {
@@ -183,6 +189,16 @@ export async function seedStaffCredentials(role: Role = 'owner', prefix = 'e2e')
       { expiresIn: '8h' },
     ),
   };
+}
+
+export async function selectOperationalPoint(
+  page: Page,
+  label: string,
+  location = 'BISHKEK-1',
+): Promise<void> {
+  const select = page.getByLabel(label);
+  await expect(select).toBeEnabled();
+  await select.selectOption(location);
 }
 
 export async function customerToken(request: APIRequestContext, phone: string): Promise<string> {

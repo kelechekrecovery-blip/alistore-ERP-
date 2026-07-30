@@ -252,8 +252,14 @@ export function inventoryCount(
   location: string,
   counted: number,
   accessToken: string,
+  idempotencyKey: string,
 ): Promise<CountResult> {
-  return postAuthJson('/inventory/count', { productId, location, counted }, accessToken);
+  return postAuthJson(
+    '/inventory/count',
+    { productId, location, counted },
+    accessToken,
+    { 'idempotency-key': idempotencyKey },
+  );
 }
 
 export interface ConsignmentItem {

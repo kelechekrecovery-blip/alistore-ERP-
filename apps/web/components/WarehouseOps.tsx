@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchCatalog, inventoryCount, printServerSvgLabels, receiveInventoryBatch, receiveQuantityInventory, renderImeiLabel, requestInventoryMovement, transferQuantityInventory, transferUnit, uploadEvidenceImages, type CatalogProduct } from '@/lib/api';
 import { EvidencePicker } from './EvidencePicker';
 import { useOperationalStorePoint } from '@/lib/use-operational-store-point';
@@ -35,6 +35,7 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
   const [labelsBusy, setLabelsBusy] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const pendingCount = useRef<{ fingerprint: string; idempotencyKey: string } | null>(null);
 
   useEffect(() => {
     fetchCatalog({ limit: 100 }).then((c) => {
@@ -111,9 +112,19 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
     const scannedImeis = parseImeis(countScans);
     const effectiveCounted = counted === '' ? scannedImeis.length : Number(counted);
     if (!productId || !location.trim() || (counted === '' && scannedImeis.length === 0)) return;
+    const fingerprint = JSON.stringify({ productId, location: location.trim(), counted: effectiveCounted });
+    if (pendingCount.current?.fingerprint !== fingerprint) {
+      pendingCount.current = { fingerprint, idempotencyKey: crypto.randomUUID() };
+    }
     setBusy('count');
     try {
-      const r = await inventoryCount(productId, location.trim(), effectiveCounted, accessToken);
+      const r = await inventoryCount(
+        productId,
+        location.trim(),
+        effectiveCounted,
+        accessToken,
+        pendingCount.current.idempotencyKey,
+      );
       const evidence = countFiles.length
         ? await uploadEvidenceImages({
             files: countFiles,
@@ -128,6 +139,7 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
       setCounted('');
       setCountScans('');
       setCountFiles([]);
+      pendingCount.current = null;
     } catch (e) {
       flash(e instanceof Error ? errMsg(e) : 'Ошибка учёта');
     } finally {
@@ -201,7 +213,7 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
       <div className="mb-3 font-display text-sm font-bold text-white">Операции склада</div>
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
         {/* receive */}
-        <div>
+        <div className="min-w-0">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">Приёмка партии</p>
           <div className="flex flex-col gap-2">
             <select value={receiveProductId} onChange={(e) => setReceiveProductId(e.target.value)} className="rounded-btn border border-surface-3 bg-surface px-3 py-2 text-sm outline-none focus:border-coral">
@@ -239,7 +251,7 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
           </div>
         </div>
         {/* transfer */}
-        <div>
+        <div className="min-w-0">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">Перемещение</p>
           <div className="flex flex-col gap-2">
             <select aria-label="Товар для перемещения" value={transferProductId} onChange={(e) => setTransferProductId(e.target.value)} className="rounded-btn border border-surface-3 bg-surface px-3 py-2 text-sm outline-none focus:border-coral">
@@ -254,14 +266,14 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
               <input value={imei} onChange={(e) => setImei(e.target.value)} placeholder="IMEI единицы" className="rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-faint focus:border-coral" />
             )}
             <div className="flex gap-2">
-              <select aria-label="Склад назначения" required disabled={pointsLoading} value={dest} onChange={(e) => setDest(e.target.value)} className="flex-1 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-coral disabled:opacity-70"><option value="" disabled>Куда</option>{points.map((item) => <option key={item.id} value={item.inventoryLocation}>{item.name} · {item.inventoryLocation}</option>)}</select>
-              <button type="button" disabled={busy === 'transfer' || !dest || Boolean(pointError)} onClick={doTransfer} className="rounded-btn bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-deep disabled:bg-surface-3">Переместить</button>
+              <select aria-label="Склад назначения" required disabled={pointsLoading} value={dest} onChange={(e) => setDest(e.target.value)} className="min-w-0 flex-1 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-coral disabled:opacity-70"><option value="" disabled>Куда</option>{points.map((item) => <option key={item.id} value={item.inventoryLocation}>{item.name} · {item.inventoryLocation}</option>)}</select>
+              <button type="button" disabled={busy === 'transfer' || !dest || Boolean(pointError)} onClick={doTransfer} className="shrink-0 rounded-btn bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-deep disabled:bg-surface-3">Переместить</button>
             </div>
             <EvidencePicker files={transferFiles} onChange={setTransferFiles} label="Фото перемещения" hint="Коробка, IMEI или полка" max={3} />
           </div>
         </div>
         {/* adjustment */}
-        <div>
+        <div className="min-w-0">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">Списание и корректировка</p>
           <div className="flex flex-col gap-2">
             <select aria-label="Товар для корректировки" value={adjustProductId} onChange={(e) => setAdjustProductId(e.target.value)} className="rounded-btn border border-surface-3 bg-surface px-3 py-2 text-sm outline-none focus:border-coral">
@@ -286,15 +298,15 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
           </div>
         </div>
         {/* count */}
-        <div>
+        <div className="min-w-0">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">Инвентаризация</p>
           <div className="flex flex-col gap-2">
-            <select value={productId} onChange={(e) => setProductId(e.target.value)} className="rounded-btn border border-surface-3 bg-surface px-3 py-2 text-sm outline-none focus:border-coral">
+            <select aria-label="Товар инвентаризации" value={productId} onChange={(e) => setProductId(e.target.value)} className="rounded-btn border border-surface-3 bg-surface px-3 py-2 text-sm outline-none focus:border-coral">
               {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <div className="flex gap-2">
               <select aria-label="Склад инвентаризации" required disabled={!canSelect || pointsLoading} value={location} onChange={(e) => setLocation(e.target.value)} className="w-48 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none focus:border-coral disabled:opacity-70"><option value="" disabled>Выберите склад</option>{points.map((item) => <option key={item.id} value={item.inventoryLocation}>{item.name} · {item.inventoryLocation}</option>)}</select>
-              <input value={counted} onChange={(e) => setCounted(e.target.value.replace(/\D/g, ''))} placeholder="факт" inputMode="numeric" className="w-20 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-faint focus:border-coral" />
+              <input aria-label="Фактическое количество" value={counted} onChange={(e) => setCounted(e.target.value.replace(/\D/g, ''))} placeholder="факт" inputMode="numeric" className="w-20 rounded-btn border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-white outline-none placeholder:text-faint focus:border-coral" />
               <button type="button" disabled={busy === 'count'} onClick={doCount} className="flex-1 rounded-btn bg-lime px-4 py-2 text-sm font-semibold text-lime-ink transition hover:bg-lime-dark disabled:bg-surface-3">Записать</button>
             </div>
             <textarea

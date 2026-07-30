@@ -50,6 +50,7 @@ public final class StaffInventoryStore {
 
     private let api: APIClient
     private let token: String
+    private var pendingCount: (fingerprint: String, idempotencyKey: String)?
 
     public init(environment: AppEnvironment, token: String, session: URLSession = .shared) {
         self.api = APIClient(baseURL: environment.apiBaseURL, session: session)
@@ -89,11 +90,18 @@ public final class StaffInventoryStore {
         errorMessage = nil
         defer { isSubmitting = false }
         do {
+            let request = InventoryCountRequest(productId: productId, location: location, counted: counted)
+            let fingerprint = try IdempotencyKeys.fingerprint(request)
+            if pendingCount?.fingerprint != fingerprint {
+                pendingCount = (fingerprint, UUID().uuidString)
+            }
             let result: InventoryCountResult = try await api.post(
                 "inventory/count",
-                body: InventoryCountRequest(productId: productId, location: location, counted: counted),
-                token: token
+                body: request,
+                token: token,
+                idempotencyKey: pendingCount?.idempotencyKey
             )
+            pendingCount = nil
             lastResult = result
             return result
         } catch {

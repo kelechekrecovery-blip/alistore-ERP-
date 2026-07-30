@@ -44,22 +44,98 @@ class OfflineQueueOwnershipTest {
   }
 
   @Test
-  fun intentionalPayloadReplacementCreatesANewImmutableRowWithTheSameKeyAndOwner() {
-    val databaseName = databaseName("replacement")
+  fun approvalContinuationPreservesOriginalAuditRowAndUsesADistinctLinkedKey() {
+    val databaseName = databaseName("continuation")
     val owner = QueueOwner("pos", "staff-a")
     val queue = OfflineQueueDb(context, databaseName, owner)
-    val oldId = queue.enqueue("pos/sale", "POST", """{"approvalId":null}""", "stable-sale")
+    val originalBody = """{"clientSaleId":"stable-sale"}"""
+    val originalId = queue.enqueue("pos/sale", "POST", originalBody, "stable-sale")
+    queue.markState(originalId, "conflict", "approval_required:approval-1")
+    val continuationBody = """{"clientSaleId":"stable-sale","approvalId":"approval-1"}"""
+    val continuationKey = posApprovalContinuationKey("stable-sale", "approval-1")
 
-    assertEquals(1, queue.replaceBodyAndRetry(oldId, """{"approvalId":"approved"}"""))
+    val continuationId = queue.enqueueContinuation(originalId, continuationBody, continuationKey)
 
-    val replacement = queue.pending().single()
-    assertNotEquals(oldId, replacement.id)
-    assertEquals(owner.storageKey, replacement.ownerId)
-    assertEquals("stable-sale", replacement.idempotencyKey)
+    val rows = queue.pending(includeConflicts = true)
+    val original = rows.first { it.id == originalId }
+    val continuation = rows.first { it.id == continuationId }
+    assertEquals(originalBody, original.body)
+    assertEquals("stable-sale", original.idempotencyKey)
     assertEquals(
-      payloadFingerprint("POST", "pos/sale", """{"approvalId":"approved"}""", "stable-sale"),
-      replacement.payloadFingerprint,
+      payloadFingerprint("POST", "pos/sale", originalBody, "stable-sale"),
+      original.payloadFingerprint,
     )
+    assertEquals("conflict", original.state)
+    assertEquals(originalId, continuation.parentMutationId)
+    assertNotEquals(original.idempotencyKey, continuation.idempotencyKey)
+    assertEquals(continuationKey, continuation.idempotencyKey)
+    assertEquals(continuationBody, continuation.body)
+    assertEquals(
+      payloadFingerprint("POST", "pos/sale", continuationBody, continuationKey),
+      continuation.payloadFingerprint,
+    )
+    assertEquals(listOf(continuationId), queue.pending().map(PendingMutation::id))
+    val claimed = requireNotNull(queue.claimNext())
+    assertEquals(continuationId, claimed.id)
+    assertEquals(1, queue.markContinuationSent(claimed))
+    val auditedOriginal = queue.pending(includeConflicts = true).single()
+    assertEquals(originalId, auditedOriginal.id)
+    assertEquals(originalBody, auditedOriginal.body)
+    assertEquals("stable-sale", auditedOriginal.idempotencyKey)
+    assertEquals("continued", auditedOriginal.state)
+  }
+
+  @Test
+  fun approvalContinuationCannotCollideWithOrReplayAsOriginal() {
+    val databaseName = databaseName("continuation-collision")
+    val queue = OfflineQueueDb(context, databaseName, QueueOwner("pos", "staff-a"))
+    val originalId = queue.enqueue("pos/sale", "POST", """{"clientSaleId":"sale-1"}""", "sale-1")
+    queue.markState(originalId, "conflict", "approval_required:approval-1")
+    val key = posApprovalContinuationKey("sale-1", "approval-1")
+    val continuationId = queue.enqueueContinuation(
+      originalId,
+      """{"clientSaleId":"sale-1","approvalId":"approval-1"}""",
+      key,
+    )
+
+    assertEquals(
+      continuationId,
+      queue.enqueueContinuation(
+        originalId,
+        """{"clientSaleId":"sale-1","approvalId":"approval-1"}""",
+        key,
+      ),
+    )
+    assertTrue(runCatching {
+      queue.enqueueContinuation(
+        originalId,
+        """{"clientSaleId":"different-sale","approvalId":"approval-1"}""",
+        key,
+      )
+    }.isFailure)
+    assertEquals(continuationId, queue.claimNext()?.id)
+  }
+
+  @Test
+  fun approvalContinuationCannotCreateAContinuationChain() {
+    val databaseName = databaseName("continuation-chain")
+    val queue = OfflineQueueDb(context, databaseName, QueueOwner("pos", "staff-a"))
+    val originalId = queue.enqueue("pos/sale", "POST", """{"clientSaleId":"sale-1"}""", "sale-1")
+    queue.markState(originalId, "conflict", "approval_required:approval-1")
+    val continuationId = queue.enqueueContinuation(
+      originalId,
+      """{"clientSaleId":"sale-1","approvalId":"approval-1"}""",
+      posApprovalContinuationKey("sale-1", "approval-1"),
+    )
+    queue.markState(continuationId, "conflict", "approval_required:approval-2")
+
+    assertTrue(runCatching {
+      queue.enqueueContinuation(
+        continuationId,
+        """{"clientSaleId":"sale-1","approvalId":"approval-2"}""",
+        posApprovalContinuationKey("sale-1", "approval-2"),
+      )
+    }.isFailure)
   }
 
   @Test

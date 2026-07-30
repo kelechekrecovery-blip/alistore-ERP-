@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { prisma, resetDb, seedProduct, seedStaffCredentials } from './helpers';
+import { prisma, resetDb, seedProduct, seedStaffCredentials, selectOperationalPoint } from './helpers';
 
 /**
  * UI-010 print cluster. The print endpoints (documents/*, labels/*,
@@ -80,6 +80,7 @@ test('warehouse intake prints one IMEI sticker per received unit', async ({ page
 
   await page.goto('/warehouse');
   await expect(page.getByText('Операции склада')).toBeVisible();
+  await selectOperationalPoint(page, 'Склад приёмки');
   const imeis = [`E2E-IN-${Date.now().toString(36)}-1`, `E2E-IN-${Date.now().toString(36)}-2`];
   await page.getByPlaceholder('IMEI / SN, каждый с новой строки').fill(imeis.join('\n'));
   const receiveResponsePromise = page.waitForResponse((response) =>

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import * as argon2 from 'argon2';
-import { prisma, resetDb } from './helpers';
+import { prisma, resetDb, selectOperationalPoint } from './helpers';
 
 test.afterEach(async () => resetDb());
 
@@ -22,8 +22,8 @@ test('owner opens and closes store operations checklists and resolves an inciden
 
   const view = page.getByTestId('store-operations-view');
   await expect(view.getByRole('heading', { name: 'Операционка точки' }).first()).toBeVisible();
+  await selectOperationalPoint(page, 'Операционная точка');
   await view.getByLabel('Дата операций точки').fill(businessDate);
-  await view.getByLabel('Код операционной точки').fill('BISHKEK-1');
 
   await view.getByRole('button', { name: 'Открыть чек-лист' }).first().click();
   await view.getByRole('button', { name: 'Открыть чек-лист' }).first().click();

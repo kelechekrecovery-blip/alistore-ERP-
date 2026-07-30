@@ -897,7 +897,7 @@ describe('Refund aggregate FIN-003E (integration)', () => {
     const failed = await refunds.get(requested!.id);
     expect(failed?.status).toBe('failed');
     expect(failed?.allocations[0]).toMatchObject({ status: 'failed', attempts: 5 });
-    expect(failed?.allocations[0].nextAttemptAt).toBeInstanceOf(Date);
+    expect(failed?.allocations[0].nextAttemptAt).toBeNull();
     expect(await failingProcessor.processPending()).toBe(0);
     await expect(shifts.close(f.shift.id, { closeCash: f.shift.openCash }, 'cashier-1'))
       .rejects.toMatchObject({ code: 'shift_has_pending_refunds' });

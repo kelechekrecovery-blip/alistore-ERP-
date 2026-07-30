@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { postJson, prisma, resetDb, seedStaffCredentials } from './helpers';
+import { postJson, prisma, resetDb, seedStaffCredentials, selectOperationalPoint } from './helpers';
 
 test.afterEach(async () => {
   await resetDb();
@@ -30,6 +30,7 @@ test('owner creates, sends, and receives a purchase order in ERP', async ({ page
   await page.getByRole('button', { name: /Закупки/ }).click();
 
   await expect(page.getByRole('heading', { name: 'Purchase Orders' })).toBeVisible();
+  await selectOperationalPoint(page, 'Склад назначения');
   await page.getByLabel('Поставщик PO').selectOption(supplier.id);
   await page.getByLabel('Товар PO 1').selectOption(product.id);
   await page.getByLabel('Количество PO 1').fill('1');

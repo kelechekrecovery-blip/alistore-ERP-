@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { resetDb, seedStaffCredentials } from './helpers';
+import { resetDb, seedStaffCredentials, selectOperationalPoint } from './helpers';
 
 /**
  * A failed request must never look like data.
@@ -25,14 +25,15 @@ interface Screen {
   route: string;
   /** Screens already cleaned — these must pass today. */
   cleaned: boolean;
+  operationalPointLabel?: string;
 }
 
 const SCREENS: Screen[] = [
   { nav: /Дашборд/, route: '**/api/reports/dashboard*', cleaned: true },
   { nav: /KPI и ЗП/, route: '**/api/reports/kpi*', cleaned: true },
   { nav: /Логистика/, route: '**/api/logistics/overview*', cleaned: true },
-  { nav: /HR · Смены/, route: '**/api/hr/week*', cleaned: true },
-  { nav: /Операции точки/, route: '**/api/store-operations/overview*', cleaned: true },
+  { nav: /HR · Смены/, route: '**/api/hr/week*', cleaned: true, operationalPointLabel: 'Точка HR' },
+  { nav: /Операции точки/, route: '**/api/store-operations/overview*', cleaned: true, operationalPointLabel: 'Операционная точка' },
   { nav: /AI-ассистент/, route: '**/api/ai/insights*', cleaned: true },
   { nav: /CRM/, route: '**/api/campaigns/preview*', cleaned: true },
   { nav: /Задачи/, route: '**/api/staff-tasks?*', cleaned: true },
@@ -63,6 +64,9 @@ for (const screen of SCREENS) {
     );
 
     await page.getByTestId('erp-sidebar').getByRole('button', { name: screen.nav }).click();
+    if (screen.operationalPointLabel) {
+      await selectOperationalPoint(page, screen.operationalPointLabel);
+    }
     // Generous: this asserts *what* the screen shows, not how fast. On a shared
     // stand a cold route compile alone can eat ten seconds.
     await expect

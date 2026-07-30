@@ -58,6 +58,10 @@ class PosSaleManagerTest {
     val body = attachPosApproval(request.toJson().toString(), approvalIdFromQueueError(message)!!)
     assertEquals("approval-12345678", org.json.JSONObject(body).getString("approvalId"))
     assertEquals("sale-stable-1", org.json.JSONObject(body).getString("clientSaleId"))
+    val continuationKey = posApprovalContinuationKey("sale-stable-1", "approval-12345678")
+    assertEquals(continuationKey, posApprovalContinuationKey("sale-stable-1", "approval-12345678"))
+    assertTrue(continuationKey != "sale-stable-1")
+    assertTrue(continuationKey.length <= 128)
   }
 }
 

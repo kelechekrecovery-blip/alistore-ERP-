@@ -10,6 +10,7 @@ import { paymentAccountCode, postAccountingEntryOnTx, postPaymentEntryOnTx } fro
 import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
 import { adjustQuantityValuationOnTx } from '../inventory/inventory-valuation';
 import { publishStorefrontRevisionOnTx } from '../storefront/storefront-publish';
+import { isUniqueConstraintViolation } from '../common/prisma-errors';
 
 const manual_adjustment: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
   const documentNumber = String(payload['documentNumber'] ?? '').trim();
@@ -528,22 +529,19 @@ const stock_adjust: ActionExecutor = async (tx, payload, approver, approvalId, e
   }
   const delta = direction === 'decrease' ? -Math.abs(qty) : Math.abs(qty);
   if (countMovementId) {
-    const claim = await tx.inventoryMovement.updateMany({
-      where: {
-        id: countMovementId,
-        type: 'count',
-        productId,
-        from: location,
-        qty: delta,
-        idempotencyKey: null,
-      },
-      data: { idempotencyKey: `count-adjustment:${approvalId}` },
-    });
-    if (claim.count !== 1) {
-      throw new ConflictError(
-        'inventory_count_already_applied',
-        'Этот пересчёт уже использован для корректировки',
-      );
+    try {
+      await tx.approval.update({
+        where: { id: approvalId },
+        data: { sourceRef: `inventory-count:${countMovementId}` },
+      });
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
+        throw new ConflictError(
+          'inventory_count_already_applied',
+          'Этот пересчёт уже использован для корректировки',
+        );
+      }
+      throw error;
     }
   }
   await tx.$queryRaw`SELECT id FROM "InventoryBalance" WHERE "productId" = ${productId} AND location = ${location} FOR UPDATE`;
