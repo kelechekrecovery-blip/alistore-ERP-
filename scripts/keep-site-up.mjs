@@ -27,10 +27,14 @@
 // Включить постоянно:  см. scripts/com.alistore.keepsiteup.plist
 
 import { execFile } from 'node:child_process';
-import { appendFile } from 'node:fs/promises';
+import { appendFile, lstat, readdir, readlink, stat, symlink, unlink } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
+
+const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), '../..');
 
 const INTERVAL_MS = 60_000;
 const PROBE_TIMEOUT_MS = 8_000;
@@ -43,7 +47,10 @@ const DOMAIN = `gui/${process.getuid()}`;
 
 const SERVICES = [
   { label: 'com.alistore.api', name: 'API (4000)', url: 'http://127.0.0.1:4000/api/health/ready' },
-  { label: 'com.alistore.web', name: 'витрина (3000)', url: 'http://127.0.0.1:3000/' },
+  // Витрина проверяется по /healthz, а не по '/': главная тянет каталог из API,
+  // и при мёртвом API отдала бы не-200 — сторож принялся бы перезапускать
+  // исправную витрину. /healthz отвечает за сам процесс Next и ни за что больше.
+  { label: 'com.alistore.web', name: 'витрина (3000)', url: 'http://127.0.0.1:3000/healthz', repair: () => repairStorefrontBuild() },
 ];
 
 // Публичные адреса проверяются отдельно: процессы могут быть живы, а сайт всё
@@ -82,15 +89,90 @@ async function agentLoaded(label) {
   return run('/bin/launchctl', ['print', `${DOMAIN}/${label}`]).then(() => true, () => false);
 }
 
+// Turbopack складывает внешние пакеты (у нас — загрузчики Sentry) в
+// apps/web/.next/node_modules симлинками на РАСКЛАДКУ ПАКЕТНОГО МЕНЕДЖЕРА, с
+// которым шла сборка: `../../../../node_modules/.pnpm/<пакет>@<версия>/node_modules/<пакет>`.
+// Любой последующий `npm install` сносит `.pnpm` — ссылки повисают, а Next
+// падает на загрузке instrumentation hook и отдаёт 500 на КАЖДЫЙ маршрут,
+// включая /healthz. Замерено 30.07.2026: шесть часов простоя и 256 бесполезных
+// kickstart'ов, потому что рестарт сломанную сборку не чинит в принципе.
+//
+// Чиним по имени пакета, а не по строке ссылки: хэш в имени каталога
+// (`require-in-the-middle-a99415fa67232f7f`) генерирует Turbopack, а вот
+// basename цели — это настоящее имя пакета, и оно же есть в плоской
+// npm-раскладке. Экспортируется ради теста scripts/__tests__/keep-site-up.test.mjs.
+export async function repairDanglingExternals(externalsDir, flatModulesDir) {
+  const repaired = [];
+  const unrepairable = [];
+  const entries = await readdir(externalsDir).catch(() => null);
+  if (!entries) return { repaired, unrepairable };
+
+  for (const entry of entries) {
+    const link = path.join(externalsDir, entry);
+    const info = await lstat(link).catch(() => null);
+    if (!info?.isSymbolicLink()) continue;
+    if (await stat(link).then(() => true, () => false)) continue; // ссылка жива — не трогаем
+
+    const target = await readlink(link).catch(() => '');
+    const fallback = path.join(flatModulesDir, path.basename(target));
+    if (!target || !(await stat(fallback).then(() => true, () => false))) {
+      unrepairable.push(entry);
+      continue;
+    }
+    await unlink(link);
+    await symlink(path.relative(externalsDir, fallback), link);
+    repaired.push(entry);
+  }
+  return { repaired, unrepairable };
+}
+
+// Сколько подряд неудачных рестартов считаем доказательством, что рестарт не
+// поможет. Один-два — обычная перезагрузка процесса; три подряд означают, что
+// сервис поднимается и сразу же снова не отвечает, то есть сломан артефакт, а
+// не процесс.
+const REVIVALS_BEFORE_REPAIR = 3;
+const REVIVALS_BEFORE_ESCALATION = 10;
+const failedRevivals = new Map();
+
+// Ремонт сборки витрины. Отдельно от revive(), потому что применим только к
+// вебу: у API нет .next и внешних симлинков.
+async function repairStorefrontBuild() {
+  const externals = path.join(REPO_ROOT, 'apps/web/.next/node_modules');
+  const flat = path.join(REPO_ROOT, 'node_modules');
+  const { repaired, unrepairable } = await repairDanglingExternals(externals, flat);
+  if (repaired.length) {
+    await log(`РЕМОНТ: повисшие внешние модули сборки перепривязаны к node_modules: ${repaired.join(', ')}`);
+  }
+  if (unrepairable.length) {
+    await log(`ВНИМАНИЕ: повисшие модули сборки без замены в node_modules: ${unrepairable.join(', ')}`);
+    await log('         пересоберите витрину: npm run build -w @alistore/web');
+  }
+  return repaired.length > 0;
+}
+
 // Возвращает сервис launchd, а не запускает копию мимо него. -k шлёт SIGKILL
 // текущему процессу, если он ещё жив: зависший процесс держит порт, и без этого
 // новый экземпляр не поднялся бы.
-async function revive({ label, name }) {
+async function revive({ label, name, repair }) {
   if (!(await agentLoaded(label))) {
     await log(`ВНИМАНИЕ: агент ${label} не загружен — ${name} поднять некому.`);
     await log(`         установите: cp scripts/${label}.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/${label}.plist`);
     return;
   }
+
+  const attempt = (failedRevivals.get(label) ?? 0) + 1;
+  failedRevivals.set(label, attempt);
+
+  // Молчаливый бесконечный рестарт — худшее из поведений: журнал заполняется
+  // одинаковыми строками, а диагноза в нём нет. Поэтому сначала пробуем
+  // починить известную поломку, потом — говорим вслух, что рестарт не помогает.
+  if (repair && attempt === REVIVALS_BEFORE_REPAIR) await repair();
+  if (attempt === REVIVALS_BEFORE_ESCALATION) {
+    await log(`ЭСКАЛАЦИЯ: ${name} не поднимается ${attempt} перезапусков подряд — рестарт не лечит причину.`);
+    await log('           смотрите /tmp/alistore-web-prod.err.log и /tmp/alistore-api-prod.err.log');
+    await notify('AliStore: рестарт не помогает', `${name} лежит после ${attempt} перезапусков. Нужен разбор.`);
+  }
+
   await log(`${name} не отвечает — перезапускаю через launchctl kickstart ${label}`);
   await run('/bin/launchctl', ['kickstart', '-k', `${DOMAIN}/${label}`]).catch(() => {});
 }
@@ -131,11 +213,16 @@ async function checkSleepGuard() {
   // Сон — главная причина простоев (22ч37м из 52ч на 23.07.2026), и сторож
   // против него бессилен: спящая машина не выполняет ничего, включая этот
   // процесс. Поэтому не «чиним», а громко фиксируем, если защиту сняли.
-  await log('ВНИМАНИЕ: sleep не запрещён — закрытая крышка снова погасит сайт.');
-  await log('         включите: sudo pmset -a disablesleep 1');
-
+  //
+  // Раз в час, а не каждый цикл: прежняя версия писала две строки в минуту и к
+  // 30.07.2026 заняла 7778 строк журнала из 9015 — настоящие простои в нём
+  // приходилось выискивать. Часа достаточно, чтобы восстановить по журналу
+  // интервал, когда защита была снята, и это ровно та же частота, что у
+  // экранного уведомления.
   if (Date.now() - lastSleepNagAt < SLEEP_NAG_INTERVAL_MS) return;
   lastSleepNagAt = Date.now();
+  await log('ВНИМАНИЕ: sleep не запрещён — закрытая крышка снова погасит сайт.');
+  await log('         включите: sudo pmset -a disablesleep 1');
   await notify(
     'AliStore: защита от сна выключена',
     'Закрытая крышка погасит магазин. Выполните: sudo pmset -a disablesleep 1',
@@ -145,7 +232,8 @@ async function checkSleepGuard() {
 async function checkOnce() {
   for (const service of SERVICES) {
     const up = await isUp(service.url);
-    if (!up) await revive(service);
+    if (up) failedRevivals.delete(service.label);
+    else await revive(service);
     await trackOutage(service.label, up, service.name);
   }
 
@@ -167,12 +255,19 @@ async function checkOnce() {
   await checkSleepGuard();
 }
 
-if (process.argv.includes('--once')) {
-  await checkOnce();
-} else {
-  await log('сторож запущен');
-  for (;;) {
+// Цикл запускается только при прямом вызове файла. Без этой проверки импорт из
+// теста (scripts/__tests__/keep-site-up.test.mjs) поднимал бы сторожа и начинал
+// перезапускать боевые сервисы прямо из прогона тестов.
+const invokedDirectly = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (invokedDirectly) {
+  if (process.argv.includes('--once')) {
     await checkOnce();
-    await new Promise((resolve) => setTimeout(resolve, INTERVAL_MS));
+  } else {
+    await log('сторож запущен');
+    for (;;) {
+      await checkOnce();
+      await new Promise((resolve) => setTimeout(resolve, INTERVAL_MS));
+    }
   }
 }
