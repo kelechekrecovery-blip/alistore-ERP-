@@ -12,6 +12,7 @@ class CourierSyncWorker(appContext: Context, params: WorkerParameters) : Corouti
     val tokenStore = SecureTokenStore(applicationContext, "alistore-courier-session")
     val session = tokenStore.readSessionSnapshot("staff") ?: return@withContext Result.failure()
     val queue = OfflineQueueDb(applicationContext, COURIER_QUEUE_DB, session.queueOwner)
+    val intentStore = StableCommandIntentStore(applicationContext, session.queueOwner)
     val client = ApiClient(apiBaseUrl)
     var retryRequired = false
     try {
@@ -29,7 +30,13 @@ class CourierSyncWorker(appContext: Context, params: WorkerParameters) : Corouti
         }
         val status = client.send(mutation, session.accessToken)
         when {
-          status in 200..299 -> queue.markClaimSent(mutation)
+          status in 200..299 -> {
+            // Close durably before deleting the queue record. If the process dies
+            // between these steps, replay remains safe under the same server key.
+            finalizeCourierQueuedSuccess(intentStore, mutation.idempotencyKey) {
+              queue.markClaimSent(mutation)
+            }
+          }
           status == 409 || status == 422 -> queue.markClaimState(mutation, "conflict", "HTTP $status")
           status == 401 || status == 403 -> queue.markClaimState(mutation, "failed", "HTTP $status")
           else -> {
@@ -52,6 +59,15 @@ class CourierSyncWorker(appContext: Context, params: WorkerParameters) : Corouti
       queue.close()
     }
   }
+}
+
+internal suspend fun finalizeCourierQueuedSuccess(
+  intentStore: StableCommandIntentStore,
+  idempotencyKey: String,
+  removeQueuedMutation: () -> Int,
+): Int {
+  intentStore.closeByIdempotencyKey(idempotencyKey)
+  return removeQueuedMutation()
 }
 
 internal const val COURIER_QUEUE_DB = "alistore-courier-offline.db"

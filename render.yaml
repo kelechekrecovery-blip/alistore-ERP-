@@ -18,6 +18,10 @@ services:
       - fromGroup: alistore-prod-common
       - key: PROCESS_ROLE
         value: api
+      # Expand/switch auth rollout: leave false while the previous API revision
+      # drains after the additive enum migration, then enable explicitly.
+      - key: AUTH_RECOVERY_OTP_ENABLED
+        value: "false"
       - key: DATABASE_URL
         fromDatabase:
           name: alistore-postgres-prod
@@ -72,6 +76,10 @@ services:
       - key: PUBLIC_DEMO_MODE
         value: "false"
       - key: NEXT_PUBLIC_DEMO_MODE
+        value: "false"
+      # This public gate is baked into the Next client build. Keep it false
+      # until deterministic API grace is enabled on every API instance.
+      - key: NEXT_PUBLIC_AUTH_REFRESH_ROTATION_GRACE_ENABLED
         value: "false"
       - key: SENTRY_DSN
         fromService: { name: alistore-api-prod, type: web, envVarKey: SENTRY_DSN }
@@ -189,6 +197,15 @@ envVarGroups:
         value: production
       - key: JWT_SECRET
         generateValue: true
+      # Mixed-version rollout gate. Keep false until every legacy API instance
+      # is drained, then enable together with the dedicated secret below.
+      - key: AUTH_REFRESH_ROTATION_GRACE_ENABLED
+        value: "false"
+      - key: AUTH_REFRESH_DERIVATION_SECRET
+        sync: false
+      # Keep disabled until email OTP delivery moves to a durable encrypted job.
+      - key: AUTH_EMAIL_LOGIN_ENABLED
+        value: "false"
       # Канал критических алертов. Без этих двух значений alerter.service держит
       # алерты в массиве в памяти процесса (delivered: false) — рестарт их
       # стирает, и о 5xx, смерти relay и падении refund-релея не узнаёт никто.

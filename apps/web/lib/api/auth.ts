@@ -1,4 +1,4 @@
-import { API_BASE, getJson, postAuthJson, postAuthVoid, postJson } from './http';
+import { API_BASE, ApiError, getJson, postAuthJson, postAuthVoid, postJson } from './http';
 
 export interface AuthTokens {
   accessToken: string;
@@ -6,6 +6,14 @@ export interface AuthTokens {
   tokenType: string;
   expiresIn: string;
 }
+
+export type TelegramAuthResult =
+  | ({ status: 'authenticated' } & AuthTokens)
+  | {
+      status: 'enrollment_required';
+      enrollmentToken: string;
+      expiresIn: number;
+    };
 
 export interface AuthUser {
   customerId: string;
@@ -17,16 +25,26 @@ export function authRequestOtp(phone: string): Promise<{ challengeId: string; de
   return postJson('/auth/otp/request', { phone });
 }
 
-export function authVerifyOtp(phone: string, code: string): Promise<AuthTokens> {
-  return postJson('/auth/otp/verify', { phone, code }, { 'x-alistore-web': '1' }, true);
+export function authVerifyOtp(phone: string, code: string, challengeId?: string): Promise<AuthTokens> {
+  return postJson(
+    '/auth/otp/verify',
+    { phone, code, ...(challengeId ? { challengeId } : {}) },
+    { 'x-alistore-web': '1' },
+    true,
+  );
 }
 
 export function authRequestRecoveryOtp(phone: string): Promise<{ challengeId: string; devCode?: string }> {
   return postJson('/auth/recovery/request', { phone });
 }
 
-export function authVerifyRecoveryOtp(phone: string, code: string): Promise<AuthTokens> {
-  return postJson('/auth/recovery/verify', { phone, code }, { 'x-alistore-web': '1' }, true);
+export function authVerifyRecoveryOtp(phone: string, code: string, challengeId?: string): Promise<AuthTokens> {
+  return postJson(
+    '/auth/recovery/verify',
+    { phone, code, ...(challengeId ? { challengeId } : {}) },
+    { 'x-alistore-web': '1' },
+    true,
+  );
 }
 
 /**
@@ -38,8 +56,13 @@ export function authRequestEmailOtp(email: string): Promise<{ challengeId: strin
   return postJson('/auth/email/request', { email });
 }
 
-export function authVerifyEmailOtp(email: string, code: string): Promise<AuthTokens> {
-  return postJson('/auth/email/verify', { email, code }, { 'x-alistore-web': '1' }, true);
+export function authVerifyEmailOtp(email: string, code: string, challengeId?: string): Promise<AuthTokens> {
+  return postJson(
+    '/auth/email/verify',
+    { email, code, ...(challengeId ? { challengeId } : {}) },
+    { 'x-alistore-web': '1' },
+    true,
+  );
 }
 
 /** Send a confirmation code to an address the signed-in customer wants to attach. */
@@ -48,15 +71,38 @@ export function authRequestEmailAttach(email: string, accessToken: string): Prom
 }
 
 /** Confirm the attach code; binds the address to the signed-in account. No response body. */
-export function authConfirmEmailAttach(email: string, code: string, accessToken: string): Promise<void> {
-  return postAuthVoid('/auth/email/attach/confirm', { email, code }, accessToken);
+export function authConfirmEmailAttach(
+  email: string,
+  code: string,
+  accessToken: string,
+  challengeId?: string,
+): Promise<void> {
+  return postAuthVoid(
+    '/auth/email/attach/confirm',
+    { email, code, ...(challengeId ? { challengeId } : {}) },
+    accessToken,
+  );
 }
 
 export function authTelegramLogin(
   initData: string,
   source: 'mini_app' | 'login_widget' = 'mini_app',
-): Promise<AuthTokens> {
-  return postJson('/auth/social/telegram', { initData, source }, { 'x-alistore-web': '1' }, true);
+): Promise<TelegramAuthResult> {
+  return postJson('/auth/v2/social/telegram', { initData, source }, { 'x-alistore-web': '1' }, true);
+}
+
+export function authCompleteSocialEnrollment(
+  enrollmentToken: string,
+  phone: string,
+  code: string,
+  challengeId?: string,
+): Promise<{ status: 'authenticated' } & AuthTokens> {
+  return postJson(
+    '/auth/v2/social/enrollment/complete',
+    { enrollmentToken, phone, code, ...(challengeId ? { challengeId } : {}) },
+    { 'x-alistore-web': '1' },
+    true,
+  );
 }
 
 export function authAppleLogin(
@@ -71,12 +117,20 @@ export function authRefresh(refreshToken?: string): Promise<AuthTokens> {
 }
 
 export async function authLogout(refreshToken?: string): Promise<void> {
-  await fetch(`${API_BASE}/auth/logout`, {
+  const response = await fetch(`${API_BASE}/auth/logout`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-alistore-web': '1' },
     credentials: 'include',
     body: JSON.stringify(refreshToken ? { refreshToken } : {}),
-  }).catch(() => undefined);
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({})) as { code?: string; message?: string };
+    throw new ApiError(
+      response.status,
+      detail.message ?? `request failed ${response.status}`,
+      detail.code,
+    );
+  }
 }
 
 export function authMe(accessToken: string): Promise<AuthUser> {

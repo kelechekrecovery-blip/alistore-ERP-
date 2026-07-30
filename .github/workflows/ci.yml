@@ -51,7 +51,6 @@ jobs:
       DATABASE_URL: postgresql://alistore:alistore@localhost:5432/alistore_test?schema=public
       TEST_DATABASE_URL: postgresql://alistore:alistore@localhost:5432/alistore_test?schema=public
       E2E_DATABASE_URL: postgresql://alistore:alistore@localhost:5432/alistore_test?schema=public
-      ALISTORE_TEST_DATABASE_CONFIRMED: '1'
       JWT_SECRET: ci-secret-alistore
       AUTH_OTP_DEV_ECHO: 'true'
 
@@ -63,6 +62,8 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - name: Supply release gate unit tests
+        run: node --test scripts/__tests__/supply-release-gate.test.mjs scripts/__tests__/supply-release-gate-db.test.mjs
       - run: npm run native:deeplink-preflight
       # Guards the App Store screenshot device class; needs no simulator.
       - run: npm run ios:store-screenshots:test
@@ -71,7 +72,13 @@ jobs:
       - run: npm run db:deploy -w @alistore/api
       - run: npm run api:build
       - run: npm run build -w @alistore/web
-      - run: npm run api:test
+      - name: API tests in an isolated per-run schema
+        run: npm run api:test
+        env:
+          # The Jest safety guard requires the configured application target to
+          # differ from TEST_DATABASE_URL. setup-env switches workers to the
+          # generated schema after globalSetup has migrated and verified it.
+          DATABASE_URL: postgresql://alistore:alistore@localhost:5432/postgres?schema=public
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e
 
@@ -82,3 +89,23 @@ jobs:
           path: |
             playwright-report/
             test-results/
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Android lint, unit tests and debug builds
+        working-directory: apps/android
+        run: >-
+          ./gradlew
+          lintDebug
+          :core:testDebugUnitTest
+          :app:assembleDebug
+          :staff:assembleDebug
+          :pos:assembleDebug
+          :courier:assembleDebug

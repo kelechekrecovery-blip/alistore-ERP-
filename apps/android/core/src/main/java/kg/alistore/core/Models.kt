@@ -52,7 +52,7 @@ data class AuthTokens(val accessToken: String, val refreshToken: String)
 
 data class AuthUser(val customerId: String, val phone: String?, val type: String)
 
-data class OtpChallenge(val devCode: String?)
+data class OtpChallenge(val devCode: String?, val challengeId: String? = null)
 
 data class CreateOrderItem(val sku: String, val qty: Int, val price: Int)
 

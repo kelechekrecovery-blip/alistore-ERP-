@@ -46,3 +46,93 @@ public enum IdempotencyKeys {
         return digest.map { String(format: "%02x", $0) }.joined().prefix(16).lowercased()
     }
 }
+
+/// Persists an open mutation intent across retries and app relaunches.
+///
+/// Only a payload fingerprint and opaque HTTP key are stored. Entity identifiers
+/// are hashed into the storage key; request bodies are never persisted.
+public final class MutationIntentStore: @unchecked Sendable {
+    private struct Record: Codable {
+        let payloadFingerprint: String
+        let idempotencyKey: String
+    }
+
+    private static let lock = NSLock()
+    private let defaults: UserDefaults
+    private let storagePrefix: String
+
+    public init(defaults: UserDefaults = .standard, storagePrefix: String = "alistore.mutation-intent.v1") {
+        self.defaults = defaults
+        self.storagePrefix = storagePrefix
+    }
+
+    /// The same open logical intent gets the same key. Edited content replaces
+    /// that intent and gets a new key.
+    public func key<Body: Encodable>(
+        namespace: String,
+        scope: String,
+        body: Body
+    ) throws -> String {
+        let payloadFingerprint = try IdempotencyKeys.fingerprint(body)
+        let storageKey = storageKey(namespace: namespace, scope: scope)
+
+        return Self.lock.withLock {
+            if let data = defaults.data(forKey: storageKey),
+               let record = try? JSONDecoder().decode(Record.self, from: data),
+               record.payloadFingerprint == payloadFingerprint {
+                return record.idempotencyKey
+            }
+
+            let key = "\(safeNamespace(namespace))-\(payloadFingerprint)-\(UUID().uuidString.lowercased())"
+            let record = Record(payloadFingerprint: payloadFingerprint, idempotencyKey: key)
+            if let data = try? JSONEncoder().encode(record) {
+                defaults.set(data, forKey: storageKey)
+            }
+            return key
+        }
+    }
+
+    /// Completes only the intent that succeeded. A late response from an older
+    /// request cannot erase a newer, edited intent.
+    public func complete(namespace: String, scope: String, idempotencyKey: String) {
+        let storageKey = storageKey(namespace: namespace, scope: scope)
+        Self.lock.withLock {
+            guard let data = defaults.data(forKey: storageKey),
+                  let record = try? JSONDecoder().decode(Record.self, from: data),
+                  record.idempotencyKey == idempotencyKey else { return }
+            defaults.removeObject(forKey: storageKey)
+        }
+    }
+
+    private func storageKey(namespace: String, scope: String) -> String {
+        let digest = SHA256.hash(data: Data("\(namespace)|\(scope)".utf8))
+        let hash = digest.map { String(format: "%02x", $0) }.joined()
+        return "\(storagePrefix).\(hash)"
+    }
+
+    private func safeNamespace(_ namespace: String) -> String {
+        String(namespace.lowercased().map { character in
+            character.isLetter || character.isNumber || character == "-" ? character : "-"
+        })
+    }
+}
+
+public enum NativeMutationEndpoint {
+    public static func orderCancellation(orderId: String) -> String {
+        "orders/mine/\(pathSegment(orderId))/cancellations"
+    }
+
+    public static func receivableSettlement(receivableId: String) -> String {
+        "payments/receivables/\(pathSegment(receivableId))/settle"
+    }
+
+    public static func itemHandover(orderId: String, itemId: String) -> String {
+        "orders/\(pathSegment(orderId))/items/\(pathSegment(itemId))/handover"
+    }
+
+    private static func pathSegment(_ value: String) -> String {
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "/")
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+    }
+}

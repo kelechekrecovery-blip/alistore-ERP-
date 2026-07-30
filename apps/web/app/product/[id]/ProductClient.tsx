@@ -29,7 +29,8 @@ import { useAuth } from "@/lib/auth";
 import { TO_ORDER_CART_QTY_CAP, useCart } from "@/lib/cart";
 import { useCompare } from "@/lib/compare";
 import { useFavorites } from "@/lib/favorites";
-import { conditionLabel, som, supplyLeadLabel } from "@/lib/format";
+import { conditionLabel, som } from "@/lib/format";
+import { availabilityLabel, catalogAvailability } from "@/lib/to-order";
 
 export default function ProductPage({ params }: { params: { id: string } }) {
   const { add } = useCart();
@@ -95,9 +96,10 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       </StoreMessage>
     );
 
-  const inStock = product.availableUnits > 0;
-  const toOrder = !inStock && product.supplyMode === "to_order" && product.orderable;
-  const buyable = product.orderable;
+  const availability = catalogAvailability(product);
+  const inStock = availability.isInStock;
+  const toOrder = availability.isToOrder;
+  const buyable = availability.buyable;
   // A to-order line has no stock ceiling — the `+` control must not clamp to
   // `availableUnits` (always 0 for it). Cap at `TO_ORDER_CART_QTY_CAP`
   // instead (see its doc comment in lib/cart.tsx for why 10).
@@ -119,7 +121,8 @@ export default function ProductPage({ params }: { params: { id: string } }) {
         price: product.price,
         stockLimit: qtyCap,
         supplyMode: toOrder ? "to_order" : "own_stock",
-        supplyLeadDays: toOrder ? product.supplyLeadDays : null,
+        supplyLeadDays: toOrder ? availability.leadTimeDays : null,
+        orderable: buyable,
       },
       qty,
     );
@@ -223,16 +226,16 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               {inStock ? (
                 <div className="mt-5 flex items-center gap-2 text-sm font-semibold text-success">
                   <span className="h-2 w-2 rounded-full bg-success shadow-[0_0_10px_#2e7d46]" />
-                  {`В наличии · ${product.availableUnits} шт.`}
+                  {availabilityLabel(availability, product.availableUnits)}
                 </div>
-              ) : product.supplyMode === "to_order" && product.supplyLeadDays ? (
+              ) : toOrder ? (
                 <div className="mt-5">
-                  <StatusPill status="info">{supplyLeadLabel(product.supplyLeadDays)}</StatusPill>
+                  <StatusPill status="info">{availabilityLabel(availability, product.availableUnits)}</StatusPill>
                 </div>
               ) : (
                 <div className="mt-5 flex items-center gap-2 text-sm font-semibold text-warn">
                   <span className="h-2 w-2 rounded-full bg-warn" />
-                  Доступен под заказ
+                  {availabilityLabel(availability, product.availableUnits)}
                 </div>
               )}
 

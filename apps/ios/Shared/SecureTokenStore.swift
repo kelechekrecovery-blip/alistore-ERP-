@@ -8,9 +8,9 @@ public struct SecureTokenStore: Sendable {
         self.service = service
     }
 
-    // Доступность токена: `AfterFirstUnlockThisDeviceOnly`. Устройство-только
-    // (не уезжает в бэкап и на другой телефон) и читается лишь после первой
-    // разблокировки за загрузку.
+    // Доступность токена: `WhenUnlockedThisDeviceOnly`. Устройство-только
+    // (не уезжает в бэкап и на другой телефон) и читается лишь пока устройство
+    // разблокировано.
     //
     // Намеренно НЕ `.biometryCurrentSet`: токен читается только в `restore()` на
     // холодном старте, до экрана quick-unlock и в фоновой Task без UI-контекста.
@@ -29,7 +29,7 @@ public struct SecureTokenStore: Sendable {
         SecItemDelete(query as CFDictionary)
         var insert = query
         insert[kSecValueData as String] = data
-        insert[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        insert[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         let status = SecItemAdd(insert as CFDictionary, nil)
         guard status == errSecSuccess else { throw KeychainError(status: status) }
     }

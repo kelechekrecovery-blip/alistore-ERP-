@@ -23,6 +23,8 @@ export interface CartItem {
   /** `to_order` lines skip the stock gate server-side — see SUPPLY-TO-ORDER-PLAN.md срез 2. */
   supplyMode: 'own_stock' | 'to_order';
   supplyLeadDays: number | null;
+  /** Refreshed storefront purchase permission; omitted by legacy stored carts. */
+  orderable?: boolean;
 }
 
 /**
@@ -67,6 +69,7 @@ interface CartContextValue {
     availableUnits: number;
     supplyMode?: 'own_stock' | 'to_order';
     supplyLeadDays?: number | null;
+    orderable?: boolean;
   }>) => void;
 }
 
@@ -106,6 +109,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             stockLimit,
             supplyMode,
             supplyLeadDays: supplyMode === 'to_order' && Number.isFinite(item.supplyLeadDays) ? item.supplyLeadDays! : null,
+            orderable: item.orderable,
             qty: Math.max(1, Math.min(item.qty!, stockLimit)),
           };
         }));
@@ -268,6 +272,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     availableUnits: number;
     supplyMode?: 'own_stock' | 'to_order';
     supplyLeadDays?: number | null;
+    orderable?: boolean;
   }>) => {
     const byId = new Map(products.map((product) => [product.id, product]));
     setItems((current) => current.flatMap((item) => {
@@ -286,6 +291,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         stockLimit,
         supplyMode: isToOrder ? 'to_order' : 'own_stock',
         supplyLeadDays: isToOrder ? (product.supplyLeadDays ?? null) : null,
+        orderable: product.orderable,
         qty: Math.min(item.qty, stockLimit),
       }];
     }));

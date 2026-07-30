@@ -17,6 +17,11 @@ export class VerifyOtpDto {
   @IsString()
   @Length(6, 6, { message: 'code must be 6 digits' })
   code!: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 64)
+  challengeId?: string;
 }
 
 export class RequestEmailOtpDto {
@@ -28,6 +33,11 @@ export class VerifyEmailOtpDto extends RequestEmailOtpDto {
   @IsString()
   @Length(6, 6, { message: 'code must be 6 digits' })
   code!: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 64)
+  challengeId?: string;
 }
 
 export class RefreshDto {
@@ -56,4 +66,10 @@ export class AppleSocialLoginDto {
   @IsOptional()
   @IsString()
   name?: string;
+}
+
+export class CompleteSocialEnrollmentDto extends VerifyOtpDto {
+  @IsString()
+  @Length(32, 256)
+  enrollmentToken!: string;
 }

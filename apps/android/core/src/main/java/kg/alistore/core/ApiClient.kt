@@ -56,26 +56,29 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     request("promotions/quote", "POST", request.toJson(), token).promotionQuote()
 
   override suspend fun requestOtp(phone: String): OtpChallenge = request("auth/otp/request", "POST", JSONObject().put("phone", phone)).let {
-    OtpChallenge(it.optString("devCode").takeIf(String::isNotBlank))
+    OtpChallenge(
+      devCode = it.optString("devCode").takeIf(String::isNotBlank),
+      challengeId = it.optString("challengeId").takeIf(String::isNotBlank),
+    )
   }
 
-  override suspend fun verifyOtp(phone: String, code: String): AuthTokens =
-    request("auth/otp/verify", "POST", JSONObject().put("phone", phone).put("code", code)).tokens()
+  override suspend fun verifyOtp(phone: String, code: String, challengeId: String?): AuthTokens =
+    request("auth/otp/verify", "POST", otpVerificationPayload(phone, code, challengeId)).tokens()
 
   override suspend fun requestEmailOtp(email: String): EmailOtpChallenge =
     request("auth/email/request", "POST", JSONObject().put("email", email)).emailChallenge()
 
-  override suspend fun verifyEmailOtp(email: String, code: String): AuthTokens =
-    request("auth/email/verify", "POST", JSONObject().put("email", email).put("code", code)).tokens()
+  override suspend fun verifyEmailOtp(email: String, code: String, challengeId: String?): AuthTokens =
+    request("auth/email/verify", "POST", emailOtpVerificationPayload(email, code, challengeId)).tokens()
 
   override suspend fun requestEmailAttach(email: String, accessToken: String): EmailOtpChallenge =
     request("auth/email/attach/request", "POST", JSONObject().put("email", email), token = accessToken).emailChallenge()
 
-  override suspend fun confirmEmailAttach(email: String, code: String, accessToken: String) {
+  override suspend fun confirmEmailAttach(email: String, code: String, accessToken: String, challengeId: String?) {
     request(
       "auth/email/attach/confirm",
       "POST",
-      JSONObject().put("email", email).put("code", code),
+      JSONObject().put("email", email).put("code", code).putOptional("challengeId", challengeId),
       token = accessToken,
       allowEmpty = true,
     )
@@ -728,6 +731,15 @@ internal fun JSONObject.promotionQuote() = PromotionQuote(
 )
 
 private fun JSONObject.tokens() = AuthTokens(getString("accessToken"), getString("refreshToken"))
+
+private fun JSONObject.putOptional(key: String, value: String?): JSONObject =
+  apply { value?.let { put(key, it) } }
+
+internal fun otpVerificationPayload(phone: String, code: String, challengeId: String?): JSONObject =
+  JSONObject().put("phone", phone).put("code", code).putOptional("challengeId", challengeId)
+
+internal fun emailOtpVerificationPayload(email: String, code: String, challengeId: String?): JSONObject =
+  JSONObject().put("email", email).put("code", code).putOptional("challengeId", challengeId)
 
 private fun JSONObject.emailChallenge() = EmailOtpChallenge(
   challengeId = optString("challengeId"),

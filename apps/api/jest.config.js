@@ -7,6 +7,8 @@ module.exports = {
     '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },
   testEnvironment: 'node',
+  globalSetup: '<rootDir>/test/global-setup.js',
+  globalTeardown: '<rootDir>/test/global-teardown.js',
   setupFiles: ['<rootDir>/test/setup-env.ts'],
   setupFilesAfterEnv: ['<rootDir>/test/setup-db.ts'],
   testTimeout: 30000,

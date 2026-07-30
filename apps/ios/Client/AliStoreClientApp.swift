@@ -298,6 +298,8 @@ private struct ClientLoginView: View {
     @State private var email = ""
     @State private var code = ""
     @State private var requested = false
+    @State private var resendAvailableAt: Date?
+    @State private var resendSeconds = 0
 
     var body: some View {
         ZStack {
@@ -310,7 +312,7 @@ private struct ClientLoginView: View {
                         .frame(width: 60, height: 60)
                         .background(ClientTheme.coral, in: RoundedRectangle(cornerRadius: 17))
                         .padding(.bottom, 24)
-                    Text("Вход в AliStore")
+                    Text(auth.requiresApplePhoneEnrollment ? "Подтвердите номер телефона" : "Войти или создать аккаунт")
                         .font(ClientTheme.display(30, weight: .black))
                         .foregroundStyle(.white)
                     Text(subtitle)
@@ -318,8 +320,16 @@ private struct ClientLoginView: View {
                         .foregroundStyle(ClientTheme.muted)
                         .lineSpacing(4)
                         .padding(.top, 10)
-                    channelSwitcher
-                        .padding(.top, 22)
+                    if !auth.requiresApplePhoneEnrollment {
+                        channelSwitcher
+                            .padding(.top, 22)
+                    } else {
+                        Text("Apple подтвердил вашу личность. Телефон нужен как основной номер аккаунта для заказов, доставки и восстановления доступа.")
+                            .font(ClientTheme.body(13))
+                            .foregroundStyle(ClientTheme.muted)
+                            .lineSpacing(3)
+                            .padding(.top, 18)
+                    }
                     if channel == .phone {
                         TextField("+996 700 12 34 56", text: $phone)
                             .keyboardType(.phonePad)
@@ -331,6 +341,7 @@ private struct ClientLoginView: View {
                             .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
                             .padding(.top, 12)
                             .accessibilityIdentifier("client-phone")
+                            .disabled(requested || auth.isLoading)
                     } else {
                         TextField("you@example.com", text: $email)
                             .keyboardType(.emailAddress)
@@ -344,6 +355,7 @@ private struct ClientLoginView: View {
                             .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
                             .padding(.top, 12)
                             .accessibilityIdentifier("client-email")
+                            .disabled(requested || auth.isLoading)
                     }
                     if requested {
                         TextField("6-значный код", text: $code)
@@ -355,6 +367,8 @@ private struct ClientLoginView: View {
                             .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.lime))
                             .padding(.top, 10)
                             .accessibilityIdentifier("client-otp")
+                            .accessibilityLabel(channel == .phone ? "Одноразовый код из SMS" : "Одноразовый код из письма")
+                            .accessibilityHint("Введите шесть цифр. Система может подставить код автоматически.")
                         if let devCode = auth.devCode {
                             Text("Код для тестового контура: \(devCode)")
                                 .font(ClientTheme.body(12))
@@ -364,15 +378,26 @@ private struct ClientLoginView: View {
                     }
                     Button {
                         Task {
-                            switch (channel, requested) {
-                            case (.phone, true):
-                                await auth.verify(phone: normalizedPhone, code: code.filter(\.isNumber))
-                            case (.phone, false):
-                                requested = await auth.requestOTP(phone: normalizedPhone)
-                            case (.email, true):
-                                await auth.verifyEmail(email: email, code: code.filter(\.isNumber))
-                            case (.email, false):
-                                requested = await auth.requestEmailOTP(email: email)
+                            if auth.requiresApplePhoneEnrollment {
+                                if requested {
+                                    await auth.completeAppleEnrollment(
+                                        phone: normalizedPhone,
+                                        code: code.filter(\.isNumber)
+                                    )
+                                } else {
+                                    await requestCode()
+                                }
+                            } else {
+                                switch (channel, requested) {
+                                case (.phone, true):
+                                    await auth.verify(phone: normalizedPhone, code: code.filter(\.isNumber))
+                                case (.phone, false):
+                                    await requestCode()
+                                case (.email, true):
+                                    await auth.verifyEmail(email: email, code: code.filter(\.isNumber))
+                                case (.email, false):
+                                    await requestCode()
+                                }
                             }
                         }
                     } label: {
@@ -385,6 +410,28 @@ private struct ClientLoginView: View {
                     .disabled(auth.isLoading || !canSubmit)
                     .padding(.top, 12)
                     .accessibilityIdentifier(requested ? "client-verify" : "client-request-otp")
+                    if requested {
+                        Button(resendSeconds > 0 ? "Отправить ещё раз через \(resendSeconds) сек." : "Отправить код ещё раз") {
+                            Task { await requestCode() }
+                        }
+                        .disabled(auth.isLoading || resendSeconds > 0)
+                        .font(ClientTheme.body(13, weight: .semibold))
+                        .foregroundStyle(resendSeconds > 0 ? ClientTheme.muted : ClientTheme.lime)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 10)
+                        .accessibilityIdentifier("client-resend-otp")
+                        Button(channel == .phone ? "Изменить номер" : "Изменить адрес") {
+                            requested = false
+                            code = ""
+                            resendAvailableAt = nil
+                        }
+                        .disabled(auth.isLoading)
+                        .font(ClientTheme.body(13))
+                        .foregroundStyle(ClientTheme.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 8)
+                        .accessibilityIdentifier("client-change-identifier")
+                    }
                     if channel == .email && !requested {
                         // Честное предупреждение вместо «письмо отправлено» в пустоту:
                         // сервер отвечает одинаково на любой адрес, чтобы не выдавать,
@@ -404,22 +451,39 @@ private struct ClientLoginView: View {
                     // Apple ниже кода, а не вместо него: телефон остаётся первичным
                     // идентификатором, без него не работают доставка и COD. Apple —
                     // быстрый вход для тех, у кого аккаунт уже связан.
-                    SignInWithAppleButton(.signIn) { request in
-                        let raw = AppleSignInNonce.random()
-                        appleRawNonce = raw
-                        request.requestedScopes = [.fullName, .email]
-                        // На сервер уйдёт эта же строка: Apple кладёт её в claim токена.
-                        request.nonce = AppleSignInNonce.hashed(raw)
-                    } onCompletion: { result in
-                        Task { await handleApple(result) }
+                    if auth.requiresApplePhoneEnrollment {
+                        Button("Отменить регистрацию через Apple") {
+                            auth.cancelAppleEnrollment()
+                            requested = false
+                            code = ""
+                            resendAvailableAt = nil
+                        }
+                        .font(ClientTheme.body(13))
+                        .foregroundStyle(ClientTheme.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 14)
+                        .accessibilityIdentifier("client-apple-enrollment-cancel")
+                    } else {
+                        SignInWithAppleButton(.signIn) { request in
+                            let raw = AppleSignInNonce.random()
+                            appleRawNonce = raw
+                            request.requestedScopes = [.fullName, .email]
+                            // На сервер уйдёт эта же строка: Apple кладёт её в claim токена.
+                            request.nonce = AppleSignInNonce.hashed(raw)
+                        } onCompletion: { result in
+                            Task { await handleApple(result) }
+                        }
+                        .signInWithAppleButtonStyle(.white)
+                        .frame(height: 50)
+                        .clipShape(RoundedRectangle(cornerRadius: 13))
+                        .padding(.top, 12)
+                        .accessibilityIdentifier("client-apple-signin")
                     }
-                    .signInWithAppleButtonStyle(.white)
-                    .frame(height: 50)
-                    .clipShape(RoundedRectangle(cornerRadius: 13))
-                    .padding(.top, 12)
-                    .accessibilityIdentifier("client-apple-signin")
 
-                    Button("Продолжить как гость →", action: onGuest)
+                    Button("Продолжить как гость →") {
+                        auth.cancelAppleEnrollment()
+                        onGuest()
+                    }
                         .font(ClientTheme.body(13))
                         .foregroundStyle(ClientTheme.muted)
                         .frame(maxWidth: .infinity)
@@ -432,6 +496,32 @@ private struct ClientLoginView: View {
                 .frame(maxWidth: 402)
                 .frame(minHeight: 700)
             }
+        }
+        .task(id: resendAvailableAt) {
+            guard let deadline = resendAvailableAt else {
+                resendSeconds = 0
+                return
+            }
+            while !Task.isCancelled {
+                let remaining = max(0, Int(ceil(deadline.timeIntervalSinceNow)))
+                resendSeconds = remaining
+                if remaining == 0 { break }
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    private func requestCode() async {
+        let issued: Bool
+        switch channel {
+        case .phone:
+            issued = await auth.requestOTP(phone: normalizedPhone)
+        case .email:
+            issued = await auth.requestEmailOTP(email: email)
+        }
+        if issued {
+            requested = true
+            resendAvailableAt = Date().addingTimeInterval(60)
         }
     }
 
@@ -454,6 +544,12 @@ private struct ClientLoginView: View {
                 nonce: AppleSignInNonce.hashed(appleRawNonce),
                 name: fullName
             )
+            if auth.requiresApplePhoneEnrollment {
+                channel = .phone
+                requested = false
+                code = ""
+                resendAvailableAt = nil
+            }
         case .failure(let error):
             // Отмену пользователем не показываем как ошибку: он просто передумал.
             if (error as? ASAuthorizationError)?.code == .canceled { return }
@@ -471,6 +567,7 @@ private struct ClientLoginView: View {
                     // означало бы предложить ввести SMS-код в форму почты.
                     requested = false
                     code = ""
+                    resendAvailableAt = nil
                 } label: {
                     Text(option.title)
                         .font(ClientTheme.body(13, weight: channel == option ? .bold : .medium))
@@ -492,13 +589,18 @@ private struct ClientLoginView: View {
     }
 
     private var subtitle: String {
-        channel == .phone
-            ? "Техника с гарантией и trade-in. Войдите по номеру — быстро и безопасно."
-            : "Войдите по адресу, привязанному к вашему аккаунту. Код придёт письмом."
+        if auth.requiresApplePhoneEnrollment {
+            return requested
+                ? "Введите код из SMS, чтобы завершить создание или привязку аккаунта."
+                : "Введите основной номер телефона. Мы отправим код подтверждения."
+        }
+        return channel == .phone
+            ? "Введите телефон и код из SMS. Если аккаунта ещё нет, мы создадим его автоматически."
+            : "Почта — дополнительный вход в тот же аккаунт. Код придёт только на ранее привязанный адрес."
     }
 
     private var actionTitle: String {
-        if requested { return "Войти" }
+        if requested { return auth.requiresApplePhoneEnrollment ? "Завершить регистрацию" : "Войти" }
         return channel == .phone ? "Получить код по SMS" : "Получить код на почту"
     }
 
@@ -1218,7 +1320,9 @@ private struct ClientRootView: View {
         .task {
             restoreLocalState()
             #if DEBUG
-            if UITestBootstrap.startsSignedIn {
+            if UITestBootstrap.startsAppleEnrollment {
+                auth.useUITestAppleEnrollment()
+            } else if UITestBootstrap.startsSignedIn {
                 auth.useUITestSession()
             }
             #endif
@@ -2474,6 +2578,7 @@ private struct ClientOrderStatusView: View {
     @State private var cancellationReason = ""
     @State private var isRequestingCancellation = false
     @State private var cancellationError: String?
+    private let mutationIntents = MutationIntentStore()
 
     private let stepIcons = ["checkmark.circle", "creditcard", "shippingbox", "truck.box", "house"]
 
@@ -2750,12 +2855,22 @@ private struct ClientOrderStatusView: View {
         cancellationError = nil
         defer { isRequestingCancellation = false }
         do {
-            cancellation = try await APIClient(baseURL: environment.apiBaseURL).post(
-                "orders/mine/\(order.id)/cancellations",
-                body: CreateOrderCancellationRequest(reason: cancellationReason.trimmingCharacters(in: .whitespacesAndNewlines)),
-                token: token,
-                idempotencyKey: UUID().uuidString
+            let request = CreateOrderCancellationRequest(
+                reason: cancellationReason.trimmingCharacters(in: .whitespacesAndNewlines)
             )
+            let scope = order.id
+            let key = try mutationIntents.key(
+                namespace: "client-order-cancellation",
+                scope: scope,
+                body: request
+            )
+            cancellation = try await APIClient(baseURL: environment.apiBaseURL).post(
+                NativeMutationEndpoint.orderCancellation(orderId: order.id),
+                body: request,
+                token: token,
+                idempotencyKey: key
+            )
+            mutationIntents.complete(namespace: "client-order-cancellation", scope: scope, idempotencyKey: key)
             showCancelConfirm = false
         } catch {
             cancellationError = error.localizedDescription

@@ -446,6 +446,9 @@ private fun PosAfterSaleScreen(
   var busy by remember { mutableStateOf(false) }
   var message by remember { mutableStateOf<String?>(null) }
   var restockLocation by rememberSaveable { mutableStateOf("RETURNS-BISHKEK") }
+  val intentStore = remember(context, session.staffId) {
+    StableCommandIntentStore(context, QueueOwner.staff(session.staffId))
+  }
   val exchangeEvidencePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
       val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
@@ -515,6 +518,13 @@ private fun PosAfterSaleScreen(
           val amount = receivableAmount.toIntOrNull() ?: return@Button
           busy = true
           scope.launch {
+            val intent = intentStore.posReceivable(
+              receivableId,
+              receivableMethod,
+              amount,
+              txnId = null,
+              shiftId = null,
+            )
             runCatching {
               requireNotNull(supplyGateway) { "API начислений недоступен в этой сборке" }
               supplyGateway.settleReceivable(
@@ -524,9 +534,10 @@ private fun PosAfterSaleScreen(
                 txnId = null,
                 shiftId = null,
                 token = session.accessToken,
-                idempotencyKey = UUID.randomUUID().toString(),
+                idempotencyKey = intent.idempotencyKey,
               )
             }.onSuccess {
+              intentStore.close(intent)
               message = "Начисление погашено"
               receivableId = ""
               receivableAmount = ""
@@ -547,15 +558,17 @@ private fun PosAfterSaleScreen(
         onClick = {
           busy = true
           scope.launch {
+            val intent = intentStore.posHandover(orderId, handoverItemId)
             runCatching {
               requireNotNull(supplyGateway) { "API частичной выдачи недоступен в этой сборке" }
               supplyGateway.handOverOrderItem(
                 orderId = orderId,
                 itemId = handoverItemId,
                 token = session.accessToken,
-                idempotencyKey = UUID.randomUUID().toString(),
+                idempotencyKey = intent.idempotencyKey,
               )
             }.onSuccess {
+              intentStore.close(intent)
               message = "Строка заказа выдана"
               handoverItemId = ""
             }.onFailure { message = it.message }

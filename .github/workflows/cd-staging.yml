@@ -61,6 +61,7 @@ jobs:
       DATABASE_URL: postgresql://alistore:alistore@localhost:5432/alistore_cd_rehearsal?schema=public
       DIRECT_DATABASE_URL: postgresql://alistore:alistore@localhost:5432/alistore_cd_rehearsal?schema=public
       JWT_SECRET: cd-rehearsal-secret
+      AUTH_REFRESH_ROTATION_GRACE_ENABLED: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

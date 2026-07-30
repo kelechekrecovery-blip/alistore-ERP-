@@ -68,7 +68,6 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import java.io.ByteArrayOutputStream
 import java.io.IOException
-import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -271,6 +270,9 @@ private fun CourierRoute(
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
+  val intentStore = remember(context, session.staffId) {
+    StableCommandIntentStore(context, QueueOwner.staff(session.staffId))
+  }
   val orderedDeliveries = remember(deliveries, focusedDeliveryId) {
     if (focusedDeliveryId == null) deliveries
     else deliveries.sortedBy { if (it.id == focusedDeliveryId) 0 else 1 }
@@ -313,8 +315,16 @@ private fun CourierRoute(
           if (delivery.status == "courier_assigned") CourierActionButton("Начать доставку", busy, delivery.canStartByNativePreflight) {
             busy = true
             scope.launch {
-              runCatching { commands.start(delivery.id, session.accessToken, UUID.randomUUID().toString()) }
-                .onSuccess { statusMessage = if (it is CourierCommandResult.Queued) "Сохранено офлайн" else "Доставка начата"; scheduleCourierSync(context.applicationContext, apiBaseUrl); onRefresh() }
+              val intent = intentStore.courierStart(delivery.id)
+              runCatching {
+                commands.start(delivery.id, session.accessToken, intent.idempotencyKey)
+              }
+                .onSuccess {
+                  if (it is CourierCommandResult.Sent) intentStore.close(intent)
+                  statusMessage = if (it is CourierCommandResult.Queued) "Сохранено офлайн" else "Доставка начата"
+                  scheduleCourierSync(context.applicationContext, apiBaseUrl)
+                  onRefresh()
+                }
                 .onFailure { statusMessage = it.message }
               busy = false
             }
@@ -338,10 +348,26 @@ private fun CourierRoute(
               )
             }
             CourierActionButton("Доставлено · ${collectedCod ?: delivery.outstandingCod} сом", busy || !validCollectedCod || (partialReasonRequired && partialCodReason.isBlank())) {
+              val reason = partialCodReason.trim().ifEmpty { null }
+              val amount = collectedCod ?: 0
               busy = true
               scope.launch {
-                runCatching { commands.deliver(delivery.id, collectedCod ?: 0, partialCodReason.trim().ifEmpty { null }, session.accessToken, UUID.randomUUID().toString()) }
-                  .onSuccess { statusMessage = if (it is CourierCommandResult.Queued) "Сохранено офлайн" else "Доставка завершена"; scheduleCourierSync(context.applicationContext, apiBaseUrl); onRefresh() }
+                val intent = intentStore.courierDeliver(delivery.id, amount, reason)
+                runCatching {
+                  commands.deliver(
+                    delivery.id,
+                    amount,
+                    reason,
+                    session.accessToken,
+                    intent.idempotencyKey,
+                  )
+                }
+                  .onSuccess {
+                    if (it is CourierCommandResult.Sent) intentStore.close(intent)
+                    statusMessage = if (it is CourierCommandResult.Queued) "Сохранено офлайн" else "Доставка завершена"
+                    scheduleCourierSync(context.applicationContext, apiBaseUrl)
+                    onRefresh()
+                  }
                   .onFailure { statusMessage = it.message }
                 busy = false
               }
@@ -351,8 +377,20 @@ private fun CourierRoute(
               onClick = {
                 busy = true
                 scope.launch {
-                  runCatching { commands.fail(delivery.id, failureReason, session.accessToken, UUID.randomUUID().toString()) }
-                    .onSuccess { statusMessage = if (it is CourierCommandResult.Queued) "Сохранено офлайн" else "Попытка записана"; scheduleCourierSync(context.applicationContext, apiBaseUrl) }
+                  val intent = intentStore.courierFail(delivery.id, failureReason)
+                  runCatching {
+                    commands.fail(
+                      delivery.id,
+                      failureReason,
+                      session.accessToken,
+                      intent.idempotencyKey,
+                    )
+                  }
+                    .onSuccess {
+                      if (it is CourierCommandResult.Sent) intentStore.close(intent)
+                      statusMessage = if (it is CourierCommandResult.Queued) "Сохранено офлайн" else "Попытка записана"
+                      scheduleCourierSync(context.applicationContext, apiBaseUrl)
+                    }
                     .onFailure { statusMessage = it.message }
                   busy = false
                 }
@@ -450,6 +488,9 @@ private fun CourierCod(
 ) {
   val context = LocalContext.current.applicationContext
   val scope = rememberCoroutineScope()
+  val intentStore = remember(context, session.staffId) {
+    StableCommandIntentStore(context, QueueOwner.staff(session.staffId))
+  }
   val runs = deliveries.mapNotNull(CourierDelivery::run).distinctBy(CourierRunSummary::id)
   LazyColumn(modifier.fillMaxSize().background(CourierInk).statusBarsPadding(), contentPadding = PaddingValues(18.dp)) {
     item {
@@ -486,10 +527,22 @@ private fun CourierCod(
             }
             Button(
               onClick = {
+                val submittedAmount = amount ?: 0
+                val submittedReason = reason.trim().ifEmpty { null }
                 busy = true
                 scope.launch {
-                  runCatching { commands.handover(run.id, amount ?: 0, reason.trim().ifEmpty { null }, session.accessToken, "courier-handover-${run.id}") }
+                  val intent = intentStore.courierHandover(run.id, submittedAmount, submittedReason)
+                  runCatching {
+                    commands.handover(
+                      run.id,
+                      submittedAmount,
+                      submittedReason,
+                      session.accessToken,
+                      intent.idempotencyKey,
+                    )
+                  }
                     .onSuccess {
+                      if (it is CourierCommandResult.Sent) intentStore.close(intent)
                       message = if (it is CourierCommandResult.Queued) "Сохранено офлайн" else "Наличные сданы"
                       if (it is CourierCommandResult.Queued) scheduleCourierSync(context, apiBaseUrl)
                       onRefresh()

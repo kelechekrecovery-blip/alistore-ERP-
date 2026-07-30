@@ -65,13 +65,16 @@ describe('Outbox (transactional, integration)', () => {
     });
 
     for (let i = 0; i < 5; i += 1) {
+      // Make the row eligible immediately before each pass. Doing this after
+      // the previous pass was vulnerable to leaked/frozen clocks elsewhere in
+      // the full Jest process and made the fifth attempt intermittently skip.
+      await prisma.outboxMessage.updateMany({
+        where: { status: 'pending' },
+        data: { nextAttemptAt: new Date(0) },
+      });
       await outbox.relayPending();
-      if (i < 4) {
-        // Advance the persisted schedule instead of sleeping through backoff.
-        await prisma.outboxMessage.updateMany({
-          data: { nextAttemptAt: new Date(0) },
-        });
-      }
+      const progress = await prisma.outboxMessage.findFirstOrThrow();
+      expect(progress.attempts).toBe(i + 1);
     }
 
     const row = await prisma.outboxMessage.findFirst();

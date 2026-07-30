@@ -37,17 +37,19 @@ function normalizePhone(value: string): string {
 }
 
 function LoginForm() {
+  const emailLoginEnabled =
+    process.env.NODE_ENV !== 'production'
+    || process.env.NEXT_PUBLIC_AUTH_EMAIL_LOGIN_ENABLED === 'true';
   const {
     requestOtp,
     verifyOtp,
-    requestRecoveryOtp,
-    verifyRecoveryOtp,
     requestEmailOtp,
     verifyEmailOtp,
     telegramLogin,
+    completeSocialEnrollment,
   } = useAuth();
   const router = useRouter();
-  const { t } = useT();
+  const { locale, t } = useT();
   const params = useSearchParams();
   const requestedNext = params.get('next');
   const next = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
@@ -60,10 +62,14 @@ function LoginForm() {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [devCode, setDevCode] = useState<string | null>(null);
+  const [challengeId, setChallengeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [recovery, setRecovery] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(0);
   const [telegramInitData, setTelegramInitData] = useState('');
+  const [telegramEnrollmentToken, setTelegramEnrollmentToken] = useState<string | null>(null);
+  const telegramEnrollmentActive = telegramEnrollmentToken !== null;
   const phoneValid = /^\+996\d{9}$/.test(phone.trim());
   const emailValid = EMAIL_RE.test(email.trim());
   const identity = channel === 'email' ? email.trim() : phone.trim();
@@ -76,56 +82,122 @@ function LoginForm() {
     }
   }, []);
 
-  async function send(e: React.FormEvent) {
-    e.preventDefault(); setError(null);
-    if (channel === 'email') {
-      if (!emailValid) return setError('Введите корректный email.');
-      setBusy(true);
-      try {
-        const { devCode: dc } = await requestEmailOtp(email.trim());
-        setDevCode(dc ?? null);
-        if (dc) setCode(dc);
-        setStepCode(true);
-      } catch (err) {
-        setError(describeAuthError(err, 'Не удалось отправить код.'));
-      } finally {
-        setBusy(false);
+  useEffect(() => {
+    if (resendSeconds <= 0) return;
+    const timer = window.setTimeout(() => setResendSeconds((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendSeconds]);
+
+  const copy = locale === 'ru'
+    ? {
+        title: telegramEnrollmentActive ? 'Подтвердите номер телефона' : 'Войти или создать аккаунт',
+        phoneSubtitle: telegramEnrollmentActive
+          ? 'Telegram подтверждён. Введите номер телефона — мы привяжем Telegram только после проверки SMS-кода.'
+          : 'Если номер ещё не зарегистрирован, после проверки кода мы создадим аккаунт.',
+        emailSubtitle: 'Войдите по привязанной почте — код придёт на адрес, уже добавленный в аккаунт.',
+        phoneLabel: 'Номер телефона',
+        emailLabel: 'Email — привязанная почта',
+        codeLabel: channel === 'email' ? 'Код из письма' : 'Код из SMS',
+        confirm: telegramEnrollmentActive ? 'Подтвердить номер и войти' : 'Войти или создать аккаунт',
+        resend: 'Отправить код ещё раз',
+        sent: `Код отправлен на ${identity}`,
       }
+    : {
+        title: telegramEnrollmentActive ? 'Телефон номерин ырастаңыз' : 'Кирүү же аккаунт түзүү',
+        phoneSubtitle: telegramEnrollmentActive
+          ? 'Telegram ырасталды. Телефон номерин киргизиңиз — SMS код текшерилгенден кийин гана Telegram байланыштырылат.'
+          : 'Эгер номер каттала элек болсо, код текшерилгенден кийин аккаунт түзөбүз.',
+        emailSubtitle: 'Байланган почта менен кириңиз — код аккаунтка кошулган дарекке келет.',
+        phoneLabel: 'Телефон номери',
+        emailLabel: 'Email — байланган почта',
+        codeLabel: channel === 'email' ? 'Каттагы код' : 'SMS коду',
+        confirm: telegramEnrollmentActive ? 'Номерди ырастап кирүү' : 'Кирүү же аккаунт түзүү',
+        resend: 'Кодду кайра жөнөтүү',
+        sent: `Код ${identity} дарегине жөнөтүлдү`,
+      };
+
+  async function requestCode() {
+    if (busy) return;
+    setError(null);
+    setStatus(null);
+    if (channel === 'email' && !emailValid) {
+      setError('Введите корректный email.');
       return;
     }
-    if (!phoneValid) return setError('Введите корректный номер.');
+    if (channel === 'phone' && !phoneValid) {
+      setError('Введите корректный номер.');
+      return;
+    }
     setBusy(true);
     try {
-      const { devCode: dc } = recovery
-        ? await requestRecoveryOtp(phone.trim())
+      const challenge = channel === 'email'
+        ? await requestEmailOtp(email.trim())
         : await requestOtp(phone.trim());
-      setDevCode(dc ?? null);
-      if (dc) setCode(dc);
+      setChallengeId(challenge.challengeId);
+      setDevCode(challenge.devCode ?? null);
+      if (challenge.devCode) setCode(challenge.devCode);
       setStepCode(true);
+      setResendSeconds(60);
+      setStatus(copy.sent);
+    } catch (err) {
+      setError(channel === 'email'
+        ? describeAuthError(err, 'Не удалось отправить код.')
+        : 'Не удалось отправить код.');
+    } finally {
+      setBusy(false);
     }
-    catch { setError('Не удалось отправить код.'); } finally { setBusy(false); }
   }
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    await requestCode();
+  }
+
   async function confirm(e: React.FormEvent) {
-    e.preventDefault(); setError(null); setBusy(true);
+    e.preventDefault();
+    if (busy || code.length !== 6) return;
+    setError(null);
+    setStatus(null);
+    setBusy(true);
     try {
-      if (channel === 'email') await verifyEmailOtp(email.trim(), code.trim());
-      else if (recovery) await verifyRecoveryOtp(phone.trim(), code.trim());
-      else await verifyOtp(phone.trim(), code.trim());
+      if (telegramEnrollmentToken) {
+        await completeSocialEnrollment(
+          telegramEnrollmentToken,
+          phone.trim(),
+          code.trim(),
+          challengeId ?? undefined,
+        );
+        setTelegramEnrollmentToken(null);
+      } else if (channel === 'email') await verifyEmailOtp(email.trim(), code.trim(), challengeId ?? undefined);
+      else await verifyOtp(phone.trim(), code.trim(), challengeId ?? undefined);
       router.push(next);
     }
     catch (err) {
       if (channel === 'email') setError(describeAuthError(err, 'Неверный или просроченный код.'));
-      else setError(recovery ? 'Аккаунт не найден или код просрочен.' : 'Неверный или просроченный код.');
+      else setError('Неверный или просроченный код.');
     } finally { setBusy(false); }
   }
 
   async function loginTelegram() {
-    if (!telegramInitData) return;
+    if (!telegramInitData || busy) return;
     setError(null);
     setBusy(true);
     try {
-      await telegramLogin(telegramInitData, 'mini_app');
-      router.push(next);
+      const result = await telegramLogin(telegramInitData, 'mini_app');
+      if (result.status === 'authenticated') {
+        setTelegramEnrollmentToken(null);
+        router.push(next);
+        return;
+      }
+      setTelegramEnrollmentToken(result.enrollmentToken);
+      setChannel('phone');
+      setStepCode(false);
+      setPhone('+996');
+      setCode('');
+      setDevCode(null);
+      setChallengeId(null);
+      setResendSeconds(0);
+      setStatus(null);
     } catch {
       setError('Не удалось войти через Telegram.');
     } finally {
@@ -134,20 +206,27 @@ function LoginForm() {
   }
 
   function switchChannel(nextChannel: Channel) {
+    setTelegramEnrollmentToken(null);
     setChannel(nextChannel);
-    setRecovery(false);
     setStepCode(false);
     setCode('');
     setDevCode(null);
+    setChallengeId(null);
+    setResendSeconds(0);
     setError(null);
+    setStatus(null);
   }
 
-  function switchMode(nextRecovery: boolean) {
-    setRecovery(nextRecovery);
+  function cancelTelegramEnrollment() {
+    setTelegramEnrollmentToken(null);
     setStepCode(false);
+    setPhone('+996');
     setCode('');
     setDevCode(null);
+    setChallengeId(null);
+    setResendSeconds(0);
     setError(null);
+    setStatus(null);
   }
 
   return (
@@ -159,91 +238,104 @@ function LoginForm() {
           <div className="grid h-[60px] w-[60px] place-items-center rounded-[17px] bg-coral font-display text-3xl font-extrabold">A</div>
           <LanguageToggle />
         </div>
-        <div className="mt-6 font-display text-3xl font-extrabold leading-none">
-          {channel === 'phone' && recovery ? t('login.title.recovery') : t('login.title.default')}
-        </div>
+        <h1 className="mt-6 font-display text-3xl font-extrabold leading-none">
+          {copy.title}
+        </h1>
         <div className="mt-2.5 text-sm leading-relaxed text-muted">
           {stepCode
-            ? t('login.codeSentTo', { identity })
+            ? copy.sent
             : channel === 'email'
-              ? t('login.subtitle.email')
-              : recovery
-                ? t('login.subtitle.recovery')
-                : t('login.subtitle.default')}
+              ? copy.emailSubtitle
+              : copy.phoneSubtitle}
         </div>
 
-        {!stepCode && (
-          <div className="login-channels mt-6 grid grid-cols-2 gap-2 rounded-[13px] border border-white/[0.08] bg-black/20 p-1">
+        {!stepCode && !telegramEnrollmentActive && (
+          <div
+            aria-label="Способ входа"
+            className={`login-channels mt-6 grid gap-2 rounded-[13px] border border-white/[0.08] bg-black/20 p-1 ${emailLoginEnabled ? 'grid-cols-2' : 'grid-cols-1'}`}
+          >
             <button
               type="button"
+              aria-pressed={channel === 'phone'}
               data-testid="login-channel-phone"
               onClick={() => switchChannel('phone')}
               className={`flex items-center justify-center gap-1.5 rounded-[10px] px-3 py-2.5 text-sm font-bold transition-colors ${channel === 'phone' ? 'bg-coral text-white' : 'text-muted hover:text-white'}`}
             >
               <Phone size={15} /> {t('login.channel.phone')}
             </button>
-            <button
-              type="button"
-              data-testid="login-channel-email"
-              onClick={() => switchChannel('email')}
-              className={`flex items-center justify-center gap-1.5 rounded-[10px] px-3 py-2.5 text-sm font-bold transition-colors ${channel === 'email' ? 'bg-coral text-white' : 'text-muted hover:text-white'}`}
-            >
-              <Mail size={15} /> {t('login.channel.email')}
-            </button>
+            {emailLoginEnabled && (
+              <button
+                type="button"
+                aria-pressed={channel === 'email'}
+                data-testid="login-channel-email"
+                onClick={() => switchChannel('email')}
+                className={`flex items-center justify-center gap-1.5 rounded-[10px] px-3 py-2.5 text-sm font-bold transition-colors ${channel === 'email' ? 'bg-coral text-white' : 'text-muted hover:text-white'}`}
+              >
+                <Mail size={15} /> {t('login.channel.email')}
+              </button>
+            )}
           </div>
         )}
 
         {!stepCode ? (
           <form onSubmit={send} className="mt-3">
-            {channel === 'phone' && (
-              <div className="login-tabs mb-3 grid grid-cols-2 gap-2 rounded-[13px] bg-surface-2 p-1">
-                <button
-                  type="button"
-                  onClick={() => switchMode(false)}
-                  className={`rounded-[10px] px-3 py-2 text-sm font-bold ${!recovery ? 'bg-lime text-lime-ink' : 'text-muted'}`}
-                >
-                  {t('login.mode.login')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => switchMode(true)}
-                  className={`rounded-[10px] px-3 py-2 text-sm font-bold ${recovery ? 'bg-lime text-lime-ink' : 'text-muted'}`}
-                >
-                  {t('login.mode.recover')}
-                </button>
-              </div>
-            )}
             {channel === 'phone' ? (
-              <input type="tel" value={phone} onChange={(e) => setPhone(normalizePhone(e.target.value))} placeholder="555 000 000" className="login-field w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-[15px] text-white outline-none focus:border-lime" autoFocus />
+              <label className="block text-sm font-semibold text-white">
+                {copy.phoneLabel}
+                <input type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(normalizePhone(e.target.value))} placeholder="+996 555 000 000" className="login-field mt-2 w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-[15px] text-white outline-none focus:border-lime" autoFocus />
+              </label>
             ) : (
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" aria-label="Email" className="login-field w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 text-[15px] text-white outline-none focus:border-lime" autoFocus />
+              <label className="block text-sm font-semibold text-white">
+                {copy.emailLabel}
+                <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="login-field mt-2 w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 text-[15px] text-white outline-none focus:border-lime" autoFocus />
+              </label>
             )}
-            {error && <p className="mt-2 text-sm text-danger-soft">{error}</p>}
+            {error && <p role="alert" aria-live="assertive" className="mt-2 text-sm text-danger-soft">{error}</p>}
             <button type="submit" disabled={busy} className="mt-3 w-full rounded-[13px] bg-coral py-3.5 text-center text-[15px] font-bold text-white disabled:opacity-60">
-              {busy ? t('login.cta.sending') : channel === 'email' ? t('login.cta.email') : recovery ? t('login.cta.recovery') : t('login.cta.sms')}
+              {busy ? t('login.cta.sending') : channel === 'email' ? t('login.cta.email') : t('login.cta.sms')}
             </button>
-            {channel === 'phone' && (
+            {channel === 'phone' && telegramInitData && !telegramEnrollmentActive && (
               <div className="mt-3 flex gap-2.5">
-                <button type="button" disabled className="flex-1 rounded-[13px] border border-surface-3 bg-surface-2 p-3 text-center text-sm text-faint opacity-70">Apple</button>
                 <button
                   type="button"
                   onClick={loginTelegram}
-                  disabled={busy || !telegramInitData}
-                  className="flex-1 rounded-[13px] border border-surface-3 bg-surface-2 p-3 text-center text-sm font-semibold text-white disabled:text-faint disabled:opacity-70"
+                  disabled={busy}
+                  className="w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3 text-center text-sm font-semibold text-white disabled:text-faint disabled:opacity-70"
                 >
                   Telegram
                 </button>
               </div>
             )}
+            {telegramEnrollmentActive && (
+              <button
+                type="button"
+                onClick={cancelTelegramEnrollment}
+                className="mt-3 w-full text-center text-[13px] text-muted"
+              >
+                Отменить вход через Telegram
+              </button>
+            )}
             <button type="button" onClick={() => router.push('/')} className="mt-5 w-full text-center text-[13px] text-muted">{t('login.guest')}</button>
           </form>
         ) : (
           <form onSubmit={confirm} className="mt-3">
-            <input inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder={t('login.code.placeholder')} className="login-field w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 text-center font-mono text-lg tracking-[0.4em] text-white outline-none focus:border-lime" autoFocus />
+            <label className="block text-sm font-semibold text-white">
+              {copy.codeLabel}
+              <input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder={t('login.code.placeholder')} className="login-field mt-2 w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 text-center font-mono text-lg tracking-[0.4em] text-white outline-none focus:border-lime" autoFocus />
+            </label>
             {devCode && <p className="mt-2 rounded-[10px] bg-surface-2 px-3 py-2 text-center font-mono text-xs text-lime">dev-код: {devCode}</p>}
-            {error && <p className="mt-2 text-sm text-danger-soft">{error}</p>}
-            <button type="submit" disabled={busy || code.length !== 6} className="mt-3 w-full rounded-[13px] bg-coral py-3.5 text-center text-[15px] font-bold text-white disabled:bg-line disabled:text-faint">{busy ? t('login.code.checking') : recovery ? t('login.code.recover') : t('login.code.login')}</button>
-            <button type="button" onClick={() => { setStepCode(false); setCode(''); setDevCode(null); }} className="mt-3 w-full text-center text-[13px] text-muted">{channel === 'email' ? t('login.code.changeEmail') : t('login.code.changePhone')}</button>
+            {status && <p aria-live="polite" className="mt-2 text-center text-sm text-muted">{status}</p>}
+            {error && <p role="alert" aria-live="assertive" className="mt-2 text-sm text-danger-soft">{error}</p>}
+            <button type="submit" disabled={busy || code.length !== 6} className="mt-3 w-full rounded-[13px] bg-coral py-3.5 text-center text-[15px] font-bold text-white disabled:bg-line disabled:text-faint">{busy ? t('login.code.checking') : copy.confirm}</button>
+            <button type="button" onClick={requestCode} disabled={busy || resendSeconds > 0} className="mt-3 w-full text-center text-[13px] text-muted disabled:text-faint">
+              {resendSeconds > 0 ? `${copy.resend} (${resendSeconds})` : copy.resend}
+            </button>
+            <button type="button" onClick={() => { setStepCode(false); setChallengeId(null); setResendSeconds(0); setDevCode(null); setError(null); setStatus(null); }} className="mt-3 w-full text-center text-[13px] text-muted">{channel === 'email' ? t('login.code.changeEmail') : t('login.code.changePhone')}</button>
+            {telegramEnrollmentActive && (
+              <button type="button" onClick={cancelTelegramEnrollment} className="mt-3 w-full text-center text-[13px] text-muted">
+                Отменить вход через Telegram
+              </button>
+            )}
           </form>
         )}
       </div>

@@ -13,6 +13,8 @@ services:
       - fromGroup: alistore-staging-common
       - key: PROCESS_ROLE
         value: api
+      - key: AUTH_RECOVERY_OTP_ENABLED
+        value: "false"
       - key: DATABASE_URL
         fromDatabase: { name: alistore-postgres-staging, property: connectionString }
       - key: DIRECT_DATABASE_URL
@@ -46,6 +48,8 @@ services:
         value: "true"
       - key: NEXT_PUBLIC_DEMO_MODE
         value: "true"
+      - key: NEXT_PUBLIC_AUTH_REFRESH_ROTATION_GRACE_ENABLED
+        value: "false"
       - key: SENTRY_DSN
         fromService: { name: alistore-api-staging, type: web, envVarKey: SENTRY_DSN }
       - key: NEXT_PUBLIC_SENTRY_DSN
@@ -112,6 +116,9 @@ envVarGroups:
     envVars:
       - { key: NODE_ENV, value: production }
       - { key: JWT_SECRET, generateValue: true }
+      - { key: AUTH_REFRESH_ROTATION_GRACE_ENABLED, value: "false" }
+      - { key: AUTH_REFRESH_DERIVATION_SECRET, sync: false }
+      - { key: AUTH_EMAIL_LOGIN_ENABLED, value: "false" }
       - { key: CORS_ORIGINS, value: "https://staging.ali.kg,https://admin-staging.ali.kg" }
       - { key: ALLOWED_HOSTS, value: api-staging.ali.kg }
       - { key: PUBLIC_DEMO_MODE, value: "true" }

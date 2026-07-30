@@ -102,6 +102,56 @@ test('adding a product of a different supply mode preserves both lines for a mix
   expect(stored.map((item: { supplyMode: string }) => item.supplyMode).sort()).toEqual(['own_stock', 'to_order']);
 });
 
+test('mixed checkout renders the reconciled server schedule as four separate obligations', async ({ page }) => {
+  await resetDb();
+  const { product: stocked } = await seedProduct('MIX-CHECKOUT-STOCK-E2E', 60_000, 50_000);
+  // Keep the supplier quote above the mandatory 10% margin floor. A 40k sale
+  // price against the helper's 70k offer is correctly non-orderable.
+  const toOrder = await seedToOrderProduct('MIX-CHECKOUT-TOORDER-E2E', 6, 90_000);
+
+  for (const product of [stocked, toOrder]) {
+    await page.goto(`/product/${product.id}`);
+    const addButton = page.locator('.md\\:block').getByTestId('pdp-add-to-cart');
+    await expect(addButton).toBeEnabled();
+    await addButton.click();
+    await expect(addButton).toHaveText(/Добавлено/);
+  }
+
+  await page.goto('/checkout');
+  await page.getByRole('button', { name: 'Далее' }).last().click();
+  await page.getByPlaceholder('+996 700 12 34 56').fill(`+996701${Date.now().toString().slice(-6)}`);
+  await page.getByPlaceholder('Имя').fill('Mixed Schedule Buyer');
+  await page.getByRole('button', { name: 'Далее' }).last().click();
+  await expect(page.getByText(/Для заказных товаров нужен задаток/i)).toBeVisible();
+  await page.getByRole('button', { name: 'К подтверждению' }).click();
+
+  await expect(page.getByText('Задаток сейчас')).toBeVisible();
+  await expect(page.getByText('Складские товары при получении')).toBeVisible();
+  await expect(page.getByText('Остаток заказных товаров')).toBeVisible();
+  await expect(page.getByText('Доставка').last()).toBeVisible();
+  await page.getByLabel(/Согласен с условиями/).check();
+  await page.getByRole('button', { name: /Подтвердить заказ/ }).click();
+
+  await expect(page.getByText('График оплаты')).toBeVisible();
+  await expect(page.getByText('Задаток сейчас')).toBeVisible();
+  await expect(page.getByText('Складские товары при получении')).toBeVisible();
+  await expect(page.getByText('Остаток заказных товаров')).toBeVisible();
+  // Next.js dev tooling owns a page-level role=alert; only checkout alerts are
+  // part of this customer-flow assertion.
+  await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0);
+
+  const order = await prisma.order.findFirstOrThrow({
+    orderBy: { createdAt: 'desc' },
+    include: { receivables: true },
+  });
+  expect(order.receivables.map((row) => row.kind).sort()).toEqual([
+    'stock_sale',
+    'supply_balance',
+    'supply_deposit',
+  ]);
+  expect(order.receivables.reduce((sum, row) => sum + row.amount, 0)).toBe(order.total);
+});
+
 test('a mixed cart restored from storage is reconciled and can enter checkout', async ({ page }) => {
   await resetDb();
   const { product: stocked } = await seedProduct('MIX-STORAGE-STOCK-E2E');

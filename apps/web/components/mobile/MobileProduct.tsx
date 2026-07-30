@@ -8,8 +8,9 @@ import { MobileFrame } from "@/components/mobile/MobileFrame";
 import { productImage, productSpecEntries } from "@/components/ProductCard";
 import { StatusPill } from "@/components/ui/Badge";
 import { ImageOff } from "lucide-react";
-import { som, conditionLabel, supplyLeadLabel } from "@/lib/format";
+import { som, conditionLabel } from "@/lib/format";
 import { TO_ORDER_CART_QTY_CAP, useCart } from "@/lib/cart";
+import { availabilityLabel, catalogAvailability } from "@/lib/to-order";
 import { useFavorites } from "@/lib/favorites";
 import type { CatalogProduct, ProductReviews } from "@/lib/api";
 
@@ -47,9 +48,10 @@ export default function MobileProduct({
   const [added, setAdded] = useState(false);
 
   const attrs = product.attrs ?? {};
-  const inStock = product.availableUnits > 0;
-  const toOrder = !inStock && product.supplyMode === "to_order" && product.orderable;
-  const buyable = product.orderable;
+  const availability = catalogAvailability(product);
+  const inStock = availability.isInStock;
+  const toOrder = availability.isToOrder;
+  const buyable = availability.buyable;
   // A to-order line has no stock ceiling — the `+` control must not clamp to
   // `availableUnits` (always 0 for it). See TO_ORDER_CART_QTY_CAP's doc
   // comment in lib/cart.tsx for why 10.
@@ -71,7 +73,8 @@ export default function MobileProduct({
         price: product.price,
         stockLimit: qtyCap,
         supplyMode: toOrder ? "to_order" : "own_stock",
-        supplyLeadDays: toOrder ? product.supplyLeadDays : null,
+        supplyLeadDays: toOrder ? availability.leadTimeDays : null,
+        orderable: buyable,
       },
       qty,
     );
@@ -228,9 +231,9 @@ export default function MobileProduct({
                 ● {inStock ? `${product.availableUnits} шт` : "нет"}
               </span>
             </div>
-            {!inStock && product.supplyMode === "to_order" && product.supplyLeadDays && (
+            {toOrder && (
               <div className="mt-2">
-                <StatusPill status="info">{supplyLeadLabel(product.supplyLeadDays)}</StatusPill>
+                <StatusPill status="info">{availabilityLabel(availability, product.availableUnits)}</StatusPill>
               </div>
             )}
           </div>

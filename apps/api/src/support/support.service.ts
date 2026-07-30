@@ -91,15 +91,31 @@ export class SupportService {
   /** Advance a ticket through its guarded status machine. */
   async transition(id: string, to: TicketStatus, dto: TicketTransitionDto, actor: string) {
     return this.audit.transaction(async (tx) => {
-      const ticket = await tx.supportTicket.findUnique({ where: { id } });
+      // Serialize every support writer with Telegram approval execution. Reading
+      // only before update allows a waiter to overwrite a state committed while
+      // it was blocked; lock first, then reread the authoritative row.
+      const [ticket] = await tx.$queryRaw<SupportTicket[]>`
+        SELECT * FROM "SupportTicket" WHERE id = ${id} FOR UPDATE
+      `;
       if (!ticket) {
         throw new ValidationError('ticket_not_found', `Тикет ${id} не найден`);
       }
       assertTicketTransition(ticket.status, to);
-      const updated = await tx.supportTicket.update({
-        where: { id },
+      const claimed = await tx.supportTicket.updateMany({
+        where: {
+          id,
+          revision: ticket.revision,
+          status: ticket.status,
+          assignee: ticket.assignee,
+          priority: ticket.priority,
+          sla: ticket.sla,
+        },
         data: { status: to, ...(dto.assignee ? { assignee: dto.assignee } : {}) },
       });
+      if (claimed.count !== 1) {
+        throw new ConflictError('support_ticket_stale', `Тикет ${id} изменён конкурентной операцией`);
+      }
+      const updated = await tx.supportTicket.findUniqueOrThrow({ where: { id } });
       if (this.outbox && to === 'resolved') {
         await enqueueConsentedCustomerNotice(tx, this.outbox, {
           customerId: ticket.customerId,
@@ -125,7 +141,9 @@ export class SupportService {
   /** Escalate a ticket one priority step up (tightening its SLA). */
   async escalate(id: string, actor: string) {
     return this.audit.transaction(async (tx) => {
-      const ticket = await tx.supportTicket.findUnique({ where: { id } });
+      const [ticket] = await tx.$queryRaw<SupportTicket[]>`
+        SELECT * FROM "SupportTicket" WHERE id = ${id} FOR UPDATE
+      `;
       if (!ticket) {
         throw new ValidationError('ticket_not_found', `Тикет ${id} не найден`);
       }
@@ -137,10 +155,21 @@ export class SupportService {
         throw new ConflictError('ticket_max_priority', `Тикет ${id} уже на максимальном приоритете`);
       }
       const sla = slaFor(next, Date.now());
-      const updated = await tx.supportTicket.update({
-        where: { id },
+      const claimed = await tx.supportTicket.updateMany({
+        where: {
+          id,
+          revision: ticket.revision,
+          status: ticket.status,
+          assignee: ticket.assignee,
+          priority: ticket.priority,
+          sla: ticket.sla,
+        },
         data: { priority: next, sla },
       });
+      if (claimed.count !== 1) {
+        throw new ConflictError('support_ticket_stale', `Тикет ${id} изменён конкурентной операцией`);
+      }
+      const updated = await tx.supportTicket.findUniqueOrThrow({ where: { id } });
       return {
         result: updated,
         events: [

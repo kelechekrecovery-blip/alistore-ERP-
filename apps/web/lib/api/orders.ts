@@ -188,6 +188,8 @@ export interface OrderDetail {
   deliverySlot?: string | null;
   pickupCode?: string | null;
   status: string;
+  subtotal?: number;
+  deliveryFee?: number;
   total: number;
   createdAt: string;
   items: CustomerOrderItem[];

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthService } from '../src/auth/auth.service';
 import { ValidationError } from '../src/common/errors';
+import type { EmailOtpSender, SendEmailOtpInput } from '../src/auth/email-otp.sender';
 
 /**
  * Email + OTP login (integration, real Postgres).
@@ -90,6 +91,23 @@ describe('Auth: email + OTP → JWT (integration)', () => {
     expect(principal.customerId).toBe(customer.id);
   });
 
+  it('pins email verification to challengeId while preserving legacy latest selection', async () => {
+    const email = nextEmail();
+    await seedCustomerWithEmail(email);
+    const older = await auth.requestEmailOtp(email);
+    const newer = await auth.requestEmailOtp(email);
+
+    const pinned = await auth.verifyEmailOtp(
+      email,
+      older.devCode as string,
+      older.challengeId,
+    );
+    expect(pinned.accessToken.split('.')).toHaveLength(3);
+
+    const legacy = await auth.verifyEmailOtp(email, newer.devCode as string);
+    expect(legacy.accessToken.split('.')).toHaveLength(3);
+  });
+
   it('normalizes case and surrounding whitespace so one address is one identity', async () => {
     const email = nextEmail();
     const customer = await seedCustomerWithEmail(email);
@@ -128,6 +146,135 @@ describe('Auth: email + OTP → JWT (integration)', () => {
     // человек — клиент AliStore». Никакая статистика не нужна.
     expect(b.challengeId.length).toBe(a.challengeId.length);
     expect(b.challengeId).toMatch(/^[a-z0-9]+$/);
+  });
+
+  it('waits for SMTP and holds known and unknown responses to one envelope', async () => {
+    const known = nextEmail();
+    await seedCustomerWithEmail(known);
+    const unknown = nextEmail();
+    let releaseDelivery!: () => void;
+    const deliveryGate = new Promise<void>((resolve) => { releaseDelivery = resolve; });
+    let markDeliveryStarted!: () => void;
+    const deliveryStarted = new Promise<void>((resolve) => { markDeliveryStarted = resolve; });
+    const sent: SendEmailOtpInput[] = [];
+    const blockingSender: EmailOtpSender = {
+      name: 'smtp',
+      assertOperational: () => undefined,
+      send: async (input) => {
+        sent.push(input);
+        markDeliveryStarted();
+        await deliveryGate;
+      },
+    };
+    const isolated = new AuthService(
+      prisma,
+      new JwtService({ secret: 'test-secret' }),
+      {
+        get: (key: string) => {
+          if (key === 'AUTH_OTP_DEV_ECHO') return 'true';
+          if (key === 'EMAIL_OTP_RESPONSE_ENVELOPE_MS') return '50';
+          return undefined;
+        },
+      } as unknown as ConfigService,
+      undefined,
+      blockingSender,
+    );
+
+    const knownRequest = isolated.requestEmailOtp(known);
+    const unknownRequest = isolated.requestEmailOtp(unknown);
+    await deliveryStarted;
+    expect(sent.map((item) => item.email)).toEqual([known]);
+    let knownSettled = false;
+    void knownRequest.then(() => { knownSettled = true; });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(knownSettled).toBe(false);
+    releaseDelivery();
+    const [knownResult, unknownResult] = await Promise.all([knownRequest, unknownRequest]);
+    expect(knownResult.challengeId).toEqual(expect.any(String));
+    expect(unknownResult.challengeId).toEqual(expect.any(String));
+  });
+
+  it('keeps an ambiguous-failure challenge and returns after send settles', async () => {
+    const known = nextEmail();
+    await seedCustomerWithEmail(known);
+    let rejectDelivery!: (error: Error) => void;
+    const lateFailure = new Promise<void>((_, reject) => { rejectDelivery = reject; });
+    let markDeliveryStarted!: () => void;
+    const deliveryStarted = new Promise<void>((resolve) => { markDeliveryStarted = resolve; });
+    const failingSender: EmailOtpSender = {
+      name: 'smtp',
+      assertOperational: () => undefined,
+      send: () => {
+        markDeliveryStarted();
+        return lateFailure;
+      },
+    };
+    const isolated = new AuthService(
+      prisma,
+      new JwtService({ secret: 'test-secret' }),
+      {
+        get: (key: string) => (key === 'EMAIL_OTP_RESPONSE_ENVELOPE_MS' ? '10' : undefined),
+      } as unknown as ConfigService,
+      undefined,
+      failingSender,
+    );
+    const request = isolated.requestEmailOtp(known);
+    await deliveryStarted;
+    rejectDelivery(new Error('smtp failed after response envelope'));
+    const issued = await request;
+    await expect(prisma.otpChallenge.findUnique({
+      where: { id: issued.challengeId },
+    })).resolves.toMatchObject({ id: issued.challengeId });
+  });
+
+  it('fails closed before issuing either known or unknown challenges when email transport is down', async () => {
+    const known = nextEmail();
+    await seedCustomerWithEmail(known);
+    const unknown = nextEmail();
+    const unavailable: EmailOtpSender = {
+      name: 'smtp',
+      assertOperational: () => {
+        throw new ValidationError('email_transport_unavailable', 'Email transport unavailable');
+      },
+      send: async () => undefined,
+    };
+    const isolated = new AuthService(
+      prisma,
+      new JwtService({ secret: 'test-secret' }),
+      { get: () => undefined } as unknown as ConfigService,
+      undefined,
+      unavailable,
+    );
+
+    await expect(isolated.requestEmailOtp(known)).rejects.toMatchObject({
+      code: 'email_transport_unavailable',
+    });
+    await expect(isolated.requestEmailOtp(unknown)).rejects.toMatchObject({
+      code: 'email_transport_unavailable',
+    });
+  });
+
+  it('keeps production email login disabled until durable delivery is explicitly released', async () => {
+    const known = nextEmail();
+    await seedCustomerWithEmail(known);
+    const send = jest.fn(async () => undefined);
+    const isolated = new AuthService(
+      prisma,
+      new JwtService({ secret: 'test-secret' }),
+      {
+        get: (key: string) => (key === 'NODE_ENV' ? 'production' : undefined),
+      } as unknown as ConfigService,
+      undefined,
+      { name: 'smtp', assertOperational: () => undefined, send },
+    );
+
+    await expect(isolated.requestEmailOtp(known)).rejects.toMatchObject({
+      code: 'email_login_temporarily_unavailable',
+    });
+    await expect(isolated.requestEmailOtp(nextEmail())).rejects.toMatchObject({
+      code: 'email_login_temporarily_unavailable',
+    });
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('не пускает больше пяти попыток даже при одновременных запросах', async () => {

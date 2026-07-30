@@ -38,7 +38,15 @@ test('customer attaches an email in settings, then signs back in with it', async
   expect(attachCode).toMatch(/^\d{6}$/);
 
   await expect(page.getByLabel('Код подтверждения email')).toHaveValue(attachCode as string);
+  const attachConfirmRequest = page.waitForRequest((request) =>
+    request.url().endsWith('/auth/email/attach/confirm') && request.method() === 'POST',
+  );
   await page.getByRole('button', { name: 'Подтвердить' }).click();
+  await expect(attachConfirmRequest.then((request) => request.postDataJSON())).resolves.toMatchObject({
+    email,
+    code: attachCode,
+    challengeId: expect.any(String),
+  });
   await expect(page.getByText(email, { exact: true })).toBeVisible();
   expect((await prisma.customer.findUnique({ where: { id: customer.id } }))?.email).toBe(email);
 
@@ -76,4 +84,83 @@ test('an unattached email cannot be used to sign in', async ({ page }) => {
   // with a supplied code the server therefore returns the generic invalid-code
   // response rather than revealing whether the address exists.
   await expect(page.getByText('Неверный код.')).toBeVisible();
+});
+
+test('login presents one phone sign-in/create flow and only available providers', async ({ page }) => {
+  await page.goto('/login?next=/cart');
+
+  await expect(page.getByRole('heading', { name: 'Войти или создать аккаунт' })).toBeVisible();
+  await expect(page.getByText(/Если номер ещё не зарегистрирован, после проверки кода мы создадим аккаунт/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Восстановить' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Apple' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Telegram' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Продолжить как гость/ })).toBeVisible();
+
+  await page.getByTestId('login-channel-email').click();
+  await expect(page.getByText(/по привязанной почте/)).toBeVisible();
+  await expect(page.getByTestId('login-channel-email')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('login-channel-phone')).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('a first verified phone creates an account and keeps the safe next redirect', async ({ page }) => {
+  await resetDb();
+  const phone = `+996700${String(Date.now()).slice(-6)}`;
+
+  await page.goto('/login?next=/cart');
+  await page.getByLabel('Номер телефона').fill(phone);
+  await page.getByRole('button', { name: 'Получить код по SMS' }).click();
+
+  const devCode = await page.getByText(/dev-код:/).textContent();
+  const code = devCode?.match(/\d{6}/)?.[0];
+  expect(code).toMatch(/^\d{6}$/);
+  await expect(page.getByLabel('Код из SMS')).toHaveValue(code as string);
+  await expect(page.getByRole('button', { name: /Отправить код ещё раз \(60\)/ })).toBeDisabled();
+  await page.getByRole('button', { name: 'Войти или создать аккаунт' }).click();
+
+  await expect(page).toHaveURL((url) => url.pathname === '/cart');
+  await expect(prisma.customer.findUnique({ where: { phone } })).resolves.not.toBeNull();
+});
+
+test('an existing phone uses the same flow without creating a duplicate account', async ({ page }) => {
+  await resetDb();
+  const phone = '+996700950099';
+  const existing = await prisma.customer.create({ data: { phone, name: 'Существующий клиент' } });
+
+  await page.goto('/login?next=/account');
+  await page.getByLabel('Номер телефона').fill(phone);
+  await page.getByRole('button', { name: 'Получить код по SMS' }).click();
+  const devCode = await page.getByText(/dev-код:/).textContent();
+  const code = devCode?.match(/\d{6}/)?.[0];
+  expect(code).toMatch(/^\d{6}$/);
+  await page.getByRole('button', { name: 'Войти или создать аккаунт' }).click();
+
+  await expect(page).toHaveURL((url) => url.pathname === '/account');
+  await expect(prisma.customer.count({ where: { phone } })).resolves.toBe(1);
+  await expect(prisma.customer.findUnique({ where: { phone } })).resolves.toMatchObject({ id: existing.id });
+});
+
+test('failed web logout still clears local auth and reload cannot restore the fixture', async ({ page }) => {
+  await resetDb();
+  const phone = '+996700950088';
+  const customer = await prisma.customer.create({ data: { phone, name: 'Logout retry' } });
+  const accessToken = sign(
+    { sub: customer.id, phone, typ: 'customer' },
+    'dev-secret-alistore-local',
+    { expiresIn: '1h' },
+  );
+  await page.addInitScript((token) => {
+    localStorage.setItem('alistore.auth.v1', JSON.stringify({ accessToken: token }));
+  }, accessToken);
+  await page.route('**/api/auth/logout', (route) => route.abort('failed'));
+
+  await page.goto('/account/settings');
+  await expect(page.getByText(phone, { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Выйти из аккаунта' }).click();
+
+  await expect(page).toHaveURL((url) => url.pathname === '/account/settings');
+  await expect(page.getByText('Не удалось выйти из аккаунта. Проверьте соединение и попробуйте снова.')).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByText('Войдите по OTP, чтобы изменить профиль.')).toBeVisible();
+  await expect(page.getByText(phone, { exact: true })).toHaveCount(0);
 });

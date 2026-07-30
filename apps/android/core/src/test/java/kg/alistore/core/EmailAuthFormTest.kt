@@ -40,13 +40,32 @@ class EmailAuthFormTest {
   @Test
   fun issuedChallengeMovesToCodeStepAndPrefillsDevCode() {
     val form = EmailAuthForm().withEmail("user@example.com").submitting()
-      .challengeIssued(EmailOtpChallenge("challenge-1", "123456"))
+      .challengeIssued(EmailOtpChallenge("challenge-1", "123456"), nowMillis = 1_000)
 
     assertTrue(form.codeSent)
     assertFalse(form.busy)
     assertEquals("123456", form.code)
     assertNull(form.error)
     assertEquals("Код отправлен на user@example.com", form.hint)
+    assertEquals("challenge-1", form.challengeId)
+    assertEquals(60, form.resendSeconds(nowMillis = 1_000))
+    assertEquals(1, form.resendSeconds(nowMillis = 60_001))
+    assertEquals(0, form.resendSeconds(nowMillis = 61_000))
+  }
+
+  @Test
+  fun transientFailureKeepsAddressCodeChallengeAndResendState() {
+    val form = EmailAuthForm().withEmail("user@example.com")
+      .challengeIssued(EmailOtpChallenge("challenge-1", null), nowMillis = 10_000)
+      .withCode("123456")
+      .submitting()
+      .failed(java.io.IOException())
+
+    assertEquals("user@example.com", form.email)
+    assertEquals("123456", form.code)
+    assertEquals("challenge-1", form.challengeId)
+    assertEquals(60, form.resendSeconds(nowMillis = 10_000))
+    assertEquals("Нет связи с сервером", form.error)
   }
 
   @Test

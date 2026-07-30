@@ -3,6 +3,7 @@ node_modules/
 # build
 dist/
 build/
+.build/
 apps/web/build-output/
 apps/web/build-courier/
 apps/web/tsconfig.tsbuildinfo

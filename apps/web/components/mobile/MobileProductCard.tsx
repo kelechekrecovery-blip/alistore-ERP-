@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { motion } from 'motion/react';
 import { useState } from 'react';
 import type { CatalogProduct } from '@/lib/api';
-import { som, supplyLeadLabel } from '@/lib/format';
+import { som } from '@/lib/format';
 import { TO_ORDER_CART_QTY_CAP, useCart } from '@/lib/cart';
+import { availabilityLabel, catalogAvailability } from '@/lib/to-order';
 import { useFavorites } from '@/lib/favorites';
 import { useCompare } from '@/lib/compare';
 import { productImage } from '@/components/ProductCard';
@@ -31,9 +32,10 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
   const { has, toggle } = useFavorites();
   const compare = useCompare();
   const [added, setAdded] = useState(false);
-  const inStock = product.availableUnits > 0;
-  const toOrder = !inStock && product.supplyMode === 'to_order' && product.orderable;
-  const buyable = product.orderable;
+  const availability = catalogAvailability(product);
+  const inStock = availability.isInStock;
+  const toOrder = availability.isToOrder;
+  const buyable = availability.buyable;
   const href = `/product/${product.id}`;
 
   function addToCart() {
@@ -45,7 +47,8 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
       price: product.price,
       stockLimit: toOrder ? TO_ORDER_CART_QTY_CAP : product.availableUnits,
       supplyMode: toOrder ? 'to_order' : 'own_stock',
-      supplyLeadDays: toOrder ? product.supplyLeadDays : null,
+      supplyLeadDays: toOrder ? availability.leadTimeDays : null,
+      orderable: buyable,
     });
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1200);
@@ -85,10 +88,10 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
         <div className="mt-0.5 text-[10px] text-subtle">
           {inStock ? (
             `${product.availableUnits} в наличии`
-          ) : product.supplyMode === 'to_order' && product.supplyLeadDays ? (
-            <StatusPill status="info">{supplyLeadLabel(product.supplyLeadDays)}</StatusPill>
+          ) : toOrder ? (
+            <StatusPill status="info">{availabilityLabel(availability, product.availableUnits)}</StatusPill>
           ) : (
-            'под заказ'
+            availabilityLabel(availability, product.availableUnits)
           )}
         </div>
         <div className="mt-2.5 flex gap-1.5">

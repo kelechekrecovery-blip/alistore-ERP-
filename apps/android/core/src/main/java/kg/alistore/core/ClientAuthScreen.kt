@@ -22,6 +22,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,15 +30,20 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.autofill.contentType
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -78,10 +84,10 @@ private fun OtpLogin(state: AuthState, manager: AuthSessionManager, onState: (Au
   var channel by remember { mutableStateOf(AuthChannel.Phone) }
   LazyColumn(modifier.fillMaxSize().background(AuthInk).padding(20.dp), verticalArrangement = Arrangement.Center) {
     item {
-      Text("Вход в AliStore", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Black)
+      Text("Войти или создать аккаунт", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Black)
       Text(
-        if (channel == AuthChannel.Phone) "Заказы, гарантия и бонусы привязаны к номеру телефона"
-        else "Почта — второй вход в тот же аккаунт: код придёт на привязанный адрес",
+        if (channel == AuthChannel.Phone) "Введите телефон и код из SMS. Если аккаунта ещё нет, мы создадим его автоматически."
+        else "Почта — дополнительный вход в тот же аккаунт. Код придёт только на ранее привязанный адрес.",
         color = AuthMuted,
         fontSize = 13.sp,
         modifier = Modifier.padding(top = 7.dp, bottom = 14.dp),
@@ -126,6 +132,17 @@ private fun AuthChannelTab(label: String, tag: String, selected: Boolean, modifi
 private fun EmailOtpLogin(manager: AuthSessionManager, onState: (AuthState) -> Unit) {
   val scope = rememberCoroutineScope()
   var form by remember { mutableStateOf(EmailAuthForm()) }
+  var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+  val emailResendSeconds = form.resendSeconds(nowMillis)
+
+  LaunchedEffect(form.resendAvailableAtMillis) {
+    val deadline = form.resendAvailableAtMillis ?: return@LaunchedEffect
+    do {
+      nowMillis = System.currentTimeMillis()
+      if (nowMillis >= deadline) break
+      delay(1_000)
+    } while (true)
+  }
 
   OutlinedTextField(
     value = form.email,
@@ -146,7 +163,10 @@ private fun EmailOtpLogin(manager: AuthSessionManager, onState: (AuthState) -> U
       label = { Text("Код из письма") },
       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
       singleLine = true,
-      modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("auth-email-code"),
+      modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+        .contentType(ContentType.SmsOtpCode)
+        .semantics { contentDescription = "Одноразовый код из письма" }
+        .testTag("auth-email-code"),
       colors = authFieldColors(),
     )
   }
@@ -175,6 +195,22 @@ private fun EmailOtpLogin(manager: AuthSessionManager, onState: (AuthState) -> U
   ) { Text(if (form.busy) "Подождите…" else if (form.codeSent) "Войти" else "Получить код", fontWeight = FontWeight.Bold) }
   if (form.codeSent) {
     Button(
+      onClick = {
+        val current = form
+        form = current.submitting()
+        scope.launch {
+          form = runCatching { manager.requestEmailOtp(current.email) }
+            .fold(onSuccess = { form.challengeIssued(it) }, onFailure = { form.failed(it) })
+        }
+      },
+      enabled = !form.busy && emailResendSeconds == 0,
+      modifier = Modifier.fillMaxWidth().padding(top = 6.dp).testTag("auth-email-resend"),
+      colors = ButtonDefaults.buttonColors(containerColor = AuthSurface, contentColor = Color.White),
+      shape = RoundedCornerShape(8.dp),
+    ) {
+      Text(if (emailResendSeconds > 0) "Отправить ещё раз через $emailResendSeconds сек." else "Отправить код ещё раз")
+    }
+    Button(
       onClick = { form = form.restart() },
       enabled = !form.busy,
       modifier = Modifier.fillMaxWidth().padding(top = 6.dp).testTag("auth-email-restart"),
@@ -192,8 +228,20 @@ private fun PhoneOtpLogin(state: AuthState, manager: AuthSessionManager, onState
   var codeRequested by remember { mutableStateOf(false) }
   var busy by remember { mutableStateOf(false) }
   var message by remember(state) { mutableStateOf((state as? AuthState.Failed)?.message) }
+  var resendAvailableAtMillis by remember { mutableStateOf<Long?>(null) }
+  var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+  val phoneResendSeconds = resendSeconds(resendAvailableAtMillis, nowMillis)
   val validPhone = phone.filter(Char::isDigit).length == 12
   val validCode = code.length == 6 && code.all(Char::isDigit)
+
+  LaunchedEffect(resendAvailableAtMillis) {
+    val deadline = resendAvailableAtMillis ?: return@LaunchedEffect
+    do {
+      nowMillis = System.currentTimeMillis()
+      if (nowMillis >= deadline) break
+      delay(1_000)
+    } while (true)
+  }
 
   OutlinedTextField(
     value = phone,
@@ -213,7 +261,10 @@ private fun PhoneOtpLogin(state: AuthState, manager: AuthSessionManager, onState
       label = { Text("Код из SMS") },
       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
       singleLine = true,
-      modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("auth-code"),
+      modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+        .contentType(ContentType.SmsOtpCode)
+        .semantics { contentDescription = "Одноразовый код из SMS" }
+        .testTag("auth-code"),
       colors = authFieldColors(),
     )
   }
@@ -224,7 +275,12 @@ private fun PhoneOtpLogin(state: AuthState, manager: AuthSessionManager, onState
         busy = true
         if (!codeRequested) {
           runCatching { manager.requestOtp(phone) }
-            .onSuccess { challenge -> codeRequested = true; challenge.devCode?.let { code = it }; message = "Код отправлен" }
+            .onSuccess { challenge ->
+              codeRequested = true
+              challenge.devCode?.let { code = it }
+              resendAvailableAtMillis = System.currentTimeMillis() + OTP_RESEND_DELAY_MILLIS
+              message = "Код отправлен"
+            }
             .onFailure { message = it.message ?: "Не удалось отправить код" }
         } else {
           val next = manager.verify(phone, code)
@@ -240,13 +296,44 @@ private fun PhoneOtpLogin(state: AuthState, manager: AuthSessionManager, onState
   ) { Text(if (busy) "Подождите…" else if (codeRequested) "Войти" else "Получить код", fontWeight = FontWeight.Bold) }
   if (codeRequested) {
     Button(
-      onClick = { codeRequested = false; code = ""; message = null },
+      onClick = {
+        scope.launch {
+          busy = true
+          runCatching { manager.requestOtp(phone) }
+            .onSuccess { challenge ->
+              challenge.devCode?.let { code = it }
+              resendAvailableAtMillis = System.currentTimeMillis() + OTP_RESEND_DELAY_MILLIS
+              message = "Новый код отправлен"
+            }
+            .onFailure { message = it.message ?: "Не удалось отправить код" }
+          busy = false
+        }
+      },
+      enabled = !busy && phoneResendSeconds == 0,
+      modifier = Modifier.fillMaxWidth().padding(top = 6.dp).testTag("auth-resend"),
+      colors = ButtonDefaults.buttonColors(containerColor = AuthSurface, contentColor = Color.White),
+      shape = RoundedCornerShape(8.dp),
+    ) {
+      Text(if (phoneResendSeconds > 0) "Отправить ещё раз через $phoneResendSeconds сек." else "Отправить код ещё раз")
+    }
+    Button(
+      onClick = {
+        codeRequested = false
+        code = ""
+        message = null
+        resendAvailableAtMillis = null
+      },
       enabled = !busy,
       modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
       colors = ButtonDefaults.buttonColors(containerColor = AuthSurface, contentColor = Color.White),
       shape = RoundedCornerShape(8.dp),
     ) { Text("Изменить номер") }
   }
+}
+
+internal fun resendSeconds(deadlineMillis: Long?, nowMillis: Long): Int {
+  val deadline = deadlineMillis ?: return 0
+  return ((deadline - nowMillis).coerceAtLeast(0) + 999).div(1_000).toInt()
 }
 
 @Composable

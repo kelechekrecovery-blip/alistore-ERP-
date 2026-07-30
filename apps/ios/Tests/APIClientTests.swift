@@ -6,6 +6,61 @@ import SwiftData
 import XCTest
 
 final class APIClientTests: XCTestCase {
+    func testOrderCancellationMutationContract() async throws {
+        let session = makeSession(status: 201, body: """
+        {"id":"cancel-1","orderId":"order-1","status":"requested","policySnapshot":"standard","purchaseOrderSentSnapshot":false,"depositPaidSnapshot":0,"requestedRefundAmount":0,"approvedRefundAmount":null,"customerReason":"Передумал","ownerReason":null,"refundId":null,"createdAt":"2026-07-30T12:00:00Z","resolvedAt":null,"completedAt":null}
+        """)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+        let request = CreateOrderCancellationRequest(reason: "Передумал")
+
+        let _: OrderCancellation = try await client.post(
+            NativeMutationEndpoint.orderCancellation(orderId: "order-1"),
+            body: request,
+            token: "client-token",
+            idempotencyKey: "client-cancel-key-1"
+        )
+
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.absoluteString, "https://api.example.test/api/orders/mine/order-1/cancellations")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "client-cancel-key-1")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer client-token")
+        XCTAssertEqual(try requestJSON(), ["reason": "Передумал"])
+    }
+
+    func testPOSReceivableSettlementMutationContract() async throws {
+        let session = makeSession(status: 200, body: #"{"id":"settlement-1","status":"settled"}"#)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+        let request = TestPOSReceivableSettlementRequest(method: "cash", amount: 5_000, txnId: nil, shiftId: nil)
+
+        let _: TestPOSMutationReceipt = try await client.post(
+            NativeMutationEndpoint.receivableSettlement(receivableId: "receivable-1"),
+            body: request,
+            token: "staff-token",
+            idempotencyKey: "pos-settlement-key-1"
+        )
+
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.absoluteString, "https://api.example.test/api/payments/receivables/receivable-1/settle")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "pos-settlement-key-1")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer staff-token")
+        XCTAssertEqual(try requestJSON(), ["amount": 5_000, "method": "cash"])
+    }
+
+    func testPOSItemHandoverMutationContractUsesCanonicalEndpoint() async throws {
+        let session = makeSession(status: 200, body: #"{"id":"item-1","status":"handed_over"}"#)
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        let _: TestPOSMutationReceipt = try await client.post(
+            NativeMutationEndpoint.itemHandover(orderId: "order-1", itemId: "item-1"),
+            body: TestPOSItemHandoverRequest(),
+            token: "staff-token",
+            idempotencyKey: "pos-handover-key-1"
+        )
+
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.absoluteString, "https://api.example.test/api/orders/order-1/items/item-1/handover")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Idempotency-Key"), "pos-handover-key-1")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer staff-token")
+        XCTAssertEqual(try requestJSON(), [:])
+    }
+
     func testUploadsAuthenticatedStaffEvidenceMultipart() async throws {
         let session = makeSession(status: 201, body: """
         {"entityType":"order","entityId":"order-1","asset":{"key":"evidence/order/order-1/photo.webp","url":"/media/photo.webp","width":1200,"height":900,"bytes":42000,"format":"webp"},"label":"handover"}
@@ -256,7 +311,7 @@ final class APIClientTests: XCTestCase {
 
         let tokens: CustomerAuthTokens = try await client.post(
             "auth/otp/verify",
-            body: OTPVerification(phone: "+996555000000", code: "123456")
+            body: OTPVerification(phone: "+996555000000", code: "123456", challengeId: "challenge-1")
         )
 
         XCTAssertEqual(tokens.accessToken, "access-1")
@@ -788,18 +843,39 @@ final class APIClientTests: XCTestCase {
         configuration.protocolClasses = [MockURLProtocol.self]
         return URLSession(configuration: configuration)
     }
+
+    private func requestJSON() throws -> [String: AnyHashable] {
+        let data = try XCTUnwrap(MockURLProtocol.lastRequestBody)
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: AnyHashable])
+    }
+}
+
+private struct TestPOSReceivableSettlementRequest: Encodable, Sendable {
+    let method: String
+    let amount: Int
+    let txnId: String?
+    let shiftId: String?
+}
+
+private struct TestPOSItemHandoverRequest: Encodable, Sendable {}
+
+private struct TestPOSMutationReceipt: Decodable, Sendable {
+    let id: String?
+    let status: String?
 }
 
 private final class MockURLProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var status = 200
     nonisolated(unsafe) static var body = Data()
     nonisolated(unsafe) static var lastRequest: URLRequest?
+    nonisolated(unsafe) static var lastRequestBody: Data?
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
         Self.lastRequest = request
+        Self.lastRequestBody = request.httpBody ?? request.httpBodyStream.flatMap(Self.read)
         let response = HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Self.body)
@@ -807,4 +883,18 @@ private final class MockURLProtocol: URLProtocol, @unchecked Sendable {
     }
 
     override func stopLoading() {}
+
+    private static func read(_ stream: InputStream) -> Data {
+        stream.open()
+        defer { stream.close() }
+        var result = Data()
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 4_096)
+        defer { buffer.deallocate() }
+        while stream.hasBytesAvailable {
+            let count = stream.read(buffer, maxLength: 4_096)
+            guard count > 0 else { break }
+            result.append(buffer, count: count)
+        }
+        return result
+    }
 }

@@ -104,3 +104,74 @@ final class InventoryWriteOffKeyTests: XCTestCase {
         XCTAssertNotEqual(key, try IdempotencyKeys.fingerprint(request(qty: 2)))
     }
 }
+
+final class MutationIntentStoreTests: XCTestCase {
+    private struct Settlement: Encodable {
+        let amount: Int
+        let reason: String
+    }
+
+    func testRetryAndRelaunchReuseKeyUntilSuccessfulCompletion() throws {
+        let suite = "MutationIntentStoreTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let firstLaunch = MutationIntentStore(defaults: defaults)
+        let body = Settlement(amount: 5_000, reason: "cash")
+        let first = try firstLaunch.key(namespace: "settlement", scope: "receivable-1", body: body)
+        let retry = try firstLaunch.key(namespace: "settlement", scope: "receivable-1", body: body)
+        let afterRelaunch = try MutationIntentStore(defaults: defaults)
+            .key(namespace: "settlement", scope: "receivable-1", body: body)
+
+        XCTAssertEqual(first, retry)
+        XCTAssertEqual(first, afterRelaunch)
+
+        firstLaunch.complete(namespace: "settlement", scope: "receivable-1", idempotencyKey: first)
+        let nextIntent = try firstLaunch.key(namespace: "settlement", scope: "receivable-1", body: body)
+        XCTAssertNotEqual(first, nextIntent, "успешно закрытая операция не должна блокировать новую такую же")
+    }
+
+    func testEditedPayloadGetsNewKeyAndLateSuccessDoesNotClearIt() throws {
+        let suite = "MutationIntentStoreTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = MutationIntentStore(defaults: defaults)
+
+        let old = try store.key(
+            namespace: "settlement",
+            scope: "receivable-1",
+            body: Settlement(amount: 5_000, reason: "cash")
+        )
+        let edited = try store.key(
+            namespace: "settlement",
+            scope: "receivable-1",
+            body: Settlement(amount: 7_000, reason: "cash")
+        )
+        XCTAssertNotEqual(old, edited)
+
+        store.complete(namespace: "settlement", scope: "receivable-1", idempotencyKey: old)
+        let retryEdited = try store.key(
+            namespace: "settlement",
+            scope: "receivable-1",
+            body: Settlement(amount: 7_000, reason: "cash")
+        )
+        XCTAssertEqual(edited, retryEdited)
+    }
+
+    func testPersistenceDoesNotStoreScopeOrRequestBody() throws {
+        let suite = "MutationIntentStoreTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = MutationIntentStore(defaults: defaults)
+
+        _ = try store.key(
+            namespace: "cancellation",
+            scope: "customer-order-secret-1",
+            body: Settlement(amount: 1, reason: "private customer reason")
+        )
+
+        let persisted = String(describing: defaults.persistentDomain(forName: suite))
+        XCTAssertFalse(persisted.contains("customer-order-secret-1"))
+        XCTAssertFalse(persisted.contains("private customer reason"))
+    }
+}

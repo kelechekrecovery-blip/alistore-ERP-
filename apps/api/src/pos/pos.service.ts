@@ -771,7 +771,7 @@ function normalizeCustomerPhone(rawPhone: string | undefined): string {
   if (!/^\+?[0-9]{9,15}$/.test(phone)) {
     throw new ValidationError('pos_customer_phone_invalid', 'Введите телефон клиента в международном формате');
   }
-  return phone;
+  return phone.startsWith('+') ? phone : `+${phone}`;
 }
 
 function maskPhone(phone: string): string {

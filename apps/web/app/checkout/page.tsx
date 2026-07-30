@@ -31,6 +31,7 @@ import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
 import { guestOrderLink, saveGuestOrderAccess } from '@/lib/guest-order-access';
 import { resolveCheckoutPaymentOptions } from '@/lib/checkout-payment-options';
+import { summarizePaymentSchedule } from '@/lib/to-order';
 import { fetchPaymentMethods, type ServerPaymentMethods } from '@/lib/api/payments';
 import { Banknote, CalendarClock, CreditCard, QrCode, Smartphone, Store, Truck, Zap } from 'lucide-react';
 
@@ -59,7 +60,17 @@ const STEPS = ['Получение', 'Контакты', 'Оплата', 'Под
  * по своему настоящему заказу. Оплату в бою подтверждает вебхук провайдера.
  */
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
-type DoneState = { order: CreatedOrder; intent?: PaymentIntent; paid?: boolean; toOrderLeadDays?: number | null };
+type DoneState = {
+  order: CreatedOrder;
+  intent?: PaymentIntent;
+  paid?: boolean;
+  toOrderLeadDays?: number | null;
+  scheduleExpectation?: {
+    hasToOrder: boolean;
+    hasOwnStock: boolean;
+    deliveryFee: number;
+  };
+};
 
 function logisticsDate() {
   return new Intl.DateTimeFormat('en-CA', {
@@ -257,13 +268,10 @@ export default function CheckoutPage() {
   const toOrderLeadDays = hasToOrderLine
     ? Math.max(...items.filter((item) => item.supplyMode === 'to_order').map((item) => item.supplyLeadDays ?? 0))
     : null;
-  const toOrderGross = items
-    .filter((item) => item.supplyMode === 'to_order')
-    .reduce((sum, item) => sum + item.price * item.qty, 0);
-  const estimatedToOrderNet = subtotal > 0 ? Math.floor(total * toOrderGross / subtotal) : 0;
-  const estimatedDeposit = Math.ceil(estimatedToOrderNet * 2000 / 10_000);
-  const estimatedSupplyBalance = estimatedToOrderNet - estimatedDeposit;
-  const estimatedStockAtPickup = total - estimatedToOrderNet;
+  const hasOwnStockLine = items.some((item) => item.supplyMode === 'own_stock');
+  const toOrderCheckoutDisabled = items.some(
+    (item) => item.supplyMode === 'to_order' && item.orderable === false,
+  );
 
   async function applyGiftCard() {
     const code = giftCode.trim();
@@ -288,6 +296,10 @@ export default function CheckoutPage() {
 
   async function place() {
     if (!piiConsent) return;
+    if (toOrderCheckoutDisabled) {
+      setError('Оформление товаров под заказ временно отключено.');
+      return;
+    }
     setBusy(true); setError(null);
     try {
       const orderInput = {
@@ -331,7 +343,15 @@ export default function CheckoutPage() {
         if (order.guestAccess) saveGuestOrderAccess(order.id, order.guestAccess.capability, order.guestAccess.expiresIn);
       }
       if (hasToOrderLine) {
-        setDone({ order, toOrderLeadDays });
+        setDone({
+          order,
+          toOrderLeadDays,
+          scheduleExpectation: {
+            hasToOrder: true,
+            hasOwnStock: items.some((item) => item.supplyMode === 'own_stock'),
+            deliveryFee,
+          },
+        });
         clear();
         rotateCheckoutAttempt();
         return;
@@ -411,12 +431,15 @@ export default function CheckoutPage() {
 
   if (done) {
     const schedule = done.order.paymentSchedule ?? [];
-    const scheduled = (kind: (typeof schedule)[number]['kind']) =>
-      schedule.filter((row) => row.kind === kind).reduce((sum, row) => sum + row.amount, 0);
-    const exactDeposit = done.order.initialDue ?? scheduled('supply_deposit');
-    const exactStock = scheduled('stock_sale');
-    const exactBalance = scheduled('supply_balance');
-    const exactDelivery = scheduled('delivery');
+    const scheduleSummary = summarizePaymentSchedule({
+      schedule,
+      items: done.order.items,
+      total: done.order.total,
+      deliveryFee: done.scheduleExpectation?.deliveryFee ?? done.order.deliveryFee,
+      initialDue: done.order.initialDue,
+      expectsToOrder: done.scheduleExpectation?.hasToOrder,
+      expectsOwnStock: done.scheduleExpectation?.hasOwnStock,
+    });
     return wrap(
       <div className="flex flex-1 flex-col items-center justify-center px-7 text-center">
         <div className="grid h-20 w-20 place-items-center rounded-full bg-lime/15 text-4xl">✓</div>
@@ -430,13 +453,24 @@ export default function CheckoutPage() {
             цена фиксируется{done.toOrderLeadDays ? `; срок поставки — ${daysLabel(done.toOrderLeadDays)}` : ''}.
           </p>
         )}
-        {schedule.length > 0 && (
+        {done.scheduleExpectation && !scheduleSummary.valid && (
+          <div role="alert" className="mt-4 w-full max-w-md rounded-[14px] border border-warn/50 bg-warn/10 p-4 text-left">
+            <div className="text-sm font-semibold text-warn">График оплаты пока не подтверждён</div>
+            <p className="mt-1 text-xs text-muted">
+              Не вносите деньги, пока магазин не подтвердит полный график.
+            </p>
+            <ul className="mt-2 list-disc pl-4 text-xs text-warn">
+              {scheduleSummary.blockingReasons.map((reason) => <li key={reason}>{reason}</li>)}
+            </ul>
+          </div>
+        )}
+        {done.scheduleExpectation && scheduleSummary.valid && (
           <div className="checkout-surface mt-4 w-full max-w-md rounded-[14px] border border-surface-3 bg-surface-2 p-4 text-left">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">График оплаты</div>
-            <Row k="Задаток сейчас" v={som(exactDeposit)} />
-            {exactStock > 0 && <Row k="Складские товары при получении" v={som(exactStock)} />}
-            {exactBalance > 0 && <Row k="Остаток заказных товаров" v={som(exactBalance)} />}
-            {exactDelivery > 0 && <Row k="Доставка перед отправкой" v={som(exactDelivery)} />}
+            <Row k="Задаток сейчас" v={som(scheduleSummary.depositNow)} />
+            {scheduleSummary.stockAtReceipt > 0 && <Row k="Складские товары при получении" v={som(scheduleSummary.stockAtReceipt)} />}
+            {scheduleSummary.toOrderBalance > 0 && <Row k="Остаток заказных товаров" v={som(scheduleSummary.toOrderBalance)} />}
+            <Row k="Доставка" v={scheduleSummary.delivery > 0 ? som(scheduleSummary.delivery) : 'бесплатно'} />
             <p className="mt-2 text-xs text-muted">Онлайн-задаток временно отключён до сертификации платёжного возврата.</p>
           </div>
         )}
@@ -574,7 +608,12 @@ export default function CheckoutPage() {
             )}
             {cartRefreshing && <p className="mb-2 text-xs text-muted">Проверяем актуальные цены и остатки…</p>}
             {cartRefreshError && <p className="mb-2 text-xs text-coral-tint">Не удалось проверить актуальные цены и остатки. Можно продолжить — сервер перепроверит их при оформлении.</p>}
-            <button type="button" disabled={cartRefreshing || deliveryCapacityLoading || deliveryCapacityError || (delivery === 'pickup' && !selectedPickupPoint) || (delivery !== 'pickup' && !deliveryAddress.trim()) || (managedCourierDelivery && !selectedDeliverySlot)} onClick={() => setStep(1)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-50">Далее</button>
+            {toOrderCheckoutDisabled && (
+              <p role="alert" className="mb-2 rounded-[11px] border border-warn/40 bg-warn/10 p-3 text-sm text-warn">
+                Оформление товаров под заказ временно отключено. Срок поставки сохранён в корзине; удалите заказную строку, чтобы продолжить со складскими товарами.
+              </p>
+            )}
+            <button type="button" disabled={cartRefreshing || toOrderCheckoutDisabled || deliveryCapacityLoading || deliveryCapacityError || (delivery === 'pickup' && !selectedPickupPoint) || (delivery !== 'pickup' && !deliveryAddress.trim()) || (managedCourierDelivery && !selectedDeliverySlot)} onClick={() => setStep(1)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-50">Далее</button>
           </>
         )}
         {step === 1 && (
@@ -630,10 +669,11 @@ export default function CheckoutPage() {
           <>
             <div className="mb-3 font-display text-base font-bold">Подтверждение</div>
             {hasToOrderLine && (
-              <p className="mb-3 rounded-[11px] border border-lime/40 bg-lime/10 p-3.5 text-sm text-lime">
-                Цена заказных строк фиксируется после задатка. Точный график начислений
-                сформирует сервер при оформлении{toOrderLeadDays ? `; срок — ${daysLabel(toOrderLeadDays)}` : ''}.
-              </p>
+              <div role="alert" className="mb-3 rounded-[11px] border border-lime/40 bg-lime/10 p-3.5 text-sm text-lime">
+                <p>Цена заказных строк фиксируется после задатка. Точный график начислений
+                  сформирует сервер при оформлении{toOrderLeadDays ? `; срок — ${daysLabel(toOrderLeadDays)}` : ''}.</p>
+                <p className="mt-1 text-xs text-muted">До получения полного графика оплата заблокирована.</p>
+              </div>
             )}
             <div className="checkout-surface rounded-[14px] border border-surface-3 bg-surface-2 p-4">
               <Row k="Получение" v={DELIVERY.find((d) => d.id === delivery)?.name ?? ''} />
@@ -650,9 +690,9 @@ export default function CheckoutPage() {
               {bonusDiscount > 0 && <Row k="Бонусы" v={`−${som(bonusDiscount)}`} />}
               <Row k="Доставка" v={deliveryFee ? som(deliveryFee) : 'бесплатно'} />
               {giftAmount > 0 && <Row k={`Подарочная ${giftCard?.code ?? ''}`} v={`−${som(giftAmount)}`} />}
-              {hasToOrderLine && <Row k="Задаток сейчас (предварительно)" v={som(estimatedDeposit)} />}
-              {hasToOrderLine && estimatedStockAtPickup > 0 && <Row k="Складские товары при получении" v={som(estimatedStockAtPickup)} />}
-              {hasToOrderLine && <Row k="Остаток заказных товаров" v={som(estimatedSupplyBalance)} />}
+              {hasToOrderLine && <Row k="Задаток сейчас" v="подтвердит сервер" />}
+              {hasToOrderLine && hasOwnStockLine && <Row k="Складские товары при получении" v="подтвердит сервер" />}
+              {hasToOrderLine && <Row k="Остаток заказных товаров" v="подтвердит сервер" />}
               <div className="flex items-center justify-between">
                 <span className="text-[15px] font-bold">{hasToOrderLine ? 'Ориентировочная сумма' : 'К оплате'}</span>
                 <span className="font-display text-lg font-extrabold text-lime">{som(dueAfterGift)}</span>

@@ -292,10 +292,12 @@ public struct OTPRequest: Encodable, Sendable {
 public struct OTPVerification: Encodable, Sendable {
     public let phone: String
     public let code: String
+    public let challengeId: String?
 
-    public init(phone: String, code: String) {
+    public init(phone: String, code: String, challengeId: String? = nil) {
         self.phone = phone
         self.code = code
+        self.challengeId = challengeId
     }
 }
 
@@ -309,13 +311,14 @@ public struct OTPVerification: Encodable, Sendable {
 ///
 /// `challengeId` объявлен обязательным намеренно: он приходит в обеих ветках,
 /// и если сервер перестанет его слать, это должно сломать тест, а не тихо
-/// разъехаться. Само приложение его не использует — `verify` шлёт телефон и код.
+/// разъехаться. Клиент возвращает его в `verify`, чтобы код нельзя было
+/// подтвердить вне выдавшего его challenge.
 public struct OTPChallenge: Decodable, Sendable {
     public let challengeId: String
     public let devCode: String?
 }
 
-/// Тело `POST auth/social/apple`.
+/// Тело `POST auth/v2/social/apple`.
 ///
 /// `nonce` — ровно та строка, которую клиент положил в `ASAuthorizationAppleIDRequest.nonce`:
 /// Apple кладёт её же в claim токена, а сервер сравнивает их напрямую
@@ -324,13 +327,64 @@ public struct OTPChallenge: Decodable, Sendable {
 /// пустую строку слать нельзя, сервер склеит из неё displayName.
 public struct AppleSocialLogin: Encodable, Sendable {
     public let identityToken: String
-    public let nonce: String?
+    public let nonce: String
     public let name: String?
 
-    public init(identityToken: String, nonce: String?, name: String?) {
+    public init(identityToken: String, nonce: String, name: String?) {
         self.identityToken = identityToken
         self.nonce = nonce
         self.name = name
+    }
+}
+
+public enum CustomerSocialAuthResult: Decodable, Sendable {
+    case authenticated(CustomerAuthTokens)
+    case enrollmentRequired(enrollmentToken: String, expiresIn: Int)
+
+    private enum CodingKeys: String, CodingKey {
+        case status
+        case accessToken
+        case refreshToken
+        case tokenType
+        case expiresIn
+        case enrollmentToken
+    }
+
+    private enum Status: String, Decodable {
+        case authenticated
+        case enrollmentRequired = "enrollment_required"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        switch try container.decode(Status.self, forKey: .status) {
+        case .authenticated:
+            self = .authenticated(CustomerAuthTokens(
+                accessToken: try container.decode(String.self, forKey: .accessToken),
+                refreshToken: try container.decode(String.self, forKey: .refreshToken),
+                tokenType: try container.decode(String.self, forKey: .tokenType),
+                expiresIn: try container.decode(String.self, forKey: .expiresIn)
+            ))
+        case .enrollmentRequired:
+            self = .enrollmentRequired(
+                enrollmentToken: try container.decode(String.self, forKey: .enrollmentToken),
+                expiresIn: try container.decode(Int.self, forKey: .expiresIn)
+            )
+        }
+    }
+}
+
+public struct CompleteSocialEnrollmentRequest: Encodable, Sendable {
+    public let enrollmentToken: String
+    public let phone: String
+    public let code: String
+    public let challengeId: String?
+
+    public init(enrollmentToken: String, phone: String, code: String, challengeId: String? = nil) {
+        self.enrollmentToken = enrollmentToken
+        self.phone = phone
+        self.code = code
+        self.challengeId = challengeId
     }
 }
 
@@ -345,10 +399,12 @@ public struct EmailOTPRequest: Encodable, Sendable {
 public struct EmailOTPVerification: Encodable, Sendable {
     public let email: String
     public let code: String
+    public let challengeId: String?
 
-    public init(email: String, code: String) {
+    public init(email: String, code: String, challengeId: String? = nil) {
         self.email = email
         self.code = code
+        self.challengeId = challengeId
     }
 }
 
@@ -357,6 +413,13 @@ public struct CustomerAuthTokens: Codable, Sendable {
     public let refreshToken: String
     public let tokenType: String
     public let expiresIn: String
+
+    public init(accessToken: String, refreshToken: String, tokenType: String, expiresIn: String) {
+        self.accessToken = accessToken
+        self.refreshToken = refreshToken
+        self.tokenType = tokenType
+        self.expiresIn = expiresIn
+    }
 }
 
 public struct CustomerPrincipal: Decodable, Sendable {
@@ -394,6 +457,13 @@ public struct CustomerSession: Codable, Sendable {
     public let refreshToken: String
     public let customerId: String
     public let phone: String
+
+    public init(accessToken: String, refreshToken: String, customerId: String, phone: String) {
+        self.accessToken = accessToken
+        self.refreshToken = refreshToken
+        self.customerId = customerId
+        self.phone = phone
+    }
 }
 
 public struct CustomerLoyalty: Decodable, Sendable {

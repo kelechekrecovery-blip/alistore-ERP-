@@ -26,6 +26,7 @@ export default function SettingsPage() {
   const [emailInput, setEmailInput] = useState('');
   const [emailCodeStep, setEmailCodeStep] = useState(false);
   const [emailCode, setEmailCode] = useState('');
+  const [emailChallengeId, setEmailChallengeId] = useState<string | null>(null);
   const [emailDevCode, setEmailDevCode] = useState<string | null>(null);
   const [emailBusy, setEmailBusy] = useState(false);
   const [emailError, setEmailError] = useState('');
@@ -59,6 +60,7 @@ export default function SettingsPage() {
     setEmailCodeStep(false);
     setEmailInput('');
     setEmailCode('');
+    setEmailChallengeId(null);
     setEmailDevCode(null);
     setEmailError('');
   }
@@ -67,6 +69,7 @@ export default function SettingsPage() {
     setEmailFormOpen(false);
     setEmailCodeStep(false);
     setEmailCode('');
+    setEmailChallengeId(null);
     setEmailDevCode(null);
     setEmailError('');
   }
@@ -74,8 +77,10 @@ export default function SettingsPage() {
   async function requestEmailAttach() {
     if (!emailValid) return setEmailError('Введите корректный email.');
     setEmailBusy(true); setEmailError('');
+    setEmailChallengeId(null);
     try {
-      const { devCode } = await authed((token) => authRequestEmailAttach(emailInput.trim(), token));
+      const { challengeId, devCode } = await authed((token) => authRequestEmailAttach(emailInput.trim(), token));
+      setEmailChallengeId(challengeId);
       setEmailDevCode(devCode ?? null);
       if (devCode) setEmailCode(devCode);
       setEmailCodeStep(true);
@@ -89,7 +94,12 @@ export default function SettingsPage() {
   async function confirmEmailAttach() {
     setEmailBusy(true); setEmailError('');
     try {
-      await authed((token) => authConfirmEmailAttach(emailInput.trim(), emailCode.trim(), token));
+      await authed((token) => authConfirmEmailAttach(
+        emailInput.trim(),
+        emailCode.trim(),
+        token,
+        emailChallengeId ?? undefined,
+      ));
       closeEmailForm();
       await reload();
     } catch (err) {
@@ -127,6 +137,16 @@ export default function SettingsPage() {
       setError(value instanceof Error ? value.message : 'Не удалось удалить аккаунт');
       setDeleting(false);
       setConfirmingDelete(false);
+    }
+  }
+
+  async function signOut() {
+    setError('');
+    try {
+      await logout();
+      router.push('/');
+    } catch {
+      setError('Не удалось выйти из аккаунта. Проверьте соединение и попробуйте снова.');
     }
   }
 
@@ -192,7 +212,10 @@ export default function SettingsPage() {
               <input
                 type="email"
                 value={emailInput}
-                onChange={(event) => setEmailInput(event.target.value)}
+                onChange={(event) => {
+                  setEmailInput(event.target.value);
+                  setEmailChallengeId(null);
+                }}
                 placeholder="you@example.com"
                 aria-label="Email для привязки"
                 className="w-full rounded-[8px] border border-surface-3 bg-ink-dark p-3 text-sm outline-none focus:border-lime"
@@ -280,7 +303,7 @@ export default function SettingsPage() {
 
       <button
         type="button"
-        onClick={async () => { await logout(); router.push('/'); }}
+        onClick={signOut}
         className="mt-4 w-full rounded-[13px] border border-danger-soft/30 bg-danger-soft/5 py-3.5 text-center text-[13px] font-semibold text-danger-soft"
       >
         Выйти из аккаунта

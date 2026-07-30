@@ -18,10 +18,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.util.UUID
 import kotlinx.coroutines.launch
 
 @Composable
@@ -45,6 +45,10 @@ internal fun StaffSupplyActions(session: StaffSession, gateway: SupplyParityGate
   var imeis by rememberSaveable { mutableStateOf("") }
   var disposition by rememberSaveable { mutableStateOf("return_to_supplier") }
   val scope = rememberCoroutineScope()
+  val context = LocalContext.current.applicationContext
+  val intentStore = remember(context, session.staffId) {
+    StableCommandIntentStore(context, QueueOwner.staff(session.staffId))
+  }
 
   LaunchedEffect(session.accessToken) {
     runCatching { gateway.supplyOperations(session.accessToken) }
@@ -90,13 +94,22 @@ internal fun StaffSupplyActions(session: StaffSession, gateway: SupplyParityGate
       Button(
         onClick = {
           scope.launch {
+            val evidence = evidenceIds.split(',').map(String::trim).filter(String::isNotBlank)
+            val refundAmount = refund.toIntOrNull()
+            val supplierExpenseAmount = expense.toIntOrNull()
+            val intent = intentStore.ownerCancellation(
+              cancellationOrderId, cancellationId, action, refundAmount, supplierExpenseAmount,
+              fault, reason, evidence,
+            )
             runCatching {
               gateway.resolveOwnerCancellation(
-                cancellationOrderId, cancellationId, action, refund.toIntOrNull(), expense.toIntOrNull(),
-                fault, reason, evidenceIds.split(',').map(String::trim).filter(String::isNotBlank), totp,
-                session.accessToken, UUID.randomUUID().toString(),
+                cancellationOrderId, cancellationId, action, refundAmount, supplierExpenseAmount,
+                fault, reason, evidence, totp, session.accessToken, intent.idempotencyKey,
               )
-            }.onSuccess { status = "Решение сохранено: ${it.status}" }.onFailure { status = it.message }
+            }.onSuccess {
+              intentStore.close(intent)
+              status = "Решение сохранено: ${it.status}"
+            }.onFailure { status = it.message }
           }
         },
         enabled = NativeSupplyPolicy.canResolveOwnerCancellation(session, operations?.capabilities?.ownerResolutionAvailable == true)
@@ -118,25 +131,34 @@ internal fun StaffSupplyActions(session: StaffSession, gateway: SupplyParityGate
     Row {
       Button(onClick = {
         scope.launch {
+          val evidence = mapOf("reference" to evidenceRef)
+          val selectedImeis = imeis.split(',').map(String::trim).filter(String::isNotBlank)
+          val intent = intentStore.quarantineProposal(orderItemId, quarantineReason, evidence, selectedImeis)
           runCatching {
             gateway.proposeSupplyQuarantine(
-              orderItemId, quarantineReason, mapOf("reference" to evidenceRef),
-              imeis.split(',').map(String::trim).filter(String::isNotBlank),
-              session.accessToken, UUID.randomUUID().toString(),
+              orderItemId, quarantineReason, evidence, selectedImeis, session.accessToken, intent.idempotencyKey,
             )
-          }.onSuccess { resolutionId = it.id; status = "Quarantine создан" }.onFailure { status = it.message }
+          }.onSuccess {
+            intentStore.close(intent)
+            resolutionId = it.id
+            status = "Quarantine создан"
+          }.onFailure { status = it.message }
         }
       }, enabled = orderItemId.isNotBlank() && quarantineReason.length >= 3 && evidenceRef.isNotBlank(), modifier = Modifier.weight(1f)) {
         Text("Предложить")
       }
       Button(onClick = {
         scope.launch {
+          val evidence = mapOf("reference" to evidenceRef)
+          val intent = intentStore.quarantineResolution(resolutionId, disposition, quarantineReason, evidence)
           runCatching {
             gateway.resolveSupplyQuarantine(
-              resolutionId, disposition, quarantineReason, mapOf("reference" to evidenceRef),
-              session.accessToken, UUID.randomUUID().toString(),
+              resolutionId, disposition, quarantineReason, evidence, session.accessToken, intent.idempotencyKey,
             )
-          }.onSuccess { status = "Quarantine: ${it.disposition}" }.onFailure { status = it.message }
+          }.onSuccess {
+            intentStore.close(intent)
+            status = "Quarantine: ${it.disposition}"
+          }.onFailure { status = it.message }
         }
       }, enabled = session.role in setOf("owner", "admin") && resolutionId.isNotBlank() && quarantineReason.length >= 3 && evidenceRef.isNotBlank(), modifier = Modifier.weight(1f)) {
         Text("Решить")

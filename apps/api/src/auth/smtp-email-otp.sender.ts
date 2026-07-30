@@ -27,6 +27,9 @@ export class SmtpEmailOtpSender implements EmailOtpSender {
           host,
           port: Number(config.get<string>('SMTP_PORT') ?? 587),
           secure: config.get<string>('SMTP_SECURE') === 'true',
+          connectionTimeout: 3_000,
+          greetingTimeout: 3_000,
+          socketTimeout: 3_000,
           auth: config.get<string>('SMTP_USER')
             ? {
                 user: config.get<string>('SMTP_USER') as string,

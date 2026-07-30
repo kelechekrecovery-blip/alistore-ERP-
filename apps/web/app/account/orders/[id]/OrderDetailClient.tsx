@@ -17,6 +17,15 @@ import { useAuth } from '@/lib/auth';
 import { WarrantyRequest } from '@/components/WarrantyRequest';
 import { som } from '@/lib/format';
 import { AccountDetailFrame } from '@/components/AccountDetailFrame';
+import {
+  buildOrderLineTimeline,
+  catalogAvailability,
+  summarizePaymentSchedule,
+} from '@/lib/to-order';
+import {
+  cancellationRequestKey,
+  completeCancellationAttempt,
+} from '@/lib/order-cancellation-idempotency';
 
 const TIMELINE = ['Оформлен', 'Собран', 'Оплачен', 'Сборка', 'Доставка', 'Завершён'];
 const STAGE: Record<string, number> = {
@@ -47,7 +56,9 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const { add } = useCart();
   const { user, hydrated, authed } = useAuth();
   const [order, setOrder] = useState<OrderDetail | null | 'missing'>(null);
+  const [orderLoadError, setOrderLoadError] = useState(false);
   const [cancellation, setCancellation] = useState<OrderCancellationPreview | null>(null);
+  const [cancellationLoadError, setCancellationLoadError] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
   const [cancellationBusy, setCancellationBusy] = useState(false);
   const [cancellationResult, setCancellationResult] = useState<string | null>(null);
@@ -62,10 +73,10 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     }
     authed((token) => fetchOrder(params.id, token))
       .then((o) => setOrder(o ?? 'missing'))
-      .catch(() => setOrder('missing'));
+      .catch(() => setOrderLoadError(true));
     authed((token) => fetchOrderCancellationPreview(params.id, token))
       .then(setCancellation)
-      .catch(() => setCancellation(null));
+      .catch(() => setCancellationLoadError(true));
     fetchCatalog({ limit: 100 }).then((c) => setCatalog(c.items));
   }, [authed, hydrated, params.id, user]);
   const bySku = useMemo(() => new Map(catalog.map((p) => [p.sku, p])), [catalog]);
@@ -74,11 +85,28 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     <AccountDetailFrame>{children}</AccountDetailFrame>
   );
 
-  if (order === null) return frame(<div className="grid flex-1 place-items-center font-mono text-sm text-subtle">Загрузка…</div>);
+  if (orderLoadError) return frame(
+    <div role="alert" className="grid flex-1 place-items-center px-6 text-center">
+      <div>
+        <p className="font-display text-lg font-bold">Заказ не загрузился</p>
+        <p className="mt-2 text-sm text-muted">Заказ сохранён; сейчас не удалось получить актуальные данные.</p>
+        <button type="button" onClick={() => window.location.reload()} className="mt-3 rounded-[11px] border border-surface-3 px-3 py-2 text-sm text-lime">Повторить</button>
+      </div>
+    </div>,
+  );
+  if (order === null) return frame(<div role="status" aria-live="polite" className="grid flex-1 place-items-center font-mono text-sm text-subtle">Загрузка…</div>);
   if (order === 'missing') return frame(<div className="grid flex-1 place-items-center text-center"><div><p className="font-display text-lg font-bold">Заказ не найден</p><Link href="/account" className="mt-3 inline-block text-sm text-lime">← В кабинет</Link></div></div>);
 
   const stageIdx = STAGE[order.status] ?? 0;
   const bad = BAD.has(order.status);
+  const hasToOrder = order.items.some((item) => item.supplyModeSnapshot === 'to_order');
+  const paymentSchedule = summarizePaymentSchedule({
+    schedule: order.receivables,
+    items: order.items,
+    total: order.total,
+    deliveryFee: order.deliveryFee,
+    expectsToOrder: hasToOrder,
+  });
 
   function reorder() {
     if (order === null || order === 'missing') return;
@@ -86,12 +114,15 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     for (const i of order.items) {
       const p = bySku.get(i.sku);
       if (!p) continue;
-      const toOrder = p.supplyMode === 'to_order';
+      const availability = catalogAvailability(p);
+      const toOrder = availability.isToOrder;
+      if (!availability.buyable) continue;
       add({
         id: p.id, sku: p.sku, name: p.name, price: i.price,
         stockLimit: toOrder ? TO_ORDER_CART_QTY_CAP : p.availableUnits,
         supplyMode: toOrder ? 'to_order' : 'own_stock',
-        supplyLeadDays: toOrder ? p.supplyLeadDays : null,
+        supplyLeadDays: toOrder ? availability.leadTimeDays : null,
+        orderable: availability.buyable,
       }, i.qty);
       any = true;
     }
@@ -105,12 +136,14 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     setCancellationBusy(true);
     setCancellationError(null);
     try {
+      const idempotencyKey = cancellationRequestKey(orderId, reason, localStorage);
       const result = await authed((token) => requestOrderCancellation(
         orderId,
         reason,
         token,
-        crypto.randomUUID(),
+        idempotencyKey,
       ));
+      completeCancellationAttempt(orderId, reason, localStorage);
       setCancellationResult(
         result.status === 'awaiting_owner'
           ? 'Запрос принят. Решение проверит владелец.'
@@ -196,8 +229,17 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       </div>
 
       <div className="mb-2 font-display text-base font-bold">Состав</div>
-      {order.items.map((i, idx) => (
-        <div key={idx} className="mb-2 flex items-center gap-3 rounded-[14px] border border-surface-3 bg-surface-2 p-3">
+      {order.items.length === 0 && (
+        <div className="mb-2 rounded-[14px] border border-surface-3 bg-surface-2 p-4 text-sm text-muted">
+          Состав заказа пока не загрузился.
+        </div>
+      )}
+      {order.items.map((i) => {
+        const lineTimeline = buildOrderLineTimeline(i);
+        const eta = i.orderLineSupply?.expectedAt ?? i.promisedDate;
+        return (
+        <div key={i.id} className="mb-2 rounded-[14px] border border-surface-3 bg-surface-2 p-3">
+          <div className="flex items-center gap-3">
           <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-surface-3 to-ink-dark font-display font-extrabold text-white/15">{(bySku.get(i.sku)?.name ?? i.sku).slice(0, 1)}</div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-semibold">{bySku.get(i.sku)?.name ?? i.sku}</div>
@@ -205,6 +247,12 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
               <div className="mt-1 text-[11px] text-lime">
                 {LINE_STATUS[i.fulfillmentStatus] ?? i.fulfillmentStatus}
                 {i.promisedDate ? ` · обещанная дата ${new Date(i.promisedDate).toLocaleDateString('ru-RU')}` : ''}
+              </div>
+            )}
+            {eta && (
+              <div className="mt-0.5 text-[11px] text-muted">
+                ETA: {new Date(eta).toLocaleDateString('ru-RU')}
+                {i.orderLineSupply?.expectedAt && i.promisedDate ? ` · обещано ${new Date(i.promisedDate).toLocaleDateString('ru-RU')}` : ''}
               </div>
             )}
             {i.orderLineSupply && i.orderLineSupply.orderedQty > 1 && (
@@ -217,8 +265,26 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           </div>
           <span className="text-[13px] text-subtle">× {i.qty}</span>
           <span className="font-mono text-[13px] font-semibold">{som(i.price * i.qty)}</span>
+          </div>
+          <ol aria-label={`Этапы товара ${bySku.get(i.sku)?.name ?? i.sku}`} className="mt-3 flex gap-1 overflow-x-auto pb-1">
+            {lineTimeline.map((step) => (
+              <li
+                key={step.key}
+                aria-current={step.state === 'current' ? 'step' : undefined}
+                className={`min-w-fit rounded-full border px-2 py-1 text-[10px] ${
+                  step.state === 'done' ? 'border-lime/40 text-lime'
+                    : step.state === 'current' ? 'border-coral/50 bg-coral/10 text-coral'
+                      : step.state === 'failed' ? 'border-danger-soft/50 text-danger-soft'
+                        : 'border-surface-3 text-subtle'
+                }`}
+              >
+                {step.state === 'done' ? '✓ ' : ''}{step.label}
+              </li>
+            ))}
+          </ol>
         </div>
-      ))}
+        );
+      })}
 
       {order.payments.length > 0 && (
         <div className="mt-3 rounded-[14px] border border-surface-3 bg-surface-2 p-4">
@@ -228,7 +294,16 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           ))}
         </div>
       )}
-      {(order.receivables?.length ?? 0) > 0 && (
+      {hasToOrder && !paymentSchedule.valid && (
+        <div role="alert" className="mt-3 rounded-[14px] border border-warn/40 bg-warn/10 p-4">
+          <div className="text-xs font-semibold uppercase tracking-wide text-warn">График начислений требует подтверждения</div>
+          <p className="mt-1 text-[12px] text-muted">Не вносите оплату по неполному графику. Обратитесь в поддержку.</p>
+          <ul className="mt-2 list-disc pl-4 text-[11px] text-warn">
+            {paymentSchedule.blockingReasons.map((reason) => <li key={reason}>{reason}</li>)}
+          </ul>
+        </div>
+      )}
+      {(order.receivables?.length ?? 0) > 0 && (!hasToOrder || paymentSchedule.valid) && (
         <div className="mt-3 rounded-[14px] border border-surface-3 bg-surface-2 p-4">
           <div className="mb-2 text-xs uppercase tracking-wide text-subtle">График начислений</div>
           {order.receivables?.map((row) => (
@@ -247,6 +322,20 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         </div>
       )}
 
+      {hasToOrder && cancellationLoadError && (
+        <div role="alert" className="mt-3 rounded-[14px] border border-surface-3 bg-surface-2 p-4 text-[12px] text-muted">
+          Предварительный расчёт отмены не загрузился. Не отправляйте повторную оплату; попробуйте позже или обратитесь в поддержку.
+        </div>
+      )}
+      {cancellation && !cancellation.canCancel && (
+        <div className="mt-3 rounded-[14px] border border-surface-3 bg-surface-2 p-4">
+          <div className="text-xs uppercase tracking-wide text-subtle">Отмена заказа</div>
+          <p className="mt-2 text-[12px] text-muted">
+            {cancellation.blockedReason ?? 'Самостоятельная отмена сейчас недоступна.'}
+          </p>
+          <Link href="/support" className="mt-3 block text-[12px] font-semibold text-coral">Обратиться в поддержку →</Link>
+        </div>
+      )}
       {cancellation?.canCancel && (
         <div className="mt-3 rounded-[14px] border border-coral/30 bg-coral/5 p-4">
           <div className="text-xs uppercase tracking-wide text-coral">Предварительный расчёт отмены</div>

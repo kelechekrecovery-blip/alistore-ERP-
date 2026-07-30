@@ -4,6 +4,7 @@ import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import {
   AppleSocialLoginDto,
+  CompleteSocialEnrollmentDto,
   RefreshDto,
   RequestEmailOtpDto,
   RequestOtpDto,
@@ -32,14 +33,14 @@ export class AuthController {
   @Post('otp/request')
   @Throttle({ default: { limit: 3, ttl: 60_000 } })
   requestOtp(@Body() dto: RequestOtpDto) {
-    return this.auth.requestOtp(dto.phone);
+    return this.auth.requestOtp(dto.phone, 'login');
   }
 
   /** Verify the OTP → access + refresh tokens. Capped to slow brute-forcing. */
   @Post('otp/verify')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async verifyOtp(@Body() dto: VerifyOtpDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    const tokens = await this.auth.verifyOtp(dto.phone, dto.code);
+    const tokens = await this.auth.verifyOtp(dto.phone, dto.code, dto.challengeId);
     if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
     return webAuthResponse(request, tokens);
   }
@@ -55,7 +56,7 @@ export class AuthController {
   @Post('recovery/verify')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async verifyRecovery(@Body() dto: VerifyOtpDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    const tokens = await this.auth.verifyRecoveryOtp(dto.phone, dto.code);
+    const tokens = await this.auth.verifyRecoveryOtp(dto.phone, dto.code, dto.challengeId);
     if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
     return webAuthResponse(request, tokens);
   }
@@ -69,7 +70,7 @@ export class AuthController {
   @Post('email/verify')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async verifyEmailOtp(@Body() dto: VerifyEmailOtpDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    const tokens = await this.auth.verifyEmailOtp(dto.email, dto.code);
+    const tokens = await this.auth.verifyEmailOtp(dto.email, dto.code, dto.challengeId);
     if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
     return webAuthResponse(request, tokens);
   }
@@ -87,7 +88,7 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   confirmEmailAttach(@CurrentUser() user: AuthPrincipal, @Body() dto: VerifyEmailOtpDto) {
     if (user.typ !== 'customer') throw new ForbiddenException('Требуется customer JWT');
-    return this.auth.confirmEmailAttach(user.customerId, dto.email, dto.code);
+    return this.auth.confirmEmailAttach(user.customerId, dto.email, dto.code, dto.challengeId);
   }
 
   /** Telegram Mini App/Login Widget auth → access + refresh tokens. */
@@ -106,6 +107,39 @@ export class AuthController {
     const tokens = await this.auth.loginWithApple(dto);
     if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
     return webAuthResponse(request, tokens);
+  }
+
+  @Post('v2/social/telegram')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async telegramSocialLoginV2(@Body() dto: TelegramSocialLoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const result = await this.auth.loginWithTelegramV2(dto);
+    if (result.status === 'authenticated' && isWebSessionRequest(request)) {
+      setWebSessionCookies(response, result, process.env.NODE_ENV === 'production');
+      return webAuthResponse(request, result);
+    }
+    return result;
+  }
+
+  @Post('v2/social/apple')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async appleSocialLoginV2(@Body() dto: AppleSocialLoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const result = await this.auth.loginWithAppleV2(dto);
+    if (result.status === 'authenticated' && isWebSessionRequest(request)) {
+      setWebSessionCookies(response, result, process.env.NODE_ENV === 'production');
+      return webAuthResponse(request, result);
+    }
+    return result;
+  }
+
+  @Post('v2/social/enrollment/complete')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async completeSocialEnrollment(@Body() dto: CompleteSocialEnrollmentDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const result = await this.auth.completeSocialEnrollment(dto);
+    if (isWebSessionRequest(request)) {
+      setWebSessionCookies(response, result, process.env.NODE_ENV === 'production');
+      return webAuthResponse(request, result);
+    }
+    return result;
   }
 
   /** Rotate the refresh token → a fresh access + refresh pair. */

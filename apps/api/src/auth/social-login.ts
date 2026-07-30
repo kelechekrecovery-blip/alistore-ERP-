@@ -19,6 +19,14 @@ export interface SocialProfile {
   avatarUrl?: string;
 }
 
+export interface VerifiedTelegramProfile extends SocialProfile {
+  /**
+   * Canonical, verifier-produced replay identity. It is derived only after the
+   * signature succeeds and is invariant to query ordering/percent spelling.
+   */
+  replayIdentity: string;
+}
+
 export interface TelegramLoginInput {
   initData: string;
   source?: TelegramAuthSource;
@@ -62,13 +70,14 @@ interface JwksResponse {
 }
 
 const TELEGRAM_DEFAULT_MAX_AGE_SECONDS = 24 * 60 * 60;
+const TELEGRAM_MAX_FUTURE_SKEW_SECONDS = 30;
 const APPLE_ISSUER = 'https://appleid.apple.com';
 const APPLE_JWKS_URL = 'https://appleid.apple.com/auth/keys';
 
 export function verifyTelegramLogin(
   input: TelegramLoginInput,
   botToken: string,
-): SocialProfile {
+): VerifiedTelegramProfile {
   const params = new URLSearchParams(input.initData);
   const receivedHash = params.get('hash');
   if (!receivedHash) {
@@ -88,7 +97,12 @@ export function verifyTelegramLogin(
   const authDate = Number(params.get('auth_date') ?? '0');
   const nowSeconds = Math.floor((input.now ?? new Date()).getTime() / 1000);
   const maxAge = input.maxAgeSeconds ?? TELEGRAM_DEFAULT_MAX_AGE_SECONDS;
-  if (!Number.isFinite(authDate) || authDate <= 0 || nowSeconds - authDate > maxAge) {
+  if (
+    !Number.isFinite(authDate)
+    || authDate <= 0
+    || authDate > nowSeconds + TELEGRAM_MAX_FUTURE_SKEW_SECONDS
+    || nowSeconds - authDate > maxAge
+  ) {
     throw new ValidationError('telegram_auth_expired', 'Telegram auth data expired');
   }
 
@@ -97,6 +111,7 @@ export function verifyTelegramLogin(
     throw new ValidationError('telegram_auth_invalid', 'Telegram user id is missing');
   }
 
+  const source = input.source ?? 'mini_app';
   return {
     provider: 'telegram',
     subject: String(user.id),
@@ -106,6 +121,12 @@ export function verifyTelegramLogin(
       user.username ? `@${user.username}` : undefined,
     ]),
     avatarUrl: user.photo_url,
+    replayIdentity: [
+      'telegram',
+      source,
+      dataCheckString,
+      receivedHash.toLowerCase(),
+    ].join('\n'),
   };
 }
 

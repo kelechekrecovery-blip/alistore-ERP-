@@ -23,6 +23,14 @@ public enum UITestBootstrap {
         #endif
     }
 
+    public static var startsAppleEnrollment: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("--ui-testing-apple-enrollment")
+        #else
+        false
+        #endif
+    }
+
     public static var startsAtCheckout: Bool {
         #if DEBUG
         ProcessInfo.processInfo.arguments.contains("--ui-testing-checkout")

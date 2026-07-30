@@ -701,6 +701,42 @@ model CustomerIdentity {
   @@index([customerId])
 }
 
+// Short-lived, one-time bridge between a verified social-provider assertion
+// and phone ownership. Neither the provider credential nor the opaque
+// enrollment token is stored: only non-reversible SHA-256 fingerprints.
+model SocialEnrollment {
+  id            String   @id @default(cuid())
+  tokenHash     String   @unique
+  assertionHash String   @unique
+  provider      String
+  subject       String
+  email         String?
+  displayName   String?
+  avatarUrl     String?
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([provider, subject])
+  @@index([expiresAt])
+}
+
+// Durable global budget for the deliberately narrow App Store / Play review
+// credential. The row is keyed by canonical phone so attempts cannot be reset
+// by changing IP, process, or API instance.
+model ReviewLoginGuard {
+  phone         String    @id
+  attempts      Int       @default(0)
+  successes     Int       @default(0)
+  lockedUntil   DateTime?
+  disabledAt    DateTime?
+  lastAttemptAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([lockedUntil])
+}
+
 model PushToken {
   id         String     @id @default(cuid())
   token      String     @unique
@@ -3279,6 +3315,7 @@ model StorefrontContentRevision {
 
 model SupportTicket {
   id             String       @id @default(cuid())
+  revision       Int          @default(0)
   customerId     String // ссылка строкой, без @relation (см. Customer)
   channel        String // web | app | whatsapp | telegram | call | store
   subject        String
@@ -3432,6 +3469,7 @@ model DeviceProtectionPolicy {
 // ---------- AUTH ----------
 enum OtpPurpose {
   login
+  recovery
   email_attach
 }
 
@@ -3469,6 +3507,9 @@ model RefreshToken {
   tokenHash  String    @unique
   expiresAt  DateTime
   revokedAt  DateTime?
+  // Set only for normal rotation. A brief replay grace lets concurrent browser
+  // tabs exchange the same old HttpOnly cookie without storing plaintext.
+  rotatedAt  DateTime?
   createdAt  DateTime  @default(now())
 
   @@index([customerId])

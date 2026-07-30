@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { AuthzModule } from '../authz/authz.module';
+import { ApprovalsModule } from '../approvals/approvals.module';
 import { OutboxModule } from '../outbox/outbox.module';
 import { ReportsModule } from '../reports/reports.module';
 import { RateLimitModule } from '../rate-limit/rate-limit.module';
@@ -12,6 +13,7 @@ import { TelegramAgentService } from './telegram-agent.service';
 
 @Module({
   imports: [
+    ApprovalsModule,
     AuthModule,
     AuthzModule,
     OutboxModule,

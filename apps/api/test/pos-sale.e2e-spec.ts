@@ -246,19 +246,17 @@ describe('POS sale (integration)', () => {
     })).rejects.toMatchObject({ message: 'pos_customer_binding_sale_mismatch' });
   });
 
-  it('prefers an exact phone match when both plus-prefixed variants exist', async () => {
+  it('resolves plus and non-plus lookup input to the same canonical customer', async () => {
     const digits = `996702${String(seq += 1).padStart(6, '0')}`;
-    const withoutPlus = await prisma.customer.create({
-      data: { phone: digits, name: 'Без плюса' },
+    const customer = await prisma.customer.create({
+      data: { phone: `+${digits}`, name: 'Канонический телефон' },
     });
-    const withPlus = await prisma.customer.create({
-      data: { phone: `+${digits}`, name: 'С плюсом' },
-    });
+    const maskedPhone = `+${digits.slice(0, 3)}******${digits.slice(-2)}`;
 
     await expect(pos.findCustomer(digits, 'staff_phone_lookup', 'BISHKEK-1', `lookup-no-plus-${RUN}`))
-      .resolves.toMatchObject({ name: withoutPlus.name });
+      .resolves.toMatchObject({ name: customer.name, phone: maskedPhone });
     await expect(pos.findCustomer(`+${digits}`, 'staff_phone_lookup', 'BISHKEK-1', `lookup-plus-${RUN}`))
-      .resolves.toMatchObject({ name: withPlus.name });
+      .resolves.toMatchObject({ name: customer.name, phone: maskedPhone });
   });
 
   it('completes a split payment sale and records each tender separately', async () => {

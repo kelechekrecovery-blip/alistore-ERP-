@@ -10,7 +10,6 @@ import { canApprove, Role } from '../rbac/permissions';
 import { ACTION_EXECUTORS, ACTION_REJECTION_EXECUTORS } from './action-executors';
 import { ExchangesService } from '../exchanges/exchanges.service';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
-import { isUniqueConstraintViolation } from '../common/prisma-errors';
 
 /** A dangerous action captured for approval (Approval Rules Matrix). */
 export interface ApprovalRequest {
@@ -126,23 +125,24 @@ export class ApprovalsService {
 
   /** Park a dangerous action for approval; returns the approvalId (caller → 202). */
   async request(req: ApprovalRequest): Promise<{ approvalId: string; status: 'requested' }> {
+    return this.audit.transaction((tx) => this.requestOnTx(tx, req));
+  }
+
+  /**
+   * Transactional request primitive for callers that must lock and validate
+   * domain state in the same transaction as the Approval insert.
+   */
+  async requestOnTx(
+    tx: Prisma.TransactionClient,
+    req: ApprovalRequest,
+  ): Promise<{ result: { approvalId: string; status: 'requested' }; events: AuditInput[] }> {
     const key = req.idempotencyKey?.trim() || undefined;
     if (key) {
-      const replay = await this.replayApproval(key, req);
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'approval-request:' + key}))::text AS locked`;
+      const replay = await this.replayApprovalOnTx(tx, key, req);
       if (replay) return replay;
     }
-    try {
-      return await this.createApproval(req, key);
-    } catch (error) {
-      // Two identical taps can both read "no approval yet" before either insert
-      // lands, so the unique index — not the read above — is what actually
-      // decides. Losing that race is a successful replay, not a failure.
-      if (key && isUniqueConstraintViolation(error)) {
-        const replay = await this.replayApproval(key, req);
-        if (replay) return replay;
-      }
-      throw error;
-    }
+    return this.createApprovalOnTx(tx, req, key);
   }
 
   /**
@@ -156,11 +156,12 @@ export class ApprovalsService {
    * physical event has had its answer, and reporting it as `requested` would
    * tell the caller something is pending when nothing is.
    */
-  private async replayApproval(
+  private async replayApprovalOnTx(
+    tx: Prisma.TransactionClient,
     key: string,
     req: ApprovalRequest,
-  ): Promise<{ approvalId: string; status: 'requested' } | null> {
-    const existing = await this.prisma.approval.findUnique({ where: { idempotencyKey: key } });
+  ): Promise<{ result: { approvalId: string; status: 'requested' }; events: AuditInput[] } | null> {
+    const existing = await tx.approval.findUnique({ where: { idempotencyKey: key } });
     if (!existing) return null;
     const stored = existing.evidence as {
       payload?: Record<string, unknown> | null;
@@ -183,11 +184,17 @@ export class ApprovalsService {
         `Эта заявка уже ${existing.status === 'approved' ? 'одобрена' : 'обработана'}. Повторите с новым ключом, если это новая операция.`,
       );
     }
-    return { approvalId: existing.id, status: 'requested' as const };
+    return {
+      result: { approvalId: existing.id, status: 'requested' as const },
+      events: [],
+    };
   }
 
-  private async createApproval(req: ApprovalRequest, key: string | undefined) {
-    return this.audit.transaction(async (tx) => {
+  private async createApprovalOnTx(
+    tx: Prisma.TransactionClient,
+    req: ApprovalRequest,
+    key: string | undefined,
+  ) {
       const approval = await tx.approval.create({
         data: {
           action: req.action,
@@ -220,7 +227,6 @@ export class ApprovalsService {
           },
         ],
       };
-    });
   }
 
   /** Approve (executes the parked action) or reject an approval. */
@@ -231,6 +237,10 @@ export class ApprovalsService {
   async decideWithStepUp(id: string, input: DecideInput, totpToken?: string) {
     return this.audit.transaction(async (tx) => {
       if (!this.staffAuth) throw new ConflictError('staff_auth_missing', 'Step-up executor не подключён');
+      // Global high-risk lock order starts with Approval, then StaffUser rows.
+      // Telegram execution follows the same order, preventing A/B approval
+      // deadlocks when requester and approver identities are reversed.
+      await tx.$queryRaw`SELECT id FROM "Approval" WHERE id = ${id} FOR UPDATE`;
       await this.staffAuth.verifyStepUpOnTx(tx, input.approver, totpToken);
       return this.decideOnTx(tx, id, input);
     });

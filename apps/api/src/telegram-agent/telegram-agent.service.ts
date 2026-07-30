@@ -8,7 +8,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, TelegramAgentIdentity } from '@prisma/client';
+import { Prisma, SupportTicket, TelegramAgentIdentity, TicketStatus } from '@prisma/client';
 import {
   createHash,
   randomBytes,
@@ -17,6 +17,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { AuthzService } from '../authz/authz.service';
+import { ApprovalsService } from '../approvals/approvals.service';
 import { ConflictError, ValidationError } from '../common/errors';
 import { resolveLlmClient } from '../ai/llm/llm.factory';
 import type { LlmClient, LlmToolDef } from '../ai/llm/llm-client';
@@ -26,6 +27,8 @@ import { ReportsService } from '../reports/reports.service';
 import { SupportService } from '../support/support.service';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
+import { assertTicketTransition } from '../support/ticket-state';
 import {
   parseTelegramUpdate,
   telegramDisplayName,
@@ -37,11 +40,44 @@ const PAIRING_TTL_MS = 10 * 60_000;
 const MAX_INBOUND_TEXT = 4_000;
 const MESSAGE_LEASE_MS = 15 * 60_000;
 const MESSAGE_RETENTION_MS = 30 * 24 * 60 * 60_000;
+const MAX_TOOL_CALLS_PER_MESSAGE = 4;
+const WRITE_APPROVAL_TTL_MS = 5 * 60_000;
+const TELEGRAM_WRITE_APPROVAL_ACTION = 'pii';
+const STAFF_ROLES = new Set(['admin', 'owner']);
+const INJECTION_PATTERN =
+  /\b(?:ignore|disregard|override)\b.{0,80}\b(?:instructions?|system|policy)\b|(?:вызови|запусти|используй|call|execute)\s+(?:tool|инструмент|sql|https?:\/\/)|<\s*\/?\s*(?:system|tool|assistant)\b|(?:system|developer)\s*prompt/isu;
 const READ_ONLY_TOOL_SCHEMA = {
   type: 'object',
   properties: {},
   additionalProperties: false,
 } as const;
+
+interface TicketApprovalSnapshot {
+  id: string;
+  revision: number;
+  customerId: string;
+  channel: string;
+  subject: string;
+  body: string | null;
+  priority: string;
+  sla: string;
+  status: TicketStatus;
+  assignee: string | null;
+  createdAt: string;
+}
+
+interface TelegramWriteApprovalPayload {
+  channel: string;
+  command: 'assign' | 'resolve';
+  ticketId: string;
+  identityId: string;
+  ticketSnapshot: TicketApprovalSnapshot;
+  ticketVersion: string;
+}
+
+type TelegramWriteOutcome =
+  | { ok: true; ticket: SupportTicket }
+  | { ok: false; code: string; message: string };
 
 @Injectable()
 export class TelegramAgentService implements OnModuleInit {
@@ -57,6 +93,7 @@ export class TelegramAgentService implements OnModuleInit {
   private readonly certified: boolean;
   private readonly customerAiEnabled: boolean;
   private readonly customerAiDataCertified: boolean;
+  private readonly ownerKillSwitch: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -67,6 +104,7 @@ export class TelegramAgentService implements OnModuleInit {
     private readonly reports: ReportsService,
     private readonly support: SupportService,
     private readonly staffAuth: StaffAuthService,
+    private readonly approvals: ApprovalsService,
   ) {
     this.enabled = envFlag(config.get<string>('TELEGRAM_AGENT_ENABLED'));
     this.webhookSecret = config.get<string>('TELEGRAM_WEBHOOK_SECRET')?.trim() ?? '';
@@ -78,6 +116,7 @@ export class TelegramAgentService implements OnModuleInit {
     this.certified = envFlag(config.get<string>('TELEGRAM_AGENT_CERTIFIED'));
     this.customerAiEnabled = envFlag(config.get<string>('TELEGRAM_AGENT_CUSTOMER_AI_ENABLED'));
     this.customerAiDataCertified = envFlag(config.get<string>('CUSTOMER_AI_DATA_CERTIFIED'));
+    this.ownerKillSwitch = envFlag(config.get<string>('TELEGRAM_AGENT_KILL_SWITCH'));
     this.client = resolveLlmClient();
   }
 
@@ -182,6 +221,7 @@ export class TelegramAgentService implements OnModuleInit {
         },
       });
       if (recent > 20) {
+        await this.auditDecision('telegram_agent.deny', telegramUserId, externalKey, 'rate_limit', []);
         await this.reply(externalKey, chatId, 'Слишком много запросов. Повторите через минуту.', 'rate_limited');
         return;
       }
@@ -211,6 +251,7 @@ export class TelegramAgentService implements OnModuleInit {
 
       if (!identity) identity = await this.autoLinkCustomer(telegramUserId, chatId, telegramDisplayName(from));
       if (!identity?.active) {
+        await this.auditDecision('telegram_agent.deny', telegramUserId, externalKey, 'identity_unlinked', []);
         const response = this.unlinkedMessage();
         await this.reply(externalKey, chatId, response, 'unlinked');
         return;
@@ -226,6 +267,22 @@ export class TelegramAgentService implements OnModuleInit {
       });
 
       const safeText = redactInboundText(text);
+      if (isPromptInjection(safeText)) {
+        await this.auditDecision(
+          'telegram_agent.deny',
+          identity.staffId ?? identity.customerId ?? telegramUserId,
+          externalKey,
+          'prompt_injection',
+          [identity.id],
+        );
+        await this.reply(
+          externalKey,
+          chatId,
+          'Запрос отклонён: инструкции для запуска инструментов, SQL или обхода политики не принимаются.',
+          'request_rejected',
+        );
+        return;
+      }
       const response = identity.kind === 'staff'
         ? await this.answerStaff(identity, safeText, externalKey)
         : await this.answerCustomer(identity, safeText, externalKey);
@@ -399,6 +456,7 @@ export class TelegramAgentService implements OnModuleInit {
     externalKey: string,
   ): Promise<{ text: string; intent: string }> {
     const customerId = identity.customerId!;
+    await this.requireCapability('customer', null, text, customerId, identity.id, externalKey);
     if (text === '/start' || text === '/help') {
       return {
         intent: 'customer_help',
@@ -430,6 +488,13 @@ export class TelegramAgentService implements OnModuleInit {
       body: text,
       priority: 'normal',
     }, customerId, `telegram-support:${externalKey}`);
+    await this.auditDecision(
+      'telegram_agent.write_requested',
+      customerId,
+      externalKey,
+      'support_ticket_create',
+      [identity.id, ticket.id],
+    );
 
     if (!this.client || !this.customerAiEnabled) {
       return {
@@ -464,7 +529,17 @@ export class TelegramAgentService implements OnModuleInit {
     externalKey: string,
   ): Promise<{ text: string; intent: string }> {
     const staff = await this.prisma.staffUser.findUnique({ where: { id: identity.staffId! } });
-    if (!staff?.active) throw new ForbiddenException('Сотрудник неактивен');
+    if (!staff?.active || !STAFF_ROLES.has(staff.role)) {
+      await this.auditDecision(
+        'telegram_agent.deny',
+        identity.staffId!,
+        externalKey,
+        'staff_revoked_or_role_downgraded',
+        [identity.id],
+      );
+      throw new ForbiddenException('Telegram AI Agent доступен только активным admin/owner');
+    }
+    await this.requireCapability('staff', staff.role, text, staff.id, identity.id, externalKey);
 
     if (text === '/start' || text === '/help') return { text: staffHelp(), intent: 'staff_help' };
     if (text === '/dashboard') {
@@ -501,20 +576,50 @@ export class TelegramAgentService implements OnModuleInit {
       }
       const ticket = await this.support.get(action.ticketId);
       if (!ticket) throw new ValidationError('ticket_not_found', `Тикет ${action.ticketId} не найден`);
-      if (action.command === 'assign') {
-        if (ticket.status === 'in_progress' && ticket.assignee === staff.username) {
-          return { text: `Тикет ${ticket.id} уже назначен на ${staff.username}.`, intent: 'staff_ticket_assign' };
-        }
-        const updated = await this.support.transition(action.ticketId, 'in_progress', { to: 'in_progress', assignee: staff.username }, staff.id);
-        return { text: `Тикет ${updated.id} назначен на ${staff.username}.`, intent: 'staff_ticket_assign' };
+      if (action.command === 'assign' &&
+        ticket.status === 'in_progress' &&
+        ticket.assignee === staff.username) {
+        return { text: `Тикет ${ticket.id} уже назначен на ${staff.username}.`, intent: 'staff_ticket_assign' };
       }
-      if (ticket.status === 'resolved' || ticket.status === 'closed') {
+      if (action.command === 'resolve' &&
+        (ticket.status === 'resolved' || ticket.status === 'closed')) {
         return { text: `Тикет ${ticket.id} уже ${ticket.status}.`, intent: 'staff_ticket_resolve' };
       }
-      if (ticket.status === 'new') {
-        await this.support.transition(action.ticketId, 'in_progress', { to: 'in_progress', assignee: staff.username }, staff.id);
+      const approval = await this.requireApprovedWrite(
+        staff.id,
+        staff.username,
+        identity.id,
+        externalKey,
+        action.command,
+        ticket,
+      );
+      if (approval.status !== 'approved') {
+        return {
+          text: `Опасная запись не выполнена. Создано согласование ${approval.approvalId}; решение требует step-up и другого admin/owner.`,
+          intent: `staff_ticket_${action.command}_approval`,
+        };
       }
-      const updated = await this.support.transition(action.ticketId, 'resolved', { to: 'resolved', assignee: staff.username }, staff.id);
+      if (action.command === 'assign') {
+        const updated = await this.executeApprovedWrite(
+          approval.approvalId,
+          staff.id,
+          staff.username,
+          identity.id,
+          externalKey,
+          action.command,
+          ticket.id,
+        );
+        return { text: `Тикет ${updated.id} назначен на ${staff.username}.`, intent: 'staff_ticket_assign' };
+      }
+      const updated = await this.executeApprovedWrite(
+        approval.approvalId,
+        staff.id,
+        staff.username,
+        identity.id,
+        externalKey,
+        action.command,
+        ticket.id,
+      );
       return { text: `Тикет ${updated.id} закрыт как resolved.`, intent: 'staff_ticket_resolve' };
     }
 
@@ -528,7 +633,7 @@ export class TelegramAgentService implements OnModuleInit {
     const result = await this.client.chat([{ role: 'user', content: text }], {
       system: staffSystemPrompt(staff.username, staff.role),
       tools: this.client.supportsTools
-        ? this.staffReadTools(staff.id, identity.id, externalKey)
+        ? this.staffReadTools(staff.id, identity.id, externalKey, staff.role)
         : undefined,
       cacheSystem: true,
       maxTokens: 900,
@@ -538,7 +643,9 @@ export class TelegramAgentService implements OnModuleInit {
     return { text: result.text.trim(), intent: 'staff_ai_read' };
   }
 
-  private staffReadTools(staffId: string, identityId: string, externalKey: string): LlmToolDef[] {
+  private staffReadTools(staffId: string, identityId: string, externalKey: string, role: string): LlmToolDef[] {
+    let calls = 0;
+    const replayKeys = new Set<string>();
     const tool = (
       name: string,
       description: string,
@@ -549,6 +656,25 @@ export class TelegramAgentService implements OnModuleInit {
       description,
       inputSchema,
       run: async (input) => {
+        const currentStaff = await this.prisma.staffUser.findUnique({
+          where: { id: staffId },
+          select: { active: true, role: true },
+        });
+        if (!STAFF_ROLES.has(role) || !currentStaff?.active || currentStaff.role !== role) {
+          await this.auditDecision('telegram_agent.deny', staffId, externalKey, 'tool_role_denied', [identityId]);
+          throw new ForbiddenException('Инструмент запрещён для текущей роли');
+        }
+        calls += 1;
+        if (calls > MAX_TOOL_CALLS_PER_MESSAGE) {
+          await this.auditDecision('telegram_agent.deny', staffId, externalKey, 'tool_budget_exceeded', [identityId]);
+          throw new ValidationError('telegram_tool_budget_exceeded', 'Лимит инструментов на запрос исчерпан');
+        }
+        const replayKey = `${name}:${canonicalToolInput(input)}`;
+        if (replayKeys.has(replayKey)) {
+          await this.auditDecision('telegram_agent.deny', staffId, externalKey, 'tool_replay', [identityId]);
+          throw new ConflictError('telegram_tool_replay', 'Повторный вызов инструмента отклонён');
+        }
+        replayKeys.add(replayKey);
         const result = await run(input);
         await this.auditStaffRead(
           staffId,
@@ -593,25 +719,361 @@ export class TelegramAgentService implements OnModuleInit {
           });
         },
       ),
-      tool(
-        'find_customers',
-        'Find up to five customers by name. Phone and email are never returned.',
-        {
-          type: 'object',
-          properties: { query: { type: 'string' } },
-          required: ['query'],
-          additionalProperties: false,
-        },
-        async (input) => {
-          const query = readStringField(input, 'query');
-          return this.prisma.customer.findMany({
-            where: { name: { contains: query, mode: 'insensitive' } },
-            take: 5,
-            select: { id: true, name: true, ltv: true, segments: true },
-          });
-        },
-      ),
     ];
+  }
+
+  private async requireCapability(
+    subject: 'customer' | 'staff',
+    role: string | null,
+    text: string,
+    actor: string,
+    identityId: string,
+    externalKey: string,
+  ): Promise<void> {
+    const command = commandName(text);
+    const allowed = subject === 'customer'
+      ? ['start', 'help', 'free_text'].includes(command)
+      : STAFF_ROLES.has(role ?? '') &&
+        ['start', 'help', 'dashboard', 'tickets', 'ticket', 'assign', 'resolve', 'free_text'].includes(command);
+    await this.auditDecision(
+      allowed ? 'telegram_agent.allow' : 'telegram_agent.deny',
+      actor,
+      externalKey,
+      `${subject}:${command}`,
+      [identityId],
+    );
+    if (!allowed) throw new ForbiddenException('Команда недоступна этому субъекту');
+  }
+
+  private async requireApprovedWrite(
+    staffId: string,
+    staffUsername: string,
+    identityId: string,
+    externalKey: string,
+    command: 'assign' | 'resolve',
+    ticket: SupportTicket,
+  ): Promise<{ approvalId: string; status: 'requested' | 'approved' }> {
+    const ticketId = ticket.id;
+    const snapshot = ticketApprovalSnapshot(ticket);
+    const currentVersion = ticketSnapshotVersion(snapshot);
+    const keyPrefix = `telegram-agent:${identityId}:${command}:${ticketId}`;
+    const rootKey = `${keyPrefix}:${currentVersion}`;
+    let existing = await this.prisma.approval.findUnique({ where: { idempotencyKey: rootKey } });
+    // Follow deterministic successor keys. Concurrent refresh attempts derive
+    // the same key and ApprovalsService resolves their unique-key race.
+    for (let depth = 0; existing && depth < 20; depth += 1) {
+      const successor = await this.prisma.approval.findUnique({
+        where: { idempotencyKey: `${rootKey}:after:${existing.id}` },
+      });
+      if (!successor) break;
+      existing = successor;
+    }
+    if (!existing) {
+      const stale = await this.prisma.approval.findFirst({
+        where: { idempotencyKey: { startsWith: `${keyPrefix}:` } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      });
+      if (stale) {
+        await this.auditDecision(
+          'telegram_agent.deny',
+          staffId,
+          externalKey,
+          'ticket_approval_stale',
+          [identityId, ticketId, stale.id],
+        );
+      }
+      return this.requestWriteApproval(
+        staffId,
+        staffUsername,
+        identityId,
+        externalKey,
+        command,
+        ticket,
+        snapshot,
+        currentVersion,
+        rootKey,
+        stale?.id,
+      );
+    }
+    const stored = existing.evidence as {
+      payload?: TelegramWriteApprovalPayload;
+    } | null;
+    const payload = stored?.payload;
+    const valid = existing.action === TELEGRAM_WRITE_APPROVAL_ACTION &&
+      existing.requester === staffId &&
+      existing.reason === `telegram_support_${command}` &&
+      payload?.channel === 'telegram' &&
+      payload.command === command &&
+      payload.ticketId === ticketId &&
+      payload.identityId === identityId &&
+      validTicketSnapshot(payload.ticketSnapshot, payload.ticketVersion);
+    if (!valid) throw new ConflictError('telegram_approval_mismatch', 'Согласование не соответствует команде');
+    if (approvalExpired(existing.createdAt)) {
+      await this.auditDecision(
+        'telegram_agent.deny',
+        staffId,
+        externalKey,
+        'ticket_approval_expired',
+        [identityId, ticketId, existing.id],
+      );
+      if (existing.consumedAt) {
+        throw new ConflictError('telegram_approval_consumed', 'Согласование уже использовано');
+      }
+      return this.requestWriteApproval(
+        staffId,
+        staffUsername,
+        identityId,
+        externalKey,
+        command,
+        ticket,
+        snapshot,
+        currentVersion,
+        `${rootKey}:after:${existing.id}`,
+        existing.id,
+      );
+    }
+    if (existing.status === 'rejected') {
+      throw new ForbiddenException('Согласование отклонено');
+    }
+    if (existing.status !== 'approved') return { approvalId: existing.id, status: 'requested' };
+    if (!existing.approver || existing.approver === staffId) {
+      throw new ForbiddenException('Для записи требуется four-eyes согласование другого сотрудника');
+    }
+    if (existing.consumedAt) {
+      throw new ConflictError('telegram_approval_consumed', 'Согласование уже использовано');
+    }
+    return { approvalId: existing.id, status: 'approved' };
+  }
+
+  private async requestWriteApproval(
+    staffId: string,
+    staffUsername: string,
+    identityId: string,
+    externalKey: string,
+    command: 'assign' | 'resolve',
+    ticket: SupportTicket,
+    snapshot: TicketApprovalSnapshot,
+    ticketVersion: string,
+    idempotencyKey: string,
+    supersedesApprovalId?: string,
+  ): Promise<{ approvalId: string; status: 'requested' }> {
+    const outcome = await this.audit.transaction<
+      | { ok: true; approvalId: string; status: 'requested' }
+      | { ok: false; code: string; message: string }
+    >(async (tx) => {
+      const [lockedTicket] = await tx.$queryRaw<SupportTicket[]>`
+        SELECT * FROM "SupportTicket" WHERE id = ${ticket.id} FOR UPDATE
+      `;
+      const deny = (code: string, message: string) => ({
+        result: { ok: false as const, code, message },
+        events: [{
+          type: 'telegram_agent.deny',
+          actor: staffId,
+          payload: { externalKey, capability: `ticket_${command}`, reason: code },
+          refs: [identityId, ticket.id],
+        }],
+      });
+      if (!lockedTicket) return deny('ticket_not_found', 'Тикет не найден');
+      if (command === 'assign' &&
+        lockedTicket.status === 'in_progress' &&
+        lockedTicket.assignee === staffUsername) {
+        return deny('telegram_ticket_already_assigned', 'Тикет уже назначен этому сотруднику');
+      }
+      if (command === 'resolve' &&
+        (lockedTicket.status === 'resolved' || lockedTicket.status === 'closed')) {
+        return deny('telegram_ticket_already_resolved', `Тикет уже ${lockedTicket.status}`);
+      }
+      const lockedSnapshot = ticketApprovalSnapshot(lockedTicket);
+      if (lockedTicket.revision !== ticket.revision ||
+        ticketSnapshotVersion(lockedSnapshot) !== ticketVersion) {
+        return deny('telegram_ticket_changed_before_approval', 'Тикет изменился до создания согласования');
+      }
+      const requested = await this.approvals.requestOnTx(tx, {
+        action: TELEGRAM_WRITE_APPROVAL_ACTION,
+        requester: staffId,
+        reason: `telegram_support_${command}`,
+        payload: {
+          channel: 'telegram',
+          command,
+          ticketId: ticket.id,
+          identityId,
+          ticketSnapshot: snapshot,
+          ticketVersion,
+        },
+        evidence: {
+          capability: `support:${command}`,
+          approvalTtlSeconds: WRITE_APPROVAL_TTL_MS / 1_000,
+          supersedesApprovalId: supersedesApprovalId ?? null,
+        },
+        idempotencyKey,
+      });
+      return {
+        result: { ok: true as const, ...requested.result },
+        events: [
+          ...requested.events,
+          {
+            type: 'telegram_agent.write_requested',
+            actor: staffId,
+            payload: { externalKey, capability: `ticket_${command}` },
+            refs: [
+              identityId,
+              ticket.id,
+              requested.result.approvalId,
+              ...(supersedesApprovalId ? [supersedesApprovalId] : []),
+            ],
+          },
+        ],
+      };
+    });
+    if (!outcome.ok) throw new ConflictError(outcome.code, outcome.message);
+    return { approvalId: outcome.approvalId, status: outcome.status };
+  }
+
+  private async executeApprovedWrite(
+    approvalId: string,
+    staffId: string,
+    staffUsername: string,
+    identityId: string,
+    externalKey: string,
+    command: 'assign' | 'resolve',
+    ticketId: string,
+  ): Promise<SupportTicket> {
+    const outcome = await this.audit.transaction<TelegramWriteOutcome>(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Approval" WHERE id = ${approvalId} FOR UPDATE`;
+      const approval = await tx.approval.findUnique({ where: { id: approvalId } });
+      const stored = approval?.evidence as { payload?: TelegramWriteApprovalPayload } | null;
+      const payload = stored?.payload;
+      const deny = (
+        code: string,
+        message: string,
+      ): { result: TelegramWriteOutcome; events: Array<{ type: string; actor: string; payload: Record<string, unknown>; refs: string[] }> } => ({
+        result: { ok: false, code, message },
+        events: [{
+          type: 'telegram_agent.deny',
+          actor: staffId,
+          payload: { externalKey, capability: `ticket_${command}`, reason: code },
+          refs: [identityId, ticketId, approvalId],
+        }],
+      });
+      if (!approval || !payload) {
+        return deny('telegram_approval_mismatch', 'Согласование не найдено');
+      }
+      const staffIds = [...new Set([staffId, ...(approval.approver ? [approval.approver] : [])])].sort();
+      await tx.$queryRaw`
+        SELECT id FROM "StaffUser"
+        WHERE id IN (${Prisma.join(staffIds)})
+        ORDER BY id
+        FOR UPDATE
+      `;
+      await tx.$queryRaw`SELECT id FROM "SupportTicket" WHERE id = ${ticketId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "TelegramAgentIdentity" WHERE id = ${identityId} FOR UPDATE`;
+      const [ticket, requester, identity, approver] = await Promise.all([
+        tx.supportTicket.findUnique({ where: { id: ticketId } }),
+        tx.staffUser.findUnique({ where: { id: staffId }, select: { active: true, role: true } }),
+        tx.telegramAgentIdentity.findUnique({
+          where: { id: identityId },
+          select: { active: true, kind: true, staffId: true },
+        }),
+        approval.approver
+          ? tx.staffUser.findUnique({
+              where: { id: approval.approver },
+              select: { active: true, role: true },
+            })
+          : Promise.resolve(null),
+      ]);
+      if (!ticket) {
+        return deny('telegram_approval_mismatch', 'Тикет не найден');
+      }
+      const bindingValid = approval.action === TELEGRAM_WRITE_APPROVAL_ACTION &&
+        approval.requester === staffId &&
+        approval.reason === `telegram_support_${command}` &&
+        payload.channel === 'telegram' &&
+        payload.command === command &&
+        payload.ticketId === ticketId &&
+        payload.identityId === identityId &&
+        validTicketSnapshot(payload.ticketSnapshot, payload.ticketVersion);
+      if (!bindingValid) {
+        return deny('telegram_approval_mismatch', 'Согласование не соответствует команде');
+      }
+      if (!requester?.active || !STAFF_ROLES.has(requester.role) ||
+        !identity?.active || identity.kind !== 'staff' || identity.staffId !== staffId) {
+        return deny('staff_revoked_or_role_downgraded', 'Доступ инициатора отозван');
+      }
+      if (approval.status !== 'approved' || !approval.approver || approval.approver === staffId) {
+        return deny('four_eye_approval_required', 'Требуется одобрение другого сотрудника');
+      }
+      if (!approver?.active || !STAFF_ROLES.has(approver.role)) {
+        return deny('approver_revoked_or_role_downgraded', 'Доступ согласующего отозван');
+      }
+      if (approval.consumedAt) {
+        return deny('telegram_approval_consumed', 'Согласование уже использовано');
+      }
+      if (approvalExpired(approval.createdAt)) {
+        return deny('telegram_approval_expired', 'Срок действия согласования истёк');
+      }
+      if (ticketSnapshotVersion(ticketApprovalSnapshot(ticket)) !== payload.ticketVersion) {
+        return deny('telegram_approval_stale', 'Тикет изменился после запроса согласования');
+      }
+
+      const events: Array<{ type: string; actor: string; payload: Record<string, unknown>; refs: string[] }> = [];
+      let current = ticket;
+      if (command === 'assign') {
+        assertTicketTransition(current.status, 'in_progress');
+        const assigned = await tx.supportTicket.updateMany({
+          where: { id: ticketId, revision: current.revision },
+          data: { status: 'in_progress', assignee: staffUsername },
+        });
+        if (assigned.count !== 1) throw new ConflictError('telegram_approval_stale', 'Тикет изменён конкурентно');
+        current = await tx.supportTicket.findUniqueOrThrow({ where: { id: ticketId } });
+        events.push(ticketTransitionEvent(ticket, current, staffId));
+      } else {
+        if (current.status === 'new') {
+          assertTicketTransition(current.status, 'in_progress');
+          const advanced = await tx.supportTicket.updateMany({
+            where: { id: ticketId, revision: current.revision },
+            data: { status: 'in_progress', assignee: staffUsername },
+          });
+          if (advanced.count !== 1) throw new ConflictError('telegram_approval_stale', 'Тикет изменён конкурентно');
+          const inProgress = await tx.supportTicket.findUniqueOrThrow({ where: { id: ticketId } });
+          events.push(ticketTransitionEvent(current, inProgress, staffId));
+          current = inProgress;
+        }
+        assertTicketTransition(current.status, 'resolved');
+        const finished = await tx.supportTicket.updateMany({
+          where: { id: ticketId, revision: current.revision },
+          data: { status: 'resolved', assignee: staffUsername },
+        });
+        if (finished.count !== 1) throw new ConflictError('telegram_approval_stale', 'Тикет изменён конкурентно');
+        const resolved = await tx.supportTicket.findUniqueOrThrow({ where: { id: ticketId } });
+        events.push(ticketTransitionEvent(current, resolved, staffId));
+        await enqueueConsentedCustomerNotice(tx, this.outbox, {
+          customerId: ticket.customerId,
+          template: 'ticket_resolved',
+          payload: { ticketId, subject: ticket.subject },
+          transactional: true,
+          dedupKey: `telegram-agent:${approvalId}`,
+        });
+        current = resolved;
+      }
+      await tx.approval.update({
+        where: { id: approvalId },
+        data: { consumedAt: new Date() },
+      });
+      events.push({
+        type: 'telegram_agent.write',
+        actor: staffId,
+        payload: { externalKey, capability: `ticket_${command}`, approvalId },
+        refs: [identityId, ticketId, approvalId],
+      });
+      return { result: { ok: true as const, ticket: current }, events };
+    });
+    if (!outcome.ok) {
+      if (outcome.code === 'telegram_approval_expired' || outcome.code === 'telegram_approval_stale') {
+        throw new ConflictError(outcome.code, outcome.message);
+      }
+      throw new ForbiddenException(outcome.message);
+    }
+    return outcome.ticket;
   }
 
   private async requirePermission(role: string, resource: string, action: string): Promise<void> {
@@ -639,8 +1101,26 @@ export class TelegramAgentService implements OnModuleInit {
     }));
   }
 
+  private async auditDecision(
+    type: string,
+    actor: string,
+    externalKey: string,
+    capability: string,
+    refs: string[],
+  ): Promise<void> {
+    await this.audit.transaction(async () => ({
+      result: undefined,
+      events: [{
+        type,
+        actor,
+        payload: { externalKey, capability },
+        refs: [...new Set(refs)],
+      }],
+    }));
+  }
+
   private async reply(externalKey: string, chatId: string, responseText: string, intent: string): Promise<void> {
-    const safeResponse = responseText.slice(0, 4096);
+    const safeResponse = redactInboundText(responseText).slice(0, 4096);
     await this.prisma.$transaction(async (tx) => {
       if (!await this.replyIdentityIsActive(tx, externalKey)) {
         await tx.telegramAgentMessage.updateMany({
@@ -712,7 +1192,7 @@ export class TelegramAgentService implements OnModuleInit {
   }
 
   private assertEnabled(): void {
-    if (!this.enabled) throw new ForbiddenException('Telegram AI Agent выключен');
+    if (!this.enabled || this.ownerKillSwitch) throw new ForbiddenException('Telegram AI Agent выключен');
     this.assertRuntimeConfiguration();
   }
 
@@ -760,6 +1240,73 @@ function envFlag(value: string | undefined): boolean {
   return ['1', 'true', 'yes'].includes(value?.trim().toLowerCase() ?? '');
 }
 
+function ticketApprovalSnapshot(ticket: SupportTicket): TicketApprovalSnapshot {
+  return {
+    id: ticket.id,
+    revision: ticket.revision,
+    customerId: ticket.customerId,
+    channel: ticket.channel,
+    subject: ticket.subject,
+    body: ticket.body,
+    priority: ticket.priority,
+    sla: ticket.sla.toISOString(),
+    status: ticket.status,
+    assignee: ticket.assignee,
+    createdAt: ticket.createdAt.toISOString(),
+  };
+}
+
+function ticketSnapshotVersion(snapshot: TicketApprovalSnapshot): string {
+  // PostgreSQL jsonb does not preserve object key insertion order. Hash an
+  // explicitly ordered tuple so a round-trip through Approval.evidence cannot
+  // make an unchanged ticket look stale.
+  const canonical = [
+    snapshot.id,
+    snapshot.revision,
+    snapshot.customerId,
+    snapshot.channel,
+    snapshot.subject,
+    snapshot.body,
+    snapshot.priority,
+    snapshot.sla,
+    snapshot.status,
+    snapshot.assignee,
+    snapshot.createdAt,
+  ];
+  return createHash('sha256')
+    .update(JSON.stringify(canonical), 'utf8')
+    .digest('hex');
+}
+
+function validTicketSnapshot(snapshot: unknown, version: unknown): snapshot is TicketApprovalSnapshot {
+  if (!snapshot || typeof snapshot !== 'object' || typeof version !== 'string') return false;
+  const candidate = snapshot as Record<string, unknown>;
+  const strings = ['id', 'customerId', 'channel', 'subject', 'priority', 'sla', 'status', 'createdAt'];
+  if (strings.some((field) => typeof candidate[field] !== 'string')) return false;
+  if (!Number.isSafeInteger(candidate.revision) || (candidate.revision as number) < 0) return false;
+  if (candidate.body !== null && typeof candidate.body !== 'string') return false;
+  if (candidate.assignee !== null && typeof candidate.assignee !== 'string') return false;
+  return ticketSnapshotVersion(snapshot as TicketApprovalSnapshot) === version;
+}
+
+function approvalExpired(createdAt: Date): boolean {
+  return createdAt.getTime() + WRITE_APPROVAL_TTL_MS <= Date.now();
+}
+
+function ticketTransitionEvent(from: SupportTicket, to: SupportTicket, actor: string) {
+  return {
+    type: `ticket.${to.status}`,
+    actor,
+    payload: {
+      ticketId: to.id,
+      from: from.status,
+      to: to.status,
+      assignee: to.assignee,
+    },
+    refs: [to.id, to.customerId],
+  };
+}
+
 function hashPairingCode(code: string): string {
   return createHash('sha256').update(code, 'utf8').digest('hex');
 }
@@ -783,10 +1330,32 @@ function redactInboundText(text: string): string {
   if (text.startsWith('/link ')) return '/link [REDACTED]';
   return text
     .replace(/\b\d{6,12}:[A-Za-z0-9_-]{30,}\b/g, '[BOT_TOKEN_REDACTED]')
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/-]{16,}=*/gi, 'Bearer [TOKEN_REDACTED]')
+    .replace(/\b(?:sk|pk|api)[-_][A-Za-z0-9_-]{16,}\b/gi, '[API_KEY_REDACTED]')
     .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[EMAIL_REDACTED]')
     .replace(/(?<!\d)(?:\+?\d[\s()-]?){10,15}(?!\d)/g, '[PHONE_REDACTED]')
     .replace(/\b(?:\d[ -]*?){13,19}\b/g, '[CARD_REDACTED]')
     .replace(/\b(?:password|пароль|otp|pin)\s*[:=]\s*\S+/gi, '$1=[REDACTED]');
+}
+
+function isPromptInjection(text: string): boolean {
+  return INJECTION_PATTERN.test(text);
+}
+
+function commandName(text: string): string {
+  if (!text.startsWith('/')) return 'free_text';
+  const match = text.match(/^\/([a-z_]+)/i);
+  return match?.[1]?.toLowerCase() ?? 'unknown_command';
+}
+
+function canonicalToolInput(input: unknown): string {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return JSON.stringify(input ?? null);
+  return JSON.stringify(
+    Object.fromEntries(
+      Object.entries(input as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right)),
+    ),
+  );
 }
 
 function isUniqueConflict(error: unknown): boolean {

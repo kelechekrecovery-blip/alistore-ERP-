@@ -18,7 +18,7 @@ final class AliStoreClientUITests: XCTestCase {
         app.launchArguments = ["--ui-testing-signed-out"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Вход в AliStore"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Войти или создать аккаунт"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.textFields["client-phone"].exists)
         XCTAssertTrue(app.buttons["Продолжить как гость →"].exists)
     }
@@ -28,7 +28,7 @@ final class AliStoreClientUITests: XCTestCase {
         app.launchArguments = ["--ui-testing-signed-out"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Вход в AliStore"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Войти или создать аккаунт"].waitForExistence(timeout: 10))
         // Apple стоит рядом с кодом, а не вместо него: телефон остаётся первичным
         // идентификатором, без него не работают доставка и COD.
         XCTAssertTrue(app.buttons["client-apple-signin"].exists)
@@ -46,7 +46,7 @@ final class AliStoreClientUITests: XCTestCase {
         app.launchArguments = ["--ui-testing-signed-out"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Вход в AliStore"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Войти или создать аккаунт"].waitForExistence(timeout: 10))
         // Телефон — канал по умолчанию: по нему заводится аккаунт.
         XCTAssertTrue(app.textFields["client-phone"].exists)
         XCTAssertFalse(app.textFields["client-email"].exists)
@@ -67,6 +67,23 @@ final class AliStoreClientUITests: XCTestCase {
         app.buttons["client-channel-phone"].tap()
         XCTAssertTrue(app.textFields["client-phone"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.textFields["client-email"].exists)
+    }
+
+    func testAppleEnrollmentIsPhoneFirstCancelableAndKeepsGuestPath() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-apple-enrollment"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Подтвердите номер телефона"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.textFields["client-phone"].exists)
+        XCTAssertFalse(app.buttons["client-channel-email"].exists)
+        XCTAssertFalse(app.buttons["client-apple-signin"].exists)
+        XCTAssertTrue(app.buttons["client-apple-enrollment-cancel"].exists)
+        XCTAssertTrue(app.buttons["Продолжить как гость →"].exists)
+
+        app.buttons["client-apple-enrollment-cancel"].tap()
+        XCTAssertTrue(app.staticTexts["Войти или создать аккаунт"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["client-apple-signin"].exists)
     }
 
     func testGuestShellUsesPrototypeNavigation() {

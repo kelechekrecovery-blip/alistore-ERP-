@@ -32,13 +32,15 @@ describe('Auth: social provider login', () => {
 
   beforeEach(async () => {
     await prisma.refreshToken.deleteMany();
+    await prisma.socialEnrollment.deleteMany();
     await prisma.customerIdentity.deleteMany();
     await prisma.customer.deleteMany({ where: { phone: { startsWith: '+999' } } });
   });
 
-  it('verifies Telegram Mini App initData and links a stable customer identity', async () => {
+  it('verifies Telegram Mini App initData and signs in a linked identity', async () => {
     const botToken = '123456:telegram-secret';
     const auth = service({ TELEGRAM_BOT_TOKEN: botToken });
+    await linkedIdentity('telegram', '777001', '+9990000000001');
     const initData = signedTelegramInitData(botToken, {
       id: 777001,
       first_name: 'Ali',
@@ -47,10 +49,11 @@ describe('Auth: social provider login', () => {
     });
 
     const first = await auth.loginWithTelegram({ initData });
-    const second = await auth.loginWithTelegram({ initData });
 
     expect(first.accessToken.split('.')).toHaveLength(3);
-    expect(second.refreshToken).not.toBe(first.refreshToken);
+    await expect(auth.loginWithTelegram({ initData })).rejects.toMatchObject({
+      code: 'social_auth_replayed',
+    });
     const identities = await prisma.customerIdentity.findMany({
       where: { provider: 'telegram', subject: '777001' },
       include: { customer: true },
@@ -59,6 +62,26 @@ describe('Auth: social provider login', () => {
     expect(identities[0].displayName).toBe('Ali Buyer @ali_buyer');
     expect(identities[0].customer.segments).toContain('auth:telegram');
     expect(identities[0].customer.phone).toMatch(/^\+999\d{10}$/);
+  });
+
+  it('rejects reordered and percent-equivalent replays on the legacy Telegram path', async () => {
+    const botToken = '123456:telegram-secret';
+    const auth = service({ TELEGRAM_BOT_TOKEN: botToken });
+    await linkedIdentity('telegram', '777003', '+9990000000005');
+    const captured = signedTelegramInitData(botToken, {
+      id: 777003,
+      first_name: 'Replay',
+    });
+
+    await expect(auth.loginWithTelegram({ initData: captured })).resolves.toHaveProperty(
+      'accessToken',
+    );
+    await expect(auth.loginWithTelegram({
+      initData: reorderedQuery(captured),
+    })).rejects.toMatchObject({ code: 'social_auth_replayed' });
+    await expect(auth.loginWithTelegram({
+      initData: equivalentPercentEncoding(captured),
+    })).rejects.toMatchObject({ code: 'social_auth_replayed' });
   });
 
   it('rejects tampered Telegram initData', async () => {
@@ -72,7 +95,15 @@ describe('Auth: social provider login', () => {
     expect((err as ValidationError).code).toBe('telegram_auth_invalid');
   });
 
-  it('verifies Apple identityToken through JWKS and links a customer identity', async () => {
+  it('requires nonce on the legacy Apple endpoint too', async () => {
+    const auth = service({ APPLE_CLIENT_ID: 'kg.alistore.web' });
+
+    await expect(auth.loginWithApple({
+      identityToken: 'stolen-or-replayed-token',
+    })).rejects.toMatchObject({ code: 'apple_nonce_required' });
+  });
+
+  it('verifies Apple identityToken through JWKS and signs in a linked identity', async () => {
     const { publicKey, privateKey } = generateKeyPairSync('rsa', {
       modulusLength: 2048,
     });
@@ -91,6 +122,7 @@ describe('Auth: social provider login', () => {
       APPLE_CLIENT_ID: 'kg.alistore.web',
       APPLE_JWKS_URL: 'https://apple.test/keys',
     });
+    await linkedIdentity('apple', 'apple-sub-1', '+9990000000002');
     const token = signedJwt(
       { alg: 'RS256', kid: 'apple-key-1' },
       {
@@ -145,6 +177,8 @@ describe('Auth: social provider login', () => {
       APPLE_CLIENT_ID: 'kg.alistore.web,kg.alistore.client',
       APPLE_JWKS_URL: 'https://apple.test/keys',
     });
+    await linkedIdentity('apple', 'apple-native-1', '+9990000000003');
+    await linkedIdentity('apple', 'apple-web-1', '+9990000000004');
 
     const nativeToken = (subject: string, audience: string) =>
       signedJwt(
@@ -156,24 +190,30 @@ describe('Auth: social provider login', () => {
           iat: Math.floor(Date.now() / 1000),
           sub: subject,
           email: `${subject}@privaterelay.appleid.com`,
+          nonce: `nonce-${subject}`,
         },
         privateKey,
       );
 
     const native = await auth.loginWithApple({
       identityToken: nativeToken('apple-native-1', 'kg.alistore.client'),
+      nonce: 'nonce-apple-native-1',
     });
     expect(native.accessToken.split('.')).toHaveLength(3);
 
     const web = await auth.loginWithApple({
       identityToken: nativeToken('apple-web-1', 'kg.alistore.web'),
+      nonce: 'nonce-apple-web-1',
     });
     expect(web.accessToken.split('.')).toHaveLength(3);
 
     // Чужая аудитория по-прежнему отвергается — список не должен превратиться
     // в «принимаем что угодно».
     const foreign = await auth
-      .loginWithApple({ identityToken: nativeToken('apple-foreign-1', 'kg.someone.else') })
+      .loginWithApple({
+        identityToken: nativeToken('apple-foreign-1', 'kg.someone.else'),
+        nonce: 'nonce-apple-foreign-1',
+      })
       .catch((error) => error);
     expect(foreign).toBeInstanceOf(ValidationError);
     expect((foreign as ValidationError).code).toBe('apple_token_invalid');
@@ -182,7 +222,7 @@ describe('Auth: social provider login', () => {
   it('fails closed when a social provider is not configured', async () => {
     const auth = service({});
     const err = await auth
-      .loginWithApple({ identityToken: 'header.payload.signature' })
+      .loginWithApple({ identityToken: 'header.payload.signature', nonce: 'nonce' })
       .catch((e) => e);
 
     expect(err).toBeInstanceOf(ValidationError);
@@ -193,6 +233,21 @@ describe('Auth: social provider login', () => {
     return new AuthService(prisma, jwt, {
       get: (key: string) => values[key],
     } as unknown as ConfigService);
+  }
+
+  async function linkedIdentity(
+    provider: string,
+    subject: string,
+    phone: string,
+  ): Promise<void> {
+    await prisma.customer.create({
+      data: {
+        phone,
+        name: '',
+        segments: [`auth:${provider}`],
+        identities: { create: { provider, subject } },
+      },
+    });
   }
 });
 
@@ -214,6 +269,14 @@ function signedTelegramInitData(
     createHmac('sha256', secret).update(dataCheckString).digest('hex'),
   );
   return params.toString();
+}
+
+function reorderedQuery(value: string): string {
+  return value.split('&').reverse().join('&');
+}
+
+function equivalentPercentEncoding(value: string): string {
+  return value.replace(/%[0-9A-F]{2}/g, (encoded) => encoded.toLowerCase());
 }
 
 function signedJwt(

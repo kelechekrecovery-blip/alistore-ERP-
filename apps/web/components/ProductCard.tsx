@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { Heart, ImageOff, Scale, ShoppingCart, Star } from 'lucide-react';
 import { useState } from 'react';
 import type { CatalogProduct } from '@/lib/api';
-import { conditionLabel, som, supplyLeadLabel } from '@/lib/format';
+import { conditionLabel, som } from '@/lib/format';
 import { TO_ORDER_CART_QTY_CAP, useCart } from '@/lib/cart';
+import { availabilityLabel, catalogAvailability } from '@/lib/to-order';
 import { useFavorites } from '@/lib/favorites';
 import { useCompare } from '@/lib/compare';
 import { StatusPill } from '@/components/ui/Badge';
@@ -50,9 +51,10 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
   const compare = useCompare();
   const [added, setAdded] = useState(false);
   const condition = conditionLabel(product.attrs);
-  const inStock = product.availableUnits > 0;
-  const toOrder = !inStock && product.supplyMode === 'to_order' && product.orderable;
-  const buyable = product.orderable;
+  const availability = catalogAvailability(product);
+  const inStock = availability.isInStock;
+  const toOrder = availability.isToOrder;
+  const buyable = availability.buyable;
   const href = `/product/${product.id}`;
 
   function addToCart() {
@@ -63,7 +65,8 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
       price: product.price,
       stockLimit: toOrder ? TO_ORDER_CART_QTY_CAP : product.availableUnits,
       supplyMode: toOrder ? 'to_order' : 'own_stock',
-      supplyLeadDays: toOrder ? product.supplyLeadDays : null,
+      supplyLeadDays: toOrder ? availability.leadTimeDays : null,
+      orderable: buyable,
     });
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1200);
@@ -87,12 +90,12 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
         <Link href={href} className={`mt-1.5 min-h-[38px] text-[13px] font-medium leading-[1.4] transition hover:text-coral ${design3 ? 'text-white' : 'text-ink'}`}>{product.name}</Link>
         <div className="mt-2 flex flex-wrap gap-1">{productSpecEntries(product).slice(0, 3).map(([key, value]) => <span key={key} className={`rounded-[4px] px-2 py-1 text-[10px] ${design3 ? 'bg-white/[.06] text-white/50' : 'bg-sand text-faint'}`}>{String(value)}</span>)}</div>
         <div className={`mt-2 flex items-center gap-1 text-[11px] ${inStock ? 'text-[#c6ff3d]' : design3 ? 'text-white/45' : 'text-faint'}`}>
-          {inStock ? (<><span className="text-[8px]">●</span>{`В наличии · ${product.availableUnits} шт.`}</>) : product.supplyMode === 'to_order' && product.supplyLeadDays ? (<StatusPill status="info">{supplyLeadLabel(product.supplyLeadDays)}</StatusPill>) : (<><span className="text-[8px]">●</span>Под заказ</>)}
+          {inStock ? (<><span className="text-[8px]">●</span>{availabilityLabel(availability, product.availableUnits)}</>) : toOrder ? (<StatusPill status="info">{availabilityLabel(availability, product.availableUnits)}</StatusPill>) : (<><span className="text-[8px]">●</span>{availabilityLabel(availability, product.availableUnits)}</>)}
         </div>
         <div className={`mt-2 font-display tabular text-[18px] font-extrabold ${design3 ? 'text-white' : 'text-ink'}`}>{som(product.price)}</div>
         {typeof product.attrs?.financingText === 'string' && <div className={`mt-1 text-[11px] ${design3 ? 'text-[#c6ff3d]' : 'text-faint'}`}>{product.attrs.financingText}</div>}
         <div className="mt-auto flex gap-1.5 pt-3">
-          <button type="button" disabled={!buyable} onClick={addToCart} className={`flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[8px] text-xs font-bold transition disabled:cursor-not-allowed disabled:bg-linen disabled:text-faint ${added ? 'bg-success text-white' : 'bg-coral text-white hover:bg-deep'}`}>
+          <button type="button" disabled={!buyable} aria-describedby={!buyable && toOrder ? `availability-${product.id}` : undefined} onClick={addToCart} className={`flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[8px] text-xs font-bold transition disabled:cursor-not-allowed disabled:bg-linen disabled:text-faint ${added ? 'bg-success text-white' : 'bg-coral text-white hover:bg-deep'}`}>
             <ShoppingCart size={14} />{added ? 'Добавлено' : toOrder ? 'Заказать' : 'В корзину'}
           </button>
           <button type="button" onClick={() => compare.toggle(product.id)} aria-label={compare.has(product.id) ? 'Удалить из сравнения' : 'Добавить к сравнению'} className={`grid h-10 w-10 shrink-0 place-items-center rounded-[8px] ${design3 ? 'bg-white/[.06]' : 'bg-sand'} ${compare.has(product.id) ? 'text-coral' : 'text-faint hover:bg-linen'}`}>
@@ -100,6 +103,7 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
           </button>
         </div>
       </div>
+      {!buyable && toOrder && <span id={`availability-${product.id}`} className="sr-only">Оформление товаров под заказ временно отключено; срок поставки сохранён на карточке.</span>}
     </article>
   );
 }

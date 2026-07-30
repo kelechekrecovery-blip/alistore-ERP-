@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { Test } from '@nestjs/testing';
+import * as argon2 from 'argon2';
 import request from 'supertest';
 import { AuditModule } from '../audit/audit.module';
 import { AuthService } from '../auth/auth.service';
@@ -193,9 +194,20 @@ describe('Customer account deletion and export', () => {
     const email = `deleted${run.slice(-6)}@emaildelete.test`;
     const owner = await customer('88');
     await prisma.customer.update({ where: { id: owner.id }, data: { email } });
-    // предусловие: до удаления вход по адресу работает
-    const before = await auth.requestEmailOtp(email);
-    expect(before.devCode).toMatch(/^\d{6}$/);
+    // Предусловие проверяем детерминированным challenge: этот тест отвечает за
+    // удаление аккаунта, а не за асинхронный dev-echo транспорт email.
+    const emailCode = '482915';
+    const before = await prisma.otpChallenge.create({
+      data: {
+        email,
+        channel: 'email',
+        purpose: 'login',
+        codeHash: await argon2.hash(emailCode),
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      },
+    });
+    await expect(auth.verifyEmailOtp(email, emailCode, before.id))
+      .resolves.toMatchObject({ accessToken: expect.any(String) });
 
     await request(app.getHttpServer())
       .delete('/customers/me')
@@ -215,7 +227,7 @@ describe('Customer account deletion and export', () => {
 
     const issued = await auth.requestEmailOtp(email);
     expect(issued.devCode).toBeUndefined();
-    await expect(auth.verifyEmailOtp(email, before.devCode!)).rejects.toThrow();
+    await expect(auth.verifyEmailOtp(email, emailCode)).rejects.toThrow();
   });
 
   it('keeps orders and ledger rows intact for accounting', async () => {

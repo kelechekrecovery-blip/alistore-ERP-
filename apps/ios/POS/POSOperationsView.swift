@@ -281,6 +281,7 @@ struct POSOperationsView: View {
     @State private var errorMessage: String?
     @State private var restockLocation = "RETURNS-BISHKEK"
     private let api = APIClient(baseURL: AppEnvironment.live().apiBaseURL)
+    private let mutationIntents = MutationIntentStore()
 
     var body: some View {
         NavigationStack {
@@ -430,18 +431,25 @@ struct POSOperationsView: View {
     @MainActor private func settleReceivable() async {
         isBusy = true; errorMessage = nil; message = nil; defer { isBusy = false }
         do {
-            let encoded = receivableId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? receivableId
-            let _: POSSupplyMutationReceipt = try await api.post(
-                "payments/receivables/\(encoded)/settle",
-                body: POSReceivableSettlementRequest(
-                    method: receivableMethod,
-                    amount: Int(receivableAmount) ?? 0,
-                    txnId: nil,
-                    shiftId: nil
-                ),
-                token: session.accessToken,
-                idempotencyKey: UUID().uuidString
+            let request = POSReceivableSettlementRequest(
+                method: receivableMethod,
+                amount: Int(receivableAmount) ?? 0,
+                txnId: nil,
+                shiftId: nil
             )
+            let scope = receivableId
+            let key = try mutationIntents.key(
+                namespace: "pos-receivable-settlement",
+                scope: scope,
+                body: request
+            )
+            let _: POSSupplyMutationReceipt = try await api.post(
+                NativeMutationEndpoint.receivableSettlement(receivableId: receivableId),
+                body: request,
+                token: session.accessToken,
+                idempotencyKey: key
+            )
+            mutationIntents.complete(namespace: "pos-receivable-settlement", scope: scope, idempotencyKey: key)
             message = "Начисление погашено"
             receivableId = ""; receivableAmount = ""
         } catch { errorMessage = error.localizedDescription }
@@ -450,14 +458,20 @@ struct POSOperationsView: View {
     @MainActor private func handOverItem() async {
         isBusy = true; errorMessage = nil; message = nil; defer { isBusy = false }
         do {
-            let encodedOrder = orderId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? orderId
-            let encodedItem = handoverItemId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? handoverItemId
-            let _: POSSupplyMutationReceipt = try await api.post(
-                "orders/\(encodedOrder)/items/\(encodedItem)/hand-over",
-                body: POSItemHandoverRequest(),
-                token: session.accessToken,
-                idempotencyKey: UUID().uuidString
+            let request = POSItemHandoverRequest()
+            let scope = "\(orderId)|\(handoverItemId)"
+            let key = try mutationIntents.key(
+                namespace: "pos-item-handover",
+                scope: scope,
+                body: request
             )
+            let _: POSSupplyMutationReceipt = try await api.post(
+                NativeMutationEndpoint.itemHandover(orderId: orderId, itemId: handoverItemId),
+                body: request,
+                token: session.accessToken,
+                idempotencyKey: key
+            )
+            mutationIntents.complete(namespace: "pos-item-handover", scope: scope, idempotencyKey: key)
             message = "Строка заказа выдана"
             handoverItemId = ""
         } catch { errorMessage = error.localizedDescription }

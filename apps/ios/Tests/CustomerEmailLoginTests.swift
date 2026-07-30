@@ -46,6 +46,9 @@ final class CustomerEmailLoginTests: XCTestCase {
     }
 
     func testVerifyEmailPostsAddressAndCode() async {
+        EmailLoginMockURLProtocol.stub(path: "/api/auth/email/request", status: 201, body: """
+        {"challengeId":"challenge-email-1"}
+        """)
         EmailLoginMockURLProtocol.stub(path: "/api/auth/email/verify", status: 200, body: """
         {"accessToken":"access-1","refreshToken":"refresh-1","tokenType":"Bearer","expiresIn":"15m"}
         """)
@@ -54,6 +57,7 @@ final class CustomerEmailLoginTests: XCTestCase {
         """)
         let store = makeStore()
 
+        _ = await store.requestEmailOTP(email: "owner@example.com")
         await store.verifyEmail(email: "owner@example.com", code: "123456")
 
         let request = EmailLoginMockURLProtocol.request(for: "/api/auth/email/verify")
@@ -61,6 +65,7 @@ final class CustomerEmailLoginTests: XCTestCase {
         let body = EmailLoginMockURLProtocol.jsonBody(for: "/api/auth/email/verify")
         XCTAssertEqual(body?["email"], "owner@example.com")
         XCTAssertEqual(body?["code"], "123456")
+        XCTAssertEqual(body?["challengeId"], "challenge-email-1")
     }
 
     func testAttachRequestCarriesSessionToken() async {
@@ -80,9 +85,13 @@ final class CustomerEmailLoginTests: XCTestCase {
     }
 
     func testAttachConfirmCarriesSessionTokenAndCode() async {
+        EmailLoginMockURLProtocol.stub(path: "/api/auth/email/attach/request", status: 201, body: """
+        {"challengeId":"challenge-attach-1"}
+        """)
         EmailLoginMockURLProtocol.stub(path: "/api/auth/email/attach/confirm", status: 200, body: "{}")
         let store = makeStore()
 
+        _ = await store.requestEmailAttach(email: "owner@example.com", token: "access-1")
         let attached = await store.confirmEmailAttach(email: "owner@example.com", code: "654321", token: "access-1")
 
         XCTAssertTrue(attached)
@@ -91,6 +100,94 @@ final class CustomerEmailLoginTests: XCTestCase {
         let body = EmailLoginMockURLProtocol.jsonBody(for: "/api/auth/email/attach/confirm")
         XCTAssertEqual(body?["email"], "owner@example.com")
         XCTAssertEqual(body?["code"], "654321")
+        XCTAssertEqual(body?["challengeId"], "challenge-attach-1")
+    }
+
+    func testPhoneVerificationReturnsIssuedChallengeId() async {
+        EmailLoginMockURLProtocol.stub(path: "/api/auth/otp/request", status: 201, body: """
+        {"challengeId":"challenge-phone-1","devCode":"123456"}
+        """)
+        EmailLoginMockURLProtocol.stub(path: "/api/auth/otp/verify", status: 200, body: """
+        {"accessToken":"access-1","refreshToken":"refresh-1","tokenType":"Bearer","expiresIn":"15m"}
+        """)
+        EmailLoginMockURLProtocol.stub(path: "/api/auth/me", status: 200, body: """
+        {"customerId":"customer-1","phone":"+996700123456","typ":"customer"}
+        """)
+        let store = makeStore()
+
+        let issued = await store.requestOTP(phone: "+996700123456")
+        XCTAssertTrue(issued)
+        await store.verify(phone: "+996700123456", code: "123456")
+
+        let body = EmailLoginMockURLProtocol.jsonBody(for: "/api/auth/otp/verify")
+        XCTAssertEqual(body?["phone"], "+996700123456")
+        XCTAssertEqual(body?["code"], "123456")
+        XCTAssertEqual(body?["challengeId"], "challenge-phone-1")
+    }
+
+    func testConcurrentRefreshesCoalesceRotatingTokenExchange() async {
+        EmailLoginMockURLProtocol.stub(path: "/api/auth/refresh", status: 200, body: """
+        {"accessToken":"access-2","refreshToken":"refresh-2","tokenType":"Bearer","expiresIn":"15m"}
+        """)
+        EmailLoginMockURLProtocol.stub(path: "/api/auth/me", status: 200, body: """
+        {"customerId":"customer-1","phone":"+996700123456","typ":"customer"}
+        """)
+        let store = makeStore()
+        store.useUITestSession()
+
+        async let first = store.refreshSession()
+        async let second = store.refreshSession()
+        _ = await (first, second)
+
+        XCTAssertEqual(EmailLoginMockURLProtocol.requestCount(for: "/api/auth/refresh"), 1)
+    }
+
+    func testLogoutDuringRefreshCannotResurrectSession() async {
+        EmailLoginMockURLProtocol.stub(path: "/api/auth/refresh", status: 200, body: """
+        {"accessToken":"stale-access","refreshToken":"stale-refresh","tokenType":"Bearer","expiresIn":"15m"}
+        """)
+        EmailLoginMockURLProtocol.stub(path: "/api/auth/logout", status: 204, body: "")
+        EmailLoginMockURLProtocol.stub(path: "/api/auth/me", status: 200, body: """
+        {"customerId":"customer-1","phone":"+996700123456","typ":"customer"}
+        """)
+        let refreshGate = EmailLoginMockURLProtocol.hold(path: "/api/auth/refresh")
+        let store = makeStore()
+        store.useUITestSession()
+
+        let refresh = Task { await store.refreshSession() }
+        await waitForRequest("/api/auth/refresh")
+        await store.logout()
+        refreshGate.signal()
+        _ = await refresh.value
+
+        XCTAssertNil(store.session)
+    }
+
+    func testNewSessionDuringRefreshCannotBeOverwrittenByStaleResult() async {
+        EmailLoginMockURLProtocol.stub(path: "/api/auth/refresh", status: 200, body: """
+        {"accessToken":"stale-access","refreshToken":"stale-refresh","tokenType":"Bearer","expiresIn":"15m"}
+        """)
+        EmailLoginMockURLProtocol.stub(path: "/api/auth/me", status: 200, body: """
+        {"customerId":"customer-new","phone":"+996555000000","typ":"customer"}
+        """)
+        let refreshGate = EmailLoginMockURLProtocol.hold(path: "/api/auth/refresh")
+        let store = makeStore()
+        store.useUITestSession()
+
+        let refresh = Task { await store.refreshSession() }
+        await waitForRequest("/api/auth/refresh")
+        store.useUITestSession(CustomerSession(
+            accessToken: "new-access",
+            refreshToken: "new-refresh",
+            customerId: "customer-new",
+            phone: "+996555000000"
+        ))
+        refreshGate.signal()
+        _ = await refresh.value
+
+        XCTAssertEqual(store.session?.accessToken, "new-access")
+        XCTAssertEqual(store.session?.refreshToken, "new-refresh")
+        XCTAssertEqual(store.session?.customerId, "customer-new")
     }
 
     func testAttachConfirmReportsTakenAddress() async {
@@ -115,6 +212,14 @@ final class CustomerEmailLoginTests: XCTestCase {
             session: URLSession(configuration: configuration)
         )
     }
+
+    private func waitForRequest(_ path: String) async {
+        for _ in 0..<100 {
+            if EmailLoginMockURLProtocol.requestCount(for: path) > 0 { return }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("Timed out waiting for \(path)")
+    }
 }
 
 /// Отвечает по пути запроса: `verify` делает два вызова подряд (verify → auth/me),
@@ -123,11 +228,15 @@ private final class EmailLoginMockURLProtocol: URLProtocol, @unchecked Sendable 
     nonisolated(unsafe) static var responses: [String: (status: Int, body: Data)] = [:]
     nonisolated(unsafe) static var requests: [String: URLRequest] = [:]
     nonisolated(unsafe) static var bodies: [String: Data] = [:]
+    nonisolated(unsafe) static var requestCounts: [String: Int] = [:]
+    nonisolated(unsafe) static var responseGates: [String: DispatchSemaphore] = [:]
 
     static func reset() {
         responses = [:]
         requests = [:]
         bodies = [:]
+        requestCounts = [:]
+        responseGates = [:]
     }
 
     static func stub(path: String, status: Int, body: String) {
@@ -135,6 +244,13 @@ private final class EmailLoginMockURLProtocol: URLProtocol, @unchecked Sendable 
     }
 
     static func request(for path: String) -> URLRequest? { requests[path] }
+    static func requestCount(for path: String) -> Int { requestCounts[path, default: 0] }
+
+    static func hold(path: String) -> DispatchSemaphore {
+        let gate = DispatchSemaphore(value: 0)
+        responseGates[path] = gate
+        return gate
+    }
 
     static func jsonBody(for path: String) -> [String: String]? {
         guard let data = bodies[path] else { return nil }
@@ -147,6 +263,7 @@ private final class EmailLoginMockURLProtocol: URLProtocol, @unchecked Sendable 
     override func startLoading() {
         let path = request.url?.path ?? ""
         Self.requests[path] = request
+        Self.requestCounts[path, default: 0] += 1
         // httpBody у перехваченного запроса пуст — тело доступно только через поток.
         if let stream = request.httpBodyStream {
             stream.open()
@@ -166,15 +283,25 @@ private final class EmailLoginMockURLProtocol: URLProtocol, @unchecked Sendable 
         }
 
         let stub = Self.responses[path] ?? (status: 404, body: Data("{}".utf8))
-        let response = HTTPURLResponse(
-            url: request.url!,
-            statusCode: stub.status,
-            httpVersion: nil,
-            headerFields: ["Content-Type": "application/json"]
-        )!
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: stub.body)
-        client?.urlProtocolDidFinishLoading(self)
+        let sendResponse: @Sendable () -> Void = { [self] in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: stub.status,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: stub.body)
+            client?.urlProtocolDidFinishLoading(self)
+        }
+        if let gate = Self.responseGates[path] {
+            DispatchQueue.global().async {
+                gate.wait()
+                sendResponse()
+            }
+        } else {
+            sendResponse()
+        }
     }
 
     override func stopLoading() {}

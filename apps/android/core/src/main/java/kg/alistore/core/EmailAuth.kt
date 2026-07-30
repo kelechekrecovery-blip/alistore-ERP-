@@ -13,6 +13,7 @@ enum class AuthChannel { Phone, Email }
 private val EMAIL_PATTERN = Regex("^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$")
 private const val EMAIL_MAX_LENGTH = 254
 private const val OTP_LENGTH = 6
+internal const val OTP_RESEND_DELAY_MILLIS = 60_000L
 
 /**
  * Состояние формы входа/привязки по почте. Неизменяемое: каждый переход
@@ -25,6 +26,8 @@ data class EmailAuthForm(
   val busy: Boolean = false,
   val error: String? = null,
   val hint: String? = null,
+  val challengeId: String? = null,
+  val resendAvailableAtMillis: Long? = null,
 ) {
   val emailValid: Boolean get() = email.length <= EMAIL_MAX_LENGTH && EMAIL_PATTERN.matches(email)
   val codeValid: Boolean get() = code.length == OTP_LENGTH && code.all(Char::isDigit)
@@ -39,23 +42,48 @@ data class EmailAuthForm(
   fun submitting(): EmailAuthForm = copy(busy = true, error = null, hint = null)
 
   /** Код ушёл на адрес: переходим к шагу ввода, в dev-режиме подставляем эхо-код. */
-  fun challengeIssued(challenge: EmailOtpChallenge): EmailAuthForm = copy(
+  fun challengeIssued(
+    challenge: EmailOtpChallenge,
+    nowMillis: Long = System.currentTimeMillis(),
+  ): EmailAuthForm = copy(
     busy = false,
     codeSent = true,
     code = challenge.devCode?.takeIf { it.length == OTP_LENGTH } ?: code,
     error = null,
     hint = "Код отправлен на $email",
+    challengeId = challenge.challengeId,
+    resendAvailableAtMillis = nowMillis + OTP_RESEND_DELAY_MILLIS,
   )
+
+  fun resendSeconds(nowMillis: Long = System.currentTimeMillis()): Int {
+    val deadline = resendAvailableAtMillis ?: return 0
+    return ((deadline - nowMillis).coerceAtLeast(0) + 999).div(1_000).toInt()
+  }
 
   fun failed(error: Throwable): EmailAuthForm =
     copy(busy = false, hint = null, error = emailAuthMessage(error))
 
   /** Успешное завершение (вход выполнен или адрес привязан). */
   fun confirmed(hint: String): EmailAuthForm =
-    copy(busy = false, codeSent = false, code = "", error = null, hint = hint)
+    copy(
+      busy = false,
+      codeSent = false,
+      code = "",
+      error = null,
+      hint = hint,
+      challengeId = null,
+      resendAvailableAtMillis = null,
+    )
 
   /** «Изменить адрес» — возврат к первому шагу без потери введённой почты. */
-  fun restart(): EmailAuthForm = copy(codeSent = false, code = "", error = null, hint = null)
+  fun restart(): EmailAuthForm = copy(
+    codeSent = false,
+    code = "",
+    error = null,
+    hint = null,
+    challengeId = null,
+    resendAvailableAtMillis = null,
+  )
 }
 
 /**

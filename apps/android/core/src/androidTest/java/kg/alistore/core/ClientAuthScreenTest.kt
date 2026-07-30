@@ -364,14 +364,15 @@ private class UiAuthGateway : AuthGateway {
   val emailAttachConfirms = mutableListOf<Pair<String, String>>()
 
   override suspend fun requestOtp(phone: String) = OtpChallenge("123456")
-  override suspend fun verifyOtp(phone: String, code: String) = AuthTokens("access", "refresh")
+  override suspend fun verifyOtp(phone: String, code: String, challengeId: String?) =
+    AuthTokens("access", "refresh")
 
   override suspend fun requestEmailOtp(email: String): EmailOtpChallenge {
     emailRequests += email
     return EmailOtpChallenge("challenge-1", "123456")
   }
 
-  override suspend fun verifyEmailOtp(email: String, code: String): AuthTokens {
+  override suspend fun verifyEmailOtp(email: String, code: String, challengeId: String?): AuthTokens {
     emailVerifications += email to code
     return AuthTokens("access", "refresh")
   }
@@ -381,7 +382,12 @@ private class UiAuthGateway : AuthGateway {
     return EmailOtpChallenge("challenge-2", "654321")
   }
 
-  override suspend fun confirmEmailAttach(email: String, code: String, accessToken: String) {
+  override suspend fun confirmEmailAttach(
+    email: String,
+    code: String,
+    accessToken: String,
+    challengeId: String?,
+  ) {
     emailAttachConfirms += email to code
   }
 

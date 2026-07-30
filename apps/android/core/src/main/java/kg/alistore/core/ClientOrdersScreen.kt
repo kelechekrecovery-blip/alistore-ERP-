@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -60,6 +61,10 @@ internal fun ClientOrdersScreen(
   val paymentApi = paymentGateway(gateway)
   val supplyApi = gateway as? SupplyParityGateway
   val scope = rememberCoroutineScope()
+  val context = LocalContext.current.applicationContext
+  val intentStore = remember(context, session.user.customerId) {
+    StableCommandIntentStore(context, QueueOwner.client(session.user.customerId))
+  }
   val uriHandler = LocalUriHandler.current
   var orders by remember { mutableStateOf<List<CustomerOrder>>(emptyList()) }
   var loading by remember { mutableStateOf(true) }
@@ -230,14 +235,16 @@ internal fun ClientOrdersScreen(
               onRequest = { reason ->
                 supplyApi?.let { api ->
                   scope.launch {
+                    val intent = intentStore.cancellation(order.id, reason)
                     runCatching {
                       api.requestCancellation(
                         order.id,
                         reason,
                         session.tokens.accessToken,
-                        UUID.randomUUID().toString(),
+                        intent.idempotencyKey,
                       )
                     }.onSuccess { cancellation ->
+                      intentStore.close(intent)
                       cancellations = cancellations + (order.id to cancellation)
                     }.onFailure { failure ->
                       error = failure.message ?: "Не удалось отправить отмену"
