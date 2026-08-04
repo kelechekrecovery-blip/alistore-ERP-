@@ -478,7 +478,23 @@ private struct CourierDeliveryCard: View {
             )
             return key
         } catch {
-            statusMessage = "Фото не загрузилось: \(error.localizedDescription)"
+            // Различаем «нет связи» и «сервер отверг фото».
+            //
+            // Обе ветки раньше давали одно «Фото не загрузилось», и курьер без
+            // связи читал это как сбой, который вот-вот пройдёт, — притом что
+            // рядом интерфейс обещает офлайн-очередь. Очередь сюда не достаёт:
+            // `execute` вызывается только после успешной загрузки, а фото —
+            // multipart, которого очередь мутаций не умеет.
+            //
+            // Ставить доставку в очередь без фото нельзя намеренно: она
+            // закрывает COD, то есть наличные, и снимок получателя — часть
+            // контроля. Поэтому здесь честное объяснение, а не тихий отказ.
+            // Очередь для multipart-фото заведена отдельной задачей.
+            if courierErrorIsTransport(error) {
+                statusMessage = "Нет связи с сервером. Доставку с фото можно закрыть только онлайн — отметьте, когда появится сеть."
+            } else {
+                statusMessage = "Фото не загрузилось: \(error.localizedDescription)"
+            }
             return nil
         }
     }
@@ -516,6 +532,20 @@ private struct CourierDeliveryCard: View {
 
 /// Только выбор фото. Загрузку делает `CourierDeliveryCard` в момент действия —
 /// иначе метку Evidence пришлось бы угадывать заранее, а сервер сверяет её побайтово.
+/// Отказ связи, а не отказ сервера по существу: тот же предикат, что решает,
+/// ставить ли мутацию в офлайн-очередь (`shouldQueue` в `CourierRootView`).
+/// Вынесен на уровень файла, потому что нужен и в карточке доставки.
+private func courierErrorIsTransport(_ error: Error) -> Bool {
+    if error is URLError { return true }
+    guard let apiError = error as? APIError else { return false }
+    switch apiError {
+    case .invalidResponse, .decoding:
+        return true
+    case let .rejected(status, _):
+        return status >= 500
+    }
+}
+
 private struct CourierEvidenceView: View {
     @Binding var imageData: Data?
     @State private var selectedPhoto: PhotosPickerItem?
