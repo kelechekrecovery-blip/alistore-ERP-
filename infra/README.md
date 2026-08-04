@@ -46,8 +46,9 @@ MEILI_HOST=http://localhost:7700 MEILI_API_KEY=<local-key> npm run infra:meili-s
 ```
 
 The smoke creates and removes a temporary index. `metabase-db` is also
-health-checked by Compose; the Metabase UI image is optional and may require a
-separate registry pull before first boot.
+available for the Metabase application state. Once the UI finishes its first
+boot migration, run `METABASE_URL=http://127.0.0.1:3001 npm run infra:metabase-smoke`
+to verify the read-only health endpoint.
 
 ## Notifications (Novu)
 
