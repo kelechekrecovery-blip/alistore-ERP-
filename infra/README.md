@@ -39,6 +39,16 @@ For production deployment, backup, restore drill and rollback steps, use
 - **Meilisearch** — configure `MEILI_HOST=http://localhost:7700`, the same
   `MEILI_API_KEY`, and run the protected catalog reindex endpoint once after boot.
 
+To verify the local search service without touching the catalog index, run:
+
+```bash
+MEILI_HOST=http://localhost:7700 MEILI_API_KEY=<local-key> npm run infra:meili-smoke
+```
+
+The smoke creates and removes a temporary index. `metabase-db` is also
+health-checked by Compose; the Metabase UI image is optional and may require a
+separate registry pull before first boot.
+
 ## Notifications (Novu)
 
 The API delivers outbox messages via Novu's REST trigger API

@@ -16,6 +16,7 @@
     "api:check": "node --check cloudflare/worker.js && node --test functions/**/*.test.js cloudflare/**/*.test.js scripts/__tests__/cloudflare-*.test.mjs",
     "api:contract:matrix": "node scripts/cloudflare-api-contract-matrix.mjs",
     "api:smoke:local": "node scripts/cloudflare-local-smoke.mjs",
+    "infra:meili-smoke": "node scripts/meilisearch-smoke.mjs",
     "api:build": "npm run build -w @alistore/api",
     "api:test": "npm run test -w @alistore/api -- --runInBand",
     "api:test:isolated": "node scripts/run-isolated-api-tests.mjs",
