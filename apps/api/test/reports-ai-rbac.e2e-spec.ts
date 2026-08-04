@@ -63,6 +63,7 @@ describe('Reports and AI RBAC', () => {
   });
 
   beforeEach(async () => {
+    await prisma.aiRun.deleteMany();
     await prisma.auditEvent.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
@@ -153,6 +154,53 @@ describe('Reports and AI RBAC', () => {
       .get('/ai/insights')
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(403);
+  });
+
+  it('runs the audited control plane only for global-read roles and keeps the tool read-only', async () => {
+    await request(app.getHttpServer())
+      .post('/ai/orchestrator/runs')
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({ tool: 'insights', intent: 'seller_probe', surface: 'erp' })
+      .expect(403);
+
+    const response = await request(app.getHttpServer())
+      .post('/ai/orchestrator/runs')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ tool: 'risk_signals', intent: 'owner_risk_review', surface: 'erp' })
+      .expect(201);
+
+    expect(response.body.runId).toEqual(expect.any(String));
+    expect(response.body.status).toBe('completed');
+    expect(response.body.decision.requiresApproval).toBe(false);
+    expect(response.body.decision.sourceRefs).toContain(response.body.runId);
+    expect(response.body.output).toEqual(expect.objectContaining({ signals: expect.any(Array) }));
+
+    const run = await prisma.aiRun.findUnique({ where: { id: response.body.runId }, include: { steps: true, decisions: true } });
+    expect(run?.status).toBe('completed');
+    expect(run?.steps.some((step) => step.kind === 'tool_call' && step.toolName === 'risk_signals')).toBe(true);
+    expect(await prisma.auditEvent.findFirst({ where: { type: 'ai.run_completed', refs: { has: response.body.runId } } })).not.toBeNull();
+
+    const replay = await request(app.getHttpServer())
+      .get(`/ai/orchestrator/runs/${response.body.runId}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(200);
+    expect(replay.body.id).toBe(response.body.runId);
+  });
+
+  it('honors the AI kill switch before creating a run', async () => {
+    const previous = process.env.AI_KILL_SWITCH;
+    process.env.AI_KILL_SWITCH = '1';
+    try {
+      await request(app.getHttpServer())
+        .post('/ai/orchestrator/runs')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ tool: 'risk_signals', intent: 'kill_switch_probe', surface: 'erp' })
+        .expect(403);
+      expect(await prisma.aiRun.count({ where: { intent: 'kill_switch_probe' } })).toBe(0);
+    } finally {
+      if (previous === undefined) delete process.env.AI_KILL_SWITCH;
+      else process.env.AI_KILL_SWITCH = previous;
+    }
   });
 
   it('keeps order timeline ledger scoped to the owning customer or staff queue readers', async () => {

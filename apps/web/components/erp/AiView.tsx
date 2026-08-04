@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { AsyncPanel } from './AsyncPanel';
+import { runAiTool, type AiRunResult } from '@/lib/reports';
 import type { Insight } from '@/lib/reports';
 
 interface Props {
@@ -9,6 +11,8 @@ interface Props {
   source: string;
   error: string;
   onRetry: () => void;
+  accessToken: string;
+  role: string;
 }
 
 const TONE_META: Record<Insight['tone'], { border: string; dot: string; label: string }> = {
@@ -37,7 +41,18 @@ function sourceLabel(source: string): string {
  * возвращает null. Поле ввода, за которым ничего нет, — это ровно тот механизм,
  * из-за которого экран и стал макетом.
  */
-export function AiView({ insights, source, error, onRetry }: Props) {
+export function AiView({ insights, source, error, onRetry, accessToken, role }: Props) {
+  const [run, setRun] = useState<AiRunResult | null>(null);
+  const [runError, setRunError] = useState('');
+  const [running, setRunning] = useState(false);
+  const canRun = role === 'owner' || role === 'admin';
+  async function startAuditedRun() {
+    setRunning(true);
+    setRunError('');
+    try { setRun(await runAiTool('insights', accessToken)); }
+    catch (cause) { setRunError(cause instanceof Error ? cause.message : 'Не удалось записать AI-запуск'); }
+    finally { setRunning(false); }
+  }
   return (
     <div className="max-w-[720px]">
       <header className="mb-5 border-b border-surface-3 pb-4">
@@ -49,6 +64,15 @@ export function AiView({ insights, source, error, onRetry }: Props) {
             : `${insights.length === 0 ? 'Сигналов нет' : `Сигналов: ${insights.length}`} · источник: ${sourceLabel(source)}`}
         </p>
       </header>
+
+      {canRun && <section className="mb-5 rounded-[10px] border border-[#FF7A4D]/30 bg-[#FF7A4D]/[.06] p-4" aria-label="Аудированный AI-запуск">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 className="text-sm font-bold text-white">Аудированный запуск</h2><p className="mt-1 text-xs text-subtle">Read-only анализ записывается в Event Ledger. Деньги, склад и статусы не изменяются.</p></div>
+          <button type="button" onClick={startAuditedRun} disabled={running} className="rounded-[7px] bg-[#FF7A4D] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{running ? 'Считаем…' : 'Запустить и записать'}</button>
+        </div>
+        {runError && <p role="alert" className="mt-3 text-xs text-danger-soft">{runError}</p>}
+        {run && <div className="mt-3 grid gap-2 text-xs text-sand sm:grid-cols-3"><span>Run: <code className="text-lime">{run.runId}</code></span><span>Уверенность: {run.decision.confidence ?? '—'}</span><span>Источник: {run.output.source ?? 'rules'}</span></div>}
+      </section>}
 
       <AsyncPanel
         data={insights}

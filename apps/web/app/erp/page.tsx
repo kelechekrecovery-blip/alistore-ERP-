@@ -473,7 +473,7 @@ export default function ErpPage() {
           {activeRoute === 'tasks' && <TasksView accessToken={session.accessToken} />}
           {activeRoute === 'admin' && <AdminView role={session.role} username={session.username} accessToken={session.accessToken} onNavigate={setRoute} />}
           {activeRoute === 'ai' && (
-            <AiView insights={insights} source={insightsSource} error={insightsError} onRetry={() => setReloadToken((value) => value + 1)} />
+            <AiView insights={insights} source={insightsSource} error={insightsError} accessToken={session.accessToken} role={session.role} onRetry={() => setReloadToken((value) => value + 1)} />
           )}
           {activeRoute === 'pricing' && <PricingView accessToken={session.accessToken} />}
           {activeRoute === 'reorder' && <ReorderView accessToken={session.accessToken} />}

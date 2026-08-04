@@ -152,6 +152,35 @@ export interface Insight {
 /** Owner AI assistant — ledger-derived insights (keyless rules; LLM when a key is set). */
 export const fetchInsights = (accessToken: string) =>
   get<{ source: string; insights: Insight[] }>('/ai/insights', accessToken);
+
+export interface AiRunDecision {
+  id: string;
+  summary: string;
+  confidence: number | null;
+  status: string;
+  requiresApproval: boolean;
+  sourceRefs: string[];
+}
+
+export interface AiRunResult {
+  runId: string;
+  status: 'completed';
+  decision: AiRunDecision;
+  output: { source?: string; insights?: Insight[] };
+}
+
+/** Starts an audited, read-only control-plane run for the ERP cockpit. */
+export function runAiTool(tool: 'insights' | 'pricing_review' | 'reorder_review' | 'risk_signals', accessToken: string): Promise<AiRunResult> {
+  return fetch(`${API_BASE}/ai/orchestrator/runs`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tool, intent: `erp_${tool}`, surface: 'erp' }),
+    cache: 'no-store',
+  }).then(async (res) => {
+    if (!res.ok) throw new Error(`/ai/orchestrator/runs → ${res.status}`);
+    return (await res.json()) as AiRunResult;
+  });
+}
 export const fetchRisks = (accessToken: string) =>
   get<{ count: number; signals: RiskSignal[] }>('/reports/risks', accessToken);
 export const fetchLedger = (accessToken: string) => get<LedgerEvent[]>('/reports/ledger', accessToken);
