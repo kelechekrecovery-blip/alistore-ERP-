@@ -25,6 +25,7 @@ describe('canApprove — authoritative approval matrix', () => {
     delete: ['owner'],
     pii: ['admin', 'owner'],
     campaign_budget: ['admin', 'owner'],
+    ai_support_triage: ['admin', 'owner'],
     manual_adjustment: ['admin', 'owner'],
     // Publishing a parked revision changes what every visitor sees, so it is
     // approved at the same level as price and pii rather than by the marketer who
