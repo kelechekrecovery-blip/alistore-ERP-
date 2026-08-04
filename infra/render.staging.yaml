@@ -28,7 +28,8 @@ services:
       - { key: S3_ENDPOINT, value: "https://alistore-staging-placeholder.s3.example.com" }
       - { key: MINIO_ROOT_USER, value: "alistore-staging-placeholder" }
       - { key: MINIO_ROOT_PASSWORD, value: "placeholder-change-before-production" }
-      - { key: SENTRY_DSN, sync: false }
+      # Sentry: placeholder DSN; заменить на реальный проект перед продом.
+      - { key: SENTRY_DSN, value: "https://placeholder@o0.ingest.sentry.io/0" }
   - type: web
     name: alistore-web-staging
     runtime: docker
