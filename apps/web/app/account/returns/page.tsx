@@ -6,17 +6,28 @@ import { useEffect, useMemo, useState } from 'react';
 import { EvidencePicker } from '@/components/EvidencePicker';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
-import { fetchMyOrders, openReturnRequest, uploadEvidenceImages, type MyOrder, type ReturnRequest } from '@/lib/api';
+import { fetchMyOrders, fetchMyReturns, openReturnRequest, uploadEvidenceImages, type MyOrder, type ReturnRequest } from '@/lib/api';
 import { som } from '@/lib/format';
 
 const reasons = ['Не подошёл / передумал', 'Брак / не работает', 'Не соответствует описанию', 'Пришёл не тот товар'];
 const BLOCKED = new Set(['cancelled', 'returned', 'refunded']);
+const RETURN_STATUS: Record<string, string> = {
+  requested: 'Заявка создана',
+  under_review: 'На проверке',
+  approved: 'Одобрено',
+  rejected: 'Отклонено',
+  processing: 'Возврат денег',
+  paid: 'Деньги возвращены',
+  reconciled: 'Сверено',
+};
 
 export default function ReturnsPage() {
   const router = useRouter();
   const { user, hydrated, authed } = useAuth();
   const [orders, setOrders] = useState<MyOrder[] | null>(null);
   const [ordersError, setOrdersError] = useState('');
+  const [returns, setReturns] = useState<ReturnRequest[] | null>(null);
+  const [returnsError, setReturnsError] = useState('');
   const [orderId, setOrderId] = useState('');
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [reason, setReason] = useState('');
@@ -36,6 +47,9 @@ export default function ReturnsPage() {
       // `setOrders([])` печатал «Нет заказов для возврата» — покупатель уходил
       // с уверенностью, что вернуть товар нельзя, хотя список не загрузился.
     }).catch((cause) => setOrdersError(cause instanceof Error ? cause.message : 'Не удалось загрузить заказы'));
+    authed(fetchMyReturns)
+      .then(setReturns)
+      .catch((cause) => setReturnsError(cause instanceof Error ? cause.message : 'Не удалось загрузить заявки на возврат'));
   }, [user, authed]);
 
   const eligible = useMemo(() => (orders ?? []).filter((o) => !BLOCKED.has(o.status)), [orders]);
@@ -74,6 +88,7 @@ export default function ReturnsPage() {
           })
         : [];
       setDone({ ret, evidenceCount: evidence.length });
+      setReturns((current) => current ? [ret, ...current.filter((item) => item.id !== ret.id)] : [ret]);
     } catch {
       setError('Не удалось отправить заявку или загрузить фото. Проверьте заказ и попробуйте ещё раз.');
     } finally {
@@ -113,6 +128,34 @@ export default function ReturnsPage() {
           <p className="mt-1 text-sm text-muted">Это не значит, что вернуть нечего — попробуйте ещё раз.</p>
         </div>
       )}
+      <section className="mb-5 rounded-[14px] border border-surface-3 bg-surface-2 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="font-display text-base font-bold">Мои заявки</div>
+            <div className="mt-1 text-[12px] text-subtle">Статусы возвратов по вашему аккаунту.</div>
+          </div>
+          <span className="rounded-full bg-surface-3 px-2.5 py-1 font-mono text-[11px] text-muted">{returns?.length ?? '…'}</span>
+        </div>
+        {returnsError && (
+          <p className="mt-3 rounded-[10px] border border-danger-soft/30 bg-danger-soft/10 p-3 text-[12px] text-danger-soft">{returnsError}</p>
+        )}
+        {!returnsError && returns === null && <p className="mt-3 font-mono text-[12px] text-subtle">Загрузка заявок…</p>}
+        {!returnsError && returns && returns.length === 0 && <p className="mt-3 text-[12px] text-subtle">Пока нет открытых возвратов.</p>}
+        {!returnsError && returns && returns.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {returns.slice(0, 4).map((ret) => (
+              <div key={ret.id} className="rounded-[12px] border border-line bg-ink-dark/30 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-mono text-[12px] font-bold">#{ret.id.slice(-8)}</div>
+                  <span className="rounded-full bg-lime/10 px-2 py-1 text-[11px] font-semibold text-lime">{RETURN_STATUS[ret.status] ?? ret.status}</span>
+                </div>
+                <div className="mt-2 text-[12px] text-subtle">Заказ #{ret.orderId.slice(-8)} · {som(ret.refundAmount)}</div>
+                <div className="mt-1 line-clamp-2 text-[12px] text-muted">{ret.reason}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
       {!ordersError && orders === null && <p className="font-mono text-sm text-subtle">Загрузка заказов…</p>}
       {!ordersError && orders && eligible.length === 0 && (
         <div className="rounded-[14px] border border-surface-3 bg-surface-2 p-5 text-center">

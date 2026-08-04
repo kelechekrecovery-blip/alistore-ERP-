@@ -50,6 +50,7 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
   const { has, toggle } = useFavorites();
   const compare = useCompare();
   const [added, setAdded] = useState(false);
+  const [compareFull, setCompareFull] = useState(false);
   const condition = conditionLabel(product.attrs);
   const availability = catalogAvailability(product);
   const inStock = availability.isInStock;
@@ -70,6 +71,14 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
     });
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1200);
+  }
+
+  function toggleCompare() {
+    const accepted = compare.toggle(product.id);
+    if (!accepted) {
+      setCompareFull(true);
+      window.setTimeout(() => setCompareFull(false), 1800);
+    }
   }
 
   return (
@@ -98,12 +107,17 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
           <button type="button" disabled={!buyable} aria-describedby={!buyable && toOrder ? `availability-${product.id}` : undefined} onClick={addToCart} className={`flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[8px] text-xs font-bold transition disabled:cursor-not-allowed disabled:bg-linen disabled:text-faint ${added ? 'bg-success text-white' : 'bg-coral text-white hover:bg-deep'}`}>
             <ShoppingCart size={14} />{added ? 'Добавлено' : toOrder ? 'Заказать' : 'В корзину'}
           </button>
-          <button type="button" onClick={() => compare.toggle(product.id)} aria-label={compare.has(product.id) ? 'Удалить из сравнения' : 'Добавить к сравнению'} className={`grid h-10 w-10 shrink-0 place-items-center rounded-[8px] ${design3 ? 'bg-white/[.06]' : 'bg-sand'} ${compare.has(product.id) ? 'text-coral' : 'text-faint hover:bg-linen'}`}>
+          <button type="button" onClick={toggleCompare} aria-describedby={compareFull ? `compare-full-${product.id}` : undefined} aria-label={compare.has(product.id) ? 'Удалить из сравнения' : 'Добавить к сравнению'} className={`grid h-10 w-10 shrink-0 place-items-center rounded-[8px] ${design3 ? 'bg-white/[.06]' : 'bg-sand'} ${compare.has(product.id) ? 'text-coral' : 'text-faint hover:bg-linen'}`}>
             <Scale size={16} />
           </button>
         </div>
       </div>
       {!buyable && toOrder && <span id={`availability-${product.id}`} className="sr-only">Оформление товаров под заказ временно отключено; срок поставки сохранён на карточке.</span>}
+      {compareFull && (
+        <span id={`compare-full-${product.id}`} role="status" className={`mt-2 rounded-[8px] px-2 py-1 text-[11px] ${design3 ? 'bg-white/[.08] text-white/70' : 'bg-sand text-faint'}`}>
+          В сравнении максимум 4 товара
+        </span>
+      )}
     </article>
   );
 }

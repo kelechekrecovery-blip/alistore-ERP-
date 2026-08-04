@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
 import { MobileTabBar, type Tab } from '@/components/MobileTabBar';
 import { loginHref } from '@/components/mobile/login-next';
 import { useAuth } from '@/lib/auth';
-import { useFavorites } from '@/lib/favorites';
+import { useCompare } from '@/lib/compare';
 
 interface MobileFrameProps {
   active: Tab;
@@ -23,7 +23,7 @@ interface MobileFrameProps {
  * the persistent 5-tab bottom nav. Screens render their content as children.
  */
 export function MobileFrame({ active, children, header = true, city = 'Бишкек' }: MobileFrameProps) {
-  const { count: favCount } = useFavorites();
+  const { count: compareCount } = useCompare();
   const { user, hydrated } = useAuth();
   const pathname = usePathname();
   // Кнопку показываем только после гидратации: до неё `user` всегда null,
@@ -51,9 +51,9 @@ export function MobileFrame({ active, children, header = true, city = 'Бишк�
                 )}
                 <Link href="/compare" className="relative" aria-label="Сравнение">
                   <ArrowLeftRight size={18} aria-hidden />
-                  {favCount > 0 && (
+                  {compareCount > 0 && (
                     <span className="absolute -right-2 -top-1.5 rounded-full bg-lime px-1 text-[9px] font-bold text-lime-ink">
-                      {favCount}
+                      {compareCount}
                     </span>
                   )}
                 </Link>

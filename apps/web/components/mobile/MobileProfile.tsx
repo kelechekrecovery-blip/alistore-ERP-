@@ -54,6 +54,8 @@ export default function MobileProfile({
   loyalty: CustomerLoyalty | null;
   onLogout: () => void;
 }) {
+  const levelLabel = loyalty?.level ?? '...';
+
   return (
     <MobileFrame active="account">
       <div className="px-4 pb-6 pt-1">
@@ -65,7 +67,7 @@ export default function MobileProfile({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="font-display text-[16px] font-bold text-white">Клиент AliStore</span>
-              <span className="rounded-full bg-warn px-2 py-0.5 text-[10px] font-bold text-lime-ink">GOLD</span>
+              <span className="rounded-full bg-warn px-2 py-0.5 text-[10px] font-bold text-lime-ink">{levelLabel}</span>
             </div>
             <div className="font-mono text-[12px] text-muted">{phone}</div>
           </div>
@@ -74,7 +76,7 @@ export default function MobileProfile({
         {/* level */}
         <div className="mb-3.5 rounded-[16px] border border-surface-3 bg-gradient-to-br from-surface-3 to-surface-2 p-4">
           <div className="mb-2 flex justify-between text-[13px]">
-            <span className="text-bright">Уровень {loyalty?.level ?? '...'}</span>
+            <span className="text-bright">Уровень {levelLabel}</span>
             <span className="font-mono text-lime">{loyalty ? `${loyalty.balance.toLocaleString('ru-RU')} бонусов` : 'Загрузка...'}</span>
           </div>
           <div className="h-[7px] overflow-hidden rounded-full bg-ink-dark">

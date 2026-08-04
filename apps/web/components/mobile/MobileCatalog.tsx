@@ -15,6 +15,7 @@ const SORTS = [
 export default function MobileCatalog() {
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
   const [category, setCategory] = useState('Все');
+  const [query, setQuery] = useState('');
   const [stockOnly, setStockOnly] = useState(false);
   const [sortIdx, setSortIdx] = useState(0);
   const [categories, setCategories] = useState(['Все']);
@@ -26,13 +27,15 @@ export default function MobileCatalog() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setCategory(params.get('category') ?? 'Все');
+    setQuery(params.get('q')?.trim() ?? '');
     fetchCatalogCategories().then((items) => { if (items) setCategories(['Все', ...items.map((item) => item.category)]); });
   }, []);
   const sort = SORTS[sortIdx];
-  useEffect(() => { setProducts(null); setError(false); fetchCatalog({ category: category === 'Все' ? undefined : category, stockOnly, sort: sort.id as CatalogQuery['sort'], limit: 20, offset }).then((response) => { if (isCatalogUnavailable(response)) throw new Error('catalog unavailable'); setProducts(response.items); setTotal(response.total); }).catch(() => { setProducts([]); setTotal(0); setError(true); }); }, [category, stockOnly, sort, offset, reloadKey]);
+  useEffect(() => { setProducts(null); setError(false); fetchCatalog({ q: query || undefined, category: category === 'Все' ? undefined : category, stockOnly, sort: sort.id as CatalogQuery['sort'], limit: 20, offset }).then((response) => { if (isCatalogUnavailable(response)) throw new Error('catalog unavailable'); setProducts(response.items); setTotal(response.total); }).catch(() => { setProducts([]); setTotal(0); setError(true); }); }, [query, category, stockOnly, sort, offset, reloadKey]);
 
   const reset = () => {
     setCategory('Все');
+    setQuery('');
     setStockOnly(false);
     setSortIdx(0);
     setOffset(0);
@@ -42,7 +45,7 @@ export default function MobileCatalog() {
     <MobileFrame active="catalog">
       <div className="px-4 pb-6 pt-1">
         <div className="mb-3 flex items-center gap-2">
-          <span className="font-display text-[20px] font-bold text-white">Каталог</span>
+          <span className="font-display text-[20px] font-bold text-white">{query ? `Поиск: ${query}` : 'Каталог'}</span>
           <span className="text-[13px] text-subtle">{products === null ? '…' : total}</span>
         </div>
 

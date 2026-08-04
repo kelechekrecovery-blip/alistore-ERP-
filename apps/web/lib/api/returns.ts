@@ -37,6 +37,10 @@ export function fetchStaffReturns(accessToken: string): Promise<ReturnRequest[]>
   return getJson('/returns', accessToken);
 }
 
+export function fetchMyReturns(accessToken: string): Promise<ReturnRequest[]> {
+  return getJson('/returns/mine', accessToken);
+}
+
 export function transitionReturn(
   id: string,
   status: 'under_review' | 'approved' | 'rejected' | 'processing' | 'reconciled',
