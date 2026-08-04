@@ -1,8 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { MobileTabBar, type Tab } from '@/components/MobileTabBar';
+import { loginHref } from '@/components/mobile/login-next';
+import { useAuth } from '@/lib/auth';
 import { useFavorites } from '@/lib/favorites';
 
 interface MobileFrameProps {
@@ -20,6 +23,11 @@ interface MobileFrameProps {
  */
 export function MobileFrame({ active, children, header = true, city = 'Бишкек' }: MobileFrameProps) {
   const { count: favCount } = useFavorites();
+  const { user, hydrated } = useAuth();
+  const pathname = usePathname();
+  // Кнопку показываем только после гидратации: до неё `user` всегда null,
+  // и её появление-исчезание на подтверждённой сессии выглядело бы миганием.
+  const showLogin = hydrated && !user;
   return (
     <div className="flex min-h-screen justify-center overflow-x-clip bg-night font-sans text-white">
       <div className="flex min-h-screen w-full max-w-[440px] flex-col bg-ink-dark">
@@ -28,6 +36,14 @@ export function MobileFrame({ active, children, header = true, city = 'Бишк�
             <div className="mb-2.5 flex items-center gap-2">
               <span className="flex items-center gap-1 text-xs text-muted">📍 {city} ▾</span>
               <div className="ml-auto flex items-center gap-3.5">
+                {showLogin && (
+                  <Link
+                    href={loginHref(pathname)}
+                    className="rounded-full border border-lime/40 bg-lime/10 px-2.5 py-1 text-[11px] font-bold text-lime"
+                  >
+                    Войти
+                  </Link>
+                )}
                 <Link href="/compare" className="relative text-[17px]" aria-label="Сравнение">
                   ⇄
                   {favCount > 0 && (

@@ -108,7 +108,14 @@ export async function createOrder(input: {
 }
 
 export async function createMyOrder(input: {
-  channel: 'web' | 'mobile';
+  /**
+   * Сужать список нельзя: сервер принимает те же каналы, что и гостевой
+   * `createOrder` (`apps/api/src/orders/orders.dto.ts` — `CreateMyOrderDto`
+   * наследует ту же валидацию). Прежние `'web' | 'mobile'` были не контрактом, а
+   * недосмотром, и из-за них Telegram Mini App не мог оформить заказ сессией
+   * покупателя, хотя API это разрешал.
+   */
+  channel: 'web' | 'app' | 'mobile' | 'staff_mobile' | 'pos' | 'telegram';
   fulfillmentType?: 'pickup' | 'courier' | 'express' | 'store';
   paymentMode?: 'prepaid' | 'cod';
   storePointId?: string;

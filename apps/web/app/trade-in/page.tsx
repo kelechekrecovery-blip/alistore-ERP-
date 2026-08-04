@@ -26,12 +26,23 @@ function basePrice(model: string) {
   return 30000;
 }
 
+function normalizePhone(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (digits.startsWith('996')) {
+    return '+' + digits.slice(0, 12);
+  }
+  if (digits.startsWith('0')) {
+    return '+996' + digits.slice(1, 10);
+  }
+  return '+996' + digits.slice(0, 9);
+}
+
 export default function TradeInPage() {
   const { user, authed } = useAuth();
   const [model, setModel] = useState('iPhone 13 · 128 ГБ');
   const [imei, setImei] = useState('');
   const [grade, setGrade] = useState<TradeInGrade>('B');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState('+996');
   const [name, setName] = useState('');
   const [passport, setPassport] = useState('');
   const [note, setNote] = useState('');
@@ -132,7 +143,7 @@ export default function TradeInPage() {
 
       {!user && (
         <div className="mt-3 grid grid-cols-1 gap-2">
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+996 700 12 34 56" className="rounded-[12px] border border-surface-3 bg-surface-2 p-3 font-mono text-sm outline-none placeholder:text-faint focus:border-lime" />
+          <input value={phone} onChange={(e) => setPhone(normalizePhone(e.target.value))} placeholder="+996 700 12 34 56" className="rounded-[12px] border border-surface-3 bg-surface-2 p-3 font-mono text-sm outline-none placeholder:text-faint focus:border-lime" />
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя продавца" className="rounded-[12px] border border-surface-3 bg-surface-2 p-3 text-sm outline-none placeholder:text-faint focus:border-lime" />
         </div>
       )}

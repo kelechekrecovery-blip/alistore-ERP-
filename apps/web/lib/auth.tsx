@@ -13,6 +13,7 @@ import {
 import {
   authLogout,
   authMe,
+  authAppleLogin,
   authCompleteSocialEnrollment,
   authRefresh,
   authRequestEmailOtp,
@@ -41,6 +42,10 @@ interface AuthContextValue {
   telegramLogin: (
     initData: string,
     source?: 'mini_app' | 'login_widget',
+  ) => Promise<{ status: 'authenticated' } | Extract<TelegramAuthResult, { status: 'enrollment_required' }>>;
+  appleLogin: (
+    identityToken: string,
+    options: { nonce: string; name?: string },
   ) => Promise<{ status: 'authenticated' } | Extract<TelegramAuthResult, { status: 'enrollment_required' }>>;
   completeSocialEnrollment: (
     enrollmentToken: string,
@@ -554,6 +559,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [finishAuth],
   );
 
+  const appleLogin = useCallback(
+    async (identityToken: string, options: { nonce: string; name?: string }) => {
+      const result = await authAppleLogin(identityToken, options);
+      // Тот же двухшаговый путь, что у Telegram: неизвестный Apple-аккаунт не
+      // ошибка, а человек без привязанного телефона. Возвращаем токен привязки
+      // наверх, чтобы экран показал ввод номера вместо «не удалось войти».
+      if (result.status === 'enrollment_required') return result;
+      const committed = await finishAuth(async () => result);
+      if (!committed) throw new Error('auth-flow-superseded');
+      return { status: 'authenticated' as const };
+    },
+    [finishAuth],
+  );
+
   const completeSocialEnrollment = useCallback(
     async (enrollmentToken: string, phone: string, code: string, challengeId?: string) => {
       const committed = await finishAuth(
@@ -651,6 +670,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestEmailOtp,
       verifyEmailOtp,
       telegramLogin,
+      appleLogin,
       completeSocialEnrollment,
       logout,
       authed,
@@ -665,6 +685,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestEmailOtp,
       verifyEmailOtp,
       telegramLogin,
+      appleLogin,
       completeSocialEnrollment,
       logout,
       authed,

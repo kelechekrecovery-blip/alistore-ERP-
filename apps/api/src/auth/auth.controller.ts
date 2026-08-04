@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Header, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
@@ -28,6 +28,27 @@ import {
 @UseGuards(ThrottlerGuard)
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
+
+  /**
+   * Какие входы живы в этом процессе. Публичный: содержит только флаги и
+   * публичный Apple client id, который всё равно уходит в браузерный SDK.
+   *
+   * Существует, потому что клиент не может знать ответ сам: бандл витрины
+   * собран заранее, а канал включается переменной в дашборде хостинга уже
+   * после сборки.
+   */
+  @Get('methods')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  /**
+   * `no-store` обязателен, а не гигиеничен: между витриной и API стоит CDN, и
+   * закешированный ответ пережил бы включение канала владельцем — тот задал бы
+   * переменную в дашборде, а экран входа продолжал бы говорить «входов нет»
+   * ровно до истечения чужого кеша.
+   */
+  @Header('Cache-Control', 'no-store')
+  methods() {
+    return this.auth.describeAuthMethods();
+  }
 
   /** Request a login OTP. Tight limit — anti SMS-bomb / cost abuse. */
   @Post('otp/request')

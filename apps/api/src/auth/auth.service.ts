@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, Optional, type OnModuleInit } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { createHash, createHmac, randomBytes, randomInt } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import * as argon2 from 'argon2';
 import type { Customer, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -18,6 +18,7 @@ import {
   verifyTelegramLogin,
 } from './social-login';
 import { NoopOtpSender } from './noop-otp.sender';
+import { describeAuthMethods, type AuthMethodsView } from './auth-methods';
 import { OTP_SENDER, OtpSender } from './otp-sender';
 import {
   EMAIL_OTP_SENDER,
@@ -58,6 +59,22 @@ type PhoneOtpPurpose = 'login' | 'recovery';
 type ClaimedOtp = { id: string; codeHash: string };
 
 /**
+ * Сравнение без утечки по времени.
+ *
+ * Обычный `!==` выходит на первом различающемся символе. Для кода ревьюера это
+ * единственное место, где секрет сверяется в открытую (у обычных OTP сравнение
+ * прячет argon2), поэтому здесь уместна та же дисциплина, что уже применяется к
+ * подписи Telegram в `social-login.ts`. Длины сверяются отдельно: `timingSafeEqual`
+ * бросает на разных размерах буферов.
+ */
+function constantTimeEquals(actual: string, expected: string): boolean {
+  const left = Buffer.from(actual, 'utf8');
+  const right = Buffer.from(expected, 'utf8');
+  if (left.length !== right.length) return false;
+  return timingSafeEqual(left, right);
+}
+
+/**
  * Customer authentication by phone + OTP (Roadmap MVP: «вход по телефону+OTP»).
  * Access is a short-lived JWT; the refresh token is opaque, stored only as a
  * sha-256 hash and rotated (single-use) on every refresh so a leaked token can be
@@ -91,6 +108,17 @@ export class AuthService implements OnModuleInit {
     }
   }
 
+  /**
+   * Какие входы действительно работают в этом процессе.
+   *
+   * Клиенты обязаны спрашивать здесь, а не выводить ответ из собственных
+   * сборочных флагов: витрина собирается заранее и о содержимом дашборда Render
+   * ничего не знает.
+   */
+  describeAuthMethods(): AuthMethodsView {
+    return describeAuthMethods((name) => this.config.get<string>(name));
+  }
+
   /** Verify a short-lived access token for non-HTTP transports (for example Socket.IO). */
   async verifyAccessToken(token: string): Promise<AuthPrincipal> {
     const payload = await this.jwt.verifyAsync<JwtPayload>(token);
@@ -115,20 +143,86 @@ export class AuthService implements OnModuleInit {
     purpose: PhoneOtpPurpose = 'login',
   ): Promise<{ challengeId: string; devCode?: string }> {
     const phone = normalizePhone(rawPhone);
-    this.otpSender.assertOperational();
+    /**
+     * Вход ревьюера сторов начинается здесь, а не в `verifyOtp`.
+     *
+     * Механизм фиксированного кода жил только в проверке, но добраться до него
+     * было нельзя: `assertOperational` ниже отказывает при `SMS_PROVIDER=disabled`,
+     * то есть до создания вызова, а клиенты (iOS и витрина) показывают поле кода
+     * лишь после успешного запроса. Ревьюеру физически некуда было ввести
+     * согласованный код — это и есть отказ App Store 2.1(a).
+     *
+     * Обход не расширяет обычный вход: `reviewOtpForPhone` требует все три
+     * переменные, точное совпадение номера и непросроченное окно не длиннее
+     * семи дней, а `purpose` ограничен логином — восстановление доступа отзывает
+     * чужие сессии и этим ключом не открывается. Любой другой номер по-прежнему
+     * получает честный отказ SMS-канала.
+     */
+    const reviewLogin = purpose === 'login' && this.reviewOtpForPhone(phone) !== null;
+    if (!reviewLogin) this.otpSender.assertOperational();
+    if (reviewLogin) {
+      // Обход канала — событие безопасности. Успех и провал самого входа уже
+      // пишутся (`auth.review_login_*`), но факт «для этого номера выпущен вызов
+      // в обход отключённого SMS» не оставлял следа, и восстановить постфактум,
+      // когда и сколько раз обходом пользовались, было нельзя. Номер здесь
+      // одновременно персональные данные и секрет обхода, поэтому в леджер идёт
+      // тот же хеш, которым помечается актор входа ревьюера.
+      await this.prisma.auditEvent.create({
+        data: {
+          type: 'auth.review_login_challenge_issued',
+          actor: `auth:review:${this.hashToken(phone)}`,
+          refs: [],
+          payload: { outcome: 'challenge_issued' },
+        },
+      });
+    }
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     const codeHash = await argon2.hash(code);
     const challenge = await this.prisma.otpChallenge.create({
-      data: { phone, purpose, codeHash, expiresAt: new Date(Date.now() + OTP_TTL_MS) },
+      data: {
+        phone,
+        purpose,
+        codeHash,
+        expiresAt: new Date(Date.now() + OTP_TTL_MS),
+        /**
+         * Вызов обхода рождается уже погашенным — и это не косметика.
+         *
+         * `verifyOtp` для согласованного номера идёт своей веткой и challenge не
+         * трогает, но он не единственный, кто такие строки ищет.
+         * `completeSocialEnrollment` берёт непогашенный `sms`/`login` вызов по
+         * тому же номеру и на верном коде зовёт
+         * `customerByCanonicalPhoneOnTx(..., true)` — то есть создаёт покупателя
+         * и привязывает к нему `CustomerIdentity`. Обычная claimable строка
+         * означала бы, что посторонний, знающий номер ревьюера, перебирает
+         * шестизначный код (5 попыток на вызов, вызовы — по 3 в минуту) и в
+         * случае удачи привязывает СВОЙ Apple-аккаунт к этому номеру, сохраняя
+         * доступ после того, как окно ревью закрыто и переменные стёрты.
+         *
+         * До обхода такой строки не существовало ни для одного номера:
+         * `assertOperational` резал запрос раньше. Погашенный вызов возвращает
+         * это свойство — он нужен лишь для формы ответа, которую ждут клиенты,
+         * и не годится ни одному потребителю, требующему `consumedAt IS NULL`.
+         */
+        ...(reviewLogin ? { consumedAt: new Date() } : {}),
+      },
     });
-    try {
-      await this.otpSender.send({ phone, code, purpose, expiresInSeconds: OTP_TTL_MS / 1000 });
-    } catch (error) {
-      await this.prisma.otpChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);
-      throw error;
+    if (!reviewLogin) {
+      try {
+        await this.otpSender.send({ phone, code, purpose, expiresInSeconds: OTP_TTL_MS / 1000 });
+      } catch (error) {
+        await this.prisma.otpChallenge.delete({ where: { id: challenge.id } }).catch(() => undefined);
+        throw error;
+      }
     }
     // A bad production env must never turn OTP into an account-takeover API.
-    const echo = this.config.get<string>('AUTH_OTP_DEV_ECHO') === 'true'
+    //
+    // Для согласованного номера эхо подавлено и вне production: сгенерированный
+    // код там бесполезен — `verifyOtp` уходит в ветку ревью и сверяет
+    // фиксированное значение. Отдать его значило бы выдать тестировщику
+    // заведомо неработающий код и потратить его время на «код не подходит» при
+    // технически валидном коде.
+    const echo = !reviewLogin
+      && this.config.get<string>('AUTH_OTP_DEV_ECHO') === 'true'
       && this.config.get<string>('NODE_ENV') !== 'production';
     return echo
       ? { challengeId: challenge.id, devCode: code }
@@ -524,7 +618,7 @@ export class AuthService implements OnModuleInit {
       }
 
       const customer = await tx.customer.findUnique({ where: { phone } });
-      if (code !== expectedCode || !customer) {
+      if (!constantTimeEquals(code, expectedCode) || !customer) {
         const attempts = guard.attempts + 1;
         const lockedUntil = attempts >= REVIEW_LOGIN_MAX_ATTEMPTS
           ? new Date(now.getTime() + REVIEW_LOGIN_LOCK_MS)

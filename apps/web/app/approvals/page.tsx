@@ -12,7 +12,6 @@ import {
   fetchApprovals,
   requestReturnRefund,
   resolveRefund,
-  staffLogin,
   staffTotpEnable,
   staffTotpSetup,
   transitionReturn,
@@ -21,6 +20,7 @@ import {
   type StaffTotpSetupResult,
 } from '@/lib/api';
 import { ApprovalList } from '@/components/approvals/ApprovalList';
+import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import { canPrintDocuments, canReadRefunds } from '@/lib/staff-permissions';
 import {
   clearStaffSession,
@@ -42,7 +42,6 @@ export default function ApprovalsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState('');
   const [session, setSession] = useState<StaffSession | null>(null);
-  const [login, setLogin] = useState({ username: '', password: '' });
   const [totpSetup, setTotpSetup] = useState<StaffTotpSetupResult | null>(null);
   const [totpToken, setTotpToken] = useState('');
   const [refundForm, setRefundForm] = useState({ returnId: '', amount: '', reason: '', shiftId: '' });
@@ -98,23 +97,6 @@ export default function ApprovalsPage() {
   function flash(m: string) {
     setToast(m);
     window.setTimeout(() => setToast(''), 1800);
-  }
-
-  async function doLogin(e: FormEvent) {
-    e.preventDefault();
-    setBusy('login');
-    try {
-      const next = await staffLogin(login.username.trim(), login.password);
-      setSession(next);
-      saveStaffSession(next);
-      flash(`Вход: ${next.role}`);
-      load(tab.status, next.accessToken);
-      loadReturns(next.accessToken);
-    } catch (e) {
-      flash(e instanceof Error ? e.message : 'Ошибка входа');
-    } finally {
-      setBusy(null);
-    }
   }
 
   async function advanceReturn(ret: ReturnRequest, status: 'under_review' | 'approved' | 'rejected' | 'processing' | 'reconciled') {
@@ -366,28 +348,14 @@ export default function ApprovalsPage() {
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto max-w-3xl">
           {!session && (
-            <form onSubmit={doLogin} className="erp3-glass rounded-[14px] p-6 text-bright">
-              <div className="font-display text-xl font-bold text-white">Вход сотрудника</div>
-              <div className="mt-1 text-sm text-muted">Введите рабочий логин, чтобы открыть очередь одобрений.</div>
-              <input
-                value={login.username}
-                onChange={(e) => setLogin((v) => ({ ...v, username: e.target.value }))}
-                placeholder="username"
-                autoComplete="username"
-                className="mt-5 w-full rounded-[10px] border border-surface-3 bg-ink-dark px-4 py-3 text-sm text-white outline-none placeholder:text-faint focus:border-lime"
+            <div className="flex justify-center">
+              <StaffSessionLogin
+                mode="dark"
+                title="Вход сотрудника"
+                caption="Введите рабочий логин, чтобы открыть очередь одобрений."
+                onAuthenticated={setSession}
               />
-              <input
-                value={login.password}
-                onChange={(e) => setLogin((v) => ({ ...v, password: e.target.value }))}
-                placeholder="password"
-                type="password"
-                autoComplete="current-password"
-                className="mt-3 w-full rounded-[10px] border border-surface-3 bg-ink-dark px-4 py-3 text-sm text-white outline-none placeholder:text-faint focus:border-lime"
-              />
-              <button type="submit" disabled={busy === 'login'} className="mt-4 rounded-[10px] bg-lime px-5 py-3 text-sm font-bold text-lime-ink disabled:opacity-50">
-                {busy === 'login' ? 'Входим…' : 'Войти'}
-              </button>
-            </form>
+            </div>
           )}
           {session && (
             <>

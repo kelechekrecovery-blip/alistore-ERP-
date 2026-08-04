@@ -1,4 +1,4 @@
-import { API_BASE, ApiError, getJson, postAuthJson, postAuthVoid, postJson } from './http';
+import { API_BASE, ApiError, getJson, getPublicJson, postAuthJson, postAuthVoid, postJson } from './http';
 
 export interface AuthTokens {
   accessToken: string;
@@ -7,13 +7,43 @@ export interface AuthTokens {
   expiresIn: string;
 }
 
-export type TelegramAuthResult =
+export type SocialAuthResult =
   | ({ status: 'authenticated' } & AuthTokens)
   | {
       status: 'enrollment_required';
       enrollmentToken: string;
       expiresIn: number;
     };
+
+/** Историческое имя того же результата — Telegram был первым социальным входом. */
+export type TelegramAuthResult = SocialAuthResult;
+
+export interface AuthMethodState {
+  enabled: boolean;
+  registers: boolean;
+}
+
+export interface AuthMethodsView {
+  phone: AuthMethodState;
+  email: AuthMethodState;
+  telegram: AuthMethodState & { botUsername: string | null };
+  apple: AuthMethodState & { clientId: string | null };
+  recovery: { enabled: boolean };
+  anyLoginAvailable: boolean;
+  registrationAvailable: boolean;
+}
+
+/**
+ * Какие входы живы — спрашиваем сервер, а не собственный бандл.
+ *
+ * `NEXT_PUBLIC_*` вшиваются в сборку Next: канал, включённый владельцем в
+ * дашборде хостинга уже после сборки образа, для витрины не существовал бы до
+ * следующего деплоя. Здесь ответ даёт тот же процесс, который будет обслуживать
+ * вход.
+ */
+export function authMethods(): Promise<AuthMethodsView> {
+  return getPublicJson('/auth/methods');
+}
 
 export interface AuthUser {
   customerId: string;
@@ -105,11 +135,25 @@ export function authCompleteSocialEnrollment(
   );
 }
 
+/**
+ * Sign in with Apple → v2, а не legacy `/auth/social/apple`.
+ *
+ * Legacy-маршрут умеет опознать только того, у кого CustomerIdentity уже есть в
+ * базе, и любому новому человеку отвечает `social_enrollment_required` без пути
+ * дальше. Именно по этой причине ревьюер App Store не смог войти. v2 в том же
+ * случае возвращает `enrollment_required` с токеном, которым привязывается
+ * телефон, — то есть даёт регистрацию, а не тупик.
+ *
+ * `nonce` обязателен: сервер отклоняет запрос без него (`apple_nonce_required`).
+ * В вебе Apple кладёт в claim `nonce` ту же строку, что передана в
+ * `AppleID.auth.init` — поэтому сюда идёт она же, без хэширования (в отличие от
+ * нативного iOS, где в токен попадает SHA-256).
+ */
 export function authAppleLogin(
   identityToken: string,
-  options: { nonce?: string; name?: string } = {},
-): Promise<AuthTokens> {
-  return postJson('/auth/social/apple', { identityToken, ...options }, { 'x-alistore-web': '1' }, true);
+  options: { nonce: string; name?: string },
+): Promise<SocialAuthResult> {
+  return postJson('/auth/v2/social/apple', { identityToken, ...options }, { 'x-alistore-web': '1' }, true);
 }
 
 export function authRefresh(refreshToken?: string): Promise<AuthTokens> {

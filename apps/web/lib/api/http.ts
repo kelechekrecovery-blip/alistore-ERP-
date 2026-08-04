@@ -184,6 +184,16 @@ export async function getJson<T>(path: string, accessToken: string): Promise<T> 
   return (await res.json()) as T;
 }
 
+/**
+ * GET без авторизации. Нужен для данных, которые читает ещё не вошедший
+ * посетитель — например справочник живых способов входа на `/login`.
+ */
+export async function getPublicJson<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, { cache: 'no-store' });
+  if (!res.ok) throw await responseError(res);
+  return (await res.json()) as T;
+}
+
 /** Authenticated binary download for server-generated documents. */
 export async function getAuthBlob(path: string, accessToken: string): Promise<Blob> {
   const res = await fetch(`${API_BASE}${path}`, {

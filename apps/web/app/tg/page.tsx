@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
   createCustomer,
+  createMyOrder,
+  createMyPaymentIntent,
   createOrder,
   createPaymentIntent,
   type CatalogProduct,
@@ -15,6 +17,7 @@ import {
   type PaymentIntent,
   type StorePoint,
 } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { LoadFailure } from '@/components/LoadFailure';
 import { som, conditionLabel } from '@/lib/format';
 import { guestOrderLink, saveGuestOrderAccess } from '@/lib/guest-order-access';
@@ -26,6 +29,11 @@ type TgUser = {
 };
 
 type TgWebApp = {
+  /**
+   * Подписанная строка. В отличие от `initDataUnsafe` её нельзя подделать со
+   * стороны клиента — только по ней сервер согласен опознать человека.
+   */
+  initData?: string;
   initDataUnsafe?: { user?: TgUser };
   ready?: () => void;
   expand?: () => void;
@@ -49,6 +57,17 @@ function telegramApp(): TgWebApp | null {
   return maybe.Telegram?.WebApp ?? null;
 }
 
+function normalizePhone(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (digits.startsWith('996')) {
+    return '+' + digits.slice(0, 12);
+  }
+  if (digits.startsWith('0')) {
+    return '+996' + digits.slice(1, 10);
+  }
+  return '+996' + digits.slice(0, 9);
+}
+
 function productIcon(category: string): string {
   return CATEGORY_ICON[category] ?? '📦';
 }
@@ -62,24 +81,48 @@ export default function TelegramMiniAppPage() {
   const [category, setCategory] = useState('all');
   const [cart, setCart] = useState<CartLine[]>([]);
   const [mode, setMode] = useState<'catalog' | 'checkout'>('catalog');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState('+996');
   const [name, setName] = useState('');
   const [payment, setPayment] = useState<PaymentChoice>('cash');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState<DoneState | null>(null);
   const [storePoint, setStorePoint] = useState<StorePoint | null>(null);
+  const { user, authed, telegramLogin } = useAuth();
 
   useEffect(() => {
     const tg = telegramApp();
     tg?.ready?.();
     tg?.expand?.();
-    const user = tg?.initDataUnsafe?.user;
-    if (user) {
-      setName([user.first_name, user.last_name].filter(Boolean).join(' '));
-      if (user.phone_number) setPhone(user.phone_number);
+    const tgUser = tg?.initDataUnsafe?.user;
+    if (tgUser) {
+      setName([tgUser.first_name, tgUser.last_name].filter(Boolean).join(' '));
+      if (tgUser.phone_number) setPhone(normalizePhone(tgUser.phone_number));
     }
-  }, []);
+    /**
+     * Telegram уже подтвердил личность — грех оформлять такого человека гостем.
+     *
+     * Раньше страница читала только `initDataUnsafe` (данные для предзаполнения,
+     * которые клиент волен подделать) и всегда шла гостевым путём: телефон
+     * оставался тем, что ввели руками, а заказ — заказом без сессии. Подписанный
+     * `initData` даёт настоящий вход тем же маршрутом, что и `/login`.
+     *
+     * Тихо и без последствий при отказе: бот может быть не настроен
+     * (`social_provider_not_configured`), а у нового человека нет привязанного
+     * телефона — тогда сервер просит привязку, завершить которую можно только
+     * SMS-кодом. Ни то, ни другое не повод ломать покупку: гостевой путь ниже
+     * работает как раньше.
+     */
+    const signed = tg?.initData;
+    if (!signed) return;
+    telegramLogin(signed, 'mini_app').catch(() => undefined);
+  }, [telegramLogin]);
+
+  // Телефон авторизованного берём из аккаунта: он проверен кодом, а введённый
+  // руками — нет.
+  useEffect(() => {
+    if (user?.phone) setPhone(user.phone);
+  }, [user?.phone]);
 
   useEffect(() => {
     fetchCatalog({ limit: 100 })
@@ -157,31 +200,41 @@ export default function TelegramMiniAppPage() {
     setBusy(true);
     setError('');
     try {
-      const customer = await createCustomer({
-        phone: phone.trim(),
-        name: name.trim() || 'Telegram customer',
-      });
-      const order = await createOrder({
-        customerId: customer.id,
-        channel: 'telegram',
-        fulfillmentType: 'pickup',
+      const orderInput = {
+        channel: 'telegram' as const,
+        fulfillmentType: 'pickup' as const,
         storePointId: storePoint.id,
         deliverySlot: storePoint.hours,
         total: subtotal,
         items: cart.map((line) => ({ sku: line.sku, qty: line.qty, price: line.price })),
-      }, customer.guestCapability, crypto.randomUUID());
-      if (order.guestAccess) saveGuestOrderAccess(order.id, order.guestAccess.capability, order.guestAccess.expiresIn);
+      };
+      const orderKey = crypto.randomUUID();
+      // Вошедший через Telegram оформляет заказ своей сессией — тогда он видит
+      // его в кабинете на любом устройстве, а не только по гостевой ссылке в
+      // этом браузере. Гостевая ветка остаётся для всех остальных случаев.
+      let guestCapability: string | null = null;
+      let order: CreatedOrder;
+      if (user) {
+        order = await authed((token) => createMyOrder(orderInput, token, orderKey));
+      } else {
+        const customer = await createCustomer({
+          phone: phone.trim(),
+          name: name.trim() || 'Telegram customer',
+        });
+        guestCapability = customer.guestCapability;
+        order = await createOrder({ ...orderInput, customerId: customer.id }, guestCapability, orderKey);
+        if (order.guestAccess) saveGuestOrderAccess(order.id, order.guestAccess.capability, order.guestAccess.expiresIn);
+      }
       if (payment === 'cash') {
         setDone({ order });
         setCart([]);
         return;
       }
-      const intent = await createPaymentIntent({
-        orderId: order.id,
-        method: payment,
-        amount: subtotal,
-        actor: 'telegram_mini_app',
-      }, customer.guestCapability, crypto.randomUUID());
+      const intentKey = crypto.randomUUID();
+      const intentInput = { orderId: order.id, method: payment, amount: subtotal };
+      const intent = user
+        ? await authed((token) => createMyPaymentIntent(intentInput, token, intentKey))
+        : await createPaymentIntent({ ...intentInput, actor: 'telegram_mini_app' }, guestCapability!, intentKey);
       setDone({ order: { ...order, status: intent.orderStatus }, intent });
       setCart([]);
     } catch {
@@ -429,7 +482,7 @@ function Checkout({
       <label className="mb-1.5 mt-5 block text-xs font-semibold uppercase tracking-wide text-subtle">Телефон</label>
       <input
         value={phone}
-        onChange={(event) => onPhone(event.target.value)}
+        onChange={(event) => onPhone(normalizePhone(event.target.value))}
         placeholder="+996700900007"
         inputMode="tel"
         className="w-full rounded-[13px] border border-surface-3 bg-surface-2 px-4 py-3 text-sm text-white outline-none placeholder:text-faint focus:border-lime"

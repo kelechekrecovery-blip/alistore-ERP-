@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  authAppleLogin,
   authConfirmEmailAttach,
   authCompleteSocialEnrollment,
   authLogout,
+  authMethods,
   authRequestEmailAttach,
   authRequestEmailOtp,
   authRequestOtp,
@@ -167,6 +169,63 @@ describe('Telegram social enrollment v2 fetchers', () => {
       challengeId: 'phone-challenge',
     });
     expect(calls[0].init.credentials).toBe('include');
+  });
+});
+
+describe('Apple sign-in fetcher', () => {
+  /**
+   * Регрессия на конкретный отказ ревью App Store: клиент бил в legacy
+   * `/auth/social/apple`, который умеет опознать только уже привязанного
+   * человека и любому новому отвечает `social_enrollment_required` без пути
+   * дальше. v2 в том же случае возвращает токен привязки телефона.
+   */
+  it('идёт в v2 и возвращает привязку вместо тупика', async () => {
+    const calls = stubFetch({
+      status: 'enrollment_required',
+      enrollmentToken: 'opaque-enrollment-token',
+      expiresIn: 600,
+    });
+
+    await expect(
+      authAppleLogin('apple-identity-token', { nonce: 'abc123', name: 'Аида' }),
+    ).resolves.toEqual({
+      status: 'enrollment_required',
+      enrollmentToken: 'opaque-enrollment-token',
+      expiresIn: 600,
+    });
+    expect(calls[0].url).toMatch(/\/auth\/v2\/social\/apple$/);
+    expect(calls[0].url).not.toMatch(/\/auth\/social\/apple$/);
+  });
+
+  /** Без nonce сервер отвечает `apple_nonce_required` — он обязан уходить. */
+  it('передаёт nonce в теле запроса', async () => {
+    const calls = stubFetch({ status: 'authenticated', accessToken: 'a', tokenType: 'Bearer', expiresIn: '15m' });
+    await authAppleLogin('apple-identity-token', { nonce: 'abc123' });
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({
+      identityToken: 'apple-identity-token',
+      nonce: 'abc123',
+    });
+    expect(calls[0].init.credentials).toBe('include');
+  });
+});
+
+describe('справочник способов входа', () => {
+  it('читается без токена — его спрашивает ещё не вошедший посетитель', async () => {
+    const calls = stubFetch({
+      phone: { enabled: false, registers: false },
+      email: { enabled: false, registers: false },
+      telegram: { enabled: false, registers: false },
+      apple: { enabled: false, registers: false, clientId: null },
+      recovery: { enabled: false },
+      anyLoginAvailable: false,
+      registrationAvailable: false,
+    });
+
+    const methods = await authMethods();
+
+    expect(calls[0].url).toMatch(/\/auth\/methods$/);
+    expect((calls[0].init?.headers as Record<string, string> | undefined)?.authorization).toBeUndefined();
+    expect(methods.anyLoginAvailable).toBe(false);
   });
 });
 

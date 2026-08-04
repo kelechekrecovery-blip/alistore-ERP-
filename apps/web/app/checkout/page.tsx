@@ -86,6 +86,20 @@ function slotLabel(slot: DeliverySlot) {
   return `${format(slot.startsAt)}–${format(slot.endsAt)}`;
 }
 
+/** Заготовка в поле телефона: не введённое значение, а подсказка формата. */
+const PHONE_PREFIX = '+996';
+
+function normalizePhone(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (digits.startsWith('996')) {
+    return '+' + digits.slice(0, 12);
+  }
+  if (digits.startsWith('0')) {
+    return '+996' + digits.slice(1, 10);
+  }
+  return '+996' + digits.slice(0, 9);
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const {
@@ -115,7 +129,7 @@ export default function CheckoutPage() {
   // покупатель видел «Картой» там, где сервер не мог довести оплату до конца.
   const [serverPayment, setServerPayment] = useState<ServerPaymentMethods | null>(null);
   const [paymentProbed, setPaymentProbed] = useState(false);
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(PHONE_PREFIX);
   const [name, setName] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
@@ -153,7 +167,14 @@ export default function CheckoutPage() {
     try { localStorage.setItem('alistore.checkout.attempt.v1', String(next)); } catch { /* storage is optional */ }
   }
 
-  useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user]);
+  // `p || user.phone` перестало работать, когда поле стало начинаться с `+996`:
+  // непустая заготовка всегда выигрывала, и телефон авторизованного покупателя
+  // больше не подставлялся — он видел «+996» и вводил номер заново. Заготовка
+  // это ещё не ввод, поэтому она уступает данным аккаунта; всё, что человек
+  // действительно набрал, по-прежнему неприкосновенно.
+  useEffect(() => {
+    if (user?.phone) setPhone((p) => (p && p !== PHONE_PREFIX ? p : user.phone));
+  }, [user]);
   useEffect(() => {
     void fetchPaymentMethods().then((result) => { setServerPayment(result); setPaymentProbed(true); });
   }, []);
@@ -619,7 +640,7 @@ export default function CheckoutPage() {
         {step === 1 && (
           <>
             <div className="mb-3 font-display text-base font-bold">Контакты</div>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+996 700 12 34 56" className="checkout-field mb-2.5 w-full rounded-[12px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-sm text-white outline-none focus:border-lime" />
+            <input type="tel" value={phone} onChange={(e) => setPhone(normalizePhone(e.target.value))} placeholder="+996 700 12 34 56" className="checkout-field mb-2.5 w-full rounded-[12px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-sm text-white outline-none focus:border-lime" />
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя" className="checkout-field mb-2.5 w-full rounded-[12px] border border-surface-3 bg-surface-2 p-3.5 text-sm text-white outline-none focus:border-lime" />
             {error && <p className="text-sm text-danger-soft">{error}</p>}
             <button type="button" disabled={!phoneValid} onClick={() => setStep(2)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:bg-line disabled:text-faint">Далее</button>

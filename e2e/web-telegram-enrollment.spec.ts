@@ -4,7 +4,36 @@ const enrollmentToken = 'telegram-enrollment-token-only-in-react-memory';
 const accessToken = 'telegram-web-access-token';
 const phone = '+996700211111';
 
+/**
+ * Витрина больше не решает сама, какие входы показать: она спрашивает сервер
+ * (`GET /auth/methods`) и рисует только живые каналы. Кнопка Telegram теперь
+ * появляется лишь когда бот настроен — раньше она рисовалась при любом
+ * `initData` и вела в отказ `social_provider_not_configured`.
+ *
+ * Этот сценарий подменяет сервер целиком, поэтому справочник обязан быть
+ * подменён вместе с остальными ответами: без него страница честно скрыла бы
+ * кнопку, и тест проверял бы отсутствующий элемент.
+ */
+async function mockAuthMethods(page: Page) {
+  await page.route('**/api/auth/methods', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      phone: { enabled: true, registers: true },
+      email: { enabled: false, registers: false },
+      // `botUsername: null` — виджет для обычного браузера не нужен: внутри
+      // Mini App вход идёт подписанным initData.
+      telegram: { enabled: true, registers: true, botUsername: null },
+      apple: { enabled: false, registers: false, clientId: null },
+      recovery: { enabled: false },
+      anyLoginAvailable: true,
+      registrationAvailable: true,
+    }),
+  }));
+}
+
 async function exposeTelegram(page: Page, initData = 'signed-telegram-init-data') {
+  await mockAuthMethods(page);
   await page.addInitScript((value) => {
     (window as typeof window & {
       Telegram?: { WebApp?: { initData: string; ready: () => void } };

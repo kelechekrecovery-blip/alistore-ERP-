@@ -259,6 +259,51 @@ envVarGroups:
         sync: false
       - key: SMS_GATEWAY_ENCRYPTION_PASSPHRASE
         sync: false
+      # Ниже — слоты входов, которых в блюпринте не было вовсе. Пустой слот
+      # ничего не включает: `GET /api/auth/methods` просто продолжит отвечать,
+      # что канал мёртв, и витрина не нарисует кнопку. Но заполнить их теперь
+      # можно в дашборде Render, без правки репозитория и пересборки образа —
+      # раньше половина этих переменных читалась кодом, не будучи объявленной
+      # нигде, а витрина решала судьбу кнопок по флагам, вшитым в бандл Next.
+      #
+      # Sign in with Apple. APPLE_CLIENT_ID принимает СПИСОК аудиторий: Services
+      # ID сайта и bundle id нативного приложения — с одним значением половина
+      # входов отвалится с «audience is invalid». APPLE_WEB_CLIENT_ID обязателен
+      # для кнопки на сайте: угадать по виду строки, где Services ID, а где
+      # bundle id, нельзя, и вывода из APPLE_CLIENT_ID нет намеренно.
+      - key: APPLE_CLIENT_ID
+        sync: false
+      - key: APPLE_WEB_CLIENT_ID
+        sync: false
+      # Вход через Telegram. Это НЕ ALERT_TELEGRAM_BOT_TOKEN выше: тот канал
+      # дежурного, этим проверяется подпись initData.
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      # Имя бота для Login Widget в обычном браузере (атрибут
+      # data-telegram-login). Без него вход через Telegram остаётся доступен
+      # только внутри Mini App, где initData подписывает сам Telegram.
+      - key: TELEGRAM_BOT_USERNAME
+        sync: false
+      # Транспорт email-кода. Без SMTP_HOST в production отправитель уходит в
+      # заглушку и вход по почте отвечает email_transport_unavailable. Домен в
+      # SMTP_FROM обязан совпадать с верифицированным у провайдера, иначе письмо
+      # отклоняется на его стороне.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      # Первый владелец ERP. Маршрут /staff-auth/bootstrap в production отдаёт
+      # 404, пока здесь не стоит "true", а другого способа завести стартовую
+      # учётку нет — сида сотрудников в репозитории не существует. Включать на
+      # время первого входа и возвращать в "false".
+      - key: STAFF_BOOTSTRAP_ENABLED
+        value: "false"
       - key: POS_HARDWARE_CERTIFIED
         value: "false"
       - key: JOB_BACKEND
