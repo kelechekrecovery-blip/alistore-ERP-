@@ -1,0 +1,151 @@
+import XCTest
+
+@MainActor
+final class AliStorePOSUITests: XCTestCase {
+    override func setUp() async throws {
+        continueAfterFailure = false
+        terminateOtherAliStoreApps()
+    }
+
+    private func terminateOtherAliStoreApps() {
+        ["kg.alistore.client", "kg.alistore.staff", "kg.alistore.courier"].forEach {
+            XCUIApplication(bundleIdentifier: $0).terminate()
+        }
+    }
+
+    func testLaunchesPOSLogin() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["AliStore POS"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.textFields["Логин"].exists)
+        XCTAssertTrue(app.secureTextFields["Пароль"].exists)
+        XCTAssertTrue(app.buttons["Открыть кассу"].exists)
+    }
+
+    func testSignedInPOSSaleSplitAndReceiptShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-role=cashier"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["POS · Касса"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Смена открыта · azizbek · AliStore Центр"].exists)
+        XCTAssertTrue(app.staticTexts["iPhone 15 128 ГБ Black"].exists)
+        XCTAssertTrue(app.staticTexts["IP15-128-BLK"].exists)
+        XCTAssertTrue(app.staticTexts["Каталог синхронизирован · 3 товара"].exists)
+
+        app.buttons["pos-qty-plus-iphone-15-128"].tap()
+        XCTAssertTrue(app.staticTexts["1 поз."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["iPhone 15 128 ГБ Black × 1"].exists)
+
+        app.swipeUp()
+        XCTAssertTrue(app.buttons["pos-sale-submit"].waitForExistence(timeout: 5))
+
+        let split = app.textFields["Наличные в split (необязательно)"]
+        XCTAssertTrue(split.exists)
+        split.tap()
+        split.typeText("10000")
+        app.swipeUp()
+
+        // Разбивка видна до отправки: внесено 10 000 наличными, остаток 99 900
+        // закроет карта. Ровно эти суммы и уйдут в оплату (cash=10000, card=99900).
+        XCTAssertEqual(app.staticTexts["pos-split-cash"].label, "10\u{00A0}000\u{00A0}сом")
+        XCTAssertEqual(app.staticTexts["pos-split-remaining"].label, "99\u{00A0}900\u{00A0}сом")
+
+        app.buttons["pos-sale-submit"].tap()
+
+        // Сумма форматируется через Money.som (ru_KG, неразрывные пробелы).
+        XCTAssertTrue(app.staticTexts["POS-4102 · оплачено 109\u{00A0}900\u{00A0}сом · Event Ledger"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Чек с сервера"].exists)
+        let receipt = app.staticTexts["pos-receipt-markup"]
+        XCTAssertTrue(receipt.exists)
+        XCTAssertTrue(receipt.label.contains("AliStore POS"))
+        XCTAssertTrue(receipt.label.contains("Оплата: cash=10000, card=99900"))
+        XCTAssertTrue(app.buttons["Печать"].exists)
+        XCTAssertTrue(app.staticTexts["ESC/POS сформирован; устройство требует отдельной сертификации"].exists)
+    }
+
+    func testSignedInPOSShiftExposesPushControl() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-role=cashier"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["POS · Касса"].waitForExistence(timeout: 10))
+        app.buttons["Смена"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Смена"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Push"].exists)
+        XCTAssertTrue(app.buttons["Включить уведомления"].exists)
+    }
+
+    func testCashShiftUsesBlindCountAndShowsServerResultAfterClose() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-testing-signed-in",
+            "--ui-testing-role=cashier",
+            "--ui-testing-cash-shift"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["POS · Касса"].waitForExistence(timeout: 10))
+        app.buttons["Смена"].firstMatch.tap()
+
+        let amount = app.textFields["pos-close-cash"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 5))
+        XCTAssertEqual(amount.value as? String, "Фактически в кассе")
+        XCTAssertFalse(app.staticTexts["Ожидается"].exists)
+        XCTAssertFalse(app.staticTexts["Ожидалось"].exists)
+        XCTAssertFalse(app.buttons["pos-close-shift"].isEnabled)
+
+        amount.tap()
+        amount.typeText("6100")
+        XCTAssertTrue(app.buttons["pos-close-shift"].isEnabled)
+        app.buttons["pos-close-shift"].tap()
+
+        XCTAssertTrue(app.staticTexts["Смена закрыта"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Ожидалось' AND label CONTAINS '6200'")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Расхождение' AND label CONTAINS '100'")).firstMatch.exists)
+    }
+
+    func testPublicStoreVisualEvidence() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-testing-signed-in",
+            "--ui-testing-role=cashier",
+            "--ui-testing-visual-evidence"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["POS · Касса"].waitForExistence(timeout: 10))
+        capture(app, named: "pos-sale")
+
+        app.buttons["pos-qty-plus-iphone-15-128"].tap()
+        XCTAssertTrue(app.staticTexts["1 поз."].waitForExistence(timeout: 5))
+        capture(app, named: "pos-cart")
+
+        app.swipeUp()
+        XCTAssertTrue(app.buttons["pos-sale-submit"].waitForExistence(timeout: 5))
+        app.buttons["pos-sale-submit"].tap()
+        XCTAssertTrue(app.staticTexts["Чек с сервера"].waitForExistence(timeout: 10))
+        capture(app, named: "pos-receipt")
+
+        app.buttons["Офлайн"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Офлайн-очередь"].waitForExistence(timeout: 5))
+        capture(app, named: "pos-offline")
+
+        app.buttons["Смена"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Смена"].waitForExistence(timeout: 5))
+        capture(app, named: "pos-shift")
+
+        app.buttons["Операции"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Операции"].waitForExistence(timeout: 5))
+        capture(app, named: "pos-operations")
+    }
+
+    private func capture(_ app: XCUIApplication, named name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+}

@@ -1,0 +1,22 @@
+{
+  "$comment": "Single source of truth for storefront-internal (staff-only/ops) path prefixes. Consumed by app/robots.ts (disallow), app/sitemap.ts (defensive filter against ever listing one of these) and next.config.mjs (X-Robots-Tag belt-and-suspenders header). Keep this the only place this list is written — see BACKLOG.md for the incident where /assess (a staff-only tool) was published in sitemap.xml with priority 0.6.",
+  "prefixes": [
+    "/erp",
+    "/pos",
+    "/admin",
+    "/staff",
+    "/warehouse",
+    "/account",
+    "/api",
+    "/order",
+    "/approvals",
+    "/refunds",
+    "/courier",
+    "/courier-cash",
+    "/ai-tools",
+    "/assess",
+    "/exchange",
+    "/warranty",
+    "/healthz"
+  ]
+}

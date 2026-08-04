@@ -71,6 +71,29 @@
 
 ---
 
+## 5. Расширенные модули (v2 — глубокая операционка)
+| Файл | Что это |
+|---|---|
+| `AliStore Финансы 2.0.dc.html` | Касса/инкассация, кассовые ордера, выплата ЗП, оплата поставщикам, расходы, cashflow-прогноз, курсы валют, взаиморасчёты филиалов |
+| `AliStore Закупки.dc.html` | PO цикл (заявка→отправка→приёмка), AI-прогноз спроса |
+| `AliStore Управление товарами.dc.html` | Варианты-матрица, комплекты, подарочные карты, предзаказ, история цены |
+| `AliStore Складской учёт.dc.html` | Серийный/штучный, комиссионный, комплектность, пересортица, уценка |
+| `AliStore HR.dc.html` | График смен, табель, профиль сотрудника, передача смены |
+| `AliStore Безопасность.dc.html` | Блокировка сотрудника, 2FA, сессии, лог входов |
+| `AliStore Сервис-центр.dc.html` | Очередь+SLA-эскалация, подменный фонд, прайс, платный ремонт |
+| `AliStore Логистика управление.dc.html` | Зоны и слоты доставки, ПВЗ, оптимизация маршрутов |
+| `AliStore Операционка точки.dc.html` | Открытие/закрытие магазина, учёт брака, резерв клиента, лист ожидания |
+| `AliStore Маркетинг CMS.dc.html` | Баннеры витрины, промокоды, модерация отзывов |
+| `AliStore Аналитика.dc.html` | ABC-анализ, когорты удержания, лидерборд продавцов |
+| `AliStore Клиент сервисы.dc.html` | Сравнение товаров, рефералка, мои устройства, адреса, Q&A |
+| `AliStore Юридическое.dc.html` | Согласие на перс.данные (закон КР), договор рассрочки, проверка личности/возраста |
+| `AliStore Order State Machine.dc.html` · `AliStore Payment Ledger.dc.html` · `AliStore Cash Shift Opening/Closing.dc.html` · `AliStore Approval Rules Matrix.dc.html` · `AliStore Role Permission Matrix.dc.html` · `AliStore Inventory Count.dc.html` · `AliStore IMEI Lifecycle.dc.html` · `AliStore Courier Cash Handover.dc.html` · `AliStore Failed Delivery.dc.html` · `AliStore Refund Money Flow.dc.html` · `AliStore Warranty Case Detail.dc.html` | P0 ядро процессов |
+| `AliStore Support Inbox.dc.html` · `AliStore Notification Preferences.dc.html` · `AliStore Marketing Segment Builder.dc.html` · `AliStore Campaign ROI.dc.html` · `AliStore Supplier Scorecard.dc.html` · `AliStore Franchise Audit Checklist.dc.html` | P1 CRM/поддержка/поставщики |
+| `AliStore API Data Contracts.dc.html` · `AliStore QA Test Scenarios.dc.html` · `AliStore Process Map 2.0.dc.html` | P2 для разработки |
+| `AliStore Продажа в долг / Списание товара / Изменение цены / Изменение остатка / Удаление товара.dc.html` | Опасные действия (approval-циклы) |
+
+---
+
 ## Ключевые принципы
 - **Event Ledger** — единый источник правды (append-only); исправления — компенсирующими событиями.
 - **Опасные действия** — с подтверждением старшего/владельца + причина, всё в аудите.

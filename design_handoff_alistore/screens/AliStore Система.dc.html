@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #0B0A08; }
+a { color: inherit; text-decoration: none; }
+::selection { background: #FF5B2E; color: #fff; }
+@keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(24px,-20px) scale(1.1);}}
+</style>
+</helmet>
+
+<div style="position: relative; overflow: hidden; min-height: 100vh; background: radial-gradient(circle at 15% 4%, #2B221B 0%, #14100C 46%, #0B0A08 100%); font-family: 'Golos Text', sans-serif; color: #E5DCD3; padding: 40px 44px 56px;">
+  <div style="position: absolute; inset: 0; z-index: 0; overflow: hidden;">
+    <div style="position: absolute; top: -150px; left: -110px; width: 480px; height: 480px; border-radius: 50%; background: radial-gradient(circle, rgba(255,91,46,0.5), transparent 68%); filter: blur(24px); animation: floatBlob 16s ease-in-out infinite;"></div>
+    <div style="position: absolute; bottom: -180px; right: -90px; width: 540px; height: 540px; border-radius: 50%; background: radial-gradient(circle, rgba(181,122,224,0.34), transparent 68%); filter: blur(28px); animation: floatBlob 20s ease-in-out infinite reverse;"></div>
+    <div style="position: absolute; top: 40%; left: 44%; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(170,220,70,0.18), transparent 66%); filter: blur(30px); animation: floatBlob 18s ease-in-out infinite;"></div>
+  </div>
+
+  <div style="position: relative; z-index: 1; max-width: 1220px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 26px;">
+      <div style="width: 44px; height: 44px; border-radius: 13px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 23px; box-shadow: 0 8px 22px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4);">A</div>
+      <div style="flex: 1;"><div style="font-family: 'Sora'; font-weight: 800; font-size: 28px; color: #fff; line-height: 1;">AliStore — вся система</div><div style="font-size: 13px; color: #8A7F76; margin-top: 5px;">Единый liquid-glass. Все поверхности связаны — кликни, чтобы открыть.</div></div>
+      <div style="text-align: right;"><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #C6FF3D; line-height: 1;">3.0</div><div style="font-size: 11px; color: #8A7F76;">единый стиль</div></div>
+    </div>
+
+    <sc-for list="{{ groups }}" as="g" hint-placeholder-count="5">
+      <div style="margin-bottom: 22px;">
+        <div style="display: flex; align-items: center; gap: 9px; margin-bottom: 12px;"><span style="font-size: 15px;">{{ g.icon }}</span><span style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">{{ g.title }}</span><span style="font-size: 12px; color: #8A7F76;">{{ g.sub }}</span></div>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px;">
+          <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="4">
+            <a href="{{ it.href }}">
+              <div style="display: flex; align-items: center; gap: 12px; padding: 15px; border-radius: 15px; background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 26px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.15);" style-hover="border: 1px solid rgba(255,122,77,0.45); box-shadow: 0 14px 32px rgba(0,0,0,0.44), 0 4px 16px rgba(255,91,46,0.22), inset 0 1px 0 rgba(255,255,255,0.2);">
+                <div style="width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 19px;">{{ it.icon }}</div>
+                <div style="flex: 1; min-width: 0;"><div style="font-size: 13.5px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ it.name }}</div><div style="font-size: 11px; color: #8A7F76;">{{ it.tag }}</div></div>
+              </div>
+            </a>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  renderVals(){
+    const groups=[
+      { title:"Владелец", sub:"командный центр", icon:"🖥️", items:[
+        {name:"ERP 3.0",tag:"дашборд + режим бога",icon:"▦",href:"AliStore ERP 3.0.dc.html"},
+        {name:"AI-директор",tag:"внутри ERP",icon:"🧠",href:"AliStore ERP 3.0.dc.html"},
+        {name:"Карта функций",tag:"кто что делает",icon:"🗺️",href:"AliStore Карта функций.dc.html"},
+        {name:"Обзор проекта",tag:"вся навигация",icon:"⌂",href:"AliStore Обзор проекта.dc.html"}
+      ]},
+      { title:"Отделы", sub:"каждый отдельный экран", icon:"🗂️", items:[
+        {name:"Финансы 3.0",tag:"касса, ЗП, P&L",icon:"💰",href:"AliStore Финансы 3.0.dc.html"},
+        {name:"Складской учёт 3.0",tag:"IMEI, остатки",icon:"📦",href:"AliStore Складской учёт 3.0.dc.html"},
+        {name:"Аналитика 3.0",tag:"ABC, когорты",icon:"📊",href:"AliStore Аналитика 3.0.dc.html"},
+        {name:"Закупки 3.0",tag:"заказы, приёмка",icon:"🛒",href:"AliStore Закупки 3.0.dc.html"},
+        {name:"Сервис-центр 3.0",tag:"ремонт, гарантия",icon:"🔧",href:"AliStore Сервис-центр 3.0.dc.html"},
+        {name:"Управление товарами",tag:"товары, бандлы",icon:"🏷️",href:"AliStore Управление товарами 3.0.dc.html"},
+        {name:"Логистика 3.0",tag:"зоны, курьеры",icon:"🚚",href:"AliStore Логистика 3.0.dc.html"},
+        {name:"HR 3.0",tag:"смены, зарплата",icon:"👔",href:"AliStore HR 3.0.dc.html"},
+        {name:"Операционка точки",tag:"открытие/закрытие",icon:"🏬",href:"AliStore Операционка точки 3.0.dc.html"},
+        {name:"POS 3.0",tag:"касса, чеки",icon:"🧾",href:"AliStore POS 3.0.dc.html"},
+        {name:"Безопасность 3.0",tag:"роли, аудит",icon:"🛡️",href:"AliStore Безопасность 3.0.dc.html"},
+        {name:"Юридическое 3.0",tag:"документы",icon:"⚖️",href:"AliStore Юридическое 3.0.dc.html"}
+      ]},
+      { title:"Маркетинг", sub:"движок роста", icon:"📈", items:[
+        {name:"Маркетинг-центр",tag:"автоворонки, ROAS",icon:"📈",href:"AliStore Маркетинг-центр.dc.html"},
+        {name:"Маркетинг CMS 3.0",tag:"контент, баннеры",icon:"📣",href:"AliStore Маркетинг CMS 3.0.dc.html"},
+        {name:"Маркетинг-движок",tag:"стратегия",icon:"⚡",href:"AliStore Маркетинг-движок.dc.html"},
+        {name:"План 30 дней",tag:"первый магазин live",icon:"🎯",href:"AliStore План 30 дней.dc.html"}
+      ]},
+      { title:"Клиент", sub:"покупатель", icon:"🛍️", items:[
+        {name:"Клиент App 3.0",tag:"приложение",icon:"📱",href:"AliStore Клиент App 3.0.dc.html"},
+        {name:"Рассрочка график",tag:"касса → приложение",icon:"💳",href:"AliStore Рассрочка график.dc.html"},
+        {name:"Клиентские сервисы",tag:"trade-in, гарантия",icon:"🤝",href:"AliStore Клиент сервисы.dc.html"}
+      ]}
+    ];
+    return { groups };
+  }
+}
+</script>
+</body>
+</html>

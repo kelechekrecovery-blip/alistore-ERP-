@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0E0C0A; } ::selection { background: #C6FF3D; color: #14110E; }</style>
+</helmet>
+
+<div style="background: #0E0C0A; font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 60px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #221E19; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+  <div style="max-width: 1120px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">Сервис-центр</span>
+      <a href="AliStore Warranty Case Detail.dc.html" style="margin-left: auto; text-decoration: none;"><span style="font-size: 13px; color: #7FB0EC;">Гарантийные кейсы →</span></a>
+    </div>
+    <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+        <div onClick="{{ t.pick }}" style="background: {{ t.bg }}; color: {{ t.fg }}; border: 1px solid {{ t.border }}; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;">{{ t.label }}</div>
+      </sc-for>
+    </div>
+
+    <!-- QUEUE + SLA -->
+    <sc-if value="{{ isQueue }}" hint-placeholder-val="{{ true }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 1fr 1.4fr 1fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid #2E2822; font-size: 11px; color: #8A7F76;"><span>Заявка</span><span>Устройство</span><span>Этап</span><span>SLA</span><span>Мастер</span></div>
+        <sc-for list="{{ queue }}" as="q" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: 1fr 1.4fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid #1A1611; align-items: center; background: {{ q.rowBg }};"><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #7FB0EC;">{{ q.no }}</span><span style="font-size: 13px; color: #fff;">{{ q.device }}</span><span style="font-size: 12px; color: #A79C92;">{{ q.stage }}</span><span><span style="background: {{ q.slaBg }}; color: {{ q.slaFg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ q.sla }}</span></span><span style="font-size: 12px; color: #A79C92;">{{ q.master }}</span></div>
+        </sc-for>
+      </div>
+      <div style="background: #3A1F1C; border: 1px solid #5A2A22; border-radius: 12px; padding: 14px 16px; margin-top: 14px; display: flex; align-items: center; gap: 12px;"><span style="font-size: 20px;">⏰</span><span style="font-size: 13px; color: #FF8A7A;">SLA-эскалация: WC-0081 просрочен на 6 ч → авто-эскалация руководителю сервиса + уведомление клиенту.</span></div>
+    </sc-if>
+
+    <!-- LOANER FUND -->
+    <sc-if value="{{ isLoaner }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 4px;">Подменный фонд</div>
+        <div style="font-size: 13px; color: #8A7F76; margin-bottom: 16px;">Устройства на выдачу клиенту на время ремонта.</div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+          <sc-for list="{{ loaners }}" as="l" hint-placeholder-count="4">
+            <div style="background: #100D0B; border: 1px solid #2E2822; border-radius: 12px; padding: 14px; display: flex; align-items: center; gap: 12px;"><span style="font-size: 22px;">📱</span><div style="flex: 1;"><div style="font-size: 14px; color: #fff;">{{ l.name }}</div><div style="font-size: 11px; color: #8A7F76;">{{ l.imei }}</div></div><span style="background: {{ l.bg }}; color: {{ l.fg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ l.status }}</span></div>
+          </sc-for>
+        </div>
+        <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Выдача под расписку/залог, привязка к кейсу ремонта. Возврат при выдаче отремонтированного.</div>
+      </div>
+    </sc-if>
+
+    <!-- PRICE LIST -->
+    <sc-if value="{{ isPrice }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid #2E2822; font-size: 11px; color: #8A7F76;"><span>Услуга</span><span>Срок</span><span>Цена от</span></div>
+        <sc-for list="{{ prices }}" as="p" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid #1A1611; align-items: center;"><span style="font-size: 13px; color: #fff;">{{ p.name }}</span><span style="font-size: 12px; color: #A79C92;">{{ p.time }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: #C6FF3D;">{{ p.price }}</span></div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Прайс на платный ремонт (в т.ч. не нашего товара). Клиент видит стоимость до начала работ.</div>
+    </sc-if>
+
+    <!-- PAID REPAIR -->
+    <sc-if value="{{ isPaid }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width: 560px; background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 22px;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 16px; color: #fff; margin-bottom: 4px;">Платный ремонт (не наш товар)</div>
+        <div style="font-size: 13px; color: #8A7F76; margin-bottom: 18px;">Приём стороннего устройства на диагностику и ремонт как услуга.</div>
+        <div style="background: #100D0B; border: 1px solid #2E2822; border-radius: 12px; padding: 16px; margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; border-bottom: 1px solid #1A1611;"><span style="color: #A79C92;">Устройство</span><span style="color: #fff;">Xiaomi 13 (клиента)</span></div>
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; border-bottom: 1px solid #1A1611;"><span style="color: #A79C92;">Проблема</span><span style="color: #fff;">Замена экрана</span></div>
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; border-bottom: 1px solid #1A1611;"><span style="color: #A79C92;">Диагностика</span><span style="color: #fff;">500 сом (в счёт ремонта)</span></div>
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0;"><span style="color: #A79C92;">Смета ремонта</span><span style="font-family: 'JetBrains Mono'; color: #C6FF3D;">6 500 сом</span></div>
+        </div>
+        <div onClick="{{ approve }}" style="background: {{ approvedBg }}; color: #14110E; border-radius: 11px; padding: 13px; text-align: center; font-weight: 700; font-size: 14px; cursor: pointer;">{{ approveLabel }}</div>
+        <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Клиент подтверждает смету → работа. Оплата на POS как услуга, гарантия на ремонт 30 дней.</div>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tab: "queue", approved: false };
+  renderVals() {
+    const t = this.state.tab;
+    const tabDef = [["queue","Очередь и SLA"],["loaner","Подменный фонд"],["price","Прайс ремонтов"],["paid","Платный ремонт"]];
+    const tabs = tabDef.map(x => ({ label: x[1], pick: () => this.setState({ tab: x[0] }),
+      bg: t === x[0] ? "#FF5B2E" : "#16130F", fg: t === x[0] ? "#fff" : "#A79C92", border: t === x[0] ? "#FF5B2E" : "#2E2822" }));
+    const sla = (s,bad,over) => ({ sla:s, slaBg: over?"rgba(255,138,122,0.15)":bad?"rgba(229,178,60,0.15)":"rgba(198,255,61,0.12)", slaFg: over?"#FF8A7A":bad?"#E5B23C":"#C6FF3D" });
+    const mk = (no,device,stage,s,bad,over,master) => ({ no,device,stage,master, ...sla(s,bad,over), rowBg: over?"rgba(90,42,34,0.15)":"transparent" });
+    const queue = [
+      mk("WC-0081","iPhone 13 (гарантия)","Ждёт поставщика","−6 ч",true,true,"Али"),
+      mk("WC-0084","MacBook Air (гарантия)","Диагностика","18 ч",false,false,"Али"),
+      mk("WC-0086","Xiaomi 13 (платный)","Ремонт","32 ч",false,false,"Тахсир"),
+      mk("WC-0088","AirPods Pro (гарантия)","Приёмка","44 ч",false,false,"—"),
+      mk("WC-0079","Galaxy S23 (платный)","Готов к выдаче","✓",false,false,"Тахсир")
+    ];
+    const loaner = (name,imei,st,avail) => ({ name,imei,status:st, bg: avail?"rgba(198,255,61,0.12)":"rgba(229,178,60,0.15)", fg: avail?"#C6FF3D":"#E5B23C" });
+    const loaners = [
+      loaner("iPhone 11","35••021","Свободен",true),
+      loaner("Redmi Note 12","89••334","Выдан (WC-0081)",false),
+      loaner("iPhone SE","35••776","Свободен",true),
+      loaner("Galaxy A54","35••902","Выдан (WC-0084)",false)
+    ];
+    const prices = [
+      { name:"Замена экрана iPhone 13", time:"1–2 дня", price:"7 500" },
+      { name:"Замена АКБ iPhone", time:"1 день", price:"3 500" },
+      { name:"Замена экрана Samsung", time:"2–3 дня", price:"6 500" },
+      { name:"Чистка от воды", time:"2 дня", price:"2 000" },
+      { name:"Диагностика", time:"1 час", price:"500" }
+    ];
+    return { tabs, isQueue:t==="queue", isLoaner:t==="loaner", isPrice:t==="price", isPaid:t==="paid",
+      queue, loaners, prices,
+      approveLabel: this.state.approved?"✓ Смета подтверждена, в работу":"Подтвердить смету и начать ремонт",
+      approvedBg: this.state.approved?"#7FD3A0":"#C6FF3D",
+      approve:()=>this.setState({approved:true}) };
+  }
+}
+</script>
+</body>
+</html>

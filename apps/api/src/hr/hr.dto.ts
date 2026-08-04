@@ -1,0 +1,63 @@
+import { HrAbsenceStatus, HrAbsenceType } from '@prisma/client';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEnum, IsISO8601, IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+
+export class HrPayrollQueryDto {
+  @ApiProperty({ example: '2026-07' })
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/) period!: string;
+
+  @ApiProperty({ example: 'BISHKEK-1' })
+  @IsString() @MaxLength(120) point!: string;
+}
+
+export class PayHrPayrollDto {
+  @ApiProperty({ example: 'BANK-2026-07-001' })
+  @IsString() @MaxLength(160) externalRef!: string;
+  @ApiPropertyOptional({ enum: ['1000', '1010', '1020'], default: '1010' })
+  @IsOptional() @IsIn(['1000', '1010', '1020']) fundingAccountCode?: '1000' | '1010' | '1020';
+}
+
+export class HrWeekQueryDto {
+  @ApiProperty({ example: '2026-07-13' })
+  @IsISO8601({ strict: true }) weekStart!: string;
+
+  @ApiPropertyOptional({ example: 'Bishkek / ЦУМ' })
+  @IsOptional() @IsString() @MaxLength(120) point?: string;
+}
+
+export class CreateHrScheduleDto {
+  @ApiProperty() @IsString() staffId!: string;
+  @ApiProperty() @IsString() @MaxLength(120) point!: string;
+  @ApiProperty({ example: '2026-07-15' }) @IsISO8601({ strict: true }) shiftDate!: string;
+  @ApiProperty({ example: '2026-07-15T03:00:00.000Z' }) @IsISO8601() startsAt!: string;
+  @ApiProperty({ example: '2026-07-15T15:00:00.000Z' }) @IsISO8601() endsAt!: string;
+}
+
+export class UpdateHrScheduleDto {
+  @ApiProperty() @IsString() @MaxLength(120) point!: string;
+  @ApiProperty({ example: '2026-07-15' }) @IsISO8601({ strict: true }) shiftDate!: string;
+  @ApiProperty({ example: '2026-07-15T03:00:00.000Z' }) @IsISO8601() startsAt!: string;
+  @ApiProperty({ example: '2026-07-15T15:00:00.000Z' }) @IsISO8601() endsAt!: string;
+}
+
+export class CancelHrScheduleDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) reason?: string;
+}
+
+export class OpenHrAttendanceDto {
+  @ApiProperty() @IsString() scheduleId!: string;
+}
+
+export class RequestHrAbsenceDto {
+  @ApiProperty({ enum: HrAbsenceType }) @IsEnum(HrAbsenceType) type!: HrAbsenceType;
+  @ApiProperty({ example: '2026-07-20' }) @IsISO8601({ strict: true }) startsOn!: string;
+  @ApiProperty({ example: '2026-07-24' }) @IsISO8601({ strict: true }) endsOn!: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) reason?: string;
+}
+
+export class DecideHrAbsenceDto {
+  @ApiProperty({ enum: [HrAbsenceStatus.approved, HrAbsenceStatus.rejected] })
+  @IsEnum(HrAbsenceStatus) status!: HrAbsenceStatus;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) note?: string;
+}

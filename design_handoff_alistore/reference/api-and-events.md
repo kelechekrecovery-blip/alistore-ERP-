@@ -4,7 +4,7 @@
 
 ## Общие правила
 - **Auth:** JWT + роль; опасные действия требуют 2FA. Права проверяются НА СЕРВЕРЕ по Role Permission Matrix.
-- **Идемпотентность:** заголовок `Idempotency-Key` на POST заказов/платежей; webhook-платежи дедуп по `txnId`.
+- **Идемпотентность:** постоянный заголовок `Idempotency-Key` обязателен на POST, меняющих деньги, склад или статус; offline replay повторяет исходные body и key. Webhook-платежи дедуп по `txnId`.
 - **Approval-gated** действия возвращают `202 { approvalId }` вместо выполнения, если превышен порог (Approval Rules Matrix). Выполняются после `approval.approved`.
 - **Ошибки:** `409` конфликт (двойная продажа IMEI, оплата без резерва), `403` нет прав, `422` валидация, `402` оплата не прошла.
 
@@ -22,6 +22,10 @@ POST  /webhooks/payment               dedup by txnId
 # Смены
 POST  /shifts/open                    { staffId, point, openCash }
 POST  /shifts/:id/close               { closeCash, evidence }  diff≠0 → approval+Risk
+# HR / payroll
+GET   /hr/payroll/preview             period+point; расчёт из schedule/attendance/payment
+POST  /hr/payroll/runs                Idempotency-Key; неизменяемый снимок периода
+POST  /hr/payroll/runs/:id/pay        Idempotency-Key; { externalRef }
 # Склад / IMEI
 GET   /units/:imei
 POST  /units                          приёмка (partию)
@@ -37,7 +41,7 @@ PATCH /warranty/:id                   переход статуса
 POST  /tickets ; PATCH /tickets/:id   Support Inbox
 # Курьер
 GET   /courier/runs/:id
-POST  /courier/handover               сверка COD, расхождение → Risk
+POST  /courier/handover               Idempotency-Key; сверка COD, расхождение → Risk
 POST  /deliveries/:id/fail            { reason, evidence }  Failed Delivery
 # Approvals
 POST  /approvals ; PATCH /approvals/:id/decide   { status, reason }
@@ -57,6 +61,7 @@ stock.received / stock.reserved / stock.moved / stock.adjusted / stock.written_o
 inventory.counted
 unit.received / unit.sold / unit.returned / unit.written_off
 shift.opened / shift.closed / cash.handover / cash.shortage
+hr.payroll_posted / hr.payroll_paid
 delivery.assigned / delivery.out / delivery.delivered / delivery.failed
 return.requested / return.completed / refund.requested
 warranty.created / warranty.closed

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #0B0A08; }
+a { color: #FF7A4D; text-decoration: none; } a:hover { color: #FF9A6E; }
+::selection { background: #FF5B2E; color: #fff; }
+@keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(24px,-20px) scale(1.1);}}
+@keyframes pulseDot{0%,100%{opacity:1;}50%{opacity:0.3;}}
+@keyframes sweep{0%{transform:translateX(-100%);}100%{transform:translateX(400%);}}
+</style>
+</helmet>
+
+<div style="position: relative; overflow: hidden; min-height: 100vh; background: radial-gradient(circle at 82% 6%, rgba(255,91,46,0.16), transparent 42%), radial-gradient(circle at 12% 92%, rgba(78,209,122,0.1), transparent 44%), radial-gradient(circle at 16% 4%, #2B221B 0%, #14100C 46%, #0B0A08 100%); font-family: 'Golos Text', sans-serif; color: #E5DCD3; padding: 30px 34px 56px;">
+  <div style="position: absolute; inset: 0; z-index: 0; overflow: hidden;">
+    <div style="position: absolute; top: -150px; left: -110px; width: 460px; height: 460px; border-radius: 50%; background: radial-gradient(circle, rgba(255,91,46,0.38), transparent 68%); filter: blur(26px); animation: floatBlob 16s ease-in-out infinite;"></div>
+    <div style="position: absolute; bottom: -180px; right: -90px; width: 520px; height: 520px; border-radius: 50%; background: radial-gradient(circle, rgba(78,209,122,0.22), transparent 68%); filter: blur(30px); animation: floatBlob 20s ease-in-out infinite reverse;"></div>
+  </div>
+
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.14); color: #fff; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <div style="position: relative; z-index: 1; max-width: 1200px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 13px; margin-bottom: 18px;">
+      <div style="width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 21px; box-shadow: 0 6px 18px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4);">A</div>
+      <div style="flex: 1;"><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff; line-height: 1;">Пульт целостности экосистемы</div><div style="font-size: 13px; color: #8A7F76; margin-top: 5px;">Живые инварианты: деньги = банк = склад = статус. Любое расхождение подсвечивается сразу.</div></div>
+      <div onClick="{{ toggleBreak }}" style="padding: 10px 16px; border-radius: 11px; background: {{ breakBg }}; border: 1px solid {{ breakBd }}; font-size: 12.5px; color: {{ breakFg }}; cursor: pointer;">{{ breakLabel }}</div>
+    </div>
+
+    <!-- health score -->
+    <div style="display: grid; grid-template-columns: 1.1fr 2fr; gap: 14px; margin-bottom: 16px;">
+      <div style="padding: 20px; border-radius: 18px; background: linear-gradient(160deg, {{ scoreGlow }}, rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid {{ scoreBd }}; box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16); display: flex; align-items: center; gap: 18px;">
+        <div style="position: relative; width: 76px; height: 76px; border-radius: 50%; background: conic-gradient({{ scoreColor }} {{ scoreDeg }}, rgba(255,255,255,0.09) 0); display: flex; align-items: center; justify-content: center;"><div style="width: 60px; height: 60px; border-radius: 50%; background: #14100C; display: flex; align-items: center; justify-content: center; font-family: 'Sora'; font-weight: 800; font-size: 20px; color: {{ scoreColor }};">{{ scorePct }}</div></div>
+        <div><div style="font-family: 'Sora'; font-weight: 700; font-size: 16px; color: #fff;">{{ scoreTitle }}</div><div style="font-size: 12px; color: #8A7F76; margin-top: 3px;">{{ okCount }} из {{ total }} инвариантов сходятся</div><div style="display: flex; align-items: center; gap: 6px; margin-top: 8px;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #4ED17A; box-shadow: 0 0 8px #4ED17A; animation: pulseDot 2s infinite;"></span><span style="font-size: 11px; color: #8A7F76;">проверка каждые 30 сек</span></div></div>
+      </div>
+      <div style="padding: 16px 20px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px); border: 1px solid rgba(255,255,255,0.1); position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; bottom: 0; width: 60px; background: linear-gradient(90deg, transparent, rgba(78,209,122,0.12), transparent); animation: sweep 3s linear infinite;"></div>
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 13px; color: #fff; margin-bottom: 12px;">Сводка по доменам</div>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px;">
+          <sc-for list="{{ domains }}" as="d" hint-placeholder-count="4">
+            <div style="padding: 11px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid {{ d.bd }};"><div style="display: flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{ d.dot }};"></span><span style="font-size: 11.5px; color: #D8CFC6;">{{ d.name }}</span></div><div style="font-family: 'JetBrains Mono'; font-size: 15px; color: {{ d.color }}; margin-top: 5px;">{{ d.val }}</div></div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <!-- invariants list -->
+    <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+      <div style="display: flex; align-items: center; margin-bottom: 12px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Инварианты системы</span><span style="margin-left: auto; font-size: 11px; color: #8A7F76;">каждый — правило, которое не должно нарушаться</span></div>
+      <sc-for list="{{ checks }}" as="c" hint-placeholder-count="8">
+        <div style="display: flex; align-items: center; gap: 13px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+          <div style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 8px; background: {{ c.iconBg }}; border: 1px solid {{ c.iconBd }}; display: flex; align-items: center; justify-content: center; font-size: 13px; color: {{ c.iconFg }};">{{ c.mark }}</div>
+          <div style="flex: 1;"><div style="font-size: 13.5px; color: #fff; font-weight: 600;">{{ c.rule }}</div><div style="font-size: 11.5px; color: #8A7F76; margin-top: 2px;">{{ c.detail }}</div></div>
+          <div style="text-align: right;"><div style="font-family: 'JetBrains Mono'; font-size: 12.5px; color: {{ c.valColor }};">{{ c.val }}</div><sc-if value="{{ c.hasFix }}" hint-placeholder-val="{{ false }}"><a href="{{ c.href }}" style="text-decoration: none;"><div style="font-size: 11px; color: #FF9A6E; margin-top: 3px; cursor: pointer;">{{ c.fixLabel }}</div></a></sc-if></div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 11px; margin-top: 14px; padding: 13px 16px; border-radius: 13px; background: {{ footBg }}; border: 1px solid {{ footBd }};">
+      <span style="font-size: 18px;">{{ footIcon }}</span>
+      <span style="font-size: 13px; color: {{ footFg }}; line-height: 1.4;">{{ footText }}</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1240,&quot;height&quot;:760}}">
+class Component extends DCLogic {
+  state = { broken: false, fixed: {} };
+  renderVals(){
+    const s=this.state;
+    // invariant definitions. When broken=true, two of them drift until fixed.
+    const def=[
+      {key:"pay_bank", rule:"Σ Payment Ledger = Σ выписка банка", detail:"каждый сом системы подтверждён банком", okVal:"312 610 = 312 610", badVal:"312 610 ≠ 312 320", canBreak:true, href:"AliStore Банковская сверка.dc.html", fixLabel:"Открыть сверку →"},
+      {key:"paid_stock", rule:"Каждый оплаченный заказ → движение склада", detail:"нет оплаты без резерва/выдачи", okVal:"47 / 47", badVal:"46 / 47 · 1 висит", canBreak:true, href:"AliStore Order Timeline.dc.html", fixLabel:"Открыть заказ →"},
+      {key:"imei_once", rule:"Ни один IMEI не продан дважды", detail:"серийник уникален в продажах", okVal:"0 дублей", badVal:null, canBreak:false},
+      {key:"reserve_orders", rule:"Резерв склада = открытые заказы", detail:"брони не висят без заказа", okVal:"12 = 12", badVal:null, canBreak:false},
+      {key:"cash_shift", rule:"Наличные в кассе = открытая смена", detail:"инкассация и ордера сходятся", okVal:"437 000 ✓", badVal:null, canBreak:false},
+      {key:"refund_symmetry", rule:"Возврат = сторно денег + склада", detail:"откат всегда симметричен", okVal:"6 / 6 симметр.", badVal:null, canBreak:false},
+      {key:"margin", rule:"Выручка − себестоимость = маржа в P&L", detail:"цифры отчёта выводимы из Ledger", okVal:"сходится", badVal:null, canBreak:false},
+      {key:"debt", rule:"Рассрочка: остаток = график платежей", detail:"долг клиента = сумма будущих платежей", okVal:"1.8 млн ✓", badVal:null, canBreak:false}
+    ];
+    const checks=def.map(d=>{
+      const broken = s.broken && d.canBreak && !s.fixed[d.key] && d.badVal;
+      return {
+        rule:d.rule, detail:d.detail,
+        mark: broken?"!":"✓",
+        iconBg: broken?"rgba(255,138,122,0.15)":"rgba(78,209,122,0.14)",
+        iconBd: broken?"rgba(255,138,122,0.35)":"rgba(78,209,122,0.3)",
+        iconFg: broken?"#FF8A7A":"#7EE6A0",
+        val: broken?d.badVal:d.okVal,
+        valColor: broken?"#FF8A7A":"#7EE6A0",
+        hasFix: broken,
+        fixLabel: d.fixLabel||"Разобрать →",
+        href: d.href||"#",
+        fix: ()=>this.setState({fixed:{...s.fixed,[d.key]:true}})
+      };
+    });
+    const okCount=checks.filter(c=>c.mark==="✓").length;
+    const total=checks.length;
+    const allOk=okCount===total;
+    const scorePct=Math.round(okCount/total*100)+"%";
+    const scoreDeg=Math.round(okCount/total*360)+"deg";
+    const scoreColor=allOk?"#4ED17A":"#FF8A7A";
+
+    const domainDot=allOk?"#4ED17A":"#E5B23C";
+    const domains=[
+      {name:"Деньги",val:"312 610",dot: s.broken&&!s.fixed.pay_bank?"#FF8A7A":"#4ED17A",color:"#fff",bd:"rgba(255,255,255,0.08)"},
+      {name:"Склад",val:"1 247",dot: s.broken&&!s.fixed.paid_stock?"#FF8A7A":"#4ED17A",color:"#fff",bd:"rgba(255,255,255,0.08)"},
+      {name:"Заказы",val:"47",dot:"#4ED17A",color:"#fff",bd:"rgba(255,255,255,0.08)"},
+      {name:"Смены",val:"3/3",dot:"#4ED17A",color:"#fff",bd:"rgba(255,255,255,0.08)"}
+    ];
+
+    return {
+      checks, okCount, total,
+      scorePct, scoreDeg, scoreColor,
+      scoreGlow: allOk?"rgba(78,209,122,0.1)":"rgba(255,138,122,0.1)",
+      scoreBd: allOk?"rgba(78,209,122,0.28)":"rgba(255,138,122,0.28)",
+      scoreTitle: allOk?"Экосистема сходится":"Есть расхождения",
+      domains,
+      toggleBreak: ()=>this.setState({broken:!s.broken, fixed:{}}),
+      breakLabel: s.broken?"⟲ Вернуть норму":"⚡ Симулировать сбой",
+      breakBg: s.broken?"rgba(255,138,122,0.12)":"rgba(255,255,255,0.06)",
+      breakBd: s.broken?"rgba(255,138,122,0.3)":"rgba(255,255,255,0.12)",
+      breakFg: s.broken?"#FF9A8A":"#B8AEA4",
+      footIcon: allOk?"🔗":"⚠️",
+      footBg: allOk?"rgba(78,209,122,0.09)":"rgba(255,138,122,0.1)",
+      footBd: allOk?"rgba(78,209,122,0.24)":"rgba(255,138,122,0.28)",
+      footFg: allOk?"#7EE6A0":"#FF9A8A",
+      footText: allOk?"Все инварианты выполняются — деньги, склад, заказы и отчёты выводятся из одного Event Ledger и совпадают.":"Расхождение обнаружено автоматически. Пока не сведено — период нельзя закрыть, отчёты помечены как неточные. Нажмите «Разобрать»."
+    };
+  }
+}
+</script>
+</body>
+</html>

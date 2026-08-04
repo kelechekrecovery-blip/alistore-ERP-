@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "designRetirements": [],
+  "gates": {
+    "visual": {
+      "status": "accepted",
+      "packageScript": "visual:e2e",
+      "command": "npm run visual:e2e",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/visual-5cfd8966584be57d1d0fd9b1e957d89af217378f6744ffa5bcc5a93f902b2da8.json",
+          "sha256": "5cfd8966584be57d1d0fd9b1e957d89af217378f6744ffa5bcc5a93f902b2da8"
+        }
+      ]
+    },
+    "ios-app-ui": {
+      "status": "accepted",
+      "packageScript": "ios:ui",
+      "command": "npm run ios:ui",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/ios-app-ui-168f8f53a85fb26c4a3881867412bafc15a5d9f3265cfdd760ae243faddb3e6f.json",
+          "sha256": "168f8f53a85fb26c4a3881867412bafc15a5d9f3265cfdd760ae243faddb3e6f"
+        }
+      ]
+    },
+    "ios-client-visual": {
+      "status": "accepted",
+      "packageScript": "ios:visual",
+      "command": "npm run ios:visual",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/ios-client-visual-9feb5194dbcfef85dba5592aa649575418d051d176f40533d013f8cbdd69408a.json",
+          "sha256": "9feb5194dbcfef85dba5592aa649575418d051d176f40533d013f8cbdd69408a"
+        }
+      ]
+    },
+    "android-app-ui": {
+      "status": "accepted",
+      "packageScript": "android:ui",
+      "command": "npm run android:ui",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/android-app-ui-d58bd126107509fdade139130ef41509d0a86c0bddbcf26c8ed928c68d809b7d.json",
+          "sha256": "d58bd126107509fdade139130ef41509d0a86c0bddbcf26c8ed928c68d809b7d"
+        }
+      ]
+    },
+    "pos-refund-reconciliation": {
+      "status": "accepted",
+      "packageScript": "ecosystem:pos-refund:e2e",
+      "command": "npm run ecosystem:pos-refund:e2e",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/pos-refund-reconciliation-b587dccbfc327edab537044ef36a77e9faa0a48f383a1147ab3504f76671a708.json",
+          "sha256": "b587dccbfc327edab537044ef36a77e9faa0a48f383a1147ab3504f76671a708"
+        }
+      ]
+    },
+    "courier-cod-reconciliation": {
+      "status": "accepted",
+      "packageScript": "ecosystem:courier-cod:e2e",
+      "command": "npm run ecosystem:courier-cod:e2e",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/courier-cod-reconciliation-6cab11a2ba7a7f7352fdbc91e631ca167c25d33a1b467df502e9d8bc487fb0cd.json",
+          "sha256": "6cab11a2ba7a7f7352fdbc91e631ca167c25d33a1b467df502e9d8bc487fb0cd"
+        }
+      ]
+    },
+    "service-loaner-reconciliation": {
+      "status": "accepted",
+      "packageScript": "ecosystem:service-loaner:e2e",
+      "command": "npm run ecosystem:service-loaner:e2e",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/service-loaner-reconciliation-0d3b00dbaef53a031b158d56ae25f43753cc5a8a51948c83c5ef75b9a5d4f425.json",
+          "sha256": "0d3b00dbaef53a031b158d56ae25f43753cc5a8a51948c83c5ef75b9a5d4f425"
+        }
+      ]
+    },
+    "procurement-sale-reconciliation": {
+      "status": "accepted",
+      "packageScript": "ecosystem:procurement-sale:e2e",
+      "command": "npm run ecosystem:procurement-sale:e2e",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/procurement-sale-reconciliation-015d73056a2991b50d516872b881ad76cd3229dd681662061ddf645ac9e97dd4.json",
+          "sha256": "015d73056a2991b50d516872b881ad76cd3229dd681662061ddf645ac9e97dd4"
+        }
+      ]
+    },
+    "reconciled-e2e": {
+      "status": "accepted",
+      "packageScript": "ecosystem:e2e",
+      "command": "npm run ecosystem:e2e",
+      "artifacts": [
+        {
+          "kind": "result",
+          "path": "docs/acceptance/artifacts/reconciled-e2e-aa35aa0df70d29e91e18f7d1048cf7b3bd4faf0d54a52b25fd83de813e2b4c8e.json",
+          "sha256": "aa35aa0df70d29e91e18f7d1048cf7b3bd4faf0d54a52b25fd83de813e2b4c8e"
+        }
+      ]
+    }
+  }
+}

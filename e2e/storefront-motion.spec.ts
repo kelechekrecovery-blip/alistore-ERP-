@@ -1,0 +1,207 @@
+import { expect, test, type Page } from '@playwright/test';
+import { sign } from 'jsonwebtoken';
+import { prisma, resetDb, seedProduct } from './helpers';
+
+async function gotoCommitted(page: Page, route: string) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await page.goto(route, { waitUntil: 'commit', timeout: 45_000 });
+      return;
+    } catch (error) {
+      const message = String(error);
+      if (!message.includes('ERR_ABORTED') || attempt === 1) throw error;
+      await page.waitForTimeout(250);
+    }
+  }
+}
+
+test('desktop storefront matches the AliStore shop prototype', async ({ page }) => {
+  await resetDb();
+  await seedProduct('MOTION-E2E');
+
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Техника с гарантией. Новое и Б/У.' })).toBeVisible();
+  await expect(page.getByRole('banner').getByRole('link', { name: 'Каталог', exact: true })).toBeVisible();
+  await expect(page.getByPlaceholder('Поиск техники…')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Обменяйте старый смартфон' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Популярное' })).toBeVisible();
+  await expect(page.getByText('4.9', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('0 · 0 · 12', { exact: true })).toHaveCount(0);
+  await expect(page.locator('article')).toHaveCount(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
+
+  await page.goto('/app');
+  await expect(page.getByText('Техника с гарантией. Новое и Б/У.', { exact: true }).first()).toBeVisible();
+});
+
+test('desktop storefront remains active in a narrow desktop browser window', async ({ page }) => {
+  await resetDb();
+  await seedProduct('DESKTOP-E2E');
+  await page.setViewportSize({ width: 863, height: 954 });
+
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Техника с гарантией. Новое и Б/У.' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Категории товаров' })).toBeVisible();
+  await expect(page.getByText('Доставка 1–2 ч', { exact: true })).toHaveCount(0);
+  const desktopTheme = await page.evaluate(() => {
+    const desktop = document.querySelector('.md\\:block');
+    const heading = document.querySelector('h1');
+    return {
+      background: desktop ? getComputedStyle(desktop).backgroundColor : '',
+      heading: heading ? getComputedStyle(heading).color : '',
+    };
+  });
+  expect(desktopTheme).toEqual({ background: 'rgb(11, 10, 8)', heading: 'rgb(255, 255, 255)' });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(863);
+
+  await page.goto('/catalog');
+  await expect(page.getByRole('heading', { name: 'Каталог техники' })).toBeVisible();
+  await expect(page.getByPlaceholder('Поиск по названию, SKU и категории')).toBeVisible();
+});
+
+test('native-style Client App keeps the dark handoff theme on phone viewports', async ({ page }) => {
+  await page.setViewportSize({ width: 402, height: 858 });
+  await page.goto('/');
+
+  await expect(page.getByText('Доставка 1–2 ч', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.md\\:hidden').getByText('Техника с гарантией. Новое и Б/У.', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(402);
+});
+
+test('storefront information links, catalog pagination and stock caps use server truth', async ({ page }) => {
+  await resetDb();
+  await prisma.product.createMany({ data: Array.from({ length: 105 }, (_, index) => ({ sku: `MER-${index.toString().padStart(3, '0')}`, name: `MER product ${index.toString().padStart(3, '0')}`, price: 1000 + index, cost: 500, category: 'paging', attrs: {} })) });
+  const stocked = await seedProduct('STOCK-CAP', 25900);
+
+  for (const route of ['/about', '/delivery']) {
+    await page.goto(route);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'AliStore Центр' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
+  }
+
+  await page.goto('/catalog?category=paging');
+  await expect(page.getByText('105 товаров')).toBeVisible();
+  await page.getByRole('button', { name: 'Дальше' }).click();
+  await expect(page.getByText('MER product 024', { exact: true })).toBeVisible();
+
+  await page.goto(`/product/${stocked.product.id}`);
+  await page.getByRole('button', { name: 'В корзину' }).click();
+  await page.goto('/cart');
+  const desktopCart = page.locator('.md\\:block');
+  await expect(desktopCart.getByRole('button', { name: 'Увеличить' })).toBeDisabled();
+});
+
+test('desktop catalog, product and cart keep the exact shop visual system', async ({ page }) => {
+  await resetDb();
+  const { product } = await seedProduct('INNER-SHOP-E2E', 124990);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  await page.goto('/catalog');
+  await expect(page.getByRole('heading', { name: 'Каталог техники' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'В корзину' })).toBeVisible();
+  const catalogTheme = await page.evaluate(() => {
+    const desktop = document.querySelector('.md\\:block');
+    const card = document.querySelector('article');
+    return {
+      background: desktop ? getComputedStyle(desktop).backgroundColor : '',
+      card: card ? getComputedStyle(card).backgroundColor : '',
+      border: card ? getComputedStyle(card).borderTopColor : '',
+    };
+  });
+  expect(catalogTheme).toEqual({
+    background: 'rgb(11, 10, 8)',
+    card: 'rgba(0, 0, 0, 0)',
+    border: 'rgba(255, 255, 255, 0.1)',
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+
+  await page.goto(`/product/${product.id}`);
+  await expect(page.getByRole('heading', { name: product.name })).toBeVisible();
+  await page.getByRole('button', { name: 'В корзину' }).click();
+  await page.goto('/cart');
+  await expect(page.locator('.md\\:block').getByRole('link', { name: product.name, exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Перейти к оформлению' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+});
+
+test('remaining desktop customer routes use the shop system through account entry', async ({ page }) => {
+  // This journey intentionally cold-compiles every remaining customer route.
+  // On a single-worker full run that can exceed two minutes before the final
+  // mobile assertion even starts, while each individual navigation remains
+  // healthy and bounded by its own expectation timeout.
+  test.setTimeout(240_000);
+  await resetDb();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  await page.goto('/search?q=iphone');
+  await expect(page).toHaveURL(/\/catalog\?q=iphone$/);
+
+  await page.goto('/favorites');
+  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
+  await page.goto('/compare');
+  expect(await page.locator('main').locator('..').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
+  await page.goto('/login?next=/account');
+  await expect(page.locator('.login-shell')).toHaveCount(1);
+  expect(await page.locator('.login-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+
+  const customer = await prisma.customer.create({ data: { phone: '+996700990021', name: 'Visual Route Customer' } });
+  const { product, unit } = await seedProduct('ACCOUNT-DETAIL-E2E', 124_990, 100_000);
+  const order = await prisma.order.create({
+    data: {
+      customerId: customer.id,
+      status: 'paid',
+      channel: 'web',
+      fulfillmentType: 'pickup',
+      pickupPoint: 'AliStore Манас',
+      pickupCode: '7391',
+      total: product.price,
+      items: { create: { sku: product.sku, qty: 1, price: product.price, imei: unit.imei } },
+      payments: { create: { amount: product.price, method: 'card', status: 'received', txnId: `visual-${Date.now()}` } },
+    },
+  });
+  await prisma.deviceUnit.update({ where: { id: unit.id }, data: { status: 'sold', orderId: order.id } });
+  const accessToken = sign(
+    { sub: customer.id, phone: customer.phone, typ: 'customer' },
+    'dev-secret-alistore-local',
+    { expiresIn: '1h' },
+  );
+  await page.evaluate((tokens) => {
+    localStorage.setItem('alistore.auth.v1', JSON.stringify(tokens));
+  }, { accessToken, refreshToken: 'visual-route-test' });
+  await page.goto('/account');
+  await expect(page.getByRole('heading', { name: 'Личный кабинет' })).toBeVisible();
+  expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
+
+  for (const route of ['/account/addresses', '/account/bonuses', '/account/settings', '/support', '/trade-in']) {
+    await page.goto(route);
+    await expect(page.locator('.customer-service-title')).toBeVisible();
+    expect(await page.locator('.customer-service-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+  }
+
+  const detailRoutes = [
+    { route: '/account/devices', text: product.name },
+    { route: `/account/orders/${order.id}`, text: `Заказ #${order.id.slice(-8)}` },
+    { route: `/account/orders/${order.id}/status`, text: `Заказ #${order.id.slice(-8)}` },
+    { route: `/account/warranty/${encodeURIComponent(unit.imei)}`, text: 'Гарантийный талон' },
+  ];
+  for (const { route, text } of detailRoutes) {
+    // The dev server can keep the load event open while compiling the next
+    // account detail route after several client navigations. The route has
+    // already committed at this point; assertions below wait for its actual
+    // authenticated content and catch a real hydration/API regression.
+    await gotoCommitted(page, route);
+    await expect(page.getByText(text, { exact: false }).first()).toBeVisible();
+    expect(await page.locator('.account-detail-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+  }
+
+  await page.setViewportSize({ width: 402, height: 858 });
+  await gotoCommitted(page, '/account/devices');
+  await expect(page.getByText(product.name, { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.account-detail-header')).toBeHidden();
+  expect(await page.locator('.account-detail-shell').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(14, 12, 10)');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(402);
+});

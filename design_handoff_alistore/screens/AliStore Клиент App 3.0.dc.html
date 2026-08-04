@@ -1,0 +1,1466 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #DED9D0; }
+  ::selection { background: #FF5B2E; color: #181410; }
+  .scr::-webkit-scrollbar { width: 0; }
+  @keyframes phoneIn { from { opacity: 0; transform: translateY(24px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes storyBar { from { width: 0; } to { width: 100%; } }
+  @keyframes faceScan { 0%{top:14px;} 50%{top:143px;} 100%{top:14px;} }
+  @keyframes courierMove { 0%{left:24%;} 100%{left:64%;} }
+  @keyframes routeDraw { 0%{width:0;} 100%{width:40%;} }
+  @keyframes pulseRing { 0%{transform:scale(.8);opacity:.7;} 70%{transform:scale(2.4);opacity:0;} 100%{opacity:0;} }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 24px; font-family: 'Manrope', sans-serif; gap: 24px; flex-wrap: wrap;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #181410; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <!-- ===== PHONE ===== -->
+  <div style="width: 402px; height: 858px; background: #181410; border-radius: 46px; padding: 10px; box-shadow: 0 40px 90px rgba(0,0,0,0.35); flex-shrink: 0; position: sticky; top: 24px; animation: phoneIn .6s cubic-bezier(.2,.7,.3,1) both;">
+    <div style="width: 100%; height: 100%; background: #201B17; border-radius: 38px; overflow: hidden; position: relative; display: flex; flex-direction: column;">
+
+      <!-- status bar -->
+      <div style="height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; color: #fff; font-size: 13px; font-weight: 600; z-index: 5;">
+        <span>9:41</span>
+        <span style="font-family: 'JetBrains Mono';">AliStore</span>
+        <span>▪▪▪ 100%</span>
+      </div>
+
+      <!-- HEADER (browse screens only) -->
+      <sc-if value="{{ showSearchHeader }}" hint-placeholder-val="{{ true }}">
+        <div style="flex-shrink: 0; padding: 4px 16px 12px; background: #201B17;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+            <div onClick="{{ goCity }}" style="display: flex; align-items: center; gap: 4px; color: #A79C92; font-size: 12px; cursor: pointer;">📍 {{ city }} ▾</div>
+            <div style="margin-left: auto; display: flex; gap: 14px; align-items: center;">
+              <span onClick="{{ goCompare }}" style="position: relative; cursor: pointer; font-size: 17px;">⇄<sc-if value="{{ hasCompare }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:-6px;right:-8px;background:#FF5B2E;color:#181410;border-radius:999px;font-size:9px;font-weight:700;padding:1px 5px;">{{ compareCount }}</span></sc-if></span>
+              <span onClick="{{ goNotif }}" style="position: relative; cursor: pointer; font-size: 17px;">🔔<sc-if value="{{ hasNotif }}" hint-placeholder-val="{{ true }}"><span style="position:absolute;top:-4px;right:-4px;width:8px;height:8px;background:#FF5B2E;border-radius:50%;"></span></sc-if></span>
+            </div>
+          </div>
+          <div onClick="{{ goSearch }}" style="display: flex; align-items: center; gap: 10px; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 13px; padding: 11px 14px; cursor: text;">
+            <span style="color: #6E645C;">🔍</span><span style="color: #6E645C; font-size: 14px;">Поиск техники, брендов…</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- SCROLL AREA -->
+      <div class="scr" style="flex: 1; overflow-y: auto; background: radial-gradient(circle at 80% 0%, rgba(255,91,46,0.1), transparent 45%), radial-gradient(circle at 10% 100%, rgba(127,176,236,0.08), transparent 45%), #201B17; padding-bottom: {{ scrPad }};">
+
+        <!-- ============ LOGIN ============ -->
+        <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 40px 26px; min-height: 100%; display: flex; flex-direction: column; justify-content: center;">
+            <div style="width: 60px; height: 60px; border-radius: 17px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; font-family: 'Manrope'; font-weight: 800; font-size: 34px; color: #fff; margin-bottom: 24px;">A</div>
+            <div style="font-family: 'Manrope'; font-weight: 800; font-size: 30px; color: #fff; line-height: 1.1;">Вход в AliStore</div>
+            <div style="font-size: 14px; color: #A79C92; margin-top: 10px; line-height: 1.5;">Техника с гарантией и trade-in. Войдите по номеру — быстро и безопасно.</div>
+            <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 13px; padding: 14px; margin-top: 26px; color: #fff; font-size: 15px; font-family: 'JetBrains Mono';">+996 700 12 34 56</div>
+            <div onClick="{{ doLogin }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; margin-top: 12px; cursor: pointer;">Получить код по SMS</div>
+            <div onClick="{{ startFace }}" style="display: flex; align-items: center; justify-content: center; gap: 10px; background: rgba(127,176,236,0.14); border: 1px solid rgba(127,176,236,0.34); color: #BFE0FF; border-radius: 13px; padding: 14px; text-align: center; font-weight: 600; font-size: 14.5px; margin-top: 10px; cursor: pointer;"><span style="font-size: 19px;">☺</span>Войти по Face ID</div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 16px;"><div style="flex: 1; height: 1px; background: #2E2822;"></div><span style="font-size: 12px; color: #6E645C;">или</span><div style="flex: 1; height: 1px; background: #2E2822;"></div></div>
+            <div style="display: flex; gap: 10px; margin-top: 16px;">
+              <div onClick="{{ doLogin }}" style="flex: 1; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 13px; padding: 13px; text-align: center; color: #fff; font-size: 14px; cursor: pointer;"> Apple</div>
+              <div onClick="{{ doLogin }}" style="flex: 1; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 13px; padding: 13px; text-align: center; color: #fff; font-size: 14px; cursor: pointer;">✈ Telegram</div>
+            </div>
+            <div onClick="{{ doGuest }}" style="text-align: center; color: #A79C92; font-size: 13px; margin-top: 22px; cursor: pointer;">Продолжить как гость →</div>
+          </div>
+        </sc-if>
+
+        <!-- ============ FACE ID ============ -->
+        <sc-if value="{{ isFace }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 40px 26px; min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+            <div style="position: relative; width: 160px; height: 160px; display: flex; align-items: center; justify-content: center;">
+              <div style="position: absolute; inset: 0; border-radius: 40px; border: 2px solid {{ faceRingColor }}; box-shadow: 0 0 40px {{ faceGlow }};"></div>
+              <sc-if value="{{ faceScanning }}" hint-placeholder-val="{{ true }}">
+                <div style="position: absolute; left: 8px; right: 8px; height: 3px; background: linear-gradient(90deg, transparent, #7FB0EC, transparent); border-radius: 3px; box-shadow: 0 0 12px #7FB0EC; animation: faceScan 1.6s ease-in-out infinite;"></div>
+              </sc-if>
+              <span style="font-size: 78px; line-height: 1; filter: drop-shadow(0 0 14px {{ faceGlow }});">{{ faceIcon }}</span>
+            </div>
+            <div style="font-family: 'Manrope'; font-weight: 800; font-size: 22px; color: #fff; margin-top: 34px;">{{ faceTitle }}</div>
+            <div style="font-size: 14px; color: #A79C92; margin-top: 8px; line-height: 1.5; max-width: 240px;">{{ faceSub }}</div>
+            <div onClick="{{ back }}" style="color: #A79C92; font-size: 13px; margin-top: 30px; cursor: pointer;">Отмена</div>
+          </div>
+        </sc-if>
+
+        <!-- ============ OTP ============ -->
+        <sc-if value="{{ isOtp }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 40px 26px; min-height: 100%; display: flex; flex-direction: column;">
+            <div onClick="{{ back }}" style="color: #A79C92; font-size: 22px; cursor: pointer;">←</div>
+            <div style="font-family: 'Manrope'; font-weight: 800; font-size: 26px; color: #fff; margin-top: 20px; line-height: 1.15;">Введите код</div>
+            <div style="font-size: 14px; color: #A79C92; margin-top: 10px; line-height: 1.5;">Отправили SMS с кодом на<br><span style="color: #fff; font-family: 'JetBrains Mono';">+996 700 12 34 56</span></div>
+            <div style="display: flex; gap: 12px; margin-top: 28px;">
+              <sc-for list="{{ otpBoxes }}" as="b" hint-placeholder-count="4">
+                <div style="flex: 1; height: 62px; border: 2px solid {{ b.border }}; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-family: 'Manrope'; font-weight: 800; font-size: 26px; color: #fff; background: #2A231D;">{{ b.d }}</div>
+              </sc-for>
+            </div>
+            <div onClick="{{ resendOtp }}" style="text-align: center; font-size: 13px; color: {{ canResend ? '#FF5B2E' : '#6E645C' }}; margin-top: 20px; cursor: pointer;">{{ otpTimerLabel }}</div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 22px;">
+              <sc-for list="{{ otpKeys }}" as="k" hint-placeholder-count="12">
+                <div onClick="{{ k.press }}" style="height: 54px; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-family: 'Manrope'; font-weight: 700; font-size: 22px; color: #fff; cursor: pointer;">{{ k.k }}</div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ============ HOME ============ -->
+        <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+          <div style="padding: 4px 16px 20px;">
+            <!-- stories -->
+            <div style="display: flex; gap: 12px; overflow-x: auto; padding: 2px 0 14px;">
+              <sc-for list="{{ stories }}" as="st" hint-placeholder-count="5">
+                <div onClick="{{ st.open }}" style="flex-shrink: 0; text-align: center; cursor: pointer;">
+                  <div style="width: 62px; height: 62px; border-radius: 50%; padding: 2px; background: linear-gradient(135deg,#FF5B2E,#FF5B2E);"><div style="width: 100%; height: 100%; border-radius: 50%; background: #2A231D; display: flex; align-items: center; justify-content: center; font-size: 26px;">{{ st.icon }}</div></div>
+                  <div style="font-size: 10px; color: #A79C92; margin-top: 5px;">{{ st.label }}</div>
+                </div>
+              </sc-for>
+            </div>
+
+            <!-- delivery banner -->
+            <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+              <div style="flex: 1; background: linear-gradient(135deg,#FF5B2E,#E8410F); border-radius: 15px; padding: 14px;"><div style="font-size: 20px;">⚡</div><div style="color: #fff; font-weight: 700; font-size: 13px; margin-top: 6px;">Доставка 1–2 ч</div><div style="color: #FFE0D5; font-size: 11px;">по г. Манас</div></div>
+              <div style="flex: 1; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; padding: 14px;"><div style="font-size: 20px;">🏬</div><div style="color: #fff; font-weight: 700; font-size: 13px; margin-top: 6px;">Самовывоз</div><div style="color: #A79C92; font-size: 11px;">бесплатно</div></div>
+              <div onClick="{{ goTradein }}" style="flex: 1; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; padding: 14px; cursor: pointer;"><div style="font-size: 20px;">♻️</div><div style="color: #fff; font-weight: 700; font-size: 13px; margin-top: 6px;">Trade-in</div><div style="color: #FF5B2E; font-size: 11px;">оценка за 30с</div></div>
+            </div>
+
+            <!-- categories -->
+            <div style="display: flex; gap: 8px; overflow-x: auto; margin-bottom: 20px; padding-bottom: 4px;">
+              <sc-for list="{{ cats }}" as="c" hint-placeholder-count="6">
+                <div onClick="{{ c.pick }}" style="flex-shrink: 0; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 10px 14px; text-align: center; cursor: pointer;"><div style="font-size: 22px;">{{ c.icon }}</div><div style="color: #D8CFC6; font-size: 11px; margin-top: 4px; white-space: nowrap;">{{ c.name }}</div></div>
+              </sc-for>
+            </div>
+
+            <!-- hero promo -->
+            <div style="background: linear-gradient(135deg,#2A2620,#201B17); border: 1px solid #3A322B; border-radius: 20px; padding: 22px; margin-bottom: 22px; position: relative; overflow: hidden;">
+              <div style="position: absolute; right: -30px; top: 50%; transform: translateY(-50%); width: 190px; height: 190px; border-radius: 50%; background: radial-gradient(circle, rgba(255,91,46,0.28), transparent 70%);"></div>
+              <div style="position: relative; z-index: 2; max-width: 58%;">
+                <div style="font-family: 'JetBrains Mono'; font-size: 11px; color: #FF5B2E;">НОВИНКА · В НАЛИЧИИ</div>
+                <div style="font-family: 'Manrope'; font-weight: 800; font-size: 24px; color: #fff; margin-top: 8px; line-height: 1.05;">iPhone 17 Pro Max</div>
+                <div style="font-size: 13px; color: #A79C92; margin-top: 4px;">от 115 000 сом · рассрочка 0%</div>
+                <div onClick="{{ goHero }}" style="display: inline-block; background: #FF5B2E; color: #fff; border-radius: 10px; padding: 10px 18px; font-weight: 700; font-size: 13px; margin-top: 16px; cursor: pointer;">Смотреть</div>
+              </div>
+              <div style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 132px; height: 132px; border-radius: 20px; background: url('assets/p-iphone.png') center/cover; box-shadow: 0 12px 28px rgba(0,0,0,0.4); z-index: 2;"></div>
+            </div>
+
+            <!-- section: hits -->
+            <div style="display: flex; align-items: center; margin-bottom: 12px;"><span style="font-family: 'Manrope'; font-weight: 700; font-size: 18px; color: #fff;">🔥 Хиты продаж</span><span onClick="{{ goCatalog }}" style="margin-left: auto; color: #FF5B2E; font-size: 13px; cursor: pointer;">Все →</span></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 22px;">
+              <sc-for list="{{ hits }}" as="p" hint-placeholder-count="4">
+                <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; overflow: hidden;">
+                  <div onClick="{{ p.open }}" style="height: 120px; background: {{ p.thumb }}; background-size: cover; background-position: center; position: relative; cursor: pointer;">
+                    <sc-if value="{{ p.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="position: absolute; top: 8px; left: 8px; background: #FF5B2E; color: #fff; font-size: 10px; font-weight: 700; border-radius: 6px; padding: 3px 7px;">{{ p.badge }}</span></sc-if>
+                    <span onClick="{{ p.fav }}" style="position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; background: rgba(20,17,14,0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer;">{{ p.favIcon }}</span>
+                  </div>
+                  <div style="padding: 10px 11px 12px;">
+                    <div onClick="{{ p.open }}" style="font-size: 13px; font-weight: 600; color: #fff; line-height: 1.3; cursor: pointer; min-height: 34px;">{{ p.name }}</div>
+                    <div style="font-family: 'Manrope'; font-weight: 800; font-size: 16px; color: #fff; margin-top: 6px;">{{ p.price }}</div>
+                    <div style="font-size: 10px; color: #8A7F76; margin-top: 2px;">{{ p.stock }}</div>
+                    <div onClick="{{ p.add }}" style="background: #FF5B2E; color: #181410; border-radius: 9px; padding: 8px; text-align: center; font-weight: 700; font-size: 12px; margin-top: 10px; cursor: pointer;">{{ p.addLabel }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <!-- recently viewed -->
+            <sc-if value="{{ hasRecent }}" hint-placeholder-val="{{ false }}">
+              <div style="font-family: 'Manrope'; font-weight: 700; font-size: 16px; color: #fff; margin-bottom: 10px;">👀 Вы смотрели</div>
+              <div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 10px;">
+                <sc-for list="{{ recent }}" as="r" hint-placeholder-count="3">
+                  <div onClick="{{ r.open }}" style="flex-shrink: 0; width: 110px; cursor: pointer;"><div style="height: 90px; border-radius: 12px; background: {{ r.thumb }}; background-size: cover; background-position: center;"></div><div style="font-size: 11px; color: #D8CFC6; margin-top: 6px; line-height: 1.3;">{{ r.name }}</div><div style="font-size: 12px; font-weight: 700; color: #fff;">{{ r.price }}</div></div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <!-- SMART: personalized recommendations -->
+            <sc-if value="{{ hasForYou }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;"><span style="font-family: 'Manrope'; font-weight: 700; font-size: 16px; color: #fff;">✨ Для вас</span><span style="font-size: 11px; color: #8A7F76;">{{ forYouReason }}</span></div>
+              <div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 18px;">
+                <sc-for list="{{ forYou }}" as="f" hint-placeholder-count="3">
+                  <div onClick="{{ f.open }}" style="flex-shrink: 0; width: 130px; cursor: pointer; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; overflow: hidden;"><div style="height: 96px; background: {{ f.thumb }}; background-size: cover; background-position: center;"></div><div style="padding: 8px 10px 11px;"><div style="font-size: 11.5px; color: #D8CFC6; line-height: 1.3; height: 30px; overflow: hidden;">{{ f.name }}</div><div style="font-size: 13px; font-weight: 700; color: #fff; margin-top: 3px;">{{ f.price }}</div><div style="font-size: 10.5px; color: {{ f.stockColor }}; margin-top: 2px;">{{ f.stock }}</div></div></div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- ============ CATALOG ============ -->
+        <sc-if value="{{ isCatalog }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+              <div style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff;">Каталог</div>
+              <span style="color: #8A7F76; font-size: 13px;">{{ catalogCount }}</span>
+            </div>
+            <!-- filter chips -->
+            <div style="display: flex; gap: 8px; overflow-x: auto; margin-bottom: 8px; padding-bottom: 4px;">
+              <sc-for list="{{ filterChips }}" as="f" hint-placeholder-count="5">
+                <div onClick="{{ f.pick }}" style="flex-shrink: 0; background: {{ f.bg }}; color: {{ f.fg }}; border: 1px solid {{ f.border }}; border-radius: 999px; padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;">{{ f.label }}</div>
+              </sc-for>
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+              <div onClick="{{ toggleSort }}" style="flex: 1; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 9px; text-align: center; color: #D8CFC6; font-size: 12px; cursor: pointer;">↕ {{ sortLabel }}</div>
+              <div onClick="{{ toggleStock }}" style="flex: 1; background: {{ stockBg }}; border: 1px solid #3A322B; border-radius: 10px; padding: 9px; text-align: center; color: {{ stockFg }}; font-size: 12px; cursor: pointer;">✓ В наличии</div>
+            </div>
+
+            <sc-if value="{{ catalogEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="text-align: center; padding: 50px 20px;"><div style="font-size: 48px;">🔍</div><div style="font-family: 'Manrope'; font-weight: 700; font-size: 17px; color: #fff; margin-top: 14px;">Ничего не найдено</div><div style="font-size: 13px; color: #A79C92; margin-top: 8px;">Попробуйте изменить фильтры</div><div onClick="{{ resetFilters }}" style="display: inline-block; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 11px 20px; color: #FF5B2E; font-size: 13px; margin-top: 16px; cursor: pointer;">Сбросить фильтры</div></div>
+            </sc-if>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <sc-for list="{{ catalogList }}" as="p" hint-placeholder-count="6">
+                <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; overflow: hidden;">
+                  <div onClick="{{ p.open }}" style="height: 120px; background: {{ p.thumb }}; background-size: cover; background-position: center; position: relative; cursor: pointer;">
+                    <sc-if value="{{ p.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="position: absolute; top: 8px; left: 8px; background: #FF5B2E; color: #fff; font-size: 10px; font-weight: 700; border-radius: 6px; padding: 3px 7px;">{{ p.badge }}</span></sc-if>
+                    <span onClick="{{ p.fav }}" style="position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; background: rgba(20,17,14,0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer;">{{ p.favIcon }}</span>
+                  </div>
+                  <div style="padding: 10px 11px 12px;">
+                    <div onClick="{{ p.open }}" style="font-size: 13px; font-weight: 600; color: #fff; line-height: 1.3; cursor: pointer; min-height: 34px;">{{ p.name }}</div>
+                    <div style="font-family: 'Manrope'; font-weight: 800; font-size: 16px; color: #fff; margin-top: 6px;">{{ p.price }}</div>
+                    <div style="font-size: 10px; color: {{ p.stockColor }}; margin-top: 2px;">{{ p.stock }}</div>
+                    <div style="display: flex; gap: 6px; margin-top: 10px;">
+                      <div onClick="{{ p.add }}" style="flex: 1; background: #FF5B2E; color: #181410; border-radius: 9px; padding: 8px; text-align: center; font-weight: 700; font-size: 12px; cursor: pointer;">{{ p.addLabel }}</div>
+                      <div onClick="{{ p.cmp }}" style="width: 34px; background: #3A322B; border-radius: 9px; display: flex; align-items: center; justify-content: center; color: {{ p.cmpColor }}; cursor: pointer;">⇄</div>
+                    </div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ============ PRODUCT ============ -->
+        <sc-if value="{{ isProduct }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 0 0 20px;">
+            <div style="position: relative;">
+              <div style="height: 280px; background: {{ pdImgMain }}; background-size: cover; background-position: center; background-color: #201B17;"></div>
+              <div onClick="{{ back }}" style="position: absolute; top: 12px; left: 12px; width: 34px; height: 34px; background: rgba(20,17,14,0.55); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer;">←</div>
+              <div style="position: absolute; top: 12px; right: 12px; display: flex; gap: 8px;"><span onClick="{{ pdFav }}" style="width: 34px; height: 34px; background: rgba(20,17,14,0.55); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;">{{ pdFavIcon }}</span><span onClick="{{ shareProduct }}" style="width: 34px; height: 34px; background: rgba(20,17,14,0.55); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer;">↗</span></div>
+              <div style="position: absolute; bottom: 12px; left: 0; right: 0; display: flex; justify-content: center; gap: 6px;">
+                <sc-for list="{{ pdDots }}" as="d" hint-placeholder-count="4"><span style="width: 7px; height: 7px; border-radius: 50%; background: {{ d.on ? '#FF5B2E' : 'rgba(255,255,255,0.4)' }};"></span></sc-for>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; padding: 12px 16px 0;">
+              <sc-for list="{{ pdGallery }}" as="g" hint-placeholder-count="4">
+                <div onClick="{{ g.pick }}" style="width: 56px; height: 56px; border-radius: 10px; background: {{ g.thumb }}; background-size: cover; background-position: center; background-color: #201B17; border: 2px solid {{ g.active ? '#FF5B2E' : '#3A322B' }}; cursor: pointer;"></div>
+              </sc-for>
+            </div>
+            <div style="padding: 18px 16px;">
+              <sc-if value="{{ pd.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="background: #FF5B2E; color: #fff; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 3px 9px;">{{ pd.badge }}</span></sc-if>
+              <div style="font-family: 'Manrope'; font-weight: 800; font-size: 22px; color: #fff; margin-top: 10px; line-height: 1.15;">{{ pd.name }}</div>
+              <div style="display: flex; align-items: baseline; gap: 10px; margin-top: 10px;">
+                <span style="font-family: 'Manrope'; font-weight: 800; font-size: 26px; color: #fff;">{{ pd.price }}</span>
+                <sc-if value="{{ pd.hasOld }}" hint-placeholder-val="{{ false }}"><span style="font-size: 15px; color: #8A7F76; text-decoration: line-through;">{{ pd.oldPrice }}</span></sc-if>
+              </div>
+              <div style="font-size: 13px; color: #FF5B2E; margin-top: 6px;">{{ pd.installment }}</div>
+
+              <!-- SMART: installment calculator -->
+              <sc-if value="{{ pdInStock }}" hint-placeholder-val="{{ true }}">
+                <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 14px; margin-top: 14px;">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;"><span style="font-size: 15px;">💳</span><span style="font-size: 13px; font-weight: 700; color: #fff;">Рассрочка 0%</span><span style="margin-left: auto; font-size: 11px; color: #8A7F76;">{{ pdInstBank }}</span></div>
+                  <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+                    <sc-for list="{{ pdInstTerms }}" as="t" hint-placeholder-count="4">
+                      <div onClick="{{ t.pick }}" style="flex: 1; text-align: center; padding: 9px 0; border-radius: 10px; cursor: pointer; font-family: 'Manrope'; font-weight: 700; font-size: 14px; color: {{ t.fg }}; background: {{ t.bg }}; border: 1px solid {{ t.bd }};">{{ t.n }}</div>
+                    </sc-for>
+                  </div>
+                  <div style="display: flex; align-items: baseline; justify-content: space-between;"><span style="font-size: 12px; color: #A79C92;">Платёж в месяц</span><span style="font-family: 'Manrope'; font-weight: 800; font-size: 22px; color: #C6FF3D;">{{ pdInstMonthly }}</span></div>
+                  <a href="AliStore Рассрочка график.dc.html" style="text-decoration: none;"><div style="text-align: center; font-size: 12px; color: #FF9A6E; margin-top: 10px; cursor: pointer;">Смотреть график погашений →</div></a>
+                </div>
+              </sc-if>
+
+              <!-- variants -->
+              <sc-if value="{{ pdShowVariants }}" hint-placeholder-val="{{ true }}">
+              <div style="font-size: 12px; color: #A79C92; margin-top: 18px; margin-bottom: 8px;">Память</div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <sc-for list="{{ pdVariants }}" as="v" hint-placeholder-count="3">
+                  <div onClick="{{ v.pick }}" style="border: 1px solid {{ v.border }}; background: {{ v.bg }}; color: {{ v.fg }}; border-radius: 10px; padding: 9px 14px; font-size: 13px; cursor: pointer;">{{ v.label }}</div>
+                </sc-for>
+              </div>
+              </sc-if>
+
+              <!-- trust row -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px;">
+                <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; font-size: 12px; color: #D8CFC6;">🛡 Гарантия 12 мес</div>
+                <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; font-size: 12px; color: #D8CFC6;">⚡ Доставка 1–2 ч</div>
+                <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; font-size: 12px; color: #D8CFC6;">🏬 Самовывоз сегодня</div>
+                <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; font-size: 12px; color: #D8CFC6;">↩️ Возврат 14 дней</div>
+              </div>
+
+              <!-- availability -->
+              <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 14px; margin-top: 12px;">
+                <div style="font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 8px;">Наличие в магазинах</div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #A79C92; padding: 4px 0;">AliStore Манас <span style="color: #FF5B2E;">● есть</span></div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #A79C92; padding: 4px 0;">Пункт выдачи Манас-2 <span style="color: #E5B23C;">● 1 шт</span></div>
+              </div>
+
+              <!-- specs -->
+              <div style="font-family: 'Manrope'; font-weight: 700; font-size: 15px; color: #fff; margin-top: 20px; margin-bottom: 8px;">Характеристики</div>
+              <sc-for list="{{ pdSpecs }}" as="s" hint-placeholder-count="4">
+                <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 9px 0; border-bottom: 1px solid #2A231D;"><span style="color: #8A7F76;">{{ s.k }}</span><span style="color: #D8CFC6;">{{ s.v }}</span></div>
+              </sc-for>
+
+              <!-- description -->
+              <div style="font-family: 'Manrope'; font-weight: 700; font-size: 15px; color: #fff; margin-top: 20px; margin-bottom: 8px;">Описание</div>
+              <div style="font-size: 13px; color: #A79C92; line-height: 1.6;">{{ pd.desc }}</div>
+
+              <!-- reviews -->
+              <div style="display: flex; align-items: center; margin-top: 20px; margin-bottom: 12px;"><span style="font-family: 'Manrope'; font-weight: 700; font-size: 15px; color: #fff;">Отзывы</span><span style="margin-left: auto; color: #E5B23C; font-size: 13px;">★ 4.9 · 128</span></div>
+              <div style="display: flex; gap: 16px; align-items: center; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 16px; margin-bottom: 12px;">
+                <div style="text-align: center;"><div style="font-family: 'Manrope'; font-weight: 800; font-size: 34px; color: #fff;">4.9</div><div style="color: #E5B23C; font-size: 12px;">★★★★★</div><div style="font-size: 11px; color: #8A7F76; margin-top: 2px;">128 оценок</div></div>
+                <div style="flex: 1;">
+                  <sc-for list="{{ ratingBars }}" as="rb" hint-placeholder-count="5">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;"><span style="font-size: 11px; color: #8A7F76; width: 8px;">{{ rb.star }}</span><div style="flex: 1; height: 6px; background: #201B17; border-radius: 999px; overflow: hidden;"><div style="height: 100%; width: {{ rb.pct }}; background: #E5B23C;"></div></div></div>
+                  </sc-for>
+                </div>
+              </div>
+              <div onClick="{{ openWriteReview }}" style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 11px; padding: 12px; text-align: center; color: #FF5B2E; font-size: 13px; font-weight: 600; margin-bottom: 12px; cursor: pointer;">✍ Оставить отзыв</div>
+              <sc-for list="{{ pdReviews }}" as="r" hint-placeholder-count="2">
+                <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 13px; margin-bottom: 8px;"><div style="display: flex; justify-content: space-between;"><span style="font-size: 13px; font-weight: 600; color: #fff;">{{ r.name }}</span><span style="color: #E5B23C; font-size: 12px;">{{ r.stars }}</span></div><div style="font-size: 12px; color: #A79C92; margin-top: 5px; line-height: 1.5;">{{ r.text }}</div></div>
+              </sc-for>
+
+              <!-- similar -->
+              <div style="font-family: 'Manrope'; font-weight: 700; font-size: 15px; color: #fff; margin-top: 20px; margin-bottom: 10px;">Похожие товары</div>
+              <div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px;">
+                <sc-for list="{{ pdSimilar }}" as="s" hint-placeholder-count="3">
+                  <div onClick="{{ s.open }}" style="flex-shrink: 0; width: 120px; cursor: pointer;"><div style="height: 92px; border-radius: 12px; background: {{ s.thumb }}; background-size: cover; background-position: center;"></div><div style="font-size: 11px; color: #D8CFC6; margin-top: 6px; line-height: 1.3;">{{ s.name }}</div><div style="font-size: 12px; font-weight: 700; color: #fff;">{{ s.price }}</div></div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ============ FAVORITES ============ -->
+        <sc-if value="{{ isFav }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff; margin-bottom: 14px;">Избранное</div>
+            <sc-if value="{{ favEmpty }}" hint-placeholder-val="{{ true }}">
+              <div style="text-align: center; padding: 46px 20px;"><div style="font-size: 48px;">🤍</div><div style="font-family: 'Manrope'; font-weight: 700; font-size: 17px; color: #fff; margin-top: 14px;">Пока пусто</div><div style="font-size: 13px; color: #A79C92; margin-top: 8px; line-height: 1.5;">Сохраняйте товары, чтобы не потерять и следить за ценой</div><div onClick="{{ goCatalog }}" style="display: inline-block; background: #FF5B2E; color: #181410; border-radius: 11px; padding: 12px 22px; font-weight: 700; font-size: 13px; margin-top: 18px; cursor: pointer;">В каталог</div></div>
+            </sc-if>
+            <sc-for list="{{ favList }}" as="p" hint-placeholder-count="3">
+              <div style="display: flex; gap: 12px; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 12px; margin-bottom: 10px;">
+                <div onClick="{{ p.open }}" style="width: 74px; height: 74px; border-radius: 10px; background: {{ p.thumb }}; background-size: cover; background-position: center; flex-shrink: 0; cursor: pointer;"></div>
+                <div style="flex: 1; min-width: 0;">
+                  <div onClick="{{ p.open }}" style="font-size: 13px; font-weight: 600; color: #fff; cursor: pointer;">{{ p.name }}</div>
+                  <div style="font-family: 'Manrope'; font-weight: 800; font-size: 15px; color: #fff; margin-top: 4px;">{{ p.price }}</div>
+                  <div style="font-size: 11px; color: {{ p.stockColor }}; margin-top: 2px;">{{ p.stock }}</div>
+                  <div style="display: flex; gap: 6px; margin-top: 8px;"><div onClick="{{ p.add }}" style="background: #FF5B2E; color: #181410; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer;">В корзину</div><div onClick="{{ p.fav }}" style="background: rgba(255,255,255,0.1); color: #A79C92; border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer;">Убрать</div></div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- ============ COMPARE ============ -->
+        <sc-if value="{{ isCompare }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff; margin-bottom: 14px;">Сравнение</div>
+            <sc-if value="{{ compareEmpty }}" hint-placeholder-val="{{ true }}">
+              <div style="text-align: center; padding: 46px 20px;"><div style="font-size: 48px;">⇄</div><div style="font-family: 'Manrope'; font-weight: 700; font-size: 17px; color: #fff; margin-top: 14px;">Нечего сравнивать</div><div style="font-size: 13px; color: #A79C92; margin-top: 8px; line-height: 1.5;">Добавьте до 4 товаров из каталога кнопкой ⇄</div><div onClick="{{ goCatalog }}" style="display: inline-block; background: #FF5B2E; color: #181410; border-radius: 11px; padding: 12px 22px; font-weight: 700; font-size: 13px; margin-top: 18px; cursor: pointer;">В каталог</div></div>
+            </sc-if>
+            <sc-if value="{{ hasCompare }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; gap: 10px; overflow-x: auto;">
+                <sc-for list="{{ compareList }}" as="c" hint-placeholder-count="2">
+                  <div style="flex-shrink: 0; width: 150px; background: #2A231D; border: 1px solid {{ c.border }}; border-radius: 14px; padding: 12px;">
+                    <div style="height: 80px; border-radius: 10px; background: {{ c.thumb }}; background-size: cover; background-position: center; margin-bottom: 8px;"></div>
+                    <sc-if value="{{ c.best }}" hint-placeholder-val="{{ false }}"><div style="background: #FF5B2E; color: #181410; font-size: 10px; font-weight: 700; border-radius: 6px; padding: 2px 7px; display: inline-block; margin-bottom: 6px;">ЛУЧШАЯ ЦЕНА</div></sc-if>
+                    <div style="font-size: 12px; font-weight: 600; color: #fff; min-height: 32px;">{{ c.name }}</div>
+                    <div style="font-family: 'Manrope'; font-weight: 800; font-size: 15px; color: #fff; margin-top: 4px;">{{ c.price }}</div>
+                    <div style="border-top: 1px solid #3A322B; margin: 8px 0; padding-top: 8px; font-size: 11px; color: #A79C92; line-height: 1.8;">{{ c.brand }}<br>{{ c.mem }}<br>🛡 {{ c.warr }}<br>{{ c.stock }}</div>
+                    <div onClick="{{ c.add }}" style="background: #FF5B2E; color: #181410; border-radius: 8px; padding: 7px; text-align: center; font-size: 12px; font-weight: 700; cursor: pointer;">В корзину</div>
+                    <div onClick="{{ c.remove }}" style="text-align: center; color: #8A7F76; font-size: 11px; margin-top: 8px; cursor: pointer;">Убрать</div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- ============ CART ============ -->
+        <sc-if value="{{ isCart }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff; margin-bottom: 14px;">Корзина</div>
+            <sc-if value="{{ cartEmpty }}" hint-placeholder-val="{{ true }}">
+              <div style="text-align: center; padding: 46px 20px;"><div style="font-size: 48px;">🛒</div><div style="font-family: 'Manrope'; font-weight: 700; font-size: 17px; color: #fff; margin-top: 14px;">Корзина пуста</div><div style="font-size: 13px; color: #A79C92; margin-top: 8px;">Добавьте товары из каталога</div><div onClick="{{ goCatalog }}" style="display: inline-block; background: #FF5B2E; color: #181410; border-radius: 11px; padding: 12px 22px; font-weight: 700; font-size: 13px; margin-top: 18px; cursor: pointer;">В каталог</div></div>
+            </sc-if>
+            <sc-if value="{{ cartSynced }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; align-items: center; gap: 9px; background: rgba(127,176,236,0.1); border: 1px solid rgba(127,176,236,0.24); border-radius: 12px; padding: 10px 13px; margin-bottom: 12px;"><span style="font-size: 14px;">🔄</span><span style="flex: 1; font-size: 11.5px; color: #C9D6E6; line-height: 1.35;">{{ syncText }}</span><span style="width: 7px; height: 7px; border-radius: 50%; background: #4ED17A; box-shadow: 0 0 7px #4ED17A;"></span></div>
+            </sc-if>
+            <sc-for list="{{ cartList }}" as="i" hint-placeholder-count="2">
+              <div style="display: flex; gap: 12px; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 12px; margin-bottom: 10px;">
+                <div onClick="{{ i.open }}" style="width: 70px; height: 70px; border-radius: 10px; background: {{ i.thumb }}; background-size: cover; background-position: center; flex-shrink: 0; cursor: pointer;"></div>
+                <div style="flex: 1; min-width: 0;">
+                  <div onClick="{{ i.open }}" style="font-size: 13px; font-weight: 600; color: #fff; cursor: pointer;">{{ i.name }}</div>
+                  <sc-if value="{{ i.priceChanged }}" hint-placeholder-val="{{ false }}"><div style="font-size: 11px; color: #E5B23C; margin-top: 2px;">⚠ Цена изменилась</div></sc-if>
+                  <div style="font-family: 'Manrope'; font-weight: 800; font-size: 15px; color: #fff; margin-top: 4px;">{{ i.lineTotal }}</div>
+                  <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+                    <div style="display: flex; align-items: center; gap: 12px; background: #3A322B; border-radius: 8px; padding: 5px 10px;"><span onClick="{{ i.dec }}" style="color: #fff; font-size: 16px; cursor: pointer;">−</span><span style="color: #fff; font-size: 13px; font-family: 'JetBrains Mono';">{{ i.qty }}</span><span onClick="{{ i.inc }}" style="color: #fff; font-size: 16px; cursor: pointer;">+</span></div>
+                    <span onClick="{{ i.remove }}" style="color: #8A7F76; font-size: 12px; cursor: pointer;">Удалить</span>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+
+            <sc-if value="{{ hasCart }}" hint-placeholder-val="{{ false }}">
+              <!-- promo -->
+              <div style="display: flex; gap: 8px; margin-top: 6px;">
+                <div style="flex: 1; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 11px; padding: 12px; color: #6E645C; font-size: 13px;">Промокод</div>
+                <div onClick="{{ applyPromo }}" style="background: rgba(255,255,255,0.1); color: {{ promoColor }}; border-radius: 11px; padding: 12px 18px; font-size: 13px; font-weight: 600; cursor: pointer;">{{ promoLabel }}</div>
+              </div>
+              <div onClick="{{ toggleBonus }}" style="display: flex; align-items: center; gap: 10px; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 11px; padding: 12px; margin-top: 8px; cursor: pointer;"><span style="width: 20px; height: 20px; border-radius: 6px; border: 2px solid {{ bonusOn ? '#FF5B2E' : '#463C31' }}; background: {{ bonusOn ? '#FF5B2E' : 'transparent' }}; color: #181410; display: flex; align-items: center; justify-content: center; font-size: 12px;">{{ bonusMark }}</span><span style="font-size: 13px; color: #D8CFC6;">{{ bonusRowLabel }}</span></div>
+
+              <!-- totals -->
+              <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 16px; margin-top: 12px;">
+                <div style="display: flex; justify-content: space-between; font-size: 13px; color: #A79C92; padding: 4px 0;">Товары <span style="color: #D8CFC6;">{{ subtotal }}</span></div>
+                <sc-if value="{{ hasDiscount }}" hint-placeholder-val="{{ false }}"><div style="display: flex; justify-content: space-between; font-size: 13px; color: #FF5B2E; padding: 4px 0;">Скидка <span>{{ discount }}</span></div></sc-if>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; color: #A79C92; padding: 4px 0;">Доставка <span style="color: #D8CFC6;">{{ deliveryFee }}</span></div>
+                <div style="border-top: 1px solid #3A322B; margin: 8px 0;"></div>
+                <div style="display: flex; justify-content: space-between; align-items: center;"><span style="font-family: 'Manrope'; font-weight: 700; font-size: 16px; color: #fff;">Итого</span><span style="font-family: 'Manrope'; font-weight: 800; font-size: 20px; color: #FF5B2E;">{{ total }}</span></div>
+              </div>
+              <div onClick="{{ goCheckout }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; margin-top: 12px; cursor: pointer;">Оформить заказ</div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- ============ CHECKOUT ============ -->
+        <sc-if value="{{ isCheckout }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;"><span onClick="{{ back }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff;">Оформление</span></div>
+            <!-- steps indicator -->
+            <div style="display: flex; gap: 6px; margin-bottom: 18px;">
+              <sc-for list="{{ coSteps }}" as="s" hint-placeholder-count="4">
+                <div style="flex: 1; height: 4px; border-radius: 999px; background: {{ s.color }};"></div>
+              </sc-for>
+            </div>
+
+            <!-- step: delivery method -->
+            <sc-if value="{{ coDelivery }}" hint-placeholder-val="{{ true }}">
+              <div style="font-family: 'Manrope'; font-weight: 700; font-size: 16px; color: #fff; margin-bottom: 12px;">Способ получения</div>
+              <sc-for list="{{ deliveryOpts }}" as="d" hint-placeholder-count="3">
+                <div onClick="{{ d.pick }}" style="display: flex; align-items: center; gap: 12px; background: #2A231D; border: 1px solid {{ d.border }}; border-radius: 13px; padding: 14px; margin-bottom: 10px; cursor: pointer;"><span style="font-size: 22px;">{{ d.icon }}</span><div style="flex: 1;"><div style="font-size: 14px; font-weight: 600; color: #fff;">{{ d.name }}</div><div style="font-size: 12px; color: #A79C92;">{{ d.meta }}</div></div><span style="color: #D8CFC6; font-size: 13px;">{{ d.price }}</span></div>
+              </sc-for>
+              <div onClick="{{ coNext }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; margin-top: 8px; cursor: pointer;">Далее</div>
+            </sc-if>
+
+            <!-- step: address / contact -->
+            <sc-if value="{{ coAddress }}" hint-placeholder-val="{{ false }}">
+              <div style="font-family: 'Manrope'; font-weight: 700; font-size: 16px; color: #fff; margin-bottom: 12px;">Контакты и адрес</div>
+              <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 13px; color: #fff; font-size: 14px; margin-bottom: 10px; font-family: 'JetBrains Mono';">+996 700 12 34 56</div>
+              <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 13px; color: #fff; font-size: 14px; margin-bottom: 10px;">г. Манас, ул. Ленина 12, кв 5</div>
+              <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 13px; color: #6E645C; font-size: 14px; margin-bottom: 10px;">Комментарий курьеру…</div>
+              <div onClick="{{ coNext }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; margin-top: 8px; cursor: pointer;">Далее</div>
+            </sc-if>
+
+            <!-- step: payment -->
+            <sc-if value="{{ coPayment }}" hint-placeholder-val="{{ false }}">
+              <div style="font-family: 'Manrope'; font-weight: 700; font-size: 16px; color: #fff; margin-bottom: 12px;">Оплата</div>
+              <sc-for list="{{ payOpts }}" as="p" hint-placeholder-count="4">
+                <div onClick="{{ p.pick }}" style="display: flex; align-items: center; gap: 12px; background: #2A231D; border: 1px solid {{ p.border }}; border-radius: 13px; padding: 14px; margin-bottom: 10px; cursor: pointer;"><span style="font-size: 20px;">{{ p.icon }}</span><span style="flex: 1; font-size: 14px; color: #fff;">{{ p.name }}</span><span style="width: 18px; height: 18px; border-radius: 50%; border: 2px solid {{ p.dot }};"></span></div>
+              </sc-for>
+              <div onClick="{{ coNext }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; margin-top: 8px; cursor: pointer;">К подтверждению</div>
+            </sc-if>
+
+            <!-- step: review -->
+            <sc-if value="{{ coReview }}" hint-placeholder-val="{{ false }}">
+              <div style="font-family: 'Manrope'; font-weight: 700; font-size: 16px; color: #fff; margin-bottom: 12px;">Подтверждение</div>
+              <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 16px;">
+                <div style="display: flex; justify-content: space-between; font-size: 13px; color: #A79C92; padding: 5px 0;">Получение <span style="color: #D8CFC6;">{{ chosenDelivery }}</span></div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; color: #A79C92; padding: 5px 0;">Оплата <span style="color: #D8CFC6;">{{ chosenPay }}</span></div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; color: #A79C92; padding: 5px 0;">Товаров <span style="color: #D8CFC6;">{{ cartCount }}</span></div>
+                <div style="border-top: 1px solid #3A322B; margin: 8px 0;"></div>
+                <div style="display: flex; justify-content: space-between; align-items: center;"><span style="font-weight: 700; font-size: 15px; color: #fff;">К оплате</span><span style="font-family: 'Manrope'; font-weight: 800; font-size: 19px; color: #FF5B2E;">{{ total }}</span></div>
+              </div>
+              <div style="font-size: 11px; color: #6E645C; margin-top: 12px; line-height: 1.5;">Нажимая «Подтвердить», вы соглашаетесь с условиями продажи и политикой возврата AliStore.</div>
+              <div onClick="{{ placeOrder }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; margin-top: 12px; cursor: pointer;">Подтвердить заказ</div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- ============ PAYMENT RESULT ============ -->
+        <sc-if value="{{ isPayResult }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 40px 26px; min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+            <div style="width: 80px; height: 80px; border-radius: 50%; background: {{ payResultBg }}; display: flex; align-items: center; justify-content: center; font-size: 40px;">{{ payResultIcon }}</div>
+            <div style="font-family: 'Manrope'; font-weight: 800; font-size: 24px; color: #fff; margin-top: 20px;">{{ payResultTitle }}</div>
+            <div style="font-size: 14px; color: #A79C92; margin-top: 10px; line-height: 1.5;">{{ payResultText }}</div>
+            <sc-if value="{{ paySuccess }}" hint-placeholder-val="{{ true }}">
+              <div onClick="{{ goOrderStatus }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 14px 26px; font-weight: 700; font-size: 14px; margin-top: 24px; cursor: pointer;">Отследить заказ</div>
+              <div onClick="{{ goHome }}" style="color: #A79C92; font-size: 13px; margin-top: 16px; cursor: pointer;">На главную</div>
+            </sc-if>
+            <sc-if value="{{ payFailed }}" hint-placeholder-val="{{ false }}">
+              <div onClick="{{ retryPay }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 14px 26px; font-weight: 700; font-size: 14px; margin-top: 24px; cursor: pointer;">Повторить оплату</div>
+              <div onClick="{{ goSupport }}" style="color: #A79C92; font-size: 13px; margin-top: 16px; cursor: pointer;">Связаться с поддержкой</div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- ============ ORDER STATUS ============ -->
+        <sc-if value="{{ isOrderStatus }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;"><span onClick="{{ back }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff;">Заказ {{ orderNo }}</span></div>
+            <div style="font-size: 13px; color: #A79C92; margin-bottom: 14px; margin-left: 30px;">{{ orderDate }} · {{ orderTotal }}</div>
+            <div style="background: linear-gradient(135deg,#1E3346,#201B17); border: 1px solid #2E4A38; border-radius: 16px; padding: 16px; margin-bottom: 12px;">
+              <sc-if value="{{ isCourierDelivery }}" hint-placeholder-val="{{ true }}">
+              <div style="height: 90px; border-radius: 12px; background: linear-gradient(135deg,#22384A,#201B17); position: relative; overflow: hidden; margin-bottom: 12px;"><span style="position: absolute; top: 50%; left: 24%; transform: translate(-50%,-50%); font-size: 20px;">🏬</span><span style="position: absolute; top: 50%; left: 64%; transform: translate(-50%,-50%); font-size: 18px;">📍</span><span style="position: absolute; top: 50%; left: 24%; width: 40%; height: 3px; transform: translateY(-50%); background: repeating-linear-gradient(90deg,#7FB0EC 0 6px,transparent 6px 11px); animation: routeDraw 1.4s ease-out both;"></span><span style="position: absolute; top: 50%; left: 24%; transform: translate(-50%,-50%); font-size: 18px; animation: courierMove 6s ease-in-out infinite alternate; filter: drop-shadow(0 2px 4px rgba(0,0,0,.5));">🛵</span><span style="position: absolute; top: 42%; left: 64%; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #7FB0EC; animation: pulseRing 2s ease-out infinite;"></span><span style="position: absolute; bottom: 8px; left: 12px; font-size: 11px; color: #7FB0EC;">Курьер в пути · {{ courierEta }}</span></div>
+              <div style="display: flex; align-items: center; gap: 12px;"><div style="width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg,#FF5B2E,#E8410F); display: flex; align-items: center; justify-content: center; font-family: 'Manrope'; font-weight: 800; font-size: 17px; color: #fff;">Д</div><div style="flex: 1;"><div style="font-size: 14px; font-weight: 600; color: #fff;">{{ courierName }} · курьер</div><div style="font-size: 12px; color: #A79C92; font-family: 'JetBrains Mono';">{{ courierPhone }}</div></div><span onClick="{{ callCourier }}" style="width: 40px; height: 40px; border-radius: 50%; background: rgba(255,91,46,0.15); display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer;">📞</span><span onClick="{{ chatCourier }}" style="width: 40px; height: 40px; border-radius: 50%; background: #2A231D; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer;">💬</span></div>
+              </sc-if>
+              <sc-if value="{{ isPickup }}" hint-placeholder-val="{{ false }}">
+                <div style="text-align: center; padding: 4px 0 6px;">
+                  <div style="font-size: 12px; color: #9FC4F0;">🏬 Самовывоз · {{ pickupStore }}</div>
+                  <div style="font-size: 11px; color: #A79C92; margin-top: 4px;">Покажите код на кассе для выдачи</div>
+                  <div style="font-family: 'JetBrains Mono'; font-weight: 700; font-size: 34px; letter-spacing: 4px; color: #fff; margin: 12px 0 4px;">{{ pickupCode }}</div>
+                  <div style="display: inline-block; background: rgba(198,255,61,0.14); color: #C6FF3D; border-radius: 999px; padding: 4px 14px; font-size: 12px; font-weight: 600;">✓ Готов к выдаче · {{ pickupHours }}</div>
+                  <div style="font-size: 11px; color: #7FB0EC; margin-top: 10px;">{{ pickupStock }}</div>
+                </div>
+              </sc-if>
+            </div>
+            <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 18px;">
+              <sc-for list="{{ orderSteps }}" as="s" hint-placeholder-count="5">
+                <div style="display: flex; gap: 12px;"><div style="display: flex; flex-direction: column; align-items: center;"><span style="width: 26px; height: 26px; border-radius: 50%; background: {{ s.bg }}; color: {{ s.fg }}; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0;">{{ s.mark }}</span><span style="width: 2px; flex: 1; background: #3A322B; min-height: 14px;"></span></div><div style="padding-bottom: 16px;"><div style="font-size: 14px; font-weight: 600; color: {{ s.titleColor }};">{{ s.title }}</div><div style="font-size: 12px; color: #8A7F76; margin-top: 2px;">{{ s.time }}</div></div></div>
+              </sc-for>
+              <div onClick="{{ orderAdvance }}" style="display: flex; align-items: center; gap: 8px; margin-top: 6px; padding-top: 12px; border-top: 1px solid #3A322B; cursor: pointer;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #4ED17A; box-shadow: 0 0 8px #4ED17A;"></span><span style="font-size: 11.5px; color: #8A7F76; line-height: 1.4;">{{ orderStageNote }}</span></div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+              <div onClick="{{ goReceipt }}" style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 11px; padding: 13px; text-align: center; color: #D8CFC6; font-size: 13px; cursor: pointer;">🧾 Чек</div>
+              <div onClick="{{ goWarranty }}" style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 11px; padding: 13px; text-align: center; color: #D8CFC6; font-size: 13px; cursor: pointer;">🛡 Гарантия</div>
+              <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 11px; padding: 13px; text-align: center; color: #D8CFC6; font-size: 13px; cursor: pointer;">💬 WhatsApp</div>
+              <div onClick="{{ askCancel }}" style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 11px; padding: 13px; text-align: center; color: #FF8A7A; font-size: 13px; cursor: pointer;">Отменить</div>
+            </div>
+            <div onClick="{{ repeatOrder }}" style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 11px; padding: 13px; text-align: center; color: #FF5B2E; font-size: 13px; cursor: pointer; margin-top: 8px;">🔁 Повторить заказ</div>
+          </div>
+        </sc-if>
+
+        <!-- ============ PROFILE ============ -->
+        <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 14px; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 16px; margin-bottom: 8px;">
+              <div style="width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg,#FF5B2E,#E8410F); display: flex; align-items: center; justify-content: center; font-family: 'Manrope'; font-weight: 800; font-size: 22px; color: #fff;">Н</div>
+              <div style="flex: 1;"><div style="display: flex; align-items: center; gap: 8px;"><span style="font-family: 'Manrope'; font-weight: 700; font-size: 16px; color: #fff;">Нурбек</span><span style="background: #E5B23C; color: #181410; border-radius: 999px; padding: 2px 8px; font-size: 10px; font-weight: 700;">GOLD</span></div><div style="font-size: 12px; color: #A79C92; font-family: 'JetBrains Mono';">+996 700 •• 12 34</div></div>
+            </div>
+
+            <!-- level -->
+            <div style="background: linear-gradient(135deg,#2A2620,#2A231D); border: 1px solid #3A322B; border-radius: 16px; padding: 16px; margin-bottom: 14px;">
+              <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px;"><span style="color: #D8CFC6;">Уровень Gold</span><span style="color: #FF5B2E; font-family: 'JetBrains Mono';">4 820 бонусов</span></div>
+              <div style="height: 7px; background: #201B17; border-radius: 999px; overflow: hidden;"><div style="height: 100%; width: 72%; background: linear-gradient(90deg,#FF5B2E,#E8410F);"></div></div>
+              <div style="font-size: 11px; color: #8A7F76; margin-top: 6px;">До Platinum осталось 51 000 сом покупок</div>
+            </div>
+
+            <!-- menu -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <sc-for list="{{ profileMenu }}" as="m" hint-placeholder-count="8">
+                <div onClick="{{ m.go }}" style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 16px; cursor: pointer;"><div style="font-size: 22px;">{{ m.icon }}</div><div style="font-size: 13px; font-weight: 600; color: #fff; margin-top: 8px;">{{ m.label }}</div><sc-if value="{{ m.hasBadge }}" hint-placeholder-val="{{ false }}"><div style="font-size: 11px; color: #FF5B2E; margin-top: 2px;">{{ m.badge }}</div></sc-if></div>
+              </sc-for>
+            </div>
+            <div onClick="{{ askLogout }}" style="text-align: center; color: #FF8A7A; font-size: 13px; margin-top: 18px; cursor: pointer;">Выйти из аккаунта</div>
+          </div>
+        </sc-if>
+
+        <!-- ============ DEVICES ============ -->
+        <sc-if value="{{ isDevices }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;"><span onClick="{{ goProfile }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff;">Мои устройства</span></div>
+            <sc-for list="{{ devices }}" as="d" hint-placeholder-count="2">
+              <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 16px; margin-bottom: 12px;">
+                <div style="display: flex; gap: 12px;"><div style="width: 54px; height: 54px; border-radius: 12px; background: {{ d.thumb }}; background-size: cover; background-position: center; flex-shrink: 0;"></div><div style="flex: 1;"><div style="font-size: 15px; font-weight: 700; color: #fff;">{{ d.name }}</div><div style="font-size: 11px; color: #8A7F76; font-family: 'JetBrains Mono'; margin-top: 2px;">{{ d.imei }}</div><div style="font-size: 12px; color: #A79C92; margin-top: 2px;">куплен {{ d.date }}</div></div><span style="background: {{ d.wBg }}; color: {{ d.wFg }}; border-radius: 6px; padding: 3px 8px; font-size: 11px; height: fit-content;">{{ d.warranty }}</span></div>
+                <div style="display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap;">
+                  <div onClick="{{ goWarranty }}" style="background: rgba(255,255,255,0.1); color: #D8CFC6; border-radius: 8px; padding: 7px 12px; font-size: 12px; cursor: pointer;">Гарантия</div>
+                  <div onClick="{{ goSupport }}" style="background: rgba(255,255,255,0.1); color: #D8CFC6; border-radius: 8px; padding: 7px 12px; font-size: 12px; cursor: pointer;">Сервис</div>
+                  <div onClick="{{ goTradein }}" style="background: rgba(255,255,255,0.1); color: #FF5B2E; border-radius: 8px; padding: 7px 12px; font-size: 12px; cursor: pointer;">Trade-in</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- ============ WARRANTY ============ -->
+        <sc-if value="{{ isWarranty }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;"><span onClick="{{ goProfile }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff;">Гарантия</span></div>
+            <div style="background: linear-gradient(135deg,#2A2620,#2A231D); border: 1px solid #3A322B; border-radius: 18px; padding: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: start;"><div style="display: flex; align-items: center; gap: 8px;"><div style="width: 24px; height: 24px; border-radius: 7px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Manrope'; font-weight: 800; font-size: 13px;">A</div><span style="font-weight: 700; font-size: 14px; color: #fff;">Гарантийный талон</span></div><span style="background: {{ warrBadgeBg }}; color: {{ warrBadgeFg }}; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 600;">{{ warrBadge }}</span></div>
+              <div style="display: flex; align-items: center; gap: 18px; margin-top: 18px;">
+                <div style="position: relative; width: 116px; height: 116px; flex-shrink: 0;">
+                  <svg width="116" height="116" viewBox="0 0 116 116" style="transform: rotate(-90deg);"><circle cx="58" cy="58" r="52" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="9"></circle><circle cx="58" cy="58" r="52" fill="none" stroke="{{ warrRingColor }}" stroke-width="9" stroke-linecap="round" stroke-dasharray="{{ warrDash }}" style="transition: stroke-dasharray 1.1s cubic-bezier(.3,.8,.3,1);"></circle></svg>
+                  <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;"><div style="font-family: 'Manrope'; font-weight: 800; font-size: 26px; color: #fff; line-height: 1;">{{ warrDaysLeft }}</div><div style="font-size: 10px; color: #8A7F76; margin-top: 3px;">дней</div></div>
+                </div>
+                <div style="flex: 1;">
+                  <div style="font-family: 'Manrope'; font-weight: 700; font-size: 18px; color: #fff;">iPhone 15 · 128 ГБ</div>
+                  <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #A79C92; margin-top: 4px;">IMEI 35 812••• 042</div>
+                  <div style="height: 1px; background: rgba(255,255,255,0.08); margin: 12px 0;"></div>
+                  <div style="display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0;"><span style="color: #8A7F76;">Начало</span><span style="color: #D8CFC6;">05.07.2026</span></div>
+                  <div style="display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0;"><span style="color: #8A7F76;">Гарантия до</span><span style="color: #fff; font-weight: 600;">05.07.2027</span></div>
+                  <div style="display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0;"><span style="color: #8A7F76;">Прошло</span><span style="color: {{ warrRingColor }};">{{ warrPct }}</span></div>
+                </div>
+              </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+              <div onClick="{{ goSupport }}" style="background: #FF5B2E; color: #181410; border-radius: 11px; padding: 13px; text-align: center; font-weight: 700; font-size: 13px; cursor: pointer;">Обращение в сервис</div>
+              <div onClick="{{ goReceipt }}" style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 11px; padding: 13px; text-align: center; color: #D8CFC6; font-size: 13px; cursor: pointer;">🧾 Чек</div>
+            </div>
+            <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 16px; margin-top: 12px;"><div style="font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 8px;">Что покрывается</div><div style="font-size: 12px; color: #A79C92; line-height: 1.7;">✓ Заводской брак<br>✓ Неисправности экрана, батареи<br>✗ Механические повреждения, влага</div></div>
+          </div>
+        </sc-if>
+
+        <!-- ============ RETURN ============ -->
+        <sc-if value="{{ isReturn }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;"><span onClick="{{ goProfile }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff;">Возврат товара</span></div>
+            <sc-if value="{{ returnSubmitted }}" hint-placeholder-val="{{ false }}">
+              <div style="text-align: center; padding: 30px 10px;"><div style="width: 72px; height: 72px; border-radius: 50%; background: rgba(255,91,46,0.15); display: flex; align-items: center; justify-content: center; font-size: 36px; margin: 0 auto;">✓</div><div style="font-family: 'Manrope'; font-weight: 700; font-size: 18px; color: #fff; margin-top: 16px;">Заявка отправлена</div><div style="font-size: 13px; color: #A79C92; margin-top: 8px; line-height: 1.5;">RET-0512 · рассмотрим за 24 часа. Статус придёт в уведомления.</div>
+                <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 14px; margin-top: 18px; text-align: left;"><div style="display: flex; gap: 10px; font-size: 12px; color: #A79C92; padding: 4px 0;"><span style="color: #FF5B2E;">●</span> Заявка принята</div><div style="display: flex; gap: 10px; font-size: 12px; color: #6E645C; padding: 4px 0;"><span>○</span> Проверка товара</div><div style="display: flex; gap: 10px; font-size: 12px; color: #6E645C; padding: 4px 0;"><span>○</span> Возврат денег</div></div>
+                <div onClick="{{ goProfile }}" style="background: #FF5B2E; color: #181410; border-radius: 12px; padding: 13px; text-align: center; font-weight: 700; font-size: 14px; margin-top: 18px; cursor: pointer;">Готово</div></div>
+            </sc-if>
+            <sc-if value="{{ returnForm }}" hint-placeholder-val="{{ true }}">
+              <div style="font-size: 13px; color: #A79C92; margin-bottom: 12px;">Выберите товар из заказа №4102</div>
+              <div style="display: flex; gap: 12px; background: #2A231D; border: 1px solid #FF5B2E; border-radius: 14px; padding: 12px; margin-bottom: 14px;"><div style="width: 54px; height: 54px; border-radius: 10px; background: linear-gradient(135deg,#EFE7DC,#F7F2EC);"></div><div style="flex: 1;"><div style="font-size: 13px; font-weight: 600; color: #fff;">AirPods Pro 2</div><div style="font-size: 12px; color: #A79C92; margin-top: 2px;">24 900 сом</div></div><span style="color: #FF5B2E;">✓</span></div>
+              <div style="font-size: 13px; color: #A79C92; margin-bottom: 8px;">Причина возврата</div>
+              <sc-for list="{{ returnReasons }}" as="r" hint-placeholder-count="4">
+                <div onClick="{{ r.pick }}" style="display: flex; align-items: center; gap: 10px; background: #2A231D; border: 1px solid {{ r.border }}; border-radius: 11px; padding: 12px; margin-bottom: 8px; cursor: pointer;"><span style="width: 18px; height: 18px; border-radius: 50%; border: 2px solid {{ r.dot }};"></span><span style="font-size: 13px; color: #D8CFC6;">{{ r.label }}</span></div>
+              </sc-for>
+              <div style="display: flex; gap: 8px; margin-top: 6px;"><div style="flex: 1; background: #2A231D; border: 1px dashed #463C31; border-radius: 11px; padding: 16px; text-align: center; color: #6E645C; font-size: 12px;">📷 Добавить фото</div></div>
+              <div onClick="{{ submitReturn }}" style="background: {{ returnCanSubmit ? '#FF5B2E' : '#463C31' }}; color: {{ returnCanSubmit ? '#181410' : '#6E645C' }}; border-radius: 13px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; margin-top: 12px; cursor: pointer;">Отправить заявку</div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- ============ SUPPORT ============ -->
+        <sc-if value="{{ isSupport }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;"><span onClick="{{ goProfile }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff;">Поддержка</span></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px;">
+              <div onClick="{{ openChat }}" style="background: #1F3D2E; border-radius: 13px; padding: 16px; text-align: center; cursor: pointer;"><div style="font-size: 24px;">💬</div><div style="font-size: 12px; color: #FF5B2E; margin-top: 6px;">Чат</div></div>
+              <div style="background: #1E3346; border-radius: 13px; padding: 16px; text-align: center; cursor: pointer;"><div style="font-size: 24px;">✈️</div><div style="font-size: 12px; color: #7FB0EC; margin-top: 6px;">Telegram</div></div>
+              <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 13px; padding: 16px; text-align: center; cursor: pointer;"><div style="font-size: 24px;">📞</div><div style="font-size: 12px; color: #D8CFC6; margin-top: 6px;">Звонок</div></div>
+            </div>
+            <div style="font-size: 13px; color: #A79C92; margin-bottom: 8px;">Частые вопросы</div>
+            <sc-for list="{{ faq }}" as="f" hint-placeholder-count="4">
+              <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 11px; padding: 13px; margin-bottom: 8px; font-size: 13px; color: #D8CFC6; cursor: pointer;">{{ f }} <span style="float: right; color: #6E645C;">▾</span></div>
+            </sc-for>
+            <div onClick="{{ openChat }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; margin-top: 12px; cursor: pointer;">Написать в чат</div>
+          </div>
+        </sc-if>
+
+        <!-- ============ SUPPORT CHAT ============ -->
+        <sc-if value="{{ isChat }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; height: 100%;">
+            <div style="flex-shrink: 0; display: flex; align-items: center; gap: 11px; padding: 10px 16px 12px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+              <span onClick="{{ goSupport }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span>
+              <div style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; font-size: 17px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);">🎧</div>
+              <div style="flex: 1;"><div style="font-family: 'Manrope'; font-weight: 700; font-size: 15px; color: #fff;">Поддержка AliStore</div><div style="font-size: 11px; color: #4ED17A;">● на связи · отвечаем ~2 мин</div></div>
+            </div>
+            <div style="flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 9px 16px; background: rgba(255,122,77,0.08); border-bottom: 1px solid rgba(255,255,255,0.06);">
+              <span style="font-size: 13px;">📦</span><span style="font-size: 11.5px; color: #A79C92;">Контекст: Заказ №4102 · iPhone 15 · IMEI 35••042</span>
+            </div>
+            <div style="flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 9px;">
+              <sc-for list="{{ supportMsgs }}" as="m" hint-placeholder-count="2">
+                <div style="display: flex; justify-content: {{ m.align }};"><div style="max-width: 80%; background: {{ m.bg }}; color: {{ m.fg }}; border-radius: {{ m.radius }}; padding: 10px 13px; font-size: 13.5px; line-height: 1.4; box-shadow: 0 4px 12px rgba(0,0,0,0.28);">{{ m.t }}<div style="font-size: 9.5px; opacity: 0.6; margin-top: 3px; text-align: right;">{{ m.time }}</div></div></div>
+              </sc-for>
+              <sc-if value="{{ supportTyping }}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; justify-content: flex-start;"><div style="background: rgba(255,255,255,0.06); border-radius: 16px 16px 16px 4px; padding: 11px 15px; font-size: 13px; color: #8A7F76;">печатает…</div></div>
+              </sc-if>
+            </div>
+            <div style="flex-shrink: 0; padding: 0 12px 8px; display: flex; gap: 7px; overflow-x: auto;">
+              <sc-for list="{{ supportQuick }}" as="q" hint-placeholder-count="3">
+                <div onClick="{{ q.ask }}" style="flex-shrink: 0; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; padding: 7px 13px; font-size: 12px; color: #FF9A6E; cursor: pointer; white-space: nowrap;">{{ q.label }}</div>
+              </sc-for>
+            </div>
+            <div style="flex-shrink: 0; display: flex; gap: 8px; padding: 8px 12px 14px; border-top: 1px solid rgba(255,255,255,0.08);">
+              <input value="{{ supportDraft }}" onChange="{{ setSupportDraft }}" placeholder="Сообщение…" style="flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; padding: 11px 16px; font-size: 14px; color: #fff; outline: none; font-family: 'Golos Text', sans-serif;">
+              <div onClick="{{ sendSupport }}" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff; cursor: pointer; box-shadow: 0 6px 16px rgba(255,91,46,0.4), inset 0 1px 0 rgba(255,255,255,0.35);">➤</div>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ============ TRADE-IN ============ -->
+        <sc-if value="{{ isTradein }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;"><span onClick="{{ back }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff;">Trade-in оценка</span></div>
+            <div style="font-size: 13px; color: #A79C92; margin-bottom: 14px; margin-left: 30px;">Оцените старое устройство за 30 секунд</div>
+            <div style="display: flex; align-items: center; gap: 10px; padding: 11px 13px; margin-bottom: 14px; border-radius: 13px; background: linear-gradient(135deg, rgba(198,255,61,0.14), rgba(255,255,255,0.02)); border: 1px solid rgba(198,255,61,0.24);"><span style="font-size: 17px;">🔥</span><span style="flex: 1; font-size: 12.5px; color: #EDE6DE; line-height: 1.4;">Акция «<b style="color:#C6FF3D;">Trade-in месяц</b>»: +5 000 сверху к оценке при покупке нового. Кампания активна до 31 июля.</span></div>
+            <sc-if value="{{ tradeinResult }}" hint-placeholder-val="{{ false }}">
+              <div style="background: linear-gradient(135deg,#2A2620,#2A231D); border: 1px solid #3A322B; border-radius: 18px; padding: 22px; text-align: center;"><div style="font-size: 13px; color: #A79C92;">Предварительная оценка</div><div style="font-family: 'Manrope'; font-weight: 800; font-size: 34px; color: #FF5B2E; margin-top: 8px;">28 000–32 000</div><div style="font-size: 12px; color: #8A7F76; margin-top: 8px; line-height: 1.5;">Точная цена — после диагностики в магазине. Можно зачесть в счёт нового устройства.</div></div>
+              <div onClick="{{ goCatalog }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; margin-top: 14px; cursor: pointer;">Выбрать новое устройство</div>
+              <div onClick="{{ resetTradein }}" style="text-align: center; color: #A79C92; font-size: 13px; margin-top: 14px; cursor: pointer;">Оценить другое</div>
+            </sc-if>
+            <sc-if value="{{ tradeinForm }}" hint-placeholder-val="{{ true }}">
+              <div style="font-size: 13px; color: #A79C92; margin-bottom: 8px;">Модель</div>
+              <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 13px; color: #fff; font-size: 14px; margin-bottom: 14px;">iPhone 13 · 128 ГБ</div>
+              <div style="font-size: 13px; color: #A79C92; margin-bottom: 8px;">Состояние</div>
+              <sc-for list="{{ tradeinConds }}" as="c" hint-placeholder-count="3">
+                <div onClick="{{ c.pick }}" style="display: flex; align-items: center; gap: 10px; background: #2A231D; border: 1px solid {{ c.border }}; border-radius: 11px; padding: 12px; margin-bottom: 8px; cursor: pointer;"><span style="width: 18px; height: 18px; border-radius: 50%; border: 2px solid {{ c.dot }};"></span><div><div style="font-size: 13px; color: #fff;">{{ c.label }}</div><div style="font-size: 11px; color: #8A7F76;">{{ c.desc }}</div></div></div>
+              </sc-for>
+              <div style="background: #2A231D; border: 1px dashed #463C31; border-radius: 11px; padding: 16px; text-align: center; color: #6E645C; font-size: 12px; margin-top: 6px;">📷 Фото устройства (4 ракурса)</div>
+              <div onClick="{{ evalTradein }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; margin-top: 12px; cursor: pointer;">Узнать цену</div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- ============ BONUSES ============ -->
+        <sc-if value="{{ isBonuses }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;"><span onClick="{{ goProfile }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff;">Бонусы и купоны</span></div>
+            <div style="background: linear-gradient(135deg,#FF5B2E,#E8410F); border-radius: 18px; padding: 22px; text-align: center;"><div style="font-size: 13px; color: #FFE0D5;">Доступно бонусов</div><div style="font-family: 'Manrope'; font-weight: 800; font-size: 40px; color: #fff; margin-top: 4px;">{{ bonusBalFmt }}</div><div style="font-size: 12px; color: #FFE0D5; margin-top: 4px;">1 бонус = 1 сом · Gold-уровень · до 30% чека</div></div>
+            <div style="font-size: 13px; color: #A79C92; margin: 16px 0 8px;">Мои купоны</div>
+            <sc-for list="{{ coupons }}" as="c" hint-placeholder-count="2">
+              <div style="display: flex; align-items: center; gap: 12px; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 13px; padding: 14px; margin-bottom: 8px;"><div style="font-size: 24px;">{{ c.icon }}</div><div style="flex: 1;"><div style="font-size: 13px; font-weight: 600; color: #fff;">{{ c.title }}</div><div style="font-size: 11px; color: #8A7F76;">{{ c.expiry }}</div></div><div style="background: #FF5B2E; color: #181410; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 700;">{{ c.value }}</div></div>
+            </sc-for>
+            <div style="font-size: 13px; color: #A79C92; margin: 16px 0 8px;">История</div>
+            <sc-for list="{{ bonusHistory }}" as="h" hint-placeholder-count="3">
+              <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #2A231D; font-size: 13px;"><span style="color: #A79C92;">{{ h.label }}</span><span style="color: {{ h.color }}; font-family: 'JetBrains Mono';">{{ h.amount }}</span></div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- ============ INSTALLMENT (моя рассрочка) ============ -->
+        <sc-if value="{{ isInstall }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;"><span onClick="{{ goProfile }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff;">Моя рассрочка</span></div>
+            <div style="border-radius: 18px; padding: 20px; background: linear-gradient(135deg, rgba(255,122,77,0.22), rgba(255,91,46,0.06)); border: 1px solid rgba(255,122,77,0.3);">
+              <div style="display: flex; justify-content: space-between; align-items: center;"><span style="font-size: 12px; color: #FFC7B0;">Следующий платёж · {{ instBank }}</span><span style="font-size: 11px; color: #FFC7B0;">{{ instNextDate }}</span></div>
+              <div style="font-family: 'Manrope'; font-weight: 800; font-size: 32px; color: #fff; margin-top: 6px;">{{ instMonthly }}</div>
+              <div onClick="{{ instPay }}" style="background: #fff; color: #14110E; border-radius: 11px; padding: 13px; text-align: center; font-weight: 700; font-size: 14px; margin-top: 14px; cursor: pointer;">{{ instPayLabel }}</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #8A7F76; margin: 14px 2px 8px;"><span>Оплачено {{ instPaidN }} из {{ instTotalN }}</span><span>Остаток {{ instRemain }}</span></div>
+            <div style="height: 8px; background: rgba(255,255,255,0.09); border-radius: 999px; overflow: hidden; margin-bottom: 18px;"><div style="width: {{ instProgress }}; height: 100%; background: linear-gradient(90deg,#8FD40F,#C6FF3D);"></div></div>
+            <div style="font-size: 13px; color: #A79C92; margin-bottom: 10px;">iPhone 15 · 128 ГБ · график</div>
+            <sc-for list="{{ instSchedule }}" as="p" hint-placeholder-count="6">
+              <div style="display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #2A231D;">
+                <div style="width: 30px; height: 30px; border-radius: 9px; background: {{ p.numBg }}; border: 1px solid {{ p.numBd }}; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono'; font-size: 12px; color: {{ p.numFg }}; flex-shrink: 0;">{{ p.mark }}</div>
+                <div style="flex: 1;"><div style="font-size: 13.5px; color: #fff;">{{ p.date }}</div><div style="font-size: 11px; color: {{ p.stFg }};">{{ p.status }}</div></div>
+                <div style="font-family: 'JetBrains Mono'; font-size: 13px; color: #D8CFC6;">{{ p.amount }}</div>
+              </div>
+            </sc-for>
+            <div style="font-size: 11px; color: #6E645C; margin-top: 12px; line-height: 1.5;">Напоминание придёт за 2 дня до платежа. Остаток долга синхронизирован с ERP.</div>
+          </div>
+        </sc-if>
+
+        <!-- ============ WAITLIST (снова в наличии) ============ -->
+        <sc-if value="{{ isWaitlist }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;"><span onClick="{{ goProfile }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff;">Снова в наличии</span></div>
+            <sc-if value="{{ waitHas }}" hint-placeholder-val="{{ true }}">
+              <div style="font-size: 12.5px; color: #8A7F76; margin-bottom: 14px;">Сообщим пушем, как только товар появится на складе.</div>
+              <sc-for list="{{ waitList }}" as="w" hint-placeholder-count="2">
+                <div style="display: flex; align-items: center; gap: 12px; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 12px; margin-bottom: 10px;">
+                  <div onClick="{{ w.open }}" style="width: 54px; height: 54px; border-radius: 11px; background: {{ w.thumb }}; background-size: cover; background-position: center; flex-shrink: 0; cursor: pointer;"></div>
+                  <div onClick="{{ w.open }}" style="flex: 1; cursor: pointer;"><div style="font-size: 13.5px; font-weight: 600; color: #fff;">{{ w.name }}</div><div style="font-family: 'Manrope'; font-weight: 800; font-size: 15px; color: #fff; margin-top: 3px;">{{ w.price }}</div><div style="font-size: 11px; color: #E5B23C; margin-top: 2px;">Ждём поступления</div></div>
+                  <span onClick="{{ w.unwatch }}" style="color: #8A7F76; font-size: 12px; cursor: pointer;">Убрать</span>
+                </div>
+              </sc-for>
+            </sc-if>
+            <sc-if value="{{ waitEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="text-align: center; padding: 50px 20px;"><div style="font-size: 46px;">🔔</div><div style="font-family: 'Manrope'; font-weight: 700; font-size: 17px; color: #fff; margin-top: 14px;">Список пуст</div><div style="font-size: 13px; color: #A79C92; margin-top: 8px; line-height: 1.5;">На карточке товара без остатка нажмите «Уведомить» — он появится здесь.</div><div onClick="{{ goCatalog }}" style="display: inline-block; background: #FF5B2E; color: #181410; border-radius: 10px; padding: 11px 20px; font-weight: 700; font-size: 13px; margin-top: 16px; cursor: pointer;">В каталог</div></div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- ============ REFERRAL ============ -->
+        <sc-if value="{{ isReferral }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;"><span onClick="{{ goProfile }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff;">Пригласи друга</span></div>
+            <div style="background: linear-gradient(135deg,#FF5B2E,#E8410F); border-radius: 18px; padding: 24px; text-align: center;"><div style="font-size: 44px;">🤝</div><div style="font-family: 'Manrope'; font-weight: 800; font-size: 22px; color: #fff; margin-top: 10px; line-height: 1.15;">+500 бонусов<br>вам и другу</div><div style="font-size: 13px; color: #FFE0D5; margin-top: 8px; line-height: 1.5;">Друг получает 500 бонусов на первую покупку, вы — 500 после его заказа.</div></div>
+            <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 13px; padding: 14px; margin-top: 14px; display: flex; align-items: center; gap: 10px;"><span style="flex: 1; font-family: 'JetBrains Mono'; font-size: 15px; color: #FF5B2E;">NURBEK500</span><span onClick="{{ copyRef }}" style="background: rgba(255,255,255,0.1); color: #D8CFC6; border-radius: 8px; padding: 8px 14px; font-size: 12px; cursor: pointer;">Копировать</span></div>
+            <div onClick="{{ shareRef }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; margin-top: 12px; cursor: pointer;">Поделиться ссылкой</div>
+            <div style="display: flex; justify-content: space-between; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 13px; padding: 16px; margin-top: 14px;"><div style="text-align: center; flex: 1;"><div style="font-family: 'Manrope'; font-weight: 800; font-size: 22px; color: #fff;">3</div><div style="font-size: 11px; color: #8A7F76;">приглашено</div></div><div style="text-align: center; flex: 1; border-left: 1px solid #3A322B;"><div style="font-family: 'Manrope'; font-weight: 800; font-size: 22px; color: #FF5B2E;">1 500</div><div style="font-size: 11px; color: #8A7F76;">бонусов заработано</div></div></div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 11px 13px; border-radius: 12px; background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.08);"><span style="width: 7px; height: 7px; border-radius: 50%; background: #4ED17A; box-shadow: 0 0 8px #4ED17A;"></span><span style="flex: 1; font-size: 11.5px; color: #A79C92; line-height: 1.4;">Часть кампании «Реферальная программа» — статистика уходит в Маркетинг-центр (k-фактор, ROAS канала).</span></div>
+          </div>
+        </sc-if>
+
+        <!-- ============ ADDRESSES ============ -->
+        <sc-if value="{{ isAddresses }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;"><span onClick="{{ goProfile }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff;">Адреса доставки</span></div>
+            <sc-for list="{{ addresses }}" as="a" hint-placeholder-count="2">
+              <div style="background: #2A231D; border: 1px solid {{ a.border }}; border-radius: 14px; padding: 16px; margin-bottom: 10px;"><div style="display: flex; justify-content: space-between;"><span style="font-size: 14px; font-weight: 600; color: #fff;">{{ a.title }}</span><sc-if value="{{ a.main }}" hint-placeholder-val="{{ false }}"><span style="background: rgba(255,91,46,0.15); color: #FF5B2E; border-radius: 6px; padding: 2px 8px; font-size: 10px;">основной</span></sc-if></div><div style="font-size: 13px; color: #A79C92; margin-top: 6px;">{{ a.text }}</div><div onClick="{{ askDeleteAddr }}" style="font-size: 12px; color: #FF8A7A; margin-top: 10px; cursor: pointer;">Удалить</div></div>
+            </sc-for>
+            <div style="background: #2A231D; border: 1px dashed #463C31; border-radius: 14px; padding: 16px; text-align: center; color: #FF5B2E; font-size: 13px; cursor: pointer;">+ Добавить адрес</div>
+          </div>
+        </sc-if>
+
+        <!-- ============ NOTIFICATIONS ============ -->
+        <sc-if value="{{ isNotif }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;"><span onClick="{{ back }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><span style="font-family: 'Manrope'; font-weight: 700; font-size: 20px; color: #fff;">Уведомления</span></div>
+            <sc-for list="{{ notifs }}" as="n" hint-placeholder-count="4">
+              <div onClick="{{ n.go }}" style="display: flex; gap: 12px; background: {{ n.bg }}; border: 1px solid #3A322B; border-radius: 13px; padding: 14px; margin-bottom: 8px; cursor: pointer;"><span style="font-size: 20px;">{{ n.icon }}</span><div style="flex: 1;"><div style="font-size: 13px; font-weight: 600; color: #fff;">{{ n.title }}</div><div style="font-size: 12px; color: #A79C92; margin-top: 2px; line-height: 1.4;">{{ n.text }}</div><div style="font-size: 11px; color: #6E645C; margin-top: 4px;">{{ n.time }}</div></div></div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- ============ SEARCH ============ -->
+        <sc-if value="{{ isSearch }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;"><span onClick="{{ back }}" style="color: #fff; font-size: 20px; cursor: pointer;">←</span><div style="flex: 1; display: flex; align-items: center; gap: 10px; background: #2A231D; border: 1px solid #FF5B2E; border-radius: 12px; padding: 8px 14px;"><span style="color: #6E645C;">🔍</span><input value="{{ sqVal }}" onInput="{{ setSq }}" placeholder="Поиск: iphone, samsung, чехол…" style="flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 14px; font-family: 'Manrope', sans-serif;" /></div></div>
+            <sc-if value="{{ didYouMean }}" hint-placeholder-val="{{ false }}">
+              <div onClick="{{ applyDym }}" style="font-size: 13px; color: #A79C92; margin-bottom: 12px; cursor: pointer;">Возможно, вы искали: <span style="color: #FF9A6E; font-weight: 600;">{{ didYouMean }}</span></div>
+            </sc-if>
+            <div style="font-size: 13px; color: #A79C92; margin-bottom: 8px;">Популярные запросы</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px;">
+              <sc-for list="{{ popular }}" as="q" hint-placeholder-count="5">
+                <div onClick="{{ q.pick }}" style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; padding: 8px 14px; font-size: 12px; color: #D8CFC6; cursor: pointer;">{{ q.label }}</div>
+              </sc-for>
+            </div>
+            <div style="font-size: 13px; color: #A79C92; margin-bottom: 8px;">Результаты</div>
+            <sc-if value="{{ searchEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="text-align: center; padding: 30px 20px;"><div style="font-size: 40px;">🔍</div><div style="font-size: 14px; color: #fff; margin-top: 10px;">Ничего не найдено</div><div style="font-size: 12px; color: #A79C92; margin-top: 6px; line-height: 1.5;">Скажите, что искали — добавим в ассортимент и уведомим вас.</div>
+                <sc-if value="{{ unmetLogged }}" hint-placeholder-val="{{ false }}"><div style="margin-top: 16px; font-size: 13px; color: #4ED17A;">✓ Заявка принята — сообщим при поступлении</div></sc-if>
+                <sc-if value="{{ unmetNotLogged }}" hint-placeholder-val="{{ true }}"><div onClick="{{ logUnmet }}" style="display: inline-block; margin-top: 16px; background: #FF5B2E; color: #fff; border-radius: 12px; padding: 12px 22px; font-size: 13px; font-weight: 700; cursor: pointer;">Сообщить, когда появится</div></sc-if>
+              </div>
+            </sc-if>
+            <sc-for list="{{ searchResults }}" as="p" hint-placeholder-count="3">
+              <div onClick="{{ p.open }}" style="display: flex; gap: 12px; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 13px; padding: 12px; margin-bottom: 8px; cursor: pointer;"><div style="width: 56px; height: 56px; border-radius: 10px; background: {{ p.thumb }}; background-size: cover; background-position: center; flex-shrink: 0;"></div><div style="flex: 1;"><div style="font-size: 13px; font-weight: 600; color: #fff;">{{ p.name }}</div><div style="font-family: 'Manrope'; font-weight: 800; font-size: 14px; color: #fff; margin-top: 4px;">{{ p.price }}</div><div style="font-size: 11px; color: {{ p.stockColor }}; margin-top: 2px;">{{ p.stock }}</div></div></div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- ============ SKELETON / LOADING ============ -->
+        <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 16px 20px;">
+            <div style="height: 20px; width: 120px; background: #2A231D; border-radius: 6px; margin-bottom: 16px;"></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <sc-for list="{{ skeletons }}" as="k" hint-placeholder-count="6">
+                <div style="background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; overflow: hidden;"><div style="height: 120px; background: linear-gradient(90deg,#2A231D,#2F281F,#2A231D);"></div><div style="padding: 11px;"><div style="height: 12px; background: #2F281F; border-radius: 4px; margin-bottom: 8px;"></div><div style="height: 12px; width: 60%; background: #2F281F; border-radius: 4px; margin-bottom: 10px;"></div><div style="height: 16px; width: 50%; background: #2F281F; border-radius: 4px;"></div></div></div>
+              </sc-for>
+            </div>
+            <div style="text-align: center; color: #6E645C; font-size: 12px; margin-top: 18px;">Загрузка товаров…</div>
+          </div>
+        </sc-if>
+
+        <!-- ============ OFFLINE ============ -->
+        <sc-if value="{{ isOffline }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 40px 26px; min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+            <div style="width: 80px; height: 80px; border-radius: 50%; background: #2A231D; display: flex; align-items: center; justify-content: center; font-size: 38px;">📡</div>
+            <div style="font-family: 'Manrope'; font-weight: 800; font-size: 22px; color: #fff; margin-top: 20px;">Нет соединения</div>
+            <div style="font-size: 14px; color: #A79C92; margin-top: 10px; line-height: 1.5;">Проверьте интернет. Избранное и корзина доступны офлайн — сохранены на устройстве.</div>
+            <div onClick="{{ retryNet }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 14px 26px; font-weight: 700; font-size: 14px; margin-top: 24px; cursor: pointer;">Повторить</div>
+            <div onClick="{{ goFav }}" style="color: #A79C92; font-size: 13px; margin-top: 16px; cursor: pointer;">Открыть избранное →</div>
+          </div>
+        </sc-if>
+
+        <!-- ============ ERROR ============ -->
+        <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 40px 26px; min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+            <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(255,138,122,0.12); display: flex; align-items: center; justify-content: center; font-size: 38px;">⚠️</div>
+            <div style="font-family: 'Manrope'; font-weight: 800; font-size: 22px; color: #fff; margin-top: 20px;">Что-то пошло не так</div>
+            <div style="font-size: 14px; color: #A79C92; margin-top: 10px; line-height: 1.5;">Не удалось загрузить данные. Мы уже знаем о проблеме — попробуйте ещё раз.</div>
+            <div onClick="{{ retryNet }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 14px 26px; font-weight: 700; font-size: 14px; margin-top: 24px; cursor: pointer;">Обновить</div>
+            <div onClick="{{ goSupport }}" style="color: #A79C92; font-size: 13px; margin-top: 16px; cursor: pointer;">Написать в поддержку</div>
+          </div>
+        </sc-if>
+
+      </div>
+
+      <!-- STORY VIEWER -->
+      <sc-if value="{{ hasStory }}" hint-placeholder-val="{{ false }}">
+        <div style="position: absolute; inset: 0; background: #140F0B; z-index: 40; display: flex; flex-direction: column; animation: fadeIn .2s ease both;">
+          <div style="display: flex; gap: 4px; padding: 12px 14px 0;">
+            <div style="flex: 1; height: 3px; background: rgba(255,255,255,0.25); border-radius: 999px; overflow: hidden;"><div style="height: 100%; background: #fff; animation: storyBar 5s linear both;"></div></div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 14px;"><div style="width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg,#FF5B2E,#FF5B2E); display: flex; align-items: center; justify-content: center; font-size: 17px;">{{ storyData.icon }}</div><span style="color: #fff; font-size: 14px; font-weight: 600;">AliStore</span><span onClick="{{ closeStory }}" style="margin-left: auto; color: #fff; font-size: 24px; cursor: pointer;">×</span></div>
+          <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-end; padding: 26px;">
+            <div style="font-size: 60px;">{{ storyData.icon }}</div>
+            <div style="font-family: 'Manrope'; font-weight: 800; font-size: 30px; color: #fff; margin-top: 16px; line-height: 1.1;">{{ storyData.title }}</div>
+            <div style="font-size: 15px; color: #D8CFC6; margin-top: 12px; line-height: 1.5;">{{ storyData.text }}</div>
+            <div onClick="{{ storyCta }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; margin-top: 24px; cursor: pointer;">{{ storyData.cta }}</div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- WRITE REVIEW SHEET -->
+      <sc-if value="{{ writeReviewOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="position: absolute; inset: 0; background: rgba(10,8,6,0.7); display: flex; align-items: flex-end; z-index: 30;">
+          <div style="width: 100%; background: #2A231D; border-radius: 22px 22px 0 0; padding: 24px; animation: sheetUp .3s cubic-bezier(.2,.7,.3,1) both;">
+            <div style="display: flex; align-items: center;"><span style="font-family: 'Manrope'; font-weight: 700; font-size: 18px; color: #fff;">Оставить отзыв</span><span onClick="{{ closeWriteReview }}" style="margin-left: auto; color: #8A7F76; font-size: 22px; cursor: pointer;">×</span></div>
+            <div style="font-size: 13px; color: #A79C92; margin-top: 6px;">Ваша оценка товара</div>
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+              <sc-for list="{{ reviewStarPicker }}" as="st" hint-placeholder-count="5">
+                <span onClick="{{ st.pick }}" style="font-size: 34px; cursor: pointer; color: {{ st.on ? '#E5B23C' : '#463C31' }};">★</span>
+              </sc-for>
+            </div>
+            <div style="background: #201B17; border: 1px solid #3A322B; border-radius: 12px; padding: 14px; margin-top: 16px; color: #6E645C; font-size: 13px; min-height: 70px;">Поделитесь впечатлением о покупке…</div>
+            <div style="display: flex; gap: 8px; margin-top: 12px;"><div style="flex: 1; background: #201B17; border: 1px dashed #463C31; border-radius: 11px; padding: 12px; text-align: center; color: #6E645C; font-size: 12px;">📷 Фото</div></div>
+            <div onClick="{{ submitReview }}" style="background: #FF5B2E; color: #181410; border-radius: 13px; padding: 15px; text-align: center; font-weight: 700; font-size: 15px; margin-top: 16px; cursor: pointer;">Отправить · +300 бонусов</div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- TOAST -->
+      <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+        <div style="position: absolute; bottom: 92px; left: 16px; right: 16px; background: #FF5B2E; color: #181410; border-radius: 12px; padding: 13px 16px; font-size: 13px; font-weight: 600; text-align: center; z-index: 20;">{{ toast }}</div>
+      </sc-if>
+
+      <!-- CONFIRM MODAL -->
+      <sc-if value="{{ hasConfirm }}" hint-placeholder-val="{{ false }}">
+        <div style="position: absolute; inset: 0; background: rgba(10,8,6,0.7); display: flex; align-items: flex-end; z-index: 30;">
+          <div style="width: 100%; background: #2A231D; border-radius: 22px 22px 0 0; padding: 24px;">
+            <div style="font-family: 'Manrope'; font-weight: 700; font-size: 18px; color: #fff;">{{ confirmTitle }}</div>
+            <div style="font-size: 13px; color: #A79C92; margin-top: 8px; line-height: 1.5;">{{ confirmText }}</div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;"><div onClick="{{ confirmYes }}" style="flex: 1; background: #FF5B2E; color: #fff; border-radius: 12px; padding: 14px; text-align: center; font-weight: 700; font-size: 14px; cursor: pointer;">{{ confirmYesLabel }}</div><div onClick="{{ confirmNo }}" style="flex: 1; background: rgba(255,255,255,0.1); color: #D8CFC6; border-radius: 12px; padding: 14px; text-align: center; font-weight: 600; font-size: 14px; cursor: pointer;">Отмена</div></div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- PRODUCT BUY BAR -->
+      <sc-if value="{{ isProduct }}" hint-placeholder-val="{{ false }}">
+        <div style="flex-shrink: 0; background: #241F18; border-top: 1px solid #3A322B; padding: 10px 14px 20px; display: flex; align-items: center; gap: 10px;">
+          <sc-if value="{{ pdInStock }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; align-items: center; gap: 12px; background: #3A322B; border-radius: 11px; padding: 8px 12px;"><span onClick="{{ pdDec }}" style="color: #fff; font-size: 18px; cursor: pointer;">−</span><span style="color: #fff; font-size: 14px; font-family: 'JetBrains Mono';">{{ pdQty }}</span><span onClick="{{ pdInc }}" style="color: #fff; font-size: 18px; cursor: pointer;">+</span></div>
+            <div onClick="{{ pdAddCart }}" style="flex: 1; background: #2A231D; border: 1px solid #FF5B2E; color: #FF5B2E; border-radius: 11px; padding: 13px; text-align: center; font-weight: 700; font-size: 14px; cursor: pointer;">В корзину</div>
+            <div onClick="{{ pdBuyNow }}" style="flex: 1; background: #FF5B2E; color: #181410; border-radius: 11px; padding: 13px; text-align: center; font-weight: 700; font-size: 14px; cursor: pointer;">Купить сейчас</div>
+          </sc-if>
+          <sc-if value="{{ pdOutStock }}" hint-placeholder-val="{{ false }}">
+            <div onClick="{{ pdNotify }}" style="flex: 1; background: #E5B23C; color: #181410; border-radius: 11px; padding: 14px; text-align: center; font-weight: 700; font-size: 14px; cursor: pointer;">{{ pdNotifyLabel }}</div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- BOTTOM NAV — Liquid Glass -->
+      <sc-if value="{{ showChrome }}" hint-placeholder-val="{{ true }}">
+        <div style="position: absolute; left: 12px; right: 12px; bottom: 13px; z-index: 40; display: flex; gap: 2px; padding: 6px; border-radius: 32px; background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.02) 44%, rgba(255,255,255,0.0)), rgba(28,24,19,0.52); -webkit-backdrop-filter: blur(26px) saturate(200%); backdrop-filter: blur(26px) saturate(200%); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 14px 38px rgba(0,0,0,0.52), 0 3px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.30), inset 0 -1px 1px rgba(0,0,0,0.35);">
+          <sc-for list="{{ nav }}" as="n" hint-placeholder-count="5">
+            <div onClick="{{ n.go }}" style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; position: relative; padding: 7px 0 6px; border-radius: 22px; background: {{ n.pillBg }}; border: 1px solid {{ n.pillBorder }}; box-shadow: {{ n.pillShadow }};">
+              <div style="font-size: 19px; line-height: 1; color: {{ n.color }}; position: relative; display: inline-block;">{{ n.icon }}<sc-if value="{{ n.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="position: absolute; top: -5px; right: -11px; background: #FF5B2E; color: #fff; border-radius: 999px; font-size: 9px; font-weight: 700; padding: 1px 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.45);">{{ n.badge }}</span></sc-if></div>
+              <div style="font-size: 9.5px; color: {{ n.color }}; font-weight: {{ n.weight }}; letter-spacing: 0.1px;">{{ n.label }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+
+  <!-- ===== SIDE: self-review table ===== -->
+  <div style="width: 360px; flex-shrink: 0; background: #201B17; border: 1px solid #3A322B; border-radius: 20px; padding: 22px; color: #D8CFC6; align-self: flex-start;">
+    <div style="font-family: 'Manrope'; font-weight: 800; font-size: 18px; color: #fff; margin-bottom: 6px;">Клиент App 3.0 — карта</div>
+    <div style="font-size: 12px; color: #8A7F76; line-height: 1.5; margin-bottom: 16px;">Полноценный e-commerce: каждый экран связан, каждая кнопка ведёт дальше. Тапайте по телефону.</div>
+    <sc-for list="{{ reviewRows }}" as="r" hint-placeholder-count="10">
+      <div style="display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #2A231D;"><span style="color: #FF5B2E; font-size: 13px;">✓</span><span style="font-size: 12px; flex: 1;">{{ r.name }}</span><span onClick="{{ r.go }}" style="font-size: 11px; color: #7FB0EC; cursor: pointer;">открыть →</span></div>
+    </sc-for>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    route: "login", prev: "home", loggedIn: false,
+    cart: {}, fav: {}, compare: {}, recent: [], waitlist: {},
+    pd: 0, catFilter: "all", sort: "pop", stockOnly: false,
+    promo: false, bonus: false, bonusBal: 4820,
+    coStep: 0, delivery: 0, pay: 0, payOk: true, order: null, sold: {},
+    tradeinCond: 0, tradeinDone: false,
+    returnReason: -1, returnDone: false,
+    toast: "", confirm: null, pdVariant: 0,
+    otpVal: "", otpTimer: 30, story: null, pdImg: 0, qty: 1,
+    faceState: "scanning",
+    reviewStars: 0, writeReview: false, sq: "", oStep: 3, pdTerm: 6,
+    supportMsgs: [
+      {me:false, t:"Здравствуйте! Я поддержка AliStore. Вижу ваш заказ №4102 (iPhone 15) и устройство по IMEI 35••042. Чем помочь?", time:"9:40"}
+    ], supportDraft: "", supportTyping: false
+  };
+
+  products() {
+    const sold = this.state.sold || {};
+    return this._productsBase().map(p => ({ ...p, stockN: Math.max(0, p.stockN - (sold[p.id]||0)) }));
+  }
+  _productsBase() {
+    return [
+      { id: 0, name: "iPhone 15 · 128 ГБ", price: 109900, old: 119900, thumb: "url('assets/p-iphone.png')", stockN: 8, brand: "Apple", mem: "128 ГБ", warr: "12 мес", badge: "-8%", cat: "phone",
+        desc: "Флагман Apple с чипом A16 Bionic, продвинутой камерой 48 Мп и USB-C. Новый, запечатанный, с официальной гарантией AliStore 12 месяцев.",
+        specs: [["Экран","6.1\" OLED"],["Чип","A16 Bionic"],["Камера","48 Мп"],["Аккумулятор","3349 мАч"]],
+        reviews: [["Азамат","★★★★★","Отличный телефон, доставили за час."],["Нургиза","★★★★★","Всё как обещали, гарантия в приложении."]] },
+      { id: 1, name: "MacBook Air M2", price: 189900, old: 0, thumb: "url('assets/p-macbook.png')", stockN: 3, brand: "Apple", mem: "256 ГБ", warr: "12 мес", badge: "", cat: "laptop",
+        desc: "Ультратонкий ноутбук на чипе M2. До 18 часов работы, безвентиляторный дизайн, дисплей Liquid Retina.",
+        specs: [["Экран","13.6\" Retina"],["Чип","Apple M2"],["ОЗУ","8 ГБ"],["SSD","256 ГБ"]],
+        reviews: [["Тимур","★★★★★","Летает, тихий, батарея огонь."]] },
+      { id: 2, name: "AirPods Pro 2", price: 24900, old: 0, thumb: "url('assets/p-airpods.png')", stockN: 25, brand: "Apple", mem: "—", warr: "12 мес", badge: "хит", cat: "audio",
+        desc: "Активное шумоподавление нового поколения, адаптивный звук, USB-C зарядка. Идеальны для города и спорта.",
+        specs: [["Тип","TWS"],["ANC","есть"],["Чип","H2"],["Защита","IP54"]],
+        reviews: [["Айбек","★★★★★","Шумодав топ."]] },
+      { id: 3, name: "Apple Watch S9", price: 44900, old: 49900, thumb: "url('assets/p-watch.png')", stockN: 0, brand: "Apple", mem: "—", warr: "12 мес", badge: "-10%", cat: "watch",
+        desc: "Умные часы с ярким дисплеем, датчиком кислорода и ЭКГ. Отслеживание тренировок и здоровья.",
+        specs: [["Экран","45 мм"],["GPS","есть"],["Датчики","ЭКГ, SpO2"],["Защита","50 м"]],
+        reviews: [["Мээрим","★★★★☆","Красивые, батарею на день."]] },
+      { id: 4, name: "iPhone 14 · Б/У A", price: 58900, old: 0, thumb: "url('assets/p-iphone.png')", stockN: 4, brand: "Apple", mem: "128 ГБ", warr: "6 мес", badge: "Б/У A", cat: "phone",
+        desc: "Привозной iPhone 14 в состоянии как новый (грейд A). Проверен, с гарантией AliStore 6 месяцев на Б/У.",
+        specs: [["Экран","6.1\" OLED"],["Чип","A15"],["Грейд","A"],["Гарантия","6 мес"]],
+        reviews: [["Данияр","★★★★★","Как новый, дешевле на треть."]] },
+      { id: 5, name: "Samsung Galaxy S24", price: 99900, old: 0, thumb: "url('assets/p-samsung.png')", stockN: 6, brand: "Samsung", mem: "256 ГБ", warr: "12 мес", badge: "", cat: "phone",
+        desc: "Флагман Samsung с AI-функциями Galaxy, ярким экраном и мощной камерой. Новый, гарантия 12 месяцев.",
+        specs: [["Экран","6.2\" AMOLED"],["Чип","Snapdragon 8 Gen 3"],["Камера","50 Мп"],["ОЗУ","8 ГБ"]],
+        reviews: [["Бакыт","★★★★★","Экран шикарный."]] },
+      { id: 6, name: "iPad Air", price: 74900, old: 0, thumb: "url('assets/p-ipad.png')", stockN: 5, brand: "Apple", mem: "128 ГБ", warr: "12 мес", badge: "", cat: "tablet",
+        desc: "Планшет на чипе M1, поддержка Apple Pencil и Magic Keyboard. Для работы, учёбы и творчества.",
+        specs: [["Экран","10.9\" Retina"],["Чип","M1"],["Память","128 ГБ"],["Перо","2-е пок."]],
+        reviews: [["Салтанат","★★★★★","Идеален для рисования."]] },
+      { id: 7, name: "Чехол iPhone 15 · Silicone", price: 1900, old: 2900, thumb: "linear-gradient(135deg,#3A5BD9,#2A3EA0)", stockN: 60, brand: "Apple", mem: "—", warr: "3 мес", badge: "-34%", cat: "acc",
+        desc: "Оригинальный силиконовый чехол с мягкой подкладкой и точными вырезами. Защищает от царапин и ударов.",
+        specs: [["Материал","Силикон"],["Совместимость","iPhone 15"],["MagSafe","есть"],["Цвета","6"]],
+        reviews: [["Айгерим","★★★★★","Качественный, сидит идеально."]] },
+      { id: 8, name: "Защитное стекло 2.5D", price: 700, old: 0, thumb: "linear-gradient(135deg,#7FB0EC,#4A78C4)", stockN: 120, brand: "AliStore", mem: "—", warr: "—", badge: "хит", cat: "acc",
+        desc: "Калёное стекло 9H с олеофобным покрытием. Установка в магазине бесплатно.",
+        specs: [["Твёрдость","9H"],["Покрытие","Олеофобное"],["Края","2.5D"],["Установка","бесплатно"]],
+        reviews: [["Талант","★★★★★","Наклеили без пузырьков."]] },
+      { id: 9, name: "Зарядка USB-C 20W", price: 1490, old: 0, thumb: "linear-gradient(135deg,#EFE7DC,#C9BFB6)", stockN: 40, brand: "Apple", mem: "—", warr: "6 мес", badge: "", cat: "acc",
+        desc: "Быстрая зарядка 20 Вт: 0–50% за 30 минут. Компактный блок для iPhone и iPad.",
+        specs: [["Мощность","20 Вт"],["Порт","USB-C"],["Быстрая","PD 3.0"],["Гарантия","6 мес"]],
+        reviews: [["Нурлан","★★★★★","Заряжает быстро."]] },
+      { id: 10, name: "Повербанк 10000 мАч", price: 2490, old: 3200, thumb: "linear-gradient(135deg,#3A322B,#4A3F33)", stockN: 18, brand: "Anker", mem: "—", warr: "12 мес", badge: "-22%", cat: "acc",
+        desc: "Компактный внешний аккумулятор Anker 10000 мАч с быстрой зарядкой и двумя портами.",
+        specs: [["Емкость","10000 мАч"],["Порты","USB-C + USB-A"],["Быстрая","20 Вт"],["Вес","210 г"]],
+        reviews: [["Эльвира","★★★★☆","Держит 2 заряда."]] },
+      { id: 11, name: "iPhone 17 Pro Max · 256 ГБ", price: 115000, old: 0, thumb: "url('assets/p-iphone.png')", stockN: 7, brand: "Apple", mem: "256 ГБ", warr: "12 мес", badge: "Новинка", cat: "phone",
+        desc: "Новейший флагман Apple с титановым корпусом, чипом A19 Pro и камерой 48 Мп с 5× зумом. Запечатанный, официальная гарантия AliStore 12 месяцев.",
+        specs: [["Экран","6.9\" OLED 120 Гц"],["Чип","A19 Pro"],["Камера","48 Мп · 5×"],["Аккумулятор","4685 мАч"]],
+        reviews: [["Марат","★★★★★","Самый быстрый айфон, камера бомба."],["Асель","★★★★★","Взяла в рассрочку, всё честно."]] }
+    ];
+  }
+
+  fmt(n) { return n.toLocaleString('ru-RU').replace(/,/g, ' ') + " сом"; }
+  thumbOf(p) { return p.thumb || "linear-gradient(135deg,#2A2620,#3A322B)"; }
+
+  cartCountN() { return Object.values(this.state.cart).reduce((a,b)=>a+b,0); }
+  subtotalN() { const P=this.products(); return Object.entries(this.state.cart).reduce((s,[id,q])=>s+P[id].price*q,0); }
+
+  toast(msg) { this.setState({ toast: msg }); clearTimeout(this._t); this._t = setTimeout(()=>this.setState({toast:""}), 1800); }
+  go(route) { this.setState({ prev: this.state.route, route }); }
+  clock(){ const d=new Date(); return d.getHours()+":"+String(d.getMinutes()).padStart(2,"0"); }
+  sendSupport(txt){ const t=(txt||this.state.supportDraft||"").trim(); if(!t) return;
+    const msgs=[...this.state.supportMsgs, {me:true, t, time:this.clock()}];
+    this.setState({supportMsgs: msgs, supportDraft:"", supportTyping:true});
+    clearTimeout(this._sc);
+    this._sc=setTimeout(()=>{
+      const low=t.toLowerCase(); let reply;
+      if(/заказ|где|достав|курьер|4102/.test(low)) reply="Заказ №4102 сейчас «Собирается», курьер выедет ~14:30. Отследить можно в разделе «Заказы» — открыть?";
+      else if(/возврат|вернуть|обмен/.test(low)) reply="Возврат оформляется 14 дней. Оформлю заявку по заказу №4102 — нажмите «Возврат» в заказе, я подскажу шаги.";
+      else if(/рассроч|платёж|платеж|долг/.test(low)) reply="По вашей рассрочке следующий платёж — в разделе «Моя рассрочка». Нужна помощь с оплатой платежа?";
+      else if(/гарант|сломал|ремонт|не работает|брак/.test(low)) reply="Гарантия на iPhone 15 (IMEI 35••042) активна ещё 354 дня. Оформить заявку в сервис?";
+      else reply="Передал вопрос специалисту, отвечу в течение 2 минут. Могу пока помочь по заказу, возврату, рассрочке или гарантии.";
+      this.setState({supportMsgs:[...this.state.supportMsgs,{me:false,t:reply,time:this.clock()}], supportTyping:false});
+    }, 1100);
+  }
+
+  startFace() {
+    this.setState({ prev: "login", route: "face", faceState: "scanning" });
+    clearTimeout(this._face1); clearTimeout(this._face2);
+    this._face1 = setTimeout(() => this.setState({ faceState: "ok" }), 1900);
+    this._face2 = setTimeout(() => { this.setState({ loggedIn: true, faceState: "scanning" }); this.go("home"); }, 3000);
+  }
+
+  startOtp() {
+    clearInterval(this._otp);
+    this.setState({ otpVal: "", otpTimer: 30 });
+    this._otp = setInterval(() => {
+      this.setState(st => { const t = Math.max(0, st.otpTimer - 1); if (t === 0) clearInterval(this._otp); return { otpTimer: t }; });
+    }, 1000);
+  }
+  otpPress(k) {
+    let v = this.state.otpVal || "";
+    if (k === "\u232b") v = v.slice(0, -1);
+    else if (k === "\u00b7") return;
+    else if (v.length < 4) v += k;
+    this.setState({ otpVal: v });
+    if (v.length === 4) { clearInterval(this._otp); setTimeout(() => { this.setState({ loggedIn: true, otpVal: "" }); this.go("home"); }, 350); }
+  }
+  storyContent(i) {
+    const d = [["\ud83d\udd25","\u0425\u0438\u0442\u044b \u043d\u0435\u0434\u0435\u043b\u0438","\u0422\u043e\u043f-5 \u0441\u043c\u0430\u0440\u0442\u0444\u043e\u043d\u043e\u0432, \u043a\u043e\u0442\u043e\u0440\u044b\u0435 \u0440\u0430\u0437\u0431\u0438\u0440\u0430\u044e\u0442 \u0431\u044b\u0441\u0442\u0440\u0435\u0435 \u0432\u0441\u0435\u0433\u043e.","\u0421\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u0445\u0438\u0442\u044b","catalog"],["\ud83c\udf81","\u0410\u043a\u0446\u0438\u0438 \u0438\u044e\u043b\u044f","\u0421\u043a\u0438\u0434\u043a\u0438 \u0434\u043e 20% \u043d\u0430 \u0430\u043a\u0441\u0435\u0441\u0441\u0443\u0430\u0440\u044b \u0438 \u0440\u0430\u0441\u0441\u0440\u043e\u0447\u043a\u0430 0% \u043d\u0430 \u0442\u0435\u0445\u043d\u0438\u043a\u0443 Apple.","\u041a \u0430\u043a\u0446\u0438\u044f\u043c","catalog"],["\u267b\ufe0f","Trade-in","\u0421\u0434\u0430\u0439 \u0441\u0442\u0430\u0440\u044b\u0439 \u0442\u0435\u043b\u0435\u0444\u043e\u043d \u2014 \u043f\u043e\u043b\u0443\u0447\u0438 \u0441\u043a\u0438\u0434\u043a\u0443 \u043d\u0430 \u043d\u043e\u0432\u044b\u0439. \u041e\u0446\u0435\u043d\u043a\u0430 \u0437\u0430 30 \u0441\u0435\u043a\u0443\u043d\u0434.","\u041e\u0446\u0435\u043d\u0438\u0442\u044c \u0443\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432\u043e","tradein"],["\ud83c\udd95","\u041d\u043e\u0432\u0438\u043d\u043a\u0438","iPhone 17 Pro Max \u0443\u0436\u0435 \u0432 \u043d\u0430\u043b\u0438\u0447\u0438\u0438. \u041f\u0435\u0440\u0432\u044b\u043c \u2014 \u043f\u043e\u0434\u0430\u0440\u043e\u043a \u0438 \u0441\u0442\u0435\u043a\u043b\u043e.","\u041e\u0442\u043a\u0440\u044b\u0442\u044c","product"],["\u26a1","\u0414\u043e\u0441\u0442\u0430\u0432\u043a\u0430 1\u20132 \u0447","\u0417\u0430\u043a\u0430\u0437\u044b \u043f\u043e \u0411\u0438\u0448\u043a\u0435\u043a\u0443 \u043f\u0440\u0438\u0432\u043e\u0437\u0438\u043c \u0432 \u0442\u043e\u0442 \u0436\u0435 \u0434\u0435\u043d\u044c.","\u0412 \u043a\u0430\u0442\u0430\u043b\u043e\u0433","catalog"]];
+    const x = d[i] || d[0]; return { icon: x[0], title: x[1], text: x[2], cta: x[3], goRoute: x[4] };
+  }
+
+  addToCart(id) { const c={...this.state.cart}; c[id]=(c[id]||0)+1; this.setState({cart:c}); this.toast("Добавлено в корзину"); }
+  toggleFav(id) { const f={...this.state.fav}; if(f[id]){delete f[id]; this.toast("Убрано из избранного");} else {f[id]=1; this.toast("В избранном");} this.setState({fav:f}); }
+  toggleCompare(id) { const c={...this.state.compare}; if(c[id]){delete c[id];} else { if(Object.keys(c).length>=4){this.toast("Максимум 4 товара");return;} c[id]=1; this.toast("Добавлено к сравнению");} this.setState({compare:c}); }
+  openProduct(id) { const r=[...this.state.recent.filter(x=>x!==id)]; r.unshift(id); this.setState({pd:id, pdVariant:0, recent:r.slice(0,6)}); this.go("product"); }
+
+  renderVals() {
+    const s = this.state, P = this.products();
+    const r = s.route;
+    const R = (x) => r === x;
+    const skeletons = [0,1,2,3,4,5];
+
+    // chrome
+    const showChrome = !R("login") && !R("otp") && !R("face");
+    const showSearchHeader = ["home","catalog","fav"].includes(r);
+
+    // nav
+    const navDef = [["home","Главная","⌂"],["catalog","Каталог","▤"],["fav","Избранное","♡"],["cart","Корзина","🛒"],["profile","Кабинет","👤"]];
+    const tabMap = { home:"home", product:"home", search:"home", tradein:"home", notif:"home", chat:"home", catalog:"catalog", compare:"catalog", loading:"catalog", fav:"fav", cart:"cart", checkout:"cart", payResult:"cart", profile:"profile", orderStatus:"profile", devices:"profile", warranty:"profile", return:"profile", support:"profile", bonuses:"profile", addresses:"profile", referral:"profile" };
+    const activeTab = tabMap[r] || "home";
+    const nav = navDef.map(n => { const on = activeTab===n[0]; return { icon: n[2], label: n[1], go: () => this.go(n[0]),
+      color: on ? "#FF5B2E" : "#A79C92", weight: on?700:500,
+      pillBg: on ? "linear-gradient(180deg, rgba(255,91,46,0.24), rgba(255,91,46,0.07))" : "transparent",
+      pillBorder: on ? "rgba(255,91,46,0.38)" : "transparent",
+      pillShadow: on ? "inset 0 1px 0 rgba(255,255,255,0.35), 0 3px 10px rgba(255,91,46,0.20)" : "none",
+      hasBadge: n[0]==="cart" && this.cartCountN()>0, badge: String(this.cartCountN()) }; });
+
+    // categories
+    const catDef = [["phone","Смартфоны","📱"],["laptop","Ноутбуки","💻"],["tablet","Планшеты","📟"],["audio","Аудио","🎧"],["watch","Часы","⌚"],["acc","Аксессуары","🔌"],["all","Все","▦"]];
+    const cats = catDef.map(c => ({ icon: c[2], name: c[1], pick: () => { this.setState({catFilter:c[0]}); this.go("catalog"); } }));
+
+    // product cards helper
+    const card = (p) => ({
+      name: p.name, price: this.fmt(p.price), thumb: this.thumbOf(p),
+      hasBadge: !!p.badge, badge: p.badge,
+      stock: p.stockN>0 ? (p.stockN<5?"Осталось "+p.stockN+" шт":"В наличии") : "Нет в наличии",
+      stockColor: p.stockN>0 ? (p.stockN<5?"#E5B23C":"#8A7F76") : "#FF8A7A",
+      favIcon: s.fav[p.id] ? "❤️" : "🤍",
+      cmpColor: s.compare[p.id] ? "#FF5B2E" : "#8A7F76",
+      addLabel: p.stockN>0 ? "В корзину" : "Уведомить",
+      open: () => this.openProduct(p.id),
+      fav: () => this.toggleFav(p.id),
+      cmp: () => this.toggleCompare(p.id),
+      add: () => p.stockN>0 ? this.addToCart(p.id) : this.toast("Сообщим о поступлении")
+    });
+
+    const hits = [P[0],P[2],P[4],P[3]].map(card);
+
+    // catalog filtering
+    let list = P.filter(p => s.catFilter==="all" || p.cat===s.catFilter);
+    if (s.stockOnly) list = list.filter(p=>p.stockN>0);
+    if (s.sort==="cheap") list=[...list].sort((a,b)=>a.price-b.price);
+    if (s.sort==="exp") list=[...list].sort((a,b)=>b.price-a.price);
+    const catalogList = list.map(card);
+    const catalogEmpty = catalogList.length===0;
+
+    const filterDef = [["all","Все"],["phone","Смартфоны"],["laptop","Ноутбуки"],["tablet","Планшеты"],["audio","Аудио"],["watch","Часы"],["acc","Аксессуары"]];
+    const filterChips = filterDef.map(f => ({ label: f[1], pick: ()=>this.setState({catFilter:f[0]}),
+      bg: s.catFilter===f[0]?"#FF5B2E":"#2A231D", fg: s.catFilter===f[0]?"#181410":"#D8CFC6", border: s.catFilter===f[0]?"#FF5B2E":"#3A322B" }));
+
+    // product detail
+    const pd = P[s.pd];
+    const pdShowVariants = ["phone","laptop","tablet"].includes(pd.cat);
+    const memDelta = pdShowVariants ? [0,15000,30000][s.pdVariant] : 0;
+    const pdPriceN = pd.price + memDelta;
+    const pdVarDef = ["128 ГБ","256 ГБ","512 ГБ"];
+    const pdVariants = pdVarDef.map((v,i)=>({ label: v, pick: ()=>this.setState({pdVariant:i}),
+      border: s.pdVariant===i?"#FF5B2E":"#3A322B", bg: s.pdVariant===i?"rgba(255,91,46,0.1)":"#2A231D", fg: s.pdVariant===i?"#FF5B2E":"#D8CFC6" }));
+    const pdSpecs = pd.specs.map(x=>({k:x[0],v:x[1]}));
+    const pdReviews = pd.reviews.map(x=>({name:x[0],stars:x[1],text:x[2]}));
+    const pdSimilar = P.filter(x=>x.id!==pd.id && x.cat===pd.cat).slice(0,3).map(x=>({name:x.name,price:this.fmt(x.price),thumb:this.thumbOf(x),open:()=>this.openProduct(x.id)}));
+
+    // favorites
+    const favIds = Object.keys(s.fav).map(Number);
+    const favList = favIds.map(id=>card(P[id]));
+    const favEmpty = favIds.length===0;
+
+    // compare
+    const cmpIds = Object.keys(s.compare).map(Number);
+    const minPrice = cmpIds.length? Math.min(...cmpIds.map(id=>P[id].price)) : 0;
+    const compareList = cmpIds.map(id=>{ const p=P[id]; return {
+      name:p.name, price:this.fmt(p.price), thumb:this.thumbOf(p), brand:p.brand, mem:p.mem, warr:p.warr,
+      stock: p.stockN>0?"В наличии":"Нет", best: p.price===minPrice, border: p.price===minPrice?"#FF5B2E":"#3A322B",
+      add:()=>this.addToCart(id), remove:()=>this.toggleCompare(id) }; });
+    const compareEmpty = cmpIds.length===0;
+
+    // cart
+    const cartIds = Object.keys(s.cart).map(Number);
+    const cartList = cartIds.map(id=>{ const p=P[id]; const q=s.cart[id]; return {
+      name:p.name, thumb:this.thumbOf(p), qty:q, lineTotal:this.fmt(p.price*q), open:()=>this.openProduct(id),
+      priceChanged: id===4,
+      inc:()=>{const c={...s.cart};c[id]++;this.setState({cart:c});},
+      dec:()=>{const c={...s.cart};c[id]--;if(c[id]<=0)delete c[id];this.setState({cart:c});},
+      remove:()=>{const c={...s.cart};delete c[id];this.setState({cart:c});} }; });
+    const cartEmpty = cartIds.length===0;
+    const sub = this.subtotalN();
+    const bonusUse = s.bonus ? Math.min(s.bonusBal, Math.round(this.subtotalN()*0.3)) : 0;
+    const disc = (s.promo?5000:0) + bonusUse;
+    const delFee = s.delivery===1 ? 0 : 300;
+    const totalN = Math.max(0, sub - disc + (cartEmpty?0:delFee));
+
+    // checkout
+    const coStepColors = [0,1,2,3].map(i=>({ color: i<=s.coStep ? "#FF5B2E" : "#3A322B" }));
+    const delDef = [["⚡","Экспресс 1–2 ч","сегодня, курьер","300 сом"],["🏬","Самовывоз","AliStore Центр","бесплатно"],["📮","Курьер на дату","завтра","300 сом"]];
+    const deliveryOpts = delDef.map((d,i)=>({ icon:d[0], name:d[1], meta:d[2], price:d[3], pick:()=>this.setState({delivery:i}),
+      border: s.delivery===i?"#FF5B2E":"#3A322B" }));
+    const payDef = [["💵","Наличными при получении"],["💳","Картой онлайн"],["📱","MBank / O!Деньги QR"],["📅","Рассрочка 0%"]];
+    const payOpts = payDef.map((p,i)=>({ icon:p[0], name:p[1], pick:()=>this.setState({pay:i}),
+      border: s.pay===i?"#FF5B2E":"#3A322B", dot: s.pay===i?"#FF5B2E":"#463C31" }));
+
+    // warranty countdown (by IMEI, real dates)
+    const warrStart = new Date(2026,6,5), warrEnd = new Date(2027,6,5), warrNow = new Date(2026,6,16);
+    const warrTotalD = Math.round((warrEnd-warrStart)/86400000);
+    const warrDaysLeft = Math.max(0, Math.round((warrEnd-warrNow)/86400000));
+    const warrFrac = Math.min(1, Math.max(0, (warrTotalD-warrDaysLeft)/warrTotalD));
+    const warrCirc = 2*Math.PI*52;
+    const warrDash = (warrCirc*(1-warrFrac)).toFixed(1)+" "+warrCirc.toFixed(1);
+    const warrPct = Math.round(warrFrac*100)+"%";
+    const warrExpiring = warrDaysLeft <= 30;
+    const warrRingColor = warrDaysLeft===0 ? "#FF6B5B" : warrExpiring ? "#E5B23C" : "#FF5B2E";
+    const warrBadge = warrDaysLeft===0 ? "○ Истекла" : warrExpiring ? "● Скоро истекает" : "● Активна";
+    const warrBadgeBg = warrDaysLeft===0 ? "rgba(255,107,91,0.15)" : warrExpiring ? "rgba(229,178,60,0.15)" : "rgba(255,91,46,0.15)";
+    const warrBadgeFg = warrDaysLeft===0 ? "#FF6B5B" : warrExpiring ? "#E5B23C" : "#FF5B2E";
+
+    // order status
+    const order = s.order;
+    const today = "16 июля 2026";
+    const orderTotal = (order && order.total) ? order.total : this.fmt(25200);
+    const orderDate = (order && order.date) ? order.date : today;
+    const oStep = s.oStep || 3;
+    const oStageDef = [
+      ["Принят","order.created","заказ создан"],
+      ["Оплачен","payment.captured","QR подтверждён"],
+      ["Собирается","order.packed","склад готовит"],
+      ["Передан курьеру","courier.assigned","в пути к вам"],
+      ["Доставлен","order.delivered","получен"]
+    ];
+    const orderSteps = oStageDef.map((o,i)=>{ const st = i<oStep-1?"done":(i===oStep-1?"active":"wait");
+      return { title:o[0], time: st==="done"?o[2]:(st==="active"?"сейчас · "+o[1]:o[1]),
+      mark: st==="done"?"✓":(st==="active"?"●":"○"),
+      bg: st==="done"?"#FF5B2E":(st==="active"?"#FF5B2E":"#3A322B"),
+      fg: st==="wait"?"#8A7F76":"#181410",
+      titleColor: st==="wait"?"#8A7F76":"#fff" }; });
+    const orderAdvance = ()=>this.setState({ oStep: Math.min(5, oStep+1) });
+    const orderStageNote = oStep>=5 ? "Заказ доставлен — статус подтверждён сервером (Event Ledger)." : "Статус приходит от сервера в реальном времени — то же событие, что видят склад и курьер.";
+
+    // profile menu
+    const wlN = Object.keys(s.waitlist).length;
+    const pmDef = [["📦","Заказы","orderStatus","1 активный"],["💳","Моя рассрочка","install","1 актив."],["🔔","Снова в наличии","waitlist", wlN?String(wlN):""],["📱","Устройства","devices",""],["🛡","Гарантии","warranty",""],["↩️","Возвраты","return",""],["🎁","Бонусы","bonuses","4 820"],["🤝","Пригласи друга","referral","+500"],["📍","Адреса","addresses",""],["🔔","Уведомления","notif",""],["💬","Поддержка","support",""],["📡","Состояния","offline",""]];
+    const profileMenu = pmDef.map(m=>({ icon:m[0], label:m[1], go:()=>{ if(m[2]==="orderStatus"&&!s.order){this.setState({order:{no:"№4102"}});} this.go(m[2]); },
+      hasBadge: !!m[3], badge: m[3] }));
+
+    // devices
+    const devices = [
+      { name:"iPhone 15", imei:"IMEI 35 812••• 042", date:"05.07.2026", thumb:"url('assets/p-iphone.png')", warranty:"9 мес", wBg:"rgba(255,91,46,0.15)", wFg:"#FF5B2E" },
+      { name:"AirPods Pro 2", imei:"SN F2••K9", date:"12.03.2026", thumb:"url('assets/p-airpods.png')", warranty:"истекла", wBg:"rgba(255,138,122,0.15)", wFg:"#FF8A7A" }
+    ];
+
+    // return
+    const rrDef = ["Не подошёл / передумал","Брак / не работает","Не соответствует описанию","Пришёл не тот товар"];
+    const returnReasons = rrDef.map((x,i)=>({ label:x, pick:()=>this.setState({returnReason:i}),
+      border: s.returnReason===i?"#FF5B2E":"#3A322B", dot: s.returnReason===i?"#FF5B2E":"#463C31" }));
+
+    // support
+    const faq = ["Как отследить заказ?","Условия возврата и обмена","Как работает рассрочка?","Гарантия на Б/У технику"];
+
+    // trade-in
+    const tcDef = [["Отличное","без царапин, как новый"],["Хорошее","мелкие потёртости"],["Удовлетворительное","заметный износ"]];
+    const tradeinConds = tcDef.map((c,i)=>({ label:c[0], desc:c[1], pick:()=>this.setState({tradeinCond:i}),
+      border: s.tradeinCond===i?"#FF5B2E":"#3A322B", dot: s.tradeinCond===i?"#FF5B2E":"#463C31" }));
+
+    // bonuses
+    const coupons = [{icon:"🎂",title:"Скидка ко дню рождения",expiry:"до 20 июля",value:"−15%"},{icon:"🎧",title:"Скидка на аксессуары",expiry:"до 31 июля",value:"−10%"}];
+    const bonusHistory = [{label:"Покупка iPhone 15",amount:"+1 099",color:"#FF5B2E"},{label:"Отзыв с фото",amount:"+300",color:"#FF5B2E"},{label:"Списано за AirPods",amount:"−2 000",color:"#FF8A7A"}];
+
+    // addresses
+    const addresses = [{title:"Дом",text:"г. Манас, ул. Ленина 12, кв 5",main:true,border:"#FF5B2E"},{title:"Работа",text:"г. Манас, ул. Садовая 8",main:false,border:"#3A322B"}];
+
+    // notifications
+    const notifs = [
+      {icon:"📦",title:"Заказ №4102 собирается",text:"Скоро передадим курьеру",time:"5 мин назад",bg:"#2A231D",go:()=>{this.setState({order:{no:"№4102"}});this.go("orderStatus");}},
+      {icon:"🏷️",title:"Цена снизилась",text:"Apple Watch S9 теперь дешевле на 5 000",time:"1 ч назад",bg:"#201B17",go:()=>this.openProduct(3)},
+      {icon:"🛡",title:"Гарантия скоро истекает",text:"AirPods Pro — осталось 12 дней",time:"вчера",bg:"#201B17",go:()=>this.go("warranty")},
+      {icon:"🎁",title:"Начислены бонусы",text:"+300 за отзыв",time:"2 дня назад",bg:"#201B17",go:()=>this.go("bonuses")}
+    ];
+
+    // search — smart: synonyms + typo tolerance + unmet-demand capture
+    const popular = ["iPhone 15","AirPods","MacBook","Samsung","Б/У"].map(q=>({ label:q, pick:()=>this.setState({sq:q}) }));
+    const synonyms = { "айфон":"iphone","айпад":"ipad","макбук":"macbook","самсунг":"samsung","эйрподс":"airpods","часы":"watch","наушники":"airpods","ноут":"macbook","ноутбук":"macbook","телефон":"iphone","планшет":"ipad" };
+    const norm = t => t.toLowerCase().replace(/ё/g,"е").replace(/[^a-zа-я0-9 ]/gi,"").trim();
+    const lev = (a,b)=>{ const m=a.length,n=b.length; if(!m)return n; if(!n)return m; const d=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]); for(let j=0;j<=n;j++)d[0][j]=j; for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); return d[m][n]; };
+    let sqRaw = norm(s.sq||"");
+    let sq = sqRaw.split(" ").map(w=>synonyms[w]||w).join(" ").trim();
+    const scoreP = p => { const hay=norm(p.name+" "+p.brand+" "+(p.cat||"")); if(!sq)return 1; if(hay.includes(sq))return 3;
+      const words=hay.split(" "); const qw=sq.split(" ");
+      let best=0; qw.forEach(q=>{ words.forEach(w=>{ if(w.startsWith(q)&&q.length>=2)best=Math.max(best,2); else if(q.length>=4&&lev(w,q)<=1)best=Math.max(best,1); }); }); return best; };
+    const searchBase = sq ? P.map(p=>({p,sc:scoreP(p)})).filter(x=>x.sc>0).sort((a,b)=>b.sc-a.sc).map(x=>x.p) : [P[0],P[4],P[5]];
+    const searchResults = searchBase.map(p=>card(p));
+    const searchEmpty = !!sq && searchBase.length===0;
+    const didYouMean = (()=>{ if(!sq||searchBase.length)return null; let best=null,bd=99; P.forEach(p=>{ (p.name+" "+p.brand).toLowerCase().split(" ").forEach(w=>{ const wn=norm(w); if(wn.length>=3){ const dd=lev(wn,sq.split(" ")[0]); if(dd<bd&&dd<=2){bd=dd;best=w;} } }); }); return best; })();
+    const unmetLogged = (s.unmet||[]).includes(sqRaw);
+    const logUnmet = ()=>{ this.setState({unmet:[...(s.unmet||[]),sqRaw]}); this.toast("Спасибо! Сообщим, когда «"+(s.sq||"").trim()+"» появится"); };
+
+    // confirm modal content
+    const cf = s.confirm;
+    let confirmTitle="", confirmText="", confirmYesLabel="Да", confirmYes=()=>{};
+    if (cf==="logout") { confirmTitle="Выйти из аккаунта?"; confirmText="Корзина и избранное сохранятся."; confirmYesLabel="Выйти"; confirmYes=()=>this.setState({confirm:null,route:"login",loggedIn:false}); }
+    if (cf==="cancel") { confirmTitle="Отменить заказ?"; confirmText="Заказ ещё собирается — отмена возможна. Деньги вернутся на счёт."; confirmYesLabel="Отменить заказ"; confirmYes=()=>{this.setState({confirm:null});this.toast("Заказ отменён");this.go("profile");}; }
+    if (cf==="addr") { confirmTitle="Удалить адрес?"; confirmText="Это действие нельзя отменить."; confirmYesLabel="Удалить"; confirmYes=()=>{this.setState({confirm:null});this.toast("Адрес удалён");}; }
+
+    // review rows (side)
+    const reviewRows = [["Главная","home"],["Каталог + фильтры","catalog"],["Карточка товара","product"],["Избранное","fav"],["Сравнение","compare"],["Корзина","cart"],["Checkout","checkout"],["Статус заказа","orderStatus"],["Кабинет","profile"],["Устройства","devices"],["Гарантия","warranty"],["Возврат","return"],["Поддержка","support"],["Trade-in","tradein"],["Бонусы","bonuses"],["Пригласи друга","referral"],["Адреса","addresses"],["Поиск","search"]].map(x=>({ name:x[0], go:()=>{ if(x[1]==="orderStatus"){this.setState({order:{no:"№4102"}});} this.go(x[1]); } }));
+
+    return {
+      showChrome, showSearchHeader, scrPad: showChrome ? "92px" : "0px", nav, cats, hits, city: "Манас",
+      hasCompare: cmpIds.length>0, compareCount: String(cmpIds.length), hasNotif: true,
+      goCity: ()=>this.toast("Пока работаем только в г. Манас"), goCompare: ()=>this.go("compare"), goNotif: ()=>this.go("notif"), goSearch: ()=>this.go("search"),
+      goCatalog: ()=>{ this.setState({prev:s.route,route:"loading"}); clearTimeout(this._n); this._n=setTimeout(()=>this.setState({route:"catalog"}),700); }, goHero: ()=>this.openProduct(11), goHome: ()=>this.go("home"),
+      goProfile: ()=>this.go("profile"), goTradein: ()=>this.go("tradein"), goSupport: ()=>this.go("support"), goWarranty: ()=>this.go("warranty"), goReceipt: ()=>this.toast("Чек открыт (PDF)"),
+      back: ()=>this.go(s.prev),
+
+      // routes
+      isLogin:R("login"), isHome:R("home"), isCatalog:R("catalog"), isProduct:R("product"),
+      isFav:R("fav"), isCompare:R("compare"), isCart:R("cart"),
+      cartSynced: cartIds.length>0, syncText: "Корзина синхронизирована с сайтом · вход по +996 555 ··· 12",
+      isCheckout:R("checkout"),
+      isPayResult:R("payResult"), isOrderStatus:R("orderStatus"), isProfile:R("profile"),
+      isDevices:R("devices"), isWarranty:R("warranty"), warrDaysLeft, warrDash, warrPct, warrRingColor, warrBadge, warrBadgeBg, warrBadgeFg, isReturn:R("return"), isSupport:R("support"),
+      isTradein:R("tradein"), isBonuses:R("bonuses"), isInstall:R("install"), isReferral:R("referral"), isAddresses:R("addresses"), isNotif:R("notif"), isSearch:R("search"), isWaitlist:R("waitlist"),
+      waitHas: wlN>0, waitEmpty: wlN===0, waitList: Object.keys(s.waitlist).map(id=>{ const p=P[id]; return { name:p.name, price:this.fmt(p.price), thumb:this.thumbOf(p), open:()=>this.openProduct(+id), unwatch:()=>{ const w={...s.waitlist}; delete w[id]; this.setState({waitlist:w}); this.toast("Убрано из ожиданий"); } }; }),
+      isLoading:R("loading"), isOffline:R("offline"), isError:R("error"), skeletons,
+      goFav: ()=>this.go("fav"),
+      retryNet: ()=>{ this.setState({prev:"profile",route:"loading"}); clearTimeout(this._n); this._n=setTimeout(()=>this.go("catalog"),1100); },
+
+      // login
+      doLogin: ()=>{ this.startOtp(); this.go("otp"); }, doGuest: ()=>{ this.go("home"); },
+      startFace: ()=>this.startFace(), isFace: R("face"),
+      faceScanning: s.faceState==="scanning",
+      faceIcon: s.faceState==="ok" ? "✓" : "☺",
+      faceRingColor: s.faceState==="ok" ? "#4ED17A" : "#7FB0EC",
+      faceGlow: s.faceState==="ok" ? "rgba(78,209,122,0.5)" : "rgba(127,176,236,0.45)",
+      faceTitle: s.faceState==="ok" ? "Лицо распознано" : "Смотрите на камеру",
+      faceSub: s.faceState==="ok" ? "Входим в AliStore…" : "Идёт сканирование Face ID. Держите телефон перед лицом.",
+      isOtp: R("otp"),
+      otpBoxes: [0,1,2,3].map(i=>({ d: (s.otpVal[i]||""), active: s.otpVal.length===i, border: s.otpVal.length===i ? "#FF5B2E" : "#3A322B" })),
+      otpKeys: ["1","2","3","4","5","6","7","8","9","\u00b7","0","\u232b"].map(k=>({ k, press:()=>this.otpPress(k) })),
+      otpTimerLabel: s.otpTimer>0 ? ("\u041d\u043e\u0432\u044b\u0439 \u043a\u043e\u0434 \u0447\u0435\u0440\u0435\u0437 0:"+(s.otpTimer<10?"0":"")+s.otpTimer) : "\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u043a\u043e\u0434 \u043f\u043e\u0432\u0442\u043e\u0440\u043d\u043e",
+      canResend: s.otpTimer===0, resendOtp: ()=>{ if(s.otpTimer===0) this.startOtp(); },
+
+      // home
+      recent: s.recent.map(id=>({name:P[id].name,price:this.fmt(P[id].price),thumb:this.thumbOf(P[id]),open:()=>this.openProduct(id)})),
+      hasRecent: s.recent.length>0,
+      instBank: "Оптима · 0%",
+      instMonthly: this.fmt(9160)+" сом", instNextDate: "10 авг 26",
+      instPaidN: (s.instPaid||1), instTotalN: 12,
+      instRemain: this.fmt(9160*(12-(s.instPaid||1)))+" сом",
+      instProgress: Math.round((s.instPaid||1)/12*100)+"%",
+      instPayLabel: (s.instPaid||1)>=12 ? "Рассрочка закрыта ✓" : "Оплатить "+this.fmt(9160)+" сом",
+      instPay: ()=>{ if((s.instPaid||1)<12){ this.setState({instPaid:(s.instPaid||1)+1}); this.toast("Платёж принят"); } },
+      instSchedule: (()=>{ const mon=["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"]; const paid=s.instPaid||1; const arr=[]; for(let i=0;i<12;i++){ const d=new Date(2026,6+i,10); const done=i<paid, cur=i===paid; arr.push({ mark: done?"✓":(i+1), date: "10 "+mon[d.getMonth()]+" "+String(d.getFullYear()).slice(2), status: done?"оплачено":(cur?"следующий":"по плану"), stFg: done?"#7EE6A0":(cur?"#FF9A6E":"#8A7F76"), amount: this.fmt(9160), numBg: done?"rgba(78,209,122,0.14)":(cur?"rgba(255,122,77,0.18)":"rgba(255,255,255,0.05)"), numBd: done?"rgba(78,209,122,0.3)":(cur?"rgba(255,122,77,0.32)":"rgba(255,255,255,0.09)"), numFg: done?"#7EE6A0":(cur?"#FF9A6E":"#B8AEA4") }); } return arr; })(),
+      forYou: (()=>{ const seen=s.recent.slice(0,2); const cats=[...new Set(seen.map(id=>P[id].cat))]; let rec=P.filter(p=>cats.includes(p.cat) && !s.recent.includes(p.id)); if(rec.length<3) rec=rec.concat(P.filter(p=>!rec.includes(p) && !s.recent.includes(p.id))); return rec.slice(0,6).map(p=>({ name:p.name, price:this.fmt(p.price), thumb:this.thumbOf(p), stock: p.stockN>0?(p.stockN<5?"Осталось "+p.stockN:"В наличии"):"Нет в наличии", stockColor: p.stockN>0?(p.stockN<5?"#E5B23C":"#7EE6A0"):"#FF8A7A", open:()=>this.openProduct(p.id) })); })(),
+      hasForYou: s.recent.length>0,
+      forYouReason: s.recent.length>0 ? "на основе просмотренного" : "",      stories: [["\ud83d\udd25","\u0425\u0438\u0442\u044b"],["\ud83c\udf81","\u0410\u043a\u0446\u0438\u0438"],["\u267b\ufe0f","Trade-in"],["\ud83c\udd95","\u041d\u043e\u0432\u0438\u043d\u043a\u0438"],["\u26a1","1\u20132 \u0447"]].map((x,i)=>({ icon:x[0], label:x[1], open:()=>this.setState({story:i}) })),
+      hasStory: s.story!==null, storyData: this.storyContent(s.story), closeStory:()=>this.setState({story:null}),
+      storyCta: ()=>{ const g=this.storyContent(s.story).goRoute; this.setState({story:null}); if(g==="product"){ this.openProduct(0); } else { this.go(g); } },
+
+      // catalog
+      catalogList, catalogEmpty, catalogCount: list.length+" товаров", filterChips,
+      sortLabel: s.sort==="cheap"?"Дешевле":(s.sort==="exp"?"Дороже":"Популярные"),
+      toggleSort: ()=>this.setState({sort: s.sort==="pop"?"cheap":(s.sort==="cheap"?"exp":"pop")}),
+      toggleStock: ()=>this.setState({stockOnly:!s.stockOnly}),
+      stockBg: s.stockOnly?"rgba(255,91,46,0.1)":"#2A231D", stockFg: s.stockOnly?"#FF5B2E":"#D8CFC6",
+      resetFilters: ()=>this.setState({catFilter:"all",stockOnly:false}),
+
+      // product
+      pd: { name:pd.name, price:this.fmt(pdPriceN), thumb:this.thumbOf(pd), hasBadge:!!pd.badge, badge:pd.badge,
+        hasOld: pd.old>0, oldPrice: pd.old?this.fmt(pd.old):"", installment: "или "+this.fmt(Math.round(pdPriceN/12))+" × 12 мес", desc: pd.desc },
+      pdShowVariants, pdInStock: pd.stockN>0, pdOutStock: pd.stockN<=0,
+      pdInstBank: "Оптима · 0%",
+      pdInstTerms: [3,6,9,12].map(n=>{ const on=(s.pdTerm||6)===n; return { n, pick:()=>this.setState({pdTerm:n}),
+        bg: on?"linear-gradient(135deg,#FF7A4D,#E8410F)":"rgba(255,255,255,0.06)", fg: on?"#fff":"#B8AEA4", bd: on?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.1)" }; }),
+      pdInstMonthly: this.fmt(Math.ceil(pdPriceN/(s.pdTerm||6)/100)*100)+" сом",
+      pdNotify: ()=>{ const w={...s.waitlist}; if(w[pd.id]){ delete w[pd.id]; this.setState({waitlist:w}); this.toast("Убрано из ожиданий"); } else { w[pd.id]=1; this.setState({waitlist:w}); this.toast("Сообщим, когда "+pd.name+" появится"); } },
+      pdNotifyLabel: s.waitlist[pd.id] ? "✓ Вы в списке ожидания" : "🔔 Уведомить о поступлении",
+      pdFavIcon: s.fav[pd.id]?"❤️":"🤍", pdFav: ()=>this.toggleFav(pd.id),
+      pdVariants, pdSpecs, pdReviews, pdSimilar,
+      pdImgMain: this.thumbOf(pd), pdDots: [0,1,2,3].map(i=>({ on: s.pdImg===i })),
+      pdGallery: [0,1,2,3].map(i=>({ active: s.pdImg===i, thumb: this.thumbOf(pd), pick:()=>this.setState({pdImg:i}) })),
+      shareProduct: ()=>this.toast("\u0421\u0441\u044b\u043b\u043a\u0430 \u043d\u0430 \u0442\u043e\u0432\u0430\u0440 \u0441\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d\u0430"),
+      pdQty: s.qty, pdInc:()=>this.setState({qty:s.qty+1}), pdDec:()=>this.setState({qty:Math.max(1,s.qty-1)}),
+      pdAddCart: ()=>{ const c={...s.cart}; c[pd.id]=(c[pd.id]||0)+s.qty; this.setState({cart:c, qty:1}); this.toast(pd.name+" \u00d7"+s.qty+" \u0432 \u043a\u043e\u0440\u0437\u0438\u043d\u0435"); },
+      pdBuyNow: ()=>{ const c={...s.cart}; c[pd.id]=(c[pd.id]||0)+s.qty; this.setState({cart:c, qty:1, coStep:0}); this.go("checkout"); },
+      ratingBars: [[5,"86%"],[4,"10%"],[3,"3%"],[2,"1%"],[1,"0%"]].map(x=>({ star:x[0], pct:x[1] })),
+      writeReviewOpen: s.writeReview, openWriteReview:()=>this.setState({writeReview:true, reviewStars:0}),
+      closeWriteReview:()=>this.setState({writeReview:false}),
+      reviewStarPicker: [1,2,3,4,5].map(n=>({ n, on:n<=s.reviewStars, pick:()=>this.setState({reviewStars:n}) })),
+      submitReview: ()=>{ if(s.reviewStars>0){ this.setState({writeReview:false}); this.toast("\u0421\u043f\u0430\u0441\u0438\u0431\u043e! \u041e\u0442\u0437\u044b\u0432 \u043d\u0430 \u043c\u043e\u0434\u0435\u0440\u0430\u0446\u0438\u0438 \u00b7 +300 \u0431\u043e\u043d\u0443\u0441\u043e\u0432"); } else this.toast("\u041f\u043e\u0441\u0442\u0430\u0432\u044c\u0442\u0435 \u043e\u0446\u0435\u043d\u043a\u0443"); },
+
+      // favorites
+      favList, favEmpty,
+      // compare
+      compareList, compareEmpty,
+
+      // cart
+      cartList, cartEmpty, hasCart: !cartEmpty,
+      subtotal:this.fmt(sub), hasDiscount: disc>0, discount:"−"+this.fmt(disc),
+      deliveryFee: delFee===0?"бесплатно":this.fmt(delFee), total:this.fmt(totalN),
+      promoLabel: s.promo?"✓ SALE5000":"Применить", promoColor: s.promo?"#FF5B2E":"#D8CFC6",
+      applyPromo: ()=>{this.setState({promo:!s.promo}); this.toast(s.promo?"Промокод убран":"Промокод применён: −5000");},
+      bonusOn: s.bonus, bonusMark: s.bonus?"✓":"", toggleBonus: ()=>this.setState({bonus:!s.bonus}),
+      bonusBalFmt: this.fmt(s.bonusBal), bonusRowLabel: "Списать "+this.fmt(bonusUse)+" бонусов (до 30%)",
+      goCheckout: ()=>{ this.setState({coStep:0}); this.go("checkout"); },
+
+      // checkout
+      coSteps: coStepColors, cartCount: this.cartCountN()+" шт",
+      coDelivery: s.coStep===0, coAddress: s.coStep===1, coPayment: s.coStep===2, coReview: s.coStep===3,
+      deliveryOpts, payOpts,
+      coNext: ()=>this.setState({coStep: Math.min(3, s.coStep+1)}),
+      chosenDelivery: delDef[s.delivery][1], chosenPay: payDef[s.pay][1],
+      isPickup: s.delivery===1, isCourierDelivery: s.delivery!==1,
+      pickupCode: "AL-4102", pickupStore: "AliStore Центр · ул. Ленина 12",
+      pickupHours: "сегодня до 21:00", pickupStock: "iPhone 15 · 1 шт зарезервирован под вас",
+      placeOrder: ()=>{ const ok = s.pay!==1 ? true : Math.random()>0.35; const sold={...s.sold}; let bal=s.bonusBal; if(ok){ Object.entries(s.cart).forEach(([id,q])=>{ sold[id]=(sold[id]||0)+q; }); bal = bal - bonusUse + Math.round(totalN*0.01); } this.setState({payOk: ok, order: ok?{no:"№4102", total:this.fmt(totalN), date:today}:null, oStep: ok?2:1, sold, bonusBal: bal, bonus:false, cart: ok?{}:s.cart }); this.go("payResult"); },
+
+      // pay result
+      paySuccess: s.payOk, payFailed: !s.payOk,
+      payResultBg: s.payOk?"rgba(255,91,46,0.15)":"rgba(255,138,122,0.15)",
+      payResultIcon: s.payOk?"✓":"✕",
+      payResultTitle: s.payOk?"Заказ оформлен!":"Оплата не прошла",
+      payResultText: s.payOk?"Заказ №4102 принят. Мы уже собираем его — статус в уведомлениях.":"Платёж отклонён банком. Попробуйте другой способ или повторите.",
+      goOrderStatus: ()=>{ this.setState({cart:{}}); this.go("orderStatus"); },
+      retryPay: ()=>this.go("checkout"),
+
+      // order status
+      orderNo: order?order.no:"№4102", orderDate, orderTotal, orderSteps, orderAdvance, orderStageNote,
+      courierName:"\u0414\u0430\u043d\u0438\u044f\u0440", courierEta:"~14 \u043c\u0438\u043d", courierPhone:"+996 700 \u2022\u2022 88",
+      callCourier:()=>this.toast("\u0417\u0432\u043e\u043d\u0438\u043c \u043a\u0443\u0440\u044c\u0435\u0440\u0443\u2026"), chatCourier:()=>this.toast("\u041e\u0442\u043a\u0440\u044b\u0432\u0430\u0435\u043c \u0447\u0430\u0442 \u0441 \u043a\u0443\u0440\u044c\u0435\u0440\u043e\u043c"),
+      askCancel: ()=>this.setState({confirm:"cancel"}),
+      repeatOrder: ()=>{ this.setState({cart:{0:1,2:1}}); this.toast("Товары добавлены в корзину"); this.go("cart"); },
+
+      // profile
+      profileMenu, askLogout: ()=>this.setState({confirm:"logout"}),
+
+      // devices
+      devices,
+
+      // return
+      returnForm: !s.returnDone, returnSubmitted: s.returnDone,
+      returnReasons, returnCanSubmit: s.returnReason>=0,
+      submitReturn: ()=>{ if(s.returnReason>=0) this.setState({returnDone:true}); else this.toast("Выберите причину"); },
+
+      // support
+      faq,
+      openChat: ()=>this.go("chat"),
+      isChat:R("chat"),
+      supportMsgs: s.supportMsgs.map(m=>({ ...m,
+        align: m.me?"flex-end":"flex-start",
+        bg: m.me?"linear-gradient(135deg,#FF7A4D,#E8410F)":"rgba(255,255,255,0.06)",
+        fg: m.me?"#fff":"#E5DCD3",
+        radius: m.me?"16px 16px 4px 16px":"16px 16px 16px 4px" })),
+      supportTyping: s.supportTyping,
+      supportDraft: s.supportDraft,
+      setSupportDraft: e=>this.setState({supportDraft:e.target.value}),
+      sendSupport: ()=>this.sendSupport(),
+      supportQuick: ["Где мой заказ?","Условия возврата","Платёж по рассрочке","Гарантия на телефон"].map(q=>({ label:q, ask:()=>this.sendSupport(q) })),
+
+      // trade-in
+      tradeinForm: !s.tradeinDone, tradeinResult: s.tradeinDone, tradeinConds,
+      evalTradein: ()=>this.setState({tradeinDone:true}), resetTradein: ()=>this.setState({tradeinDone:false}),
+
+      // bonuses
+      coupons, bonusHistory,
+      // addresses
+      addresses, askDeleteAddr: ()=>this.setState({confirm:"addr"}),
+      copyRef: ()=>this.toast("\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434 \u0441\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d"), shareRef: ()=>this.toast("\u0421\u0441\u044b\u043b\u043a\u0430 \u0433\u043e\u0442\u043e\u0432\u0430 \u043a \u043e\u0442\u043f\u0440\u0430\u0432\u043a\u0435"),
+      // notifications
+      notifs,
+      // search
+      popular, searchResults, searchEmpty, sqVal: s.sq||"", didYouMean, applyDym: didYouMean?(()=>this.setState({sq:didYouMean})):(()=>{}),
+      unmetLogged, unmetNotLogged: !unmetLogged, logUnmet, setSq: (e)=>this.setState({sq: (e&&e.target)?e.target.value:""}),
+
+      // toast + confirm
+      hasToast: !!s.toast, toast: s.toast,
+      hasConfirm: !!s.confirm, confirmTitle, confirmText, confirmYesLabel, confirmYes,
+      confirmNo: ()=>this.setState({confirm:null}),
+
+      reviewRows
+    };
+  }
+}
+</script>
+</body>
+</html>

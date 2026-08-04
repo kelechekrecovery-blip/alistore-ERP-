@@ -1,0 +1,174 @@
+import { PrismaService } from '../src/prisma/prisma.service';
+import { AuditService } from '../src/audit/audit.service';
+import { UnitsService } from '../src/units/units.service';
+import { OrdersService } from '../src/orders/orders.service';
+import { ConflictError } from '../src/common/errors';
+
+/**
+ * Warehouse fulfillment: a web order arrives `created` with IMEI-less lines.
+ * fulfill() assigns concrete in_stock units, normalizes qty>1 to one unit per
+ * line, reserves them, and moves the order to `reserved`.
+ */
+describe('Warehouse fulfillment (integration)', () => {
+  let prisma: PrismaService;
+  let orders: OrdersService;
+  let seq = 0;
+
+  beforeAll(async () => {
+    prisma = new PrismaService();
+    await prisma.$connect();
+    const audit = new AuditService(prisma);
+    orders = new OrdersService(prisma, audit, new UnitsService(prisma));
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  beforeEach(async () => {
+    await prisma.auditEvent.deleteMany();
+    await prisma.reservation.deleteMany();
+    await prisma.orderItem.deleteMany();
+    await prisma.order.deleteMany();
+    await prisma.deviceUnit.deleteMany();
+    await prisma.inventoryMovement.deleteMany();
+    await prisma.product.deleteMany();
+    await prisma.tradeInDevice.deleteMany();
+    await prisma.customer.deleteMany();
+  });
+
+  async function seed(units: number) {
+    seq += 1;
+    const customer = await prisma.customer.create({
+      data: { phone: `+99670007${seq.toString().padStart(4, '0')}`, name: 'Веб' },
+    });
+    const product = await prisma.product.create({
+      data: { sku: `WH-${seq}`, name: 'iPhone', price: 100000, cost: 80000, category: 'phones', attrs: {} },
+    });
+    for (let n = 0; n < units; n += 1) {
+      await prisma.deviceUnit.create({
+        data: { imei: `IMEI-WH-${seq}-${n}`, productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },
+      });
+    }
+    return { customer, product };
+  }
+
+  it('assigns a unit to a web order line and moves it to reserved', async () => {
+    const { customer, product } = await seed(2);
+    const order = await orders.create(
+      { customerId: customer.id, channel: 'web', total: 100000, items: [{ sku: product.sku, qty: 1, price: 100000 }] },
+      'system',
+    );
+
+    const res = await orders.fulfill(order.id, 'warehouse');
+    expect(res.order.status).toBe('reserved');
+    expect(res.assigned).toHaveLength(1);
+
+    const item = await prisma.orderItem.findFirst({ where: { orderId: order.id } });
+    expect(item?.imei).toBe(res.assigned[0]);
+    const unit = await prisma.deviceUnit.findUnique({ where: { imei: res.assigned[0] } });
+    expect(unit?.status).toBe('reserved');
+    expect(unit?.orderId).toBe(order.id);
+  });
+
+  it('rejects direct reservation of an IMEI-less serialized line', async () => {
+    const { customer, product } = await seed(1);
+    const order = await orders.create(
+      { customerId: customer.id, channel: 'web', total: 100000, items: [{ sku: product.sku, qty: 1, price: 100000 }] },
+      'system',
+    );
+
+    await expect(orders.reserve(order.id, 'seller')).rejects.toMatchObject({ code: 'serialized_unit_required' });
+    expect(await prisma.reservation.count({ where: { orderId: order.id } })).toBe(0);
+    expect(await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).toMatchObject({ status: 'created' });
+  });
+
+  it('normalizes a qty>1 line to one unit per line', async () => {
+    const { customer, product } = await seed(3);
+    const order = await orders.create(
+      { customerId: customer.id, channel: 'web', total: 200000, items: [{ sku: product.sku, qty: 2, price: 100000 }] },
+      'system',
+    );
+
+    const res = await orders.fulfill(order.id, 'warehouse');
+    expect(res.assigned).toHaveLength(2);
+    const items = await prisma.orderItem.findMany({ where: { orderId: order.id } });
+    expect(items).toHaveLength(2);
+    expect(items.every((i) => i.imei && i.qty === 1)).toBe(true);
+    expect(items.every((item) => item.taxBaseAmount + item.taxAmount + item.discountAmount === item.price)).toBe(true);
+    expect(items.reduce((sum, item) => sum + item.taxAmount, 0)).toBe(order.taxAmount);
+    expect(items.reduce((sum, item) => sum + item.taxBaseAmount, 0)).toBe(order.taxBaseAmount);
+    const reserved = await prisma.deviceUnit.count({ where: { status: 'reserved' } });
+    expect(reserved).toBe(2);
+  });
+
+  it('rejects fulfillment when stock is insufficient (409)', async () => {
+    const { customer, product } = await seed(1);
+    const order = await orders.create(
+      { customerId: customer.id, channel: 'web', total: 300000, items: [{ sku: product.sku, qty: 3, price: 100000 }] },
+      'system',
+    );
+    const err = await orders.fulfill(order.id, 'warehouse').catch((e) => e);
+    expect(err).toBeInstanceOf(ConflictError);
+    expect(err.getStatus()).toBe(409);
+    expect(err.code).toBe('insufficient_stock');
+  });
+
+  it('rejects a preassigned IMEI that is already reserved by another order', async () => {
+    const { customer, product } = await seed(1);
+    const unit = await prisma.deviceUnit.findFirstOrThrow({ where: { productId: product.id } });
+    const owner = await prisma.order.create({
+      data: { customerId: customer.id, channel: 'web', total: 100000, status: 'created' },
+    });
+    await prisma.deviceUnit.update({
+      where: { imei: unit.imei },
+      data: { status: 'reserved', orderId: owner.id },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'web',
+        total: 100000,
+        status: 'created',
+        items: {
+          create: {
+            lineNumber: 1,
+            sku: product.sku,
+            qty: 1,
+            price: 100000,
+            imei: unit.imei,
+            inventorySnapshot: { productId: product.id, trackingMode: 'serialized', components: [] },
+          },
+        },
+      },
+    });
+
+    await expect(orders.fulfill(order.id, 'warehouse')).rejects.toMatchObject({ code: 'unit_already_taken' });
+    expect(await prisma.reservation.count({ where: { orderId: order.id } })).toBe(0);
+    expect(await prisma.deviceUnit.findUniqueOrThrow({ where: { imei: unit.imei } })).toMatchObject({
+      status: 'reserved',
+      orderId: owner.id,
+    });
+  });
+
+  it('is race-safe: two fulfillments cannot double-reserve the same unit', async () => {
+    const { customer, product } = await seed(1); // exactly one in-stock unit
+    const mk = async () =>
+      orders.create(
+        { customerId: customer.id, channel: 'web', total: 100000, items: [{ sku: product.sku, qty: 1, price: 100000 }] },
+        'system',
+      );
+    const [o1, o2] = [await mk(), await mk()];
+    // Both warehouse staff fulfill at once — only one may claim the single unit.
+    const results = await Promise.allSettled([
+      orders.fulfill(o1.id, 'warehouse'),
+      orders.fulfill(o2.id, 'warehouse'),
+    ]);
+    const ok = results.filter((r) => r.status === 'fulfilled');
+    expect(ok).toHaveLength(1); // exactly one wins, the other 409s (no double-reserve)
+    const reserved = await prisma.deviceUnit.findMany({ where: { status: 'reserved' } });
+    expect(reserved).toHaveLength(1);
+    // the unit is reserved to exactly one of the two orders, not overwritten
+    expect([o1.id, o2.id]).toContain(reserved[0].orderId);
+  });
+});

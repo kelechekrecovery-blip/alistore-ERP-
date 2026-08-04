@@ -1,0 +1,111 @@
+import {
+  ArrayMinSize,
+  IsArray,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Max,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { PaymentMethod } from '@prisma/client';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class PosLineDto {
+  @ApiProperty({ example: 'clx_product_001' })
+  @IsString() productId!: string;
+
+  @ApiProperty({ example: 'IPH-15-128' })
+  @IsString() sku!: string;
+
+  @ApiProperty({ minimum: 0, example: 109900 })
+  @IsInt() @Min(0) price!: number;
+
+  @ApiProperty({ minimum: 1, example: 1 })
+  @IsInt() @Min(1) qty!: number;
+
+  @ApiPropertyOptional({ example: '356789012345678', description: 'Exact serialized unit selected by scanner.' })
+  @IsOptional() @IsString() imei?: string;
+}
+
+export class PosCustomerLookupDto {
+  @ApiProperty({ example: '+996700123456' })
+  @IsString() @IsNotEmpty() @MaxLength(16) phone!: string;
+
+  @ApiProperty({ example: 'BISHKEK-1' })
+  @IsString() @IsNotEmpty() @MaxLength(100) point!: string;
+
+  @ApiProperty({ example: 'pos_20260720_0001' })
+  @IsString() @IsNotEmpty() @MaxLength(200) clientSaleId!: string;
+}
+
+export class PosPaymentDto {
+  @ApiProperty({ enum: PaymentMethod, example: PaymentMethod.cash })
+  @IsEnum(PaymentMethod) method!: PaymentMethod;
+
+  @ApiProperty({ minimum: 1, example: 50000 })
+  @IsInt() @Min(1) amount!: number;
+}
+
+export class PosSaleDto {
+  @ApiPropertyOptional({ example: 'staff_seller_01', description: 'Derived from staff JWT for HTTP requests.' })
+  @IsOptional()
+  @IsString() staffId!: string;
+
+  @ApiProperty({ example: 'BISHKEK-1' })
+  @IsString() point!: string;
+
+  @ApiPropertyOptional({
+    enum: PaymentMethod,
+    example: PaymentMethod.cash,
+    description: 'Legacy single payment method. Use payments[] for split tenders.',
+  })
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  method?: PaymentMethod;
+
+  @ApiPropertyOptional({
+    type: () => [PosPaymentDto],
+    description: 'Split payment tenders. Amounts must add up exactly to the sale total.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => PosPaymentDto)
+  payments?: PosPaymentDto[];
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 100, example: 10, description: 'Discount %' })
+  @IsOptional() @IsInt() @Min(0) @Max(100) discountPct?: number;
+
+  @ApiPropertyOptional({ description: 'Approved discount/margin approvalId — required to complete a gated sale' })
+  @IsOptional() @IsString() approvalId?: string;
+
+  @ApiPropertyOptional({ example: 'постоянный клиент, акция' })
+  @IsOptional() @IsString() reason?: string;
+
+  @ApiPropertyOptional({
+    description: 'Short-lived signed binding returned by the authenticated POS customer lookup.',
+  })
+  @IsOptional() @IsString() @IsNotEmpty() @MaxLength(4096) customerBinding?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Client-generated sale id for retry idempotency. Web/mobile always send one; if ' +
+      'omitted, the server derives a windowed cart fingerprint so a retry still cannot ' +
+      'create a second order.',
+    example: 'pos_20260707_0001',
+  })
+  @IsOptional() @IsString() clientSaleId?: string;
+
+  @ApiProperty({ type: () => [PosLineDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => PosLineDto)
+  lines!: PosLineDto[];
+}

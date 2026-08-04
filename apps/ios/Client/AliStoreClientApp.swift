@@ -1,0 +1,6922 @@
+// Legacy composition root: structural extraction is tracked separately from release fixes.
+// swiftlint:disable file_length type_body_length function_body_length line_length
+import AliStoreCore
+import AuthenticationServices
+import PhotosUI
+import SwiftData
+import SwiftUI
+import UIKit
+@preconcurrency import UserNotifications
+
+private extension Notification.Name {
+    static let alistoreAPNsToken = Notification.Name("alistore.apns.token")
+    static let alistoreAPNsFailure = Notification.Name("alistore.apns.failure")
+    static let alistorePushRoute = Notification.Name("alistore.push.route")
+}
+
+@MainActor
+private final class ClientAppDelegate: NSObject, UIApplicationDelegate {
+    private let notificationDelegate = ClientNotificationDelegate()
+
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = notificationDelegate
+        return true
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        NotificationCenter.default.post(name: .alistoreAPNsToken, object: token)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .alistoreAPNsFailure, object: error.localizedDescription)
+    }
+
+}
+
+private final class ClientNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .badge, .sound])
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let userInfo = response.notification.request.content.userInfo
+        let route = stringValue(userInfo["route"]) ?? routeFromDeepLink(stringValue(userInfo["deepLink"])) ?? "account"
+        var payload: [AnyHashable: Any] = ["route": route]
+        if let referenceId = stringValue(userInfo["referenceId"]) ?? stringValue(userInfo["orderId"]) ?? stringValue(userInfo["warrantyId"]) {
+            payload["referenceId"] = referenceId
+        }
+        Task { @MainActor in
+            NotificationCenter.default.post(name: .alistorePushRoute, object: nil, userInfo: payload)
+        }
+    }
+
+    private func stringValue(_ value: Any?) -> String? {
+        if let value = value as? String, !value.isEmpty { return value }
+        return nil
+    }
+
+    private func routeFromDeepLink(_ rawValue: String?) -> String? {
+        guard let rawValue, let url = URL(string: rawValue) else { return nil }
+        let value = "\(url.host ?? "")\(url.path)".lowercased()
+        if value.contains("warranty") || value.contains("service") { return "warranty" }
+        if value.contains("order") { return "order" }
+        if value.contains("account") || value.contains("profile") { return "account" }
+        return nil
+    }
+}
+
+private enum ClientTab: Hashable {
+    case home, catalog, favorites, cart, account
+}
+
+/// Order number shown to customers; the UI-test fixture keeps its prototype number.
+private func clientDisplayOrderNumber(_ orderId: String) -> String {
+    #if DEBUG
+    if orderId == "ui-order-2401" { return "№4102" }
+    #endif
+    return "#\(orderId.suffix(6))"
+}
+
+/// Space-grouped integer used by prototype cards, e.g. 4820 → "4 820".
+private func clientGroupedDigits(_ value: Int) -> String {
+    let digits = Array(String(value))
+    let reversed = digits.reversed().enumerated().flatMap { index, character -> [Character] in
+        index > 0 && index % 3 == 0 ? [" ", character] : [character]
+    }
+    return String(reversed.reversed())
+}
+
+private enum ClientOverlay: String, Identifiable, Hashable {
+    case search, compare, notifications, support
+
+    var id: String { rawValue }
+}
+
+// 3.0: forwards to the Design3 token system (AliStoreCore). Existing screens keep using
+// ClientTheme.* while migrating; this instantly swaps Avenir → Manrope/Golos and the 2.0
+// palette → 3.0 dark liquid-glass tokens. Remove once all screens use Design3 directly.
+private enum ClientTheme {
+    static let background = Design3.screen
+    static let surface = Design3.surface
+    static let line = Design3.hairline
+    static let coral = Design3.orange
+    static let lime = Design3.orange   // 3.0: primary action is orange (2.0 lime → orange)
+    static let muted = Design3.textMuted
+    static let gold = Design3.gold
+
+    static func display(_ size: CGFloat, weight: Font.Weight = .bold) -> Font {
+        Design3.heading(size, weight)
+    }
+
+    static func body(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        Design3.body(size, weight)
+    }
+}
+
+/// Колонки товарной сетки. Фиксированные две колонки растягивали карточку во всю
+/// половину экрана на iPad — товар выглядел как плакат. Адаптивный минимум даёт
+/// две колонки на телефоне и четыре-пять на 13″ iPad, тем же приёмом, что уже
+/// работает в кассе (`POSSaleView` → `.adaptive(minimum: 155)`).
+private let productGridColumns = [GridItem(.adaptive(minimum: 160), spacing: 12)]
+
+private struct ClientProductImage: View {
+    let product: Product
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(Color.white.opacity(0.045))
+            if let asset = assetName {
+                Image(asset)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(14)
+            } else {
+                Image(systemName: fallbackSymbol)
+                    .font(ClientTheme.body(52, weight: .ultraLight))
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+    }
+
+    private var assetName: String? {
+        let value = "\(product.name) \(product.category)".lowercased()
+        if value.contains("airpods") || value.contains("аудио") { return "client-product-airpods" }
+        if value.contains("macbook") || value.contains("ноут") { return "client-product-macbook" }
+        if value.contains("ipad") || value.contains("планшет") { return "client-product-ipad" }
+        if value.contains("watch") || value.contains("часы") { return "client-product-watch" }
+        if value.contains("samsung") { return "client-product-samsung" }
+        if value.contains("iphone") || value.contains("смартфон") { return "client-product-iphone" }
+        return nil
+    }
+
+    private var fallbackSymbol: String {
+        product.category.localizedCaseInsensitiveContains("ноут") ? "laptopcomputer" : "iphone.gen3"
+    }
+}
+
+private struct ClientHeader: View {
+    let onCompare: () -> Void
+    let onNotifications: () -> Void
+    let onSearch: () -> Void
+    // На каталоге поиск уже живёт в ящике навбара (`.searchable`) и фильтрует
+    // сетку на месте. Кнопка в общей шапке открывала второй, отдельный экран
+    // поиска — два разных входа в одну функцию на одном экране. Прячем её
+    // только там; на остальных вкладках `.searchable` нет и кнопка нужна.
+    var showsSearch = true
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Label("Магазины AliStore", systemImage: "mappin.fill")
+                    .font(ClientTheme.body(12, weight: .medium))
+                    .foregroundStyle(ClientTheme.muted)
+                Spacer()
+                Button(action: onCompare) { Image(systemName: "arrow.left.arrow.right").minTapTarget() }
+                    .accessibilityLabel("Сравнение")
+                Button(action: onNotifications) { Image(systemName: "bell").minTapTarget() }
+                    .accessibilityLabel("Уведомления")
+            }
+            .foregroundStyle(.white)
+            if showsSearch {
+                Button(action: onSearch) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(Design3.textFaint)
+                        Text("Поиск техники, брендов…")
+                            .font(ClientTheme.body(14))
+                            .foregroundStyle(Design3.textFaint)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(height: 44)
+                    .glass(radius: 13)
+                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Поиск техники и брендов")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
+        .background(ClientTheme.background)
+    }
+}
+
+private struct ClientBottomNav: View {
+    let selected: ClientTab
+    let cartCount: Int
+    let onSelect: (ClientTab) -> Void
+
+    var body: some View {
+        HStack(spacing: 4) {
+            navButton(.home, title: "Главная", symbol: "house")
+            navButton(.catalog, title: "Каталог", symbol: "square.grid.2x2")
+            navButton(.favorites, title: "Избранное", symbol: "heart")
+            navButton(.cart, title: "Корзина", symbol: "bag")
+            navButton(.account, title: "Кабинет", symbol: "person.crop.circle")
+        }
+        .padding(6)
+        .background {
+            RoundedRectangle(cornerRadius: 32, style: .continuous)
+                .fill(Color.white.opacity(0.10))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 32, style: .continuous).strokeBorder(Color.white.opacity(0.14), lineWidth: 1))
+        }
+        .shadow(color: .black.opacity(0.5), radius: 24, y: 12)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+    }
+
+    private func navButton(_ tab: ClientTab, title: String, symbol: String) -> some View {
+        Button { onSelect(tab) } label: {
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 3) {
+                    Image(systemName: selected == tab ? "\(symbol).fill" : symbol)
+                        .font(ClientTheme.body(19, weight: .medium))
+                    Text(title).font(ClientTheme.body(9.5, weight: selected == tab ? .bold : .medium))
+                }
+                .foregroundStyle(selected == tab ? Design3.orange : ClientTheme.muted)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background {
+                    if selected == tab {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(LinearGradient(colors: [Design3.orange.opacity(0.24), Design3.orange.opacity(0.07)], startPoint: .top, endPoint: .bottom))
+                            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Design3.orange.opacity(0.38), lineWidth: 1))
+                    }
+                }
+                if tab == .cart, cartCount > 0 {
+                    Text("\(cartCount)")
+                        .font(ClientTheme.body(9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(ClientTheme.coral, in: Capsule())
+                        .offset(x: -18, y: -2)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        // Метка была голым заголовком: счётчик корзины рисуется отдельной
+        // плашкой поверх кнопки и VoiceOver его не читал — незрячий покупатель
+        // не знал, что в корзине что-то лежит. Активная вкладка тоже ничем не
+        // отличалась на слух: подсветка чисто визуальная.
+        // Счётчик уходит в value, а не в label: VoiceOver читает и то и другое,
+        // но label остаётся стабильным — иначе кнопка перестаёт находиться по
+        // имени и в тестах, и в голосовом управлении («нажми Корзина»).
+        .accessibilityLabel(title)
+        .accessibilityValue(tab == .cart && cartCount > 0 ? "товаров: \(cartCount)" : "")
+        .accessibilityAddTraits(selected == tab ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+/// Канал входа. Телефон остаётся первичным — по нему заводится аккаунт и по нему
+/// работают доставка и COD. Почта это второй ключ от той же двери: войти по ней
+/// может только тот, кто раньше привязал адрес в кабинете.
+private enum LoginChannel: String, CaseIterable {
+    case phone
+    case email
+
+    var title: String { self == .phone ? "Телефон" : "Почта" }
+}
+
+private struct ClientLoginView: View {
+    @Bindable var auth: CustomerAuthStore
+    let onGuest: () -> Void
+    @State private var channel: LoginChannel = .phone
+    /// Сырой nonce живёт только между запросом и ответом Apple: на сервер уходит
+    /// его хэш, а сама строка нужна лишь чтобы хэш был непредсказуем.
+    @State private var appleRawNonce = ""
+    @State private var phone = "+996 "
+    @State private var email = ""
+    @State private var code = ""
+    @State private var requested = false
+    @State private var resendAvailableAt: Date?
+    @State private var resendSeconds = 0
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("A")
+                        .font(ClientTheme.display(34, weight: .black))
+                        .foregroundStyle(.white)
+                        .frame(width: 60, height: 60)
+                        .background(ClientTheme.coral, in: RoundedRectangle(cornerRadius: 17))
+                        .padding(.bottom, 24)
+                    Text(auth.requiresApplePhoneEnrollment ? "Подтвердите номер телефона" : "Войти или создать аккаунт")
+                        .font(ClientTheme.display(30, weight: .black))
+                        .foregroundStyle(.white)
+                    Text(subtitle)
+                        .font(ClientTheme.body(14))
+                        .foregroundStyle(ClientTheme.muted)
+                        .lineSpacing(4)
+                        .padding(.top, 10)
+                    if !auth.requiresApplePhoneEnrollment {
+                        channelSwitcher
+                            .padding(.top, 22)
+                    } else {
+                        Text("Apple подтвердил вашу личность. Телефон нужен как основной номер аккаунта для заказов, доставки и восстановления доступа.")
+                            .font(ClientTheme.body(13))
+                            .foregroundStyle(ClientTheme.muted)
+                            .lineSpacing(3)
+                            .padding(.top, 18)
+                    }
+                    if channel == .phone {
+                        TextField("+996 700 12 34 56", text: $phone)
+                            .keyboardType(.phonePad)
+                            .textContentType(.telephoneNumber)
+                            .foregroundStyle(.white)
+                            .font(Design3.mono(15))
+                            .padding(14)
+                            .glass(radius: 13)
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                            .padding(.top, 12)
+                            .accessibilityIdentifier("client-phone")
+                            .disabled(requested || auth.isLoading)
+                    } else {
+                        TextField("you@example.com", text: $email)
+                            .keyboardType(.emailAddress)
+                            .textContentType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .foregroundStyle(.white)
+                            .font(ClientTheme.body(15))
+                            .padding(14)
+                            .glass(radius: 13)
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                            .padding(.top, 12)
+                            .accessibilityIdentifier("client-email")
+                            .disabled(requested || auth.isLoading)
+                    }
+                    if requested {
+                        TextField("6-значный код", text: $code)
+                            .keyboardType(.numberPad)
+                            .textContentType(.oneTimeCode)
+                            .foregroundStyle(.white)
+                            .padding(14)
+                            .glass(radius: 13)
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.lime))
+                            .padding(.top, 10)
+                            .accessibilityIdentifier("client-otp")
+                            .accessibilityLabel(channel == .phone ? "Одноразовый код из SMS" : "Одноразовый код из письма")
+                            .accessibilityHint("Введите шесть цифр. Система может подставить код автоматически.")
+                        if let devCode = auth.devCode {
+                            Text("Код для тестового контура: \(devCode)")
+                                .font(ClientTheme.body(12))
+                                .foregroundStyle(ClientTheme.muted)
+                                .padding(.top, 8)
+                        }
+                    }
+                    Button {
+                        Task {
+                            if auth.requiresApplePhoneEnrollment {
+                                if requested {
+                                    await auth.completeAppleEnrollment(
+                                        phone: normalizedPhone,
+                                        code: code.filter(\.isNumber)
+                                    )
+                                } else {
+                                    await requestCode()
+                                }
+                            } else {
+                                switch (channel, requested) {
+                                case (.phone, true):
+                                    await auth.verify(phone: normalizedPhone, code: code.filter(\.isNumber))
+                                case (.phone, false):
+                                    await requestCode()
+                                case (.email, true):
+                                    await auth.verifyEmail(email: email, code: code.filter(\.isNumber))
+                                case (.email, false):
+                                    await requestCode()
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack { Spacer(); if auth.isLoading { ProgressView().tint(.black) } else { Text(actionTitle) }; Spacer() }
+                            .font(ClientTheme.body(15, weight: .bold))
+                            .foregroundStyle(.black)
+                            .frame(height: 50)
+                            .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .disabled(auth.isLoading || !canSubmit)
+                    .padding(.top, 12)
+                    .accessibilityIdentifier(requested ? "client-verify" : "client-request-otp")
+                    if requested {
+                        Button(resendSeconds > 0 ? "Отправить ещё раз через \(resendSeconds) сек." : "Отправить код ещё раз") {
+                            Task { await requestCode() }
+                        }
+                        .disabled(auth.isLoading || resendSeconds > 0)
+                        .font(ClientTheme.body(13, weight: .semibold))
+                        .foregroundStyle(resendSeconds > 0 ? ClientTheme.muted : ClientTheme.lime)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 10)
+                        .accessibilityIdentifier("client-resend-otp")
+                        Button(channel == .phone ? "Изменить номер" : "Изменить адрес") {
+                            requested = false
+                            code = ""
+                            resendAvailableAt = nil
+                        }
+                        .disabled(auth.isLoading)
+                        .font(ClientTheme.body(13))
+                        .foregroundStyle(ClientTheme.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 8)
+                        .accessibilityIdentifier("client-change-identifier")
+                    }
+                    if channel == .email && !requested {
+                        // Честное предупреждение вместо «письмо отправлено» в пустоту:
+                        // сервер отвечает одинаково на любой адрес, чтобы не выдавать,
+                        // у кого есть аккаунт, поэтому объяснить это должен клиент.
+                        Text("Письмо придёт, если этот адрес привязан к аккаунту. Привязать его можно в кабинете, войдя по номеру.")
+                            .font(ClientTheme.body(12))
+                            .foregroundStyle(ClientTheme.muted)
+                            .lineSpacing(3)
+                            .padding(.top, 10)
+                    }
+                    // Кнопки «Войти по Face ID» здесь быть не может: на экране входа нет
+                    // сессии, которую можно разблокировать, а эндпоинта биометрического
+                    // входа на сервере не существует. Прежняя версия при успешной
+                    // биометрии вызывала onGuest() — то есть обещала вход в аккаунт, а
+                    // делала гостем, ровно как кнопка ниже. Биометрия остаётся там, где
+                    // она осмысленна: в QuickUnlock уже открытой сессии.
+                    // Apple ниже кода, а не вместо него: телефон остаётся первичным
+                    // идентификатором, без него не работают доставка и COD. Apple —
+                    // быстрый вход для тех, у кого аккаунт уже связан.
+                    if auth.requiresApplePhoneEnrollment {
+                        Button("Отменить регистрацию через Apple") {
+                            auth.cancelAppleEnrollment()
+                            requested = false
+                            code = ""
+                            resendAvailableAt = nil
+                        }
+                        .font(ClientTheme.body(13))
+                        .foregroundStyle(ClientTheme.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 14)
+                        .accessibilityIdentifier("client-apple-enrollment-cancel")
+                    } else {
+                        SignInWithAppleButton(.signIn) { request in
+                            let raw = AppleSignInNonce.random()
+                            appleRawNonce = raw
+                            request.requestedScopes = [.fullName, .email]
+                            // На сервер уйдёт эта же строка: Apple кладёт её в claim токена.
+                            request.nonce = AppleSignInNonce.hashed(raw)
+                        } onCompletion: { result in
+                            Task { await handleApple(result) }
+                        }
+                        .signInWithAppleButtonStyle(.white)
+                        .frame(height: 50)
+                        .clipShape(RoundedRectangle(cornerRadius: 13))
+                        .padding(.top, 12)
+                        .accessibilityIdentifier("client-apple-signin")
+                    }
+
+                    Button("Продолжить как гость →") {
+                        auth.cancelAppleEnrollment()
+                        onGuest()
+                    }
+                        .font(ClientTheme.body(13))
+                        .foregroundStyle(ClientTheme.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 22)
+                    if let error = auth.errorMessage {
+                        Text(error).font(ClientTheme.body(12)).foregroundStyle(.red).padding(.top, 12)
+                    }
+                }
+                .padding(.horizontal, 26)
+                .frame(maxWidth: 402)
+                .frame(minHeight: 700)
+            }
+        }
+        .task(id: resendAvailableAt) {
+            guard let deadline = resendAvailableAt else {
+                resendSeconds = 0
+                return
+            }
+            while !Task.isCancelled {
+                let remaining = max(0, Int(ceil(deadline.timeIntervalSinceNow)))
+                resendSeconds = remaining
+                if remaining == 0 { break }
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    private func requestCode() async {
+        let issued: Bool
+        switch channel {
+        case .phone:
+            issued = await auth.requestOTP(phone: normalizedPhone)
+        case .email:
+            issued = await auth.requestEmailOTP(email: email)
+        }
+        if issued {
+            requested = true
+            resendAvailableAt = Date().addingTimeInterval(60)
+        }
+    }
+
+    private func handleApple(_ result: Result<ASAuthorization, Error>) async {
+        switch result {
+        case .success(let authorization):
+            guard
+                let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                let tokenData = credential.identityToken,
+                let identityToken = String(data: tokenData, encoding: .utf8)
+            else {
+                auth.reportSignInFailure("Apple не вернула токен входа")
+                return
+            }
+            let fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
+                .compactMap { $0 }
+                .joined(separator: " ")
+            await auth.signInWithApple(
+                identityToken: identityToken,
+                nonce: AppleSignInNonce.hashed(appleRawNonce),
+                name: fullName
+            )
+            if auth.requiresApplePhoneEnrollment {
+                channel = .phone
+                requested = false
+                code = ""
+                resendAvailableAt = nil
+            }
+        case .failure(let error):
+            // Отмену пользователем не показываем как ошибку: он просто передумал.
+            if (error as? ASAuthorizationError)?.code == .canceled { return }
+            auth.reportSignInFailure(error.localizedDescription)
+        }
+    }
+
+    private var channelSwitcher: some View {
+        HStack(spacing: 6) {
+            ForEach(LoginChannel.allCases, id: \.self) { option in
+                Button {
+                    guard channel != option else { return }
+                    channel = option
+                    // Запрошенный код принадлежит прежнему каналу: оставить его
+                    // означало бы предложить ввести SMS-код в форму почты.
+                    requested = false
+                    code = ""
+                    resendAvailableAt = nil
+                } label: {
+                    Text(option.title)
+                        .font(ClientTheme.body(13, weight: channel == option ? .bold : .medium))
+                        .foregroundStyle(channel == option ? .black : ClientTheme.muted)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 38)
+                        .background(
+                            channel == option ? AnyShapeStyle(ClientTheme.lime) : AnyShapeStyle(.clear),
+                            in: RoundedRectangle(cornerRadius: 10)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("client-channel-\(option.rawValue)")
+            }
+        }
+        .padding(4)
+        .glass(radius: 13)
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+    }
+
+    private var subtitle: String {
+        if auth.requiresApplePhoneEnrollment {
+            return requested
+                ? "Введите код из SMS, чтобы завершить создание или привязку аккаунта."
+                : "Введите основной номер телефона. Мы отправим код подтверждения."
+        }
+        return channel == .phone
+            ? "Введите телефон и код из SMS. Если аккаунта ещё нет, мы создадим его автоматически."
+            : "Почта — дополнительный вход в тот же аккаунт. Код придёт только на ранее привязанный адрес."
+    }
+
+    private var actionTitle: String {
+        if requested { return auth.requiresApplePhoneEnrollment ? "Завершить регистрацию" : "Войти" }
+        return channel == .phone ? "Получить код по SMS" : "Получить код на почту"
+    }
+
+    private var canSubmit: Bool {
+        if requested { return code.filter(\.isNumber).count == 6 }
+        switch channel {
+        case .phone: return normalizedPhone.filter(\.isNumber).count >= 9
+        case .email: return isPlausibleEmail
+        }
+    }
+
+    /// Ровно та же форма, что принимает сервер (`EMAIL_PATTERN` в auth.service.ts):
+    /// непустое имя, «собака», домен с точкой. Строже проверять смысла нет —
+    /// адрес всё равно подтверждается письмом.
+    private var isPlausibleEmail: Bool {
+        let value = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.count <= 254, let separatorIndex = value.firstIndex(of: "@") else { return false }
+        let local = value[value.startIndex..<separatorIndex]
+        let domain = value[value.index(after: separatorIndex)...]
+        return !local.isEmpty
+            && !domain.isEmpty
+            && domain.contains(".")
+            && !value.contains(" ")
+            && domain.firstIndex(of: "@") == nil
+    }
+
+    private var normalizedPhone: String {
+        let digits = phone.filter(\.isNumber)
+        return "+\(digits)"
+    }
+}
+
+private struct ClientOverlayView: View {
+    let screen: ClientOverlay
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let products: [Product]
+    @Binding var cart: [String: Int]
+    @Binding var favorites: Set<String>
+    @Binding var compared: Set<String>
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+    @State private var notifications: [CustomerNotification] = []
+    @State private var notificationError: String?
+    @State private var notificationsLoading = false
+    let onRoute: (CustomerNotification) -> Void
+
+    private var matchingProducts: [Product] {
+        let value = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return products }
+        return products.filter {
+            $0.name.localizedCaseInsensitiveContains(value) ||
+            $0.category.localizedCaseInsensitiveContains(value) ||
+            $0.sku.localizedCaseInsensitiveContains(value)
+        }
+    }
+
+    private var comparedProducts: [Product] {
+        products.filter { compared.contains($0.id) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                ClientTheme.background.ignoresSafeArea()
+                switch screen {
+                case .search:
+                    searchContent
+                case .compare:
+                    compareContent
+                case .notifications:
+                    notificationContent
+                case .support:
+                    CustomerSupportView(environment: environment, auth: auth)
+                }
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Закрыть", systemImage: "xmark") { dismiss() }
+                        .accessibilityLabel("Закрыть")
+                }
+            }
+        }
+        .tint(ClientTheme.lime)
+        .preferredColorScheme(.dark)
+        .task {
+            guard screen == .notifications else { return }
+            await loadNotifications()
+        }
+    }
+
+    private var title: String {
+        switch screen {
+        case .search: "Поиск"
+        case .compare: "Сравнение"
+        case .notifications: "Уведомления"
+        case .support: "Поддержка"
+        }
+    }
+
+    @ViewBuilder
+    private var searchContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(ClientTheme.muted)
+                    TextField("iphone", text: $query)
+                        .textInputAutocapitalization(.never)
+                        .foregroundStyle(.white)
+                }
+                .padding(14)
+                .glass(radius: 12)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.lime))
+                Text("Популярные запросы")
+                    .font(ClientTheme.body(13, weight: .semibold))
+                    .foregroundStyle(ClientTheme.muted)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        searchChip("iPhone 15")
+                        searchChip("AirPods")
+                        searchChip("MacBook")
+                    }
+                    HStack(spacing: 8) {
+                        searchChip("Samsung")
+                        searchChip("Б/У")
+                    }
+                }
+                Text("Результаты")
+                    .font(ClientTheme.body(13, weight: .semibold))
+                    .foregroundStyle(ClientTheme.muted)
+                if products.isEmpty {
+                    EmptyStateView(title: "Каталог недоступен", detail: "Проверьте соединение и повторите поиск.", symbol: "wifi.exclamationmark")
+                } else if matchingProducts.isEmpty {
+                    EmptyStateView(title: "Ничего не найдено", detail: "Измените запрос или попробуйте название бренда.", symbol: "magnifyingglass")
+                } else {
+                    LazyVStack(spacing: 10) {
+                        ForEach(matchingProducts) { product in
+                            NavigationLink {
+                                ProductDetail(environment: environment, product: product, cart: $cart, favorites: $favorites)
+                            } label: {
+                                searchRow(product)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .padding(16)
+        }
+        .onAppear {
+            if UITestBootstrap.startsAtVisualEvidence && query.isEmpty {
+                query = "iphone"
+            }
+        }
+    }
+
+    private func searchChip(_ value: String) -> some View {
+        Button {
+            query = value.lowercased()
+        } label: {
+            Text(value)
+                .font(ClientTheme.body(12, weight: .semibold))
+                .foregroundStyle(Design3.textBright)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(ClientTheme.surface, in: Capsule())
+                .overlay(Capsule().stroke(ClientTheme.line))
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var compareContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("До 4 товаров")
+                    .font(ClientTheme.body(12, weight: .semibold))
+                    .foregroundStyle(ClientTheme.muted)
+                if comparedProducts.isEmpty {
+                    EmptyStateView(title: "Нет товаров для сравнения", detail: "Откройте поиск и добавьте технику к сравнению.", symbol: "arrow.left.arrow.right")
+                } else {
+                    let lowestPrice = comparedProducts.map(\.price).min()
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .top, spacing: 10) {
+                            ForEach(comparedProducts) { product in
+                                compareCard(product, isBestPrice: product.price == lowestPrice)
+                            }
+                        }
+                    }
+                }
+                if !products.isEmpty {
+                    Text("Добавить товар")
+                        .font(ClientTheme.display(16, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.top, 8)
+                    ForEach(products.filter { !compared.contains($0.id) }.prefix(8)) { product in
+                        compareRow(product, selected: false)
+                    }
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    @ViewBuilder
+    private var notificationContent: some View {
+        if notificationsLoading {
+            ProgressView("Загружаем уведомления")
+                .tint(ClientTheme.lime)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let notificationError {
+            ClientDataErrorView(message: notificationError, retry: { Task { await loadNotifications() } })
+                .padding(16)
+        } else if notifications.isEmpty {
+            EmptyStateView(
+                title: auth.session == nil ? "Войдите, чтобы увидеть уведомления" : "Уведомлений пока нет",
+                detail: auth.session == nil ? "Статусы заказов, гарантия и бонусы появятся здесь." : "Мы покажем здесь важные обновления по вашим покупкам.",
+                symbol: "bell"
+            )
+            .padding(16)
+        } else {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 10) {
+                        Button { dismiss() } label: {
+                            Image(systemName: "chevron.left")
+                                .font(ClientTheme.body(17, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Назад")
+                        Text("Уведомления")
+                            .font(ClientTheme.display(20, weight: .bold))
+                            .foregroundStyle(.white)
+                        Spacer()
+                    }
+                    .padding(.bottom, 4)
+
+                    ForEach(notifications) { notification in
+                        notificationDestination(notification)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .padding(.bottom, 20)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func notificationDestination(_ notification: CustomerNotification) -> some View {
+        let row = ClientNotificationRow(
+            icon: notificationIcon(notification),
+            title: notification.title,
+            detail: notification.detail,
+            time: relativeTime(notification.createdAt),
+            isUnread: notification.readAt == nil,
+            route: notification.route
+        )
+        switch notification.route {
+        case "order" where notification.referenceId != nil:
+            if let orderId = notification.referenceId {
+                NavigationLink {
+                    ClientNotificationOrderView(environment: environment, auth: auth, orderId: orderId, products: products, cart: $cart)
+                } label: {
+                    row
+                }
+                .buttonStyle(.plain)
+                .simultaneousGesture(TapGesture().onEnded { markNotificationRead(notification) })
+            }
+        case "warranty":
+            NavigationLink {
+                DevicesView(environment: environment, auth: auth)
+            } label: {
+                row
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded { markNotificationRead(notification) })
+        case "bonuses":
+            NavigationLink {
+                CustomerLoyaltyView(environment: environment, auth: auth)
+            } label: {
+                row
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded { markNotificationRead(notification) })
+        default:
+            Button {
+                markNotificationRead(notification)
+                onRoute(notification)
+            } label: { row }
+                .buttonStyle(.plain)
+        }
+    }
+
+    private func markNotificationRead(_ notification: CustomerNotification) {
+        guard notification.readAt == nil else { return }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            replaceNotification(notification, readAt: Date())
+            return
+        }
+#endif
+        guard let token = auth.session?.accessToken else { return }
+        Task {
+            do {
+                let updated: CustomerNotification = try await APIClient(baseURL: environment.apiBaseURL).patch(
+                    "notifications/\(notification.id)/read",
+                    body: EmptyRequest(),
+                    token: token
+                )
+                replaceNotification(updated, readAt: updated.readAt ?? Date())
+            } catch is CancellationError {
+            } catch {
+                // Reading a notification is best-effort and must not block navigation.
+            }
+        }
+    }
+
+    private func replaceNotification(_ notification: CustomerNotification, readAt: Date) {
+        guard let index = notifications.firstIndex(where: { $0.id == notification.id }) else { return }
+        notifications[index] = CustomerNotification(
+            id: notification.id,
+            template: notification.template,
+            title: notification.title,
+            detail: notification.detail,
+            symbol: notification.symbol,
+            route: notification.route,
+            referenceId: notification.referenceId,
+            createdAt: notification.createdAt,
+            readAt: readAt
+        )
+    }
+
+    private func loadNotifications() async {
+        notificationsLoading = true
+        defer { notificationsLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            notifications = ClientUIFixture.notifications
+            notificationError = nil
+            return
+        }
+#endif
+        guard let token = auth.session?.accessToken else {
+            notifications = []
+            notificationError = nil
+            return
+        }
+        do {
+            notifications = try await APIClient(baseURL: environment.apiBaseURL).get("notifications/mine", token: token)
+            notificationError = nil
+        } catch is CancellationError {
+        } catch {
+            notificationError = error.localizedDescription
+        }
+    }
+
+    private func notificationIcon(_ notification: CustomerNotification) -> String {
+        let value = "\(notification.template) \(notification.title) \(notification.route) \(notification.symbol)".lowercased()
+        if value.contains("price") || value.contains("цена") || value.contains("tag") { return "🏷️" }
+        if value.contains("warranty") || value.contains("гарант") || value.contains("shield") { return "🛡" }
+        if value.contains("bonus") || value.contains("loyalty") || value.contains("бонус") || value.contains("gift") { return "🎁" }
+        if value.contains("support") || value.contains("поддерж") { return "💬" }
+        return "📦"
+    }
+
+    private func relativeTime(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    private func searchRow(_ product: Product) -> some View {
+        HStack(spacing: 12) {
+            ClientProductImage(product: product, cornerRadius: 11)
+                .frame(width: 56, height: 56)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(product.name).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white).lineLimit(2)
+                Text(Money.som(product.price)).font(ClientTheme.display(14, weight: .bold)).foregroundStyle(.white)
+                Text(searchStockLabel(product))
+                    .font(ClientTheme.body(11))
+                    .foregroundStyle(searchStockColor(product))
+            }
+            Spacer()
+            Image(systemName: "chevron.right").foregroundStyle(ClientTheme.muted)
+        }
+        .padding(12)
+        .glass(radius: 13)
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+    }
+
+    private func searchStockLabel(_ product: Product) -> String {
+        if product.availableUnits <= 0 { return "Нет в наличии" }
+        if product.availableUnits < 5 { return "Осталось \(product.availableUnits) шт" }
+        return "В наличии"
+    }
+
+    private func searchStockColor(_ product: Product) -> Color {
+        if product.availableUnits <= 0 { return Design3.danger }
+        if product.availableUnits < 5 { return ClientTheme.gold }
+        return ClientTheme.lime
+    }
+
+    private func compareCard(_ product: Product, isBestPrice: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ClientProductImage(product: product, cornerRadius: 10)
+                .frame(width: 138, height: 92)
+            if isBestPrice {
+                Text("ЛУЧШАЯ ЦЕНА")
+                    .font(ClientTheme.body(9, weight: .bold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(ClientTheme.lime, in: Capsule())
+            }
+            Text(product.name)
+                .font(ClientTheme.body(12, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+                .frame(minHeight: 32, alignment: .top)
+            Text(Money.som(product.price))
+                .font(ClientTheme.display(15, weight: .black))
+                .foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(product.category)
+                Text("🛡 Гарантия 12 мес")
+                Text(product.availableUnits > 0 ? "● В наличии" : "● Нет в наличии")
+                    .foregroundStyle(product.availableUnits > 0 ? ClientTheme.lime : ClientTheme.coral)
+            }
+            .font(ClientTheme.body(10))
+            .foregroundStyle(ClientTheme.muted)
+            .padding(.top, 4)
+            Button {
+                cart[product.id] = min(product.availableUnits, (cart[product.id] ?? 0) + 1)
+            } label: {
+                Text(product.availableUnits > 0 ? "В корзину" : "Нет в наличии")
+                    .font(ClientTheme.body(11, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity, minHeight: 32)
+                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 8))
+            }
+            .disabled(product.availableUnits == 0)
+            Button {
+                compared.remove(product.id)
+            } label: {
+                Text("Убрать")
+                    .font(ClientTheme.body(10))
+                    .foregroundStyle(ClientTheme.muted)
+                    .frame(maxWidth: .infinity, minHeight: 24)
+            }
+            .accessibilityLabel("Убрать \(product.name) из сравнения")
+        }
+        .padding(10)
+        .frame(width: 160, alignment: .topLeading)
+        .glass(radius: 14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(isBestPrice ? ClientTheme.lime : ClientTheme.line))
+    }
+
+    private func compareRow(_ product: Product, selected: Bool) -> some View {
+        HStack(spacing: 10) {
+            ClientProductImage(product: product, cornerRadius: 9).frame(width: 58, height: 58)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(product.name).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
+                Text(Money.som(product.price)).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
+            }
+            Spacer()
+            Button {
+                if selected {
+                    compared.remove(product.id)
+                } else if compared.count < 4 {
+                    compared.insert(product.id)
+                }
+            } label: {
+                Image(systemName: selected ? "minus.circle.fill" : "plus.circle")
+                    .font(.title3)
+                    .foregroundStyle(selected ? ClientTheme.coral : ClientTheme.lime)
+            }
+            .accessibilityLabel(selected ? "Убрать из сравнения" : "Добавить к сравнению")
+        }
+        .padding(10)
+        .glass(radius: 13)
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+    }
+}
+
+private struct ClientNotificationRow: View {
+    let icon: String
+    let title: String
+    let detail: String
+    let time: String
+    let isUnread: Bool
+    let route: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(icon)
+                .font(ClientTheme.body(20))
+                .frame(width: 24, alignment: .center)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(ClientTheme.body(13, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text(detail)
+                    .font(ClientTheme.body(12))
+                    .foregroundStyle(ClientTheme.muted)
+                    .lineLimit(2)
+                Text(time)
+                    .font(ClientTheme.body(11))
+                    .foregroundStyle(Design3.textFaint)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(backgroundColor, in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title). \(detail). \(time)")
+    }
+
+    private var backgroundColor: Color {
+        if isUnread && route == "order" { return ClientTheme.surface }
+        return Design3.frame
+    }
+}
+
+/**
+ Корзина, избранное и сравнение — на устройстве, но по аккаунту.
+
+ Ключи были общими на всё приложение, поэтому состояние переживало выход: следующий
+ вошедший видел чужую корзину и чужое избранное. В магазине, где одним телефоном
+ пользуются по очереди, это и утечка интереса покупателя, и заказ, собранный не тем
+ человеком.
+ */
+private enum ClientLocalState {
+    private static func key(_ base: String, owner: String?) -> String {
+        // Гость — отдельное пространство, а не общее: иначе гостевая корзина
+        // подмешивалась бы к первому же вошедшему.
+        "alistore.client.\(base).v2.\(owner ?? "guest")"
+    }
+
+    static func cart(owner: String?) -> [String: Int] {
+        guard let data = UserDefaults.standard.data(forKey: key("cart", owner: owner)),
+              let value = try? JSONDecoder().decode([String: Int].self, from: data) else {
+            return [:]
+        }
+        return value
+    }
+
+    static func favorites(owner: String?) -> Set<String> {
+        guard let data = UserDefaults.standard.data(forKey: key("favorites", owner: owner)),
+              let value = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return Set(value)
+    }
+
+    static func compared(owner: String?) -> Set<String> {
+        guard let data = UserDefaults.standard.data(forKey: key("compared", owner: owner)),
+              let value = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return Set(value)
+    }
+
+    static func save(cart: [String: Int], favorites: Set<String>, compared: Set<String>, owner: String?) {
+        let encoder = JSONEncoder()
+        if let data = try? encoder.encode(cart) {
+            UserDefaults.standard.set(data, forKey: key("cart", owner: owner))
+        }
+        if let data = try? encoder.encode(Array(favorites).sorted()) {
+            UserDefaults.standard.set(data, forKey: key("favorites", owner: owner))
+        }
+        if let data = try? encoder.encode(Array(compared).sorted()) {
+            UserDefaults.standard.set(data, forKey: key("compared", owner: owner))
+        }
+    }
+
+    /// Стирает состояние конкретного владельца — вызывается при выходе, чтобы
+    /// на общем устройстве от прежнего аккаунта не оставалось следов.
+    static func clear(owner: String?) {
+        for base in ["cart", "favorites", "compared"] {
+            UserDefaults.standard.removeObject(forKey: key(base, owner: owner))
+        }
+        // Ключи первой версии были общими на всех: убираем их при первом же
+        // выходе, иначе чужая корзина осталась бы на устройстве навсегда.
+        for legacy in ["alistore.client.cart.v1", "alistore.client.favorites.v1", "alistore.client.compared.v1"] {
+            UserDefaults.standard.removeObject(forKey: legacy)
+        }
+    }
+}
+
+@main
+struct AliStoreClientApp: App {
+    @UIApplicationDelegateAdaptor(ClientAppDelegate.self) private var appDelegate
+    private let container = OfflineStore.container()
+
+    var body: some Scene {
+        WindowGroup {
+            ClientRootView(environment: .live())
+                // Dynamic Type поддержан, но ограничен сверху: витрина — плотная
+                // сетка карточек, безлимитный AX5 разорвал бы её. accessibility2
+                // покрывает подавляющую часть нужд, не ломая раскладку.
+                .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+        }
+        .modelContainer(container)
+    }
+}
+
+private struct ClientRootView: View {
+    let environment: AppEnvironment
+    @State private var auth: CustomerAuthStore
+    @State private var products: [Product] = []
+    @State private var catalogLoading = true
+    @State private var catalogError: String?
+    @State private var cart: [String: Int] = [:]
+    @State private var favorites: Set<String> = []
+    @State private var selectedTab: ClientTab = .home
+    @State private var guestMode: Bool
+    @State private var overlay: ClientOverlay?
+    @State private var compared: Set<String> = []
+    @State private var orderRefreshRevision = 0
+    @State private var pushStatus = "Push не настроен"
+#if DEBUG
+    // Отладочный роутер экранов существует только в DEBUG: экраны, на которые
+    // он ведёт, содержат выдуманные данные и в сборку для магазина не входят.
+    @State private var debugFeature: ClientDebugFeature?
+#endif
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
+
+    init(environment: AppEnvironment) {
+        self.environment = environment
+        _guestMode = State(initialValue: UITestBootstrap.startsAsGuest)
+        _selectedTab = State(initialValue: UITestBootstrap.startsAtAccount ? .account : .home)
+        _auth = State(initialValue: CustomerAuthStore(
+            environment: environment,
+            restoresStoredSession: !UITestBootstrap.disablesSessionRestore && !UITestBootstrap.startsSignedIn
+        ))
+#if DEBUG
+        _debugFeature = State(initialValue: ClientDebugFeature.fromLaunch)
+#endif
+    }
+
+    var body: some View {
+        Group {
+            if auth.isRestoring {
+                ZStack { ClientTheme.background.ignoresSafeArea(); ProgressView("Открываем AliStore").tint(ClientTheme.lime) }
+            } else if auth.session == nil && !guestMode {
+                ClientLoginView(auth: auth, onGuest: { guestMode = true })
+            } else {
+                VStack(spacing: 0) {
+                    ClientHeader(
+                        onCompare: { overlay = .compare },
+                        onNotifications: { overlay = .notifications },
+                        onSearch: { overlay = .search },
+                        showsSearch: selectedTab != .catalog
+                    )
+                    ZStack {
+                        switch selectedTab {
+                        case .home:
+                            ClientHomeView(environment: environment, products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites, openCatalog: { selectedTab = .catalog })
+                        case .catalog:
+                            CatalogView(environment: environment, products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites)
+                        case .favorites:
+                            FavoritesView(environment: environment, products: products, cart: $cart, favorites: $favorites)
+                        case .cart:
+                            CartView(
+                                environment: environment,
+                                auth: auth,
+                                products: products,
+                                cart: $cart,
+                                onOpenCatalog: { selectedTab = .catalog },
+                                onOpenSupport: { overlay = .support }
+                            )
+                        case .account:
+                            AccountView(environment: environment, auth: auth, pushStatus: pushStatus, orderRefreshRevision: orderRefreshRevision, products: products, cart: $cart, onEnablePush: enablePush, onLogout: { guestMode = false })
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .toolbar(.hidden, for: .navigationBar)
+                    ClientBottomNav(selected: selectedTab, cartCount: cart.values.reduce(0, +), onSelect: { selectedTab = $0 })
+                }
+                .background(ClientTheme.background)
+            }
+        }
+        .preferredColorScheme(.dark)
+#if DEBUG
+        .fullScreenCover(item: $debugFeature) { feature in
+            feature.screen
+        }
+#endif
+        .overlay {
+            if auth.requiresQuickUnlock, let session = auth.session {
+                QuickUnlockView(title: "AliStore", username: session.phone, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: { Task { await auth.logout(); guestMode = false } })
+            }
+        }
+        .fullScreenCover(item: $overlay) { screen in
+            ClientOverlayView(
+                screen: screen,
+                environment: environment,
+                auth: auth,
+                products: products,
+                cart: $cart,
+                favorites: $favorites,
+                compared: $compared,
+                onRoute: { _ in
+                    overlay = nil
+                    selectedTab = .account
+                    orderRefreshRevision += 1
+                }
+            )
+        }
+        .task {
+            restoreLocalState()
+            #if DEBUG
+            if UITestBootstrap.startsAppleEnrollment {
+                auth.useUITestAppleEnrollment()
+            } else if UITestBootstrap.startsSignedIn {
+                auth.useUITestSession()
+            }
+            #endif
+            async let restore: Void = UITestBootstrap.startsSignedIn ? () : auth.restore()
+            async let catalog: Void = loadCatalog()
+            _ = await (restore, catalog)
+        }
+        .onOpenURL { url in
+            let customScheme = url.scheme == "alistore" && url.host == "payment-return"
+            let httpsLink = url.scheme == "https" &&
+                (url.host == "ali.kg" || url.host == "www.ali.kg") &&
+                url.path == "/payment-return"
+            guard customScheme || httpsLink else { return }
+            selectedTab = .account
+            orderRefreshRevision += 1
+        }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active:
+                if auth.session != nil {
+                    orderRefreshRevision += 1
+                    Task { await replayPendingOrders() }
+                }
+            case .background:
+                // Закрываем аккаунт при уходе в фон: на общем устройстве иначе
+                // следующий увидит заказы, адреса и историю предыдущего.
+                auth.lock()
+            default:
+                break
+            }
+        }
+        .onChange(of: cart) { _, _ in saveLocalState() }
+        .onChange(of: favorites) { _, _ in saveLocalState() }
+        .onChange(of: compared) { _, _ in saveLocalState() }
+        // Смена владельца — это и выход, и вход другого человека, и истечение
+        // сессии. Раньше корзина и избранное были общими на всё приложение и
+        // переживали выход: следующий вошедший видел чужую корзину. Телефоном
+        // в магазине пользуются по очереди, поэтому состояние прежнего владельца
+        // с устройства уходит, а новый получает своё.
+        .onChange(of: auth.session?.customerId) { previous, current in
+            if let previous, previous != current { forgetLocalState(of: previous) }
+            restoreLocalState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .alistoreAPNsToken)) { notification in
+            guard let token = notification.object as? String else { return }
+            Task { await registerPushToken(token) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .alistoreAPNsFailure)) { notification in
+            pushStatus = notification.object as? String ?? "APNs registration failed"
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .alistorePushRoute)) { _ in
+            guard auth.session != nil else { return }
+            selectedTab = .account
+            orderRefreshRevision += 1
+            // The inbox owns the authenticated, entity-scoped destination link.
+            // Opening it here keeps push payloads non-authoritative and lets the
+            // API decide whether the referenced order or warranty is still visible.
+            overlay = .notifications
+        }
+    }
+
+    /// Владелец локального состояния. Пока человек не вошёл — «гость», и это
+    /// отдельное пространство, а не общее с аккаунтами.
+    private var localStateOwner: String? { auth.session?.customerId }
+
+    private func restoreLocalState() {
+        guard !UITestBootstrap.startsAtCheckout, !UITestBootstrap.startsAtCart else { return }
+        let owner = localStateOwner
+        cart = ClientLocalState.cart(owner: owner)
+        favorites = ClientLocalState.favorites(owner: owner)
+        compared = ClientLocalState.compared(owner: owner)
+    }
+
+    private func saveLocalState() {
+        guard !UITestBootstrap.startsAtCheckout, !UITestBootstrap.startsAtCart else { return }
+        ClientLocalState.save(cart: cart, favorites: favorites, compared: compared, owner: localStateOwner)
+    }
+
+    /// Выход обязан унести с устройства корзину и интересы прежнего аккаунта:
+    /// телефоном в магазине пользуются по очереди.
+    private func forgetLocalState(of owner: String?) {
+        ClientLocalState.clear(owner: owner)
+        cart = [:]
+        favorites = []
+        compared = []
+    }
+
+    private func loadCatalog() async {
+        catalogLoading = true
+        defer { catalogLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsAsGuest,
+           !UITestBootstrap.startsAtVisualEvidence,
+           !UITestBootstrap.startsAtCheckout,
+           !UITestBootstrap.startsAtCart {
+            products = ClientUIFixture.products
+            catalogError = nil
+            return
+        }
+        if UITestBootstrap.startsAtVisualEvidence {
+            products = ClientUIFixture.products
+            if !UITestBootstrap.startsAtCheckout, !UITestBootstrap.startsAtCart {
+                favorites = ["ui-product-iphone", "ui-product-macbook"]
+                compared = ["ui-product-iphone", "ui-product-samsung", "ui-product-macbook"]
+            }
+            if UITestBootstrap.startsAtCheckout || UITestBootstrap.startsAtCart, let product = products.first {
+                cart[product.id] = 1
+            }
+            catalogError = nil
+            return
+        }
+#endif
+        do {
+            let response: CatalogResponse = try await APIClient(baseURL: environment.apiBaseURL).get("catalog/products?limit=100")
+            let requiresPurchaseFixture = UITestBootstrap.startsAtCheckout || UITestBootstrap.startsAtCart
+            if requiresPurchaseFixture, response.items.isEmpty {
+                let fixture = Product(id: "ui-product", sku: "UI-IPHONE", name: "iPhone 17 Pro Max", price: 115_000, category: "Смартфоны", availableUnits: 3)
+                products = [fixture]
+                cart[fixture.id] = 1
+            } else {
+                products = response.items
+            }
+            if requiresPurchaseFixture, let product = response.items.first {
+                cart[product.id] = 1
+            }
+            catalogError = nil
+        } catch {
+            if UITestBootstrap.startsAtCheckout || UITestBootstrap.startsAtCart {
+                let fixture = Product(id: "ui-product", sku: "UI-IPHONE", name: "iPhone 17 Pro Max", price: 115_000, category: "Смартфоны", availableUnits: 3)
+                products = [fixture]
+                cart[fixture.id] = 1
+            }
+            catalogError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func replayPendingOrders() async {
+        guard let token = auth.session?.accessToken else { return }
+        let descriptor = FetchDescriptor<PendingMutation>(
+            sortBy: [SortDescriptor(\.createdAt)]
+        )
+        guard let mutations = try? modelContext.fetch(descriptor) else { return }
+        // Включая `syncing`: заказ, на котором приложение убили посреди отправки,
+        // иначе застревал бы навсегда (см. OfflineOrderQueue.replayable).
+        for mutation in OfflineOrderQueue.replayable(mutations) {
+            await OfflineOrderQueue.replay(
+                mutation,
+                api: APIClient(baseURL: environment.apiBaseURL),
+                token: token,
+                context: modelContext
+            )
+        }
+    }
+
+    private func enablePush() {
+        Task {
+            do {
+                let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
+                guard granted else {
+                    pushStatus = "Уведомления отключены"
+                    return
+                }
+                pushStatus = "Регистрация APNs…"
+                await MainActor.run { UIApplication.shared.registerForRemoteNotifications() }
+            } catch {
+                pushStatus = error.localizedDescription
+            }
+        }
+    }
+
+    private func registerPushToken(_ token: String) async {
+        guard let session = auth.session else {
+            pushStatus = "Войдите, чтобы привязать push"
+            return
+        }
+        do {
+            let deviceId = installationId()
+            let registered: RegisteredPushToken = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "notifications/push-tokens",
+                body: RegisterPushTokenRequest(token: token, deviceId: deviceId),
+                token: session.accessToken
+            )
+            pushStatus = registered.enabled ? "Push подключён" : "Push отключён"
+        } catch {
+            pushStatus = error.localizedDescription
+        }
+    }
+
+    private func installationId() -> String {
+        let key = "alistore.client.installation-id"
+        if let value = UserDefaults.standard.string(forKey: key) { return value }
+        let value = "ios-\(UUID().uuidString.lowercased())"
+        UserDefaults.standard.set(value, forKey: key)
+        return value
+    }
+}
+
+private enum ClientCheckoutStep: Int, CaseIterable, Identifiable {
+    case delivery
+    case address
+    case payment
+    case review
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .delivery: "Получение"
+        case .address: "Адрес"
+        case .payment: "Оплата"
+        case .review: "Проверка"
+        }
+    }
+}
+
+private struct ClientChoiceRow: View {
+    let symbol: String
+    let title: String
+    let detail: String
+    let trailing: String?
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(ClientTheme.body(19, weight: .semibold))
+                    .foregroundStyle(selected ? .black : ClientTheme.lime)
+                    .frame(width: 40, height: 40)
+                    .background(selected ? ClientTheme.lime : ClientTheme.background, in: RoundedRectangle(cornerRadius: 11))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(ClientTheme.body(14, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text(detail)
+                        .font(ClientTheme.body(12))
+                        .foregroundStyle(ClientTheme.muted)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 8)
+                if let trailing {
+                    Text(trailing)
+                        .font(ClientTheme.body(12, weight: .medium))
+                        .foregroundStyle(selected ? ClientTheme.lime : ClientTheme.muted)
+                }
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(selected ? ClientTheme.lime : ClientTheme.muted)
+            }
+            .padding(14)
+            .glass(radius: 13)
+            .overlay(RoundedRectangle(cornerRadius: 13).stroke(selected ? ClientTheme.lime : ClientTheme.line))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct ClientCheckoutSteps: View {
+    let current: ClientCheckoutStep
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(ClientCheckoutStep.allCases) { step in
+                Capsule()
+                    .fill(step.rawValue <= current.rawValue ? ClientTheme.lime : ClientTheme.line)
+                    .frame(height: 4)
+                    .accessibilityLabel(step.title)
+            }
+        }
+    }
+}
+
+private struct ClientSummaryRow: View {
+    let title: String
+    let value: String
+    let emphasized: Bool
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(ClientTheme.body(emphasized ? 15 : 13, weight: emphasized ? .bold : .regular))
+                .foregroundStyle(emphasized ? .white : ClientTheme.muted)
+            Spacer()
+            Text(value)
+                .font(ClientTheme.display(emphasized ? 19 : 13, weight: emphasized ? .black : .medium))
+                .foregroundStyle(emphasized ? ClientTheme.lime : Design3.textBright)
+        }
+    }
+}
+
+private struct ClientReadOnlyField: View {
+    let title: String
+    let value: String
+    let monospaced: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(ClientTheme.body(11, weight: .medium))
+                .foregroundStyle(ClientTheme.muted)
+            Text(value)
+                .font(monospaced ? .system(size: 14, design: .monospaced) : ClientTheme.body(14))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(13)
+                .glass(radius: 12)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+        }
+    }
+}
+
+private struct ClientInputField: View {
+    let title: String
+    @Binding var text: String
+    let placeholder: String
+    let monospaced: Bool
+
+    init(title: String, text: Binding<String>, placeholder: String = "", monospaced: Bool = false) {
+        self.title = title
+        _text = text
+        self.placeholder = placeholder
+        self.monospaced = monospaced
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(ClientTheme.body(11, weight: .medium))
+                .foregroundStyle(ClientTheme.muted)
+            TextField(placeholder, text: $text)
+                .font(monospaced ? .system(size: 14, design: .monospaced) : ClientTheme.body(14))
+                .foregroundStyle(.white)
+                .textInputAutocapitalization(.never)
+                .padding(13)
+                .glass(radius: 12)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+        }
+    }
+}
+
+private struct ClientCallout: View {
+    let symbol: String
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol).foregroundStyle(ClientTheme.lime)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white)
+                Text(detail).font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted).lineSpacing(2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(13)
+        .glass(radius: 12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+    }
+}
+
+private struct CartView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let products: [Product]
+    @Binding var cart: [String: Int]
+    @Environment(\.modelContext) private var modelContext
+    @State private var fulfillment = "pickup"
+    @State private var paymentMethod = "cash"
+    @State private var giftCardCode = ""
+    @State private var address = ""
+    @State private var pickupPoints: [StorePoint] = []
+    @State private var selectedStorePointId = ""
+    @State private var pointError: String?
+    @State private var deliveryZones: [DeliveryZone] = []
+    @State private var selectedDeliveryZoneId = ""
+    @State private var selectedDeliverySlotId = ""
+    @State private var promoInput = ""
+    @State private var appliedPromoCode: String?
+    @State private var promoDiscount = 0
+    @State private var promoError: String?
+    @State private var isApplyingPromo = false
+    @State private var loyaltyBalance = 0
+    @State private var bonusApplied = false
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
+    @State private var completedOrder: CustomerOrder?
+    @State private var paymentIntent: PaymentIntent?
+    @State private var isRetryingPayment = false
+    @State private var retryErrorMessage: String?
+    @State private var queuedOffline = false
+    @State private var checkoutStep: ClientCheckoutStep = .delivery
+    @State private var showingOrderStatus = false
+    @State private var showingCheckout = UITestBootstrap.startsAtCheckout
+    let onOpenCatalog: () -> Void
+    let onOpenSupport: () -> Void
+
+    private var lines: [(Product, Int)] {
+        cart.compactMap { id, quantity in products.first(where: { $0.id == id }).map { ($0, quantity) } }
+    }
+    private var total: Int { lines.reduce(0) { $0 + $1.0.price * $1.1 } }
+    private var selectedDeliveryZone: DeliveryZone? { deliveryZones.first(where: { $0.id == selectedDeliveryZoneId }) }
+    private var selectedDeliverySlot: DeliverySlot? { selectedDeliveryZone?.slots.first(where: { $0.id == selectedDeliverySlotId }) }
+    private var managedCourierDelivery: Bool { fulfillment == "courier" && !deliveryZones.isEmpty }
+    private var deliveryFee: Int { fulfillment == "courier" ? selectedDeliveryZone?.fee ?? 200 : 0 }
+    private var courierDetail: String {
+        guard let zone = selectedDeliveryZone else {
+            return deliveryZones.isEmpty ? "Условия будут рассчитаны при оформлении" : "Выберите зону доставки"
+        }
+        let eta: String
+        switch (zone.etaMinMinutes, zone.etaMaxMinutes) {
+        case let (minimum?, maximum?) where minimum == maximum:
+            eta = "около \(minimum) мин."
+        case let (minimum?, maximum?):
+            eta = "\(minimum)–\(maximum) мин."
+        case let (minimum?, nil):
+            eta = "от \(minimum) мин."
+        case let (nil, maximum?):
+            eta = "до \(maximum) мин."
+        default:
+            eta = "доступные интервалы — на следующем шаге"
+        }
+        return "\(zone.name) · \(eta)"
+    }
+    private var bonusDiscount: Int { bonusApplied ? min(max(total - promoDiscount, 0), loyaltyBalance) : 0 }
+    private var payable: Int { total - promoDiscount - bonusDiscount + deliveryFee }
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    header
+                    if queuedOffline {
+                        offlineState
+                    } else if let order = completedOrder {
+                        ClientPaymentResultView(
+                            order: order,
+                            paymentIntent: paymentIntent,
+                            paymentURL: paymentIntent.flatMap(paymentURL),
+                            forceFailure: UITestBootstrap.startsAtPaymentFailure,
+                            isRetrying: isRetryingPayment,
+                            retryErrorMessage: retryErrorMessage,
+                            onTrack: { showingOrderStatus = true },
+                            onRetry: { Task { await retryPayment() } },
+                            onSupport: onOpenSupport,
+                            onReset: {
+                                resetCheckout()
+                                onOpenCatalog()
+                            }
+                        )
+                    } else if lines.isEmpty {
+                        EmptyStateView(title: "Корзина пуста", detail: "Добавьте товары из каталога.", symbol: "bag")
+                    } else {
+                        if showingCheckout {
+                            if checkoutStep == .review {
+                                reviewStep
+                            } else {
+                                stepContent
+                            }
+                            footer
+                        } else {
+                            cartContents
+                            cartFooter
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 22)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .task {
+            #if DEBUG
+            if UITestBootstrap.startsAtPaymentResult || UITestBootstrap.startsAtPaymentFailure {
+                completedOrder = ClientUIFixture.orders[0]
+            }
+            #endif
+            await loadStorePoints()
+            await loadLoyalty()
+        }
+        .sheet(isPresented: $showingOrderStatus) {
+            if let order = completedOrder {
+                ClientOrderStatusView(order: order, environment: environment, auth: auth, products: products, cart: $cart)
+            }
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(completedOrder == nil ? (showingCheckout ? "Оформление" : "Корзина") : "Готово")
+                    .font(ClientTheme.display(20, weight: .bold))
+                    .foregroundStyle(.white)
+                Spacer()
+                if completedOrder == nil && !lines.isEmpty {
+                    Text("\(cart.values.reduce(0, +)) шт.")
+                        .font(ClientTheme.body(12, weight: .medium))
+                        .foregroundStyle(ClientTheme.muted)
+                }
+            }
+            if completedOrder == nil && showingCheckout && !lines.isEmpty {
+                ClientCheckoutSteps(current: checkoutStep)
+                HStack {
+                    ForEach(ClientCheckoutStep.allCases) { step in
+                        Text(step.title)
+                            .font(ClientTheme.body(10, weight: step == checkoutStep ? .bold : .regular))
+                            .foregroundStyle(step == checkoutStep ? ClientTheme.lime : ClientTheme.muted)
+                            .frame(maxWidth: .infinity, alignment: step == .delivery ? .leading : step == .review ? .trailing : .center)
+                    }
+                }
+            }
+        }
+    }
+
+    private var cartContents: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(lines, id: \.0.id) { product, quantity in
+                HStack(alignment: .top, spacing: 12) {
+                    ClientProductImage(product: product, cornerRadius: 10)
+                        .frame(width: 76, height: 76)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(product.name)
+                            .font(ClientTheme.body(13, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                        Text(Money.som(product.price))
+                            .font(ClientTheme.display(15, weight: .black))
+                            .foregroundStyle(.white)
+                        HStack(spacing: 8) {
+                            HStack(spacing: 10) {
+                                Button {
+                                    quantityBinding(product.id).wrappedValue = quantity - 1
+                                } label: {
+                                    Image(systemName: "minus")
+                                        .font(ClientTheme.body(11, weight: .bold))
+                                        .frame(width: 28, height: 28)
+                                        .minTapTarget()
+                                }
+                                .accessibilityLabel("Уменьшить количество \(product.name)")
+                                Text("\(quantity)")
+                                    .font(Design3.mono(13, .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(minWidth: 20)
+                                Button {
+                                    quantityBinding(product.id).wrappedValue = quantity + 1
+                                } label: {
+                                    Image(systemName: "plus")
+                                        .font(ClientTheme.body(11, weight: .bold))
+                                        .frame(width: 28, height: 28)
+                                        .minTapTarget()
+                                }
+                                .accessibilityLabel("Увеличить количество \(product.name)")
+                            }
+                            .foregroundStyle(.white)
+                            .background(ClientTheme.line, in: RoundedRectangle(cornerRadius: 8))
+                            Button("Удалить") {
+                                quantityBinding(product.id).wrappedValue = 0
+                            }
+                            .font(ClientTheme.body(11, weight: .medium))
+                            .foregroundStyle(ClientTheme.muted)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    Text(Money.som((product.price * quantity)))
+                        .font(ClientTheme.display(14, weight: .bold))
+                        .foregroundStyle(ClientTheme.lime)
+                        .multilineTextAlignment(.trailing)
+                }
+                .padding(12)
+                .glass(radius: 14)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+                .accessibilityElement(children: .contain)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                ClientSummaryRow(title: "Товаров", value: "\(cart.values.reduce(0, +)) шт.", emphasized: false)
+                ClientSummaryRow(title: "Сумма товаров", value: Money.som(total), emphasized: false)
+                ClientSummaryRow(title: "Итого", value: Money.som(total), emphasized: true)
+            }
+            .padding(16)
+            .glass(radius: 14)
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+        }
+    }
+
+    private var cartFooter: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                showingCheckout = true
+                checkoutStep = .delivery
+            } label: {
+                HStack {
+                    Spacer()
+                    Text("Оформить заказ")
+                    Spacer()
+                }
+                .font(ClientTheme.body(15, weight: .bold))
+                .foregroundStyle(.black)
+                .frame(height: 50)
+                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+            }
+            .accessibilityIdentifier("cart-checkout-button")
+        }
+    }
+
+    private var stepContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            switch checkoutStep {
+            case .delivery:
+                Text("Способ получения").font(ClientTheme.display(16, weight: .bold)).foregroundStyle(.white)
+                ClientChoiceRow(symbol: "building.2.fill", title: "Самовывоз", detail: "Заберите сегодня из магазина", trailing: "бесплатно", selected: fulfillment == "pickup") { fulfillment = "pickup" }
+                ClientChoiceRow(
+                    symbol: "bolt.fill",
+                    title: "Курьер",
+                    detail: courierDetail,
+                    trailing: selectedDeliveryZone.map { Money.som($0.fee) },
+                    selected: fulfillment == "courier"
+                ) { fulfillment = "courier" }
+            case .address:
+                Text("Контакты и адрес").font(ClientTheme.display(16, weight: .bold)).foregroundStyle(.white)
+                ClientReadOnlyField(title: "Телефон", value: auth.session?.phone ?? "Войдите в аккаунт", monospaced: true)
+                if fulfillment == "courier" {
+                    ClientInputField(title: "Адрес доставки", text: $address, placeholder: "Город, улица, дом")
+                    if managedCourierDelivery {
+                        Text("Зона доставки").font(ClientTheme.body(11, weight: .medium)).foregroundStyle(ClientTheme.muted)
+                        ForEach(deliveryZones) { zone in
+                            ClientChoiceRow(symbol: "map", title: zone.name, detail: "Доставка по зоне", trailing: Money.som(zone.fee), selected: selectedDeliveryZoneId == zone.id) {
+                                selectedDeliveryZoneId = zone.id
+                                selectedDeliverySlotId = zone.slots.first(where: { $0.available })?.id ?? ""
+                            }
+                        }
+                        if let zone = selectedDeliveryZone {
+                            Text("Интервал").font(ClientTheme.body(11, weight: .medium)).foregroundStyle(ClientTheme.muted)
+                            ForEach(zone.slots) { slot in
+                                ClientChoiceRow(symbol: "clock", title: slotLabel(slot), detail: slot.available ? "Осталось мест: \(slot.remaining)" : "Интервал занят", trailing: nil, selected: selectedDeliverySlotId == slot.id) {
+                                    if slot.available { selectedDeliverySlotId = slot.id }
+                                }
+                            }
+                            if zone.slots.isEmpty {
+                                ClientCallout(symbol: "calendar.badge.exclamationmark", title: "Нет свободных интервалов", detail: "Попробуйте оформить заказ позже или выберите самовывоз.")
+                            }
+                        }
+                    }
+                } else if pickupPoints.isEmpty {
+                    ClientCallout(symbol: "building.2", title: pointError ?? "Точки самовывоза загружаются", detail: "Выберите способ получения после загрузки данных.")
+                } else {
+                    ForEach(pickupPoints) { point in
+                        ClientChoiceRow(symbol: "mappin", title: point.name, detail: point.address, trailing: point.hours, selected: selectedStorePointId == point.id) { selectedStorePointId = point.id }
+                    }
+                }
+            case .payment:
+                Text("Оплата").font(ClientTheme.display(16, weight: .bold)).foregroundStyle(.white)
+                ClientChoiceRow(symbol: "banknote", title: "При получении", detail: "Наличными или картой в точке", trailing: nil, selected: paymentMethod == "cash") { paymentMethod = "cash" }
+                ClientChoiceRow(symbol: "creditcard.fill", title: "Банковская карта", detail: "Защищённый платёж через провайдера", trailing: nil, selected: paymentMethod == OnlinePaymentMethod.card.rawValue) { paymentMethod = OnlinePaymentMethod.card.rawValue }
+                ClientChoiceRow(symbol: "qrcode", title: "MBank QR", detail: "Оплата в приложении MBank", trailing: nil, selected: paymentMethod == OnlinePaymentMethod.qrMBank.rawValue) { paymentMethod = OnlinePaymentMethod.qrMBank.rawValue }
+                ClientChoiceRow(symbol: "qrcode", title: "O!Деньги QR", detail: "Оплата в приложении O!Деньги", trailing: nil, selected: paymentMethod == OnlinePaymentMethod.qrODengi.rawValue) { paymentMethod = OnlinePaymentMethod.qrODengi.rawValue }
+                ClientChoiceRow(symbol: "calendar", title: "Рассрочка", detail: "Условия зависят от банка-партнёра", trailing: nil, selected: paymentMethod == OnlinePaymentMethod.installment.rawValue) { paymentMethod = OnlinePaymentMethod.installment.rawValue }
+                ClientChoiceRow(symbol: "giftcard", title: "Подарочная карта", detail: "Оплатить заказ балансом карты целиком", trailing: nil, selected: paymentMethod == "gift_card") { paymentMethod = "gift_card" }
+                if paymentMethod == "gift_card" { giftCardField }
+                promoSection
+                if loyaltyBalance > 0 {
+                    ClientChoiceRow(symbol: "gift.fill", title: "Списать бонусы", detail: "Доступно \(loyaltyBalance.formatted()) · спишем \(Money.som(bonusDiscount))", trailing: bonusApplied ? "−\(Money.som(bonusDiscount))" : nil, selected: bonusApplied) { bonusApplied.toggle() }
+                    .accessibilityIdentifier("checkout-bonus-toggle")
+                }
+            case .review:
+                reviewStep
+            }
+        }
+    }
+
+    private var promoSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Промокод")
+                .font(ClientTheme.body(11, weight: .medium))
+                .foregroundStyle(ClientTheme.muted)
+            HStack(spacing: 8) {
+                TextField("SALE5000", text: $promoInput)
+                    .font(Design3.mono(14))
+                    .foregroundStyle(.white)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .padding(13)
+                    .glass(radius: 12)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+                    .accessibilityIdentifier("checkout-promo-input")
+                Button {
+                    Task { await applyPromo() }
+                } label: {
+                    if isApplyingPromo { ProgressView().tint(.black) } else { Text("OK") }
+                }
+                .font(ClientTheme.body(14, weight: .bold))
+                .foregroundStyle(.black)
+                .frame(width: 56, height: 46)
+                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 12))
+                .disabled(isApplyingPromo || promoInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityIdentifier("checkout-promo-apply")
+            }
+            if let appliedPromoCode {
+                HStack(spacing: 6) {
+                    Text("\(appliedPromoCode): −\(Money.som(promoDiscount))")
+                        .font(ClientTheme.body(12, weight: .medium))
+                        .foregroundStyle(ClientTheme.lime)
+                    Spacer()
+                    Button("Убрать") {
+                        self.appliedPromoCode = nil
+                        promoDiscount = 0
+                        promoError = nil
+                    }
+                    .font(ClientTheme.body(12, weight: .medium))
+                    .foregroundStyle(ClientTheme.muted)
+                }
+            }
+            if let promoError {
+                Text(promoError).font(ClientTheme.body(12)).foregroundStyle(Design3.danger)
+            }
+        }
+    }
+
+    private var giftCardField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Код подарочной карты")
+                .font(ClientTheme.body(11, weight: .medium))
+                .foregroundStyle(ClientTheme.muted)
+            TextField("GC-XXXX", text: $giftCardCode)
+                .font(Design3.mono(14))
+                .foregroundStyle(.white)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                .padding(13)
+                .glass(radius: 12)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+                .accessibilityIdentifier("checkout-giftcard-input")
+            Text("Спишем всю сумму заказа с карты. Если баланса не хватит — заказ не оформим.")
+                .font(ClientTheme.body(12))
+                .foregroundStyle(ClientTheme.muted)
+        }
+    }
+
+    private var reviewStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Подтверждение").font(ClientTheme.display(16, weight: .bold)).foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(lines, id: \.0.id) { product, quantity in
+                    HStack(spacing: 10) {
+                        ClientProductImage(product: product, cornerRadius: 10).frame(width: 54, height: 54)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(product.name).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white).lineLimit(2)
+                            Text("\(quantity) × \(Money.som(product.price))").font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                        }
+                        Spacer()
+                    }
+                }
+                Divider().overlay(ClientTheme.line)
+                ClientSummaryRow(title: "Получение", value: fulfillment == "pickup" ? (pickupPoints.first(where: { $0.id == selectedStorePointId })?.name ?? "Самовывоз") : "Курьер", emphasized: false)
+                if fulfillment == "courier", let selectedDeliveryZone {
+                    ClientSummaryRow(title: "Зона", value: selectedDeliveryZone.name, emphasized: false)
+                }
+                if fulfillment == "courier", let selectedDeliverySlot {
+                    ClientSummaryRow(title: "Интервал", value: slotLabel(selectedDeliverySlot), emphasized: false)
+                }
+                ClientSummaryRow(title: "Оплата", value: paymentLabel, emphasized: false)
+                ClientSummaryRow(title: "Товаров", value: "\(cart.values.reduce(0, +))", emphasized: false)
+                Divider().overlay(ClientTheme.line)
+                ClientSummaryRow(title: "Сумма товаров", value: Money.som(total), emphasized: false)
+                if deliveryFee > 0 {
+                    ClientSummaryRow(title: "Доставка", value: Money.som(deliveryFee), emphasized: false)
+                }
+                if promoDiscount > 0 {
+                    ClientSummaryRow(title: "Промокод \(appliedPromoCode ?? "")", value: "−\(Money.som(promoDiscount))", emphasized: false)
+                }
+                if bonusDiscount > 0 {
+                    ClientSummaryRow(title: "Бонусы", value: "−\(Money.som(bonusDiscount))", emphasized: false)
+                }
+                ClientSummaryRow(title: "К оплате", value: Money.som(payable), emphasized: true)
+            }
+            .padding(16)
+            .glass(radius: 14)
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+            Text("Нажимая «Подтвердить заказ», вы соглашаетесь с условиями продажи и политикой возврата AliStore.")
+                .font(ClientTheme.body(11))
+                .foregroundStyle(ClientTheme.muted)
+                .lineSpacing(3)
+        }
+    }
+
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if auth.session == nil {
+                ClientCallout(symbol: "person.badge.key", title: "Войдите, чтобы оформить заказ", detail: "Откройте Кабинет и войдите по SMS-коду.")
+            }
+            if let errorMessage {
+                Text(errorMessage).font(ClientTheme.body(12)).foregroundStyle(Design3.danger)
+            }
+            Button {
+                if checkoutStep == .review {
+                    Task { await checkout() }
+                } else if let next = ClientCheckoutStep(rawValue: checkoutStep.rawValue + 1) {
+                    checkoutStep = next
+                }
+            } label: {
+                HStack {
+                    Spacer()
+                    if isSubmitting { ProgressView().tint(.black) } else { Text(checkoutStep == .review ? "Подтвердить заказ" : checkoutStep == .payment ? "К подтверждению" : "Далее") }
+                    Spacer()
+                }
+                .font(ClientTheme.body(15, weight: .bold))
+                .foregroundStyle(canAdvance ? .black : Design3.textDisabled)
+                .frame(height: 50)
+                .background(canAdvance ? ClientTheme.lime : ClientTheme.line, in: RoundedRectangle(cornerRadius: 13))
+            }
+            .disabled(!canAdvance || isSubmitting)
+            if checkoutStep != .delivery {
+                Button("Назад") { checkoutStep = ClientCheckoutStep(rawValue: checkoutStep.rawValue - 1) ?? .delivery }
+                    .font(ClientTheme.body(13, weight: .medium))
+                    .foregroundStyle(ClientTheme.muted)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var offlineState: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "arrow.triangle.2.circlepath").font(ClientTheme.body(38)).foregroundStyle(ClientTheme.lime)
+            Text("Заказ сохранён офлайн").font(ClientTheme.display(20, weight: .bold)).foregroundStyle(.white)
+            Text("Он отправится автоматически после восстановления связи. Повторить отправку можно в Кабинет → Синхронизация.")
+                .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted).multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, minHeight: 300)
+    }
+
+    private var canAdvance: Bool {
+        guard auth.session != nil else { return false }
+        switch checkoutStep {
+        case .delivery: return fulfillment == "pickup" || fulfillment == "courier"
+        case .address:
+            if fulfillment == "pickup" { return !selectedStorePointId.isEmpty }
+            guard !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+            return !managedCourierDelivery || !selectedDeliverySlotId.isEmpty
+        case .payment:
+            if paymentMethod == "gift_card" {
+                return !giftCardCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            return !paymentMethod.isEmpty
+        case .review: return !lines.isEmpty
+        }
+    }
+
+    private var paymentLabel: String {
+        switch paymentMethod {
+        case "cash": "При получении"
+        case OnlinePaymentMethod.card.rawValue: "Банковская карта"
+        case OnlinePaymentMethod.qrMBank.rawValue: "MBank QR"
+        case OnlinePaymentMethod.qrODengi.rawValue: "O!Деньги QR"
+        case OnlinePaymentMethod.installment.rawValue: "Рассрочка"
+        case "gift_card": "Подарочная карта"
+        default: paymentMethod
+        }
+    }
+
+    private func resetCheckout() {
+        completedOrder = nil
+        paymentIntent = nil
+        isRetryingPayment = false
+        retryErrorMessage = nil
+        queuedOffline = false
+        promoInput = ""
+        appliedPromoCode = nil
+        promoDiscount = 0
+        promoError = nil
+        bonusApplied = false
+        checkoutStep = .delivery
+        showingCheckout = false
+    }
+
+    private func quantityBinding(_ id: String) -> Binding<Int> {
+        Binding(
+            get: { cart[id] ?? 0 },
+            set: { value in
+                let stockCap = products.first(where: { $0.id == id })?.availableUnits ?? value
+                let capped = min(max(value, 0), stockCap)
+                if capped == 0 { cart.removeValue(forKey: id) } else { cart[id] = capped }
+            }
+        )
+    }
+
+    private func checkout() async {
+        guard let session = auth.session else { return }
+        isSubmitting = true
+        errorMessage = nil
+        defer { isSubmitting = false }
+        let request = CreateOrderRequest(
+            customerId: session.customerId,
+            fulfillmentType: fulfillment,
+            storePointId: fulfillment == "pickup" ? selectedStorePointId : nil,
+            deliveryAddress: fulfillment == "courier" ? address.trimmingCharacters(in: .whitespaces) : nil,
+            total: payable,
+            items: lines.map { CreateOrderItem(sku: $0.0.sku, qty: $0.1, price: $0.0.price) },
+            paymentMode: paymentMethod == "cash" && fulfillment == "courier" ? "cod" : "prepaid",
+            promoCode: appliedPromoCode,
+            loyaltyPoints: bonusDiscount > 0 ? bonusDiscount : nil,
+            deliveryZoneId: fulfillment == "courier" ? selectedDeliveryZone?.id : nil,
+            deliverySlotId: fulfillment == "courier" ? selectedDeliverySlot?.id : nil,
+            deliverySlot: fulfillment == "pickup"
+                ? pickupPoints.first(where: { $0.id == selectedStorePointId })?.hours
+                : selectedDeliverySlot.map { slotLabel($0) }
+        )
+        let idempotencyKey = UUID().uuidString
+        guard await giftCardCanCoverOrder() else { return }
+        // Создание заказа и запуск оплаты — две разные операции, и раньше они
+        // стояли под одним `catch`. Если заказ создавался, а оплата падала по
+        // сети, покупатель читал «сохранено офлайн» про уже существующий заказ,
+        // `completedOrder` не выставлялся — и работающая кнопка повторной оплаты
+        // становилась недостижимой. Заказ висел неоплаченным.
+        guard let order = await createOrder(
+            request,
+            token: session.accessToken,
+            idempotencyKey: idempotencyKey
+        ) else { return }
+
+        // С этого места заказ существует на сервере. Офлайн-очередь здесь уже
+        // неуместна: повторять нечего, платить — есть чем.
+        completedOrder = order
+        cart.removeAll()
+
+        // Подарочная карта закрывает заказ сразу — платёж уходит здесь же под
+        // конкретный orderId. Успех: intent остаётся nil → экран показывает успех,
+        // как при оплате «при получении». Отказ (баланс изменился между проверкой и
+        // списанием): заказ существует неоплаченным — говорим это прямо, а не ложный
+        // успех; повтор именно gift_card недоступен, поэтому уводим в поддержку.
+        if paymentMethod == "gift_card" {
+            do {
+                try await GiftCardCheckout(environment: environment).pay(
+                    orderId: order.id,
+                    amount: order.total,
+                    code: giftCardCode.trimmingCharacters(in: .whitespacesAndNewlines),
+                    token: session.accessToken
+                )
+            } catch is CancellationError {
+            } catch {
+                retryErrorMessage = "Заказ создан, но оплата подарочной картой не прошла: \(error.localizedDescription). Проверьте баланс карты или обратитесь в поддержку."
+            }
+            return
+        }
+
+        guard let onlineMethod = OnlinePaymentMethod(rawValue: paymentMethod) else { return }
+        do {
+            paymentIntent = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "payments/intents/mine",
+                body: CreatePaymentIntentRequest(
+                    orderId: order.id,
+                    method: onlineMethod,
+                    amount: order.total,
+                    returnUrl: paymentReturnURL(for: order.id)
+                ),
+                token: session.accessToken,
+                idempotencyKey: UUID().uuidString
+            )
+        } catch {
+            retryErrorMessage = "Заказ создан, но оплата не началась. Повторите оплату — заказ не потерян."
+        }
+    }
+
+    /// Подарочная карта должна покрывать заказ полностью до его создания.
+    /// Сервер остаётся источником истины и повторно проверяет баланс при списании.
+    private func giftCardCanCoverOrder() async -> Bool {
+        guard paymentMethod == "gift_card" else { return true }
+        let code = giftCardCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty else {
+            errorMessage = "Введите код подарочной карты."
+            return false
+        }
+        do {
+            let card = try await GiftCardCheckout(environment: environment).lookup(code: code)
+            guard card.redeemable, card.balance >= payable else {
+                errorMessage = "На карте \(Money.som(card.balance)), а к оплате \(Money.som(payable)). Пополните карту или выберите другой способ."
+                return false
+            }
+            return true
+        } catch {
+            errorMessage = "Не удалось проверить подарочную карту: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    /// Сетевая ошибка до подтверждённого создания безопасно уходит в offline
+    /// queue. Любая серверная ошибка остаётся видимой и не дублирует заказ.
+    private func createOrder(
+        _ request: CreateOrderRequest,
+        token: String,
+        idempotencyKey: String
+    ) async -> CustomerOrder? {
+        do {
+            return try await APIClient(baseURL: environment.apiBaseURL).post(
+                "orders/mine",
+                body: request,
+                token: token,
+                idempotencyKey: idempotencyKey
+            )
+        } catch {
+            guard error is URLError else {
+                errorMessage = error.localizedDescription
+                return nil
+            }
+            do {
+                try OfflineOrderQueue.enqueue(request, idempotencyKey: idempotencyKey, context: modelContext)
+                queuedOffline = true
+                cart.removeAll()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            return nil
+        }
+    }
+
+    @MainActor
+    private func retryPayment() async {
+        guard let session = auth.session, let order = completedOrder else { return }
+        guard let method = OnlinePaymentMethod(rawValue: paymentIntent?.method ?? paymentMethod) else {
+            retryErrorMessage = "Для этого заказа повторная онлайн-оплата недоступна. Обратитесь в поддержку."
+            return
+        }
+        isRetryingPayment = true
+        retryErrorMessage = nil
+        defer { isRetryingPayment = false }
+        do {
+            paymentIntent = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "payments/intents/mine",
+                body: CreatePaymentIntentRequest(
+                    orderId: order.id,
+                    method: method,
+                    amount: order.total,
+                    returnUrl: paymentReturnURL(for: order.id)
+                ),
+                token: session.accessToken,
+                idempotencyKey: UUID().uuidString
+            )
+        } catch is CancellationError {
+        } catch {
+            retryErrorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func loadStorePoints() async {
+        do {
+            let options: CheckoutOptions = try await APIClient(baseURL: environment.apiBaseURL).get("logistics/checkout-options")
+            pickupPoints = options.pickupPoints
+            if !pickupPoints.contains(where: { $0.id == selectedStorePointId }) {
+                selectedStorePointId = pickupPoints.first?.id ?? ""
+            }
+            pointError = pickupPoints.isEmpty ? "Самовывоз временно недоступен" : nil
+            deliveryZones = options.deliveryZones
+            let zone = deliveryZones.first(where: { $0.slots.contains(where: { $0.available }) })
+            selectedDeliveryZoneId = zone?.id ?? ""
+            selectedDeliverySlotId = zone?.slots.first(where: { $0.available })?.id ?? ""
+        } catch {
+            pickupPoints = []
+            selectedStorePointId = ""
+            deliveryZones = []
+            selectedDeliveryZoneId = ""
+            selectedDeliverySlotId = ""
+            pointError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func loadLoyalty() async {
+        guard let token = auth.session?.accessToken else { return }
+        do {
+            let loyalty: CustomerLoyalty = try await APIClient(baseURL: environment.apiBaseURL).get("customers/me/loyalty", token: token)
+            loyaltyBalance = loyalty.balance
+        } catch {
+            loyaltyBalance = 0
+            bonusApplied = false
+        }
+    }
+
+    @MainActor
+    private func applyPromo() async {
+        let code = promoInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty, !isApplyingPromo else { return }
+        isApplyingPromo = true
+        promoError = nil
+        defer { isApplyingPromo = false }
+        do {
+            let quote: PromotionQuote = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "promotions/quote",
+                body: PromotionQuoteRequest(
+                    code: code,
+                    items: lines.map { PromotionQuoteItem(sku: $0.0.sku, qty: $0.1) }
+                ),
+                token: auth.session?.accessToken
+            )
+            appliedPromoCode = quote.code
+            promoDiscount = quote.discount
+        } catch {
+            appliedPromoCode = nil
+            promoDiscount = 0
+            promoError = error.localizedDescription
+        }
+    }
+
+    private func slotLabel(_ slot: DeliverySlot) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return "\(formatter.string(from: slot.startsAt))–\(formatter.string(from: slot.endsAt))"
+    }
+
+    private func paymentURL(_ intent: PaymentIntent) -> URL? {
+        URL(string: intent.paymentUrl, relativeTo: environment.apiBaseURL)?.absoluteURL
+    }
+
+    private func paymentReturnURL(for orderId: String) -> String {
+        let base = (Bundle.main.object(forInfoDictionaryKey: "PAYMENT_RETURN_URL") as? String)
+            ?? "alistore://payment-return"
+        let separator = base.contains("?") ? "&" : "?"
+        return "\(base)\(separator)orderId=\(orderId)"
+    }
+}
+
+private struct ClientPaymentResultView: View {
+    let order: CustomerOrder
+    let paymentIntent: PaymentIntent?
+    let paymentURL: URL?
+    let forceFailure: Bool
+    let isRetrying: Bool
+    let retryErrorMessage: String?
+    let onTrack: () -> Void
+    let onRetry: () -> Void
+    let onSupport: () -> Void
+    let onReset: () -> Void
+
+    // Состояние экрана вынесено в чистую функцию paymentResultState (Shared,
+    // покрыта PaymentResultStateTests): при `nil` интенте + surfaced-ошибке экран
+    // обязан показать провал, а не «Заказ оформлен». Раньше эта проверка
+    // отсутствовала, и неоплаченный заказ (провал онлайн-интента или отказ
+    // подарочной карты) показывался успехом.
+    private var resultState: PaymentResultState {
+        paymentResultState(
+            forceFailure: forceFailure,
+            paymentStatus: paymentIntent?.status,
+            orderStatus: paymentIntent?.orderStatus,
+            hasRetryError: retryErrorMessage != nil
+        )
+    }
+
+    private var title: String {
+        switch resultState {
+        case .success: "Заказ оформлен"
+        case .pending: "Ожидает оплаты"
+        case .failed: "Оплата не прошла"
+        }
+    }
+
+    private var detail: String {
+        switch resultState {
+        case .success: "Мы передали заказ в обработку. Актуальный статус будет обновляться в Кабинете."
+        case .pending: "Завершите оплату на защищённой странице провайдера. Статус подтвердит только серверный webhook."
+        case .failed: "Платёж не подтверждён провайдером. Повторите попытку или обратитесь в поддержку. Деньги не считаются списанными без серверного подтверждения."
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: resultState == .success ? "checkmark" : resultState == .failed ? "xmark" : "creditcard")
+                .font(ClientTheme.body(30, weight: .bold))
+                .foregroundStyle(.black)
+                .frame(width: 80, height: 80)
+                .background(resultState == .success ? ClientTheme.lime : resultState == .failed ? ClientTheme.coral : Design3.gold, in: Circle())
+            Text(title)
+                .font(ClientTheme.display(24, weight: .black))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .accessibilityIdentifier("payment-result-title")
+            Text("Заказ #\(order.id.suffix(6)) · \(Money.som(order.total))")
+                .font(ClientTheme.body(14))
+                .foregroundStyle(ClientTheme.muted)
+            Text(detail)
+                .font(ClientTheme.body(13))
+                .foregroundStyle(ClientTheme.muted)
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
+                .padding(.horizontal, 10)
+            if resultState == .pending, let paymentURL {
+                Link("Перейти к оплате", destination: paymentURL)
+                    .font(ClientTheme.body(15, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+            }
+            switch resultState {
+            case .success, .pending:
+                Button("Отследить заказ", action: onTrack)
+                    .font(ClientTheme.body(15, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                    .accessibilityIdentifier("payment-track-button")
+                Button("Вернуться в каталог", action: onReset)
+                    .font(ClientTheme.body(13, weight: .medium))
+                    .foregroundStyle(ClientTheme.muted)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("payment-catalog-button")
+            case .failed:
+                if let retryErrorMessage {
+                    Text(retryErrorMessage)
+                        .font(ClientTheme.body(12))
+                        .foregroundStyle(ClientTheme.coral)
+                        .multilineTextAlignment(.center)
+                }
+                Button(action: onRetry) {
+                    HStack {
+                        Spacer()
+                        if isRetrying { ProgressView().tint(.black) } else { Text("Повторить оплату") }
+                        Spacer()
+                    }
+                    .font(ClientTheme.body(15, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(height: 50)
+                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                }
+                .disabled(isRetrying)
+                .accessibilityIdentifier("payment-retry-button")
+                Button("Связаться с поддержкой", action: onSupport)
+                    .font(ClientTheme.body(13, weight: .medium))
+                    .foregroundStyle(ClientTheme.muted)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("payment-support-button")
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, minHeight: 440)
+    }
+}
+
+private struct ClientOrderStatusView: View {
+    let order: CustomerOrder
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let products: [Product]
+    @Binding var cart: [String: Int]
+    @Environment(\.dismiss) private var dismiss
+    @State private var showCancelConfirm = false
+    @State private var showSupport = false
+    @State private var repeatMessage: String?
+    @State private var repeatFailed = false
+    @State private var ledger: [OrderLedgerEvent]?
+    @State private var cancellationPreview: OrderCancellationPreview?
+    @State private var cancellation: OrderCancellation?
+    @State private var cancellationReason = ""
+    @State private var isRequestingCancellation = false
+    @State private var cancellationError: String?
+    private let mutationIntents = MutationIntentStore()
+
+    private let stepIcons = ["checkmark.circle", "creditcard", "shippingbox", "truck.box", "house"]
+
+    private var displayOrderNumber: String {
+        clientDisplayOrderNumber(order.id)
+    }
+
+    private var currentIndex: Int {
+        let value = order.status.lowercased()
+        if value.contains("deliver") || value.contains("complete") || value.contains("получ") { return 4 }
+        if value.contains("out_for") || value.contains("ready") || value.contains("pickup") || value.contains("courier") { return 3 }
+        if value.contains("process") || value.contains("pack") || value.contains("reserv") { return 2 }
+        if value.contains("paid") || value.contains("confirm") { return 1 }
+        return 0
+    }
+
+    /// Ledger-driven timeline; when the ledger is unavailable, fall back to the
+    /// server-reported status without inventing timestamps.
+    private var timelineSteps: [OrderTimelineStep] {
+        if let ledger {
+            return OrderTimelineBuilder.build(events: ledger)
+        }
+        return OrderTimelineBuilder.stepTitles.enumerated().map { index, title in
+            OrderTimelineStep(title: title, isDone: index < currentIndex, isCurrent: index == currentIndex, time: nil)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .center, spacing: 10) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(ClientTheme.body(16, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 34, height: 34)
+                                .background(ClientTheme.surface, in: Circle())
+                                .overlay(Circle().stroke(ClientTheme.line))
+                        }
+                        .accessibilityLabel("Назад")
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Заказ \(displayOrderNumber)")
+                                .font(ClientTheme.display(20, weight: .bold))
+                                .foregroundStyle(.white)
+                            Text("\(order.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(Money.som(order.total))")
+                                .font(ClientTheme.body(12))
+                                .foregroundStyle(ClientTheme.muted)
+                        }
+                        Spacer()
+                    }
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(timelineSteps.enumerated()), id: \.offset) { index, step in
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(spacing: 0) {
+                                    Image(systemName: step.isDone ? "checkmark" : stepIcons[index])
+                                        .font(ClientTheme.body(12, weight: .bold))
+                                        .foregroundStyle(step.isDone ? .black : ClientTheme.muted)
+                                        .frame(width: 26, height: 26)
+                                        .background(step.isDone ? ClientTheme.lime : ClientTheme.background, in: Circle())
+                                    if index < timelineSteps.count - 1 {
+                                        Rectangle().fill(ClientTheme.line).frame(width: 2, height: 28)
+                                    }
+                                }
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(step.title)
+                                        .font(ClientTheme.body(14, weight: step.isCurrent ? .bold : .medium))
+                                        .foregroundStyle(step.isDone || step.isCurrent ? .white : ClientTheme.muted)
+                                    if step.isCurrent {
+                                        Text("Текущий статус: \(order.status)")
+                                            .font(ClientTheme.body(11))
+                                            .foregroundStyle(ClientTheme.lime)
+                                    } else if let time = step.time {
+                                        Text(time.formatted(date: .abbreviated, time: .shortened))
+                                            .font(ClientTheme.body(11))
+                                            .foregroundStyle(ClientTheme.muted.opacity(0.75))
+                                    }
+                                }
+                                .padding(.top, 3)
+                                Spacer()
+                            }
+                        }
+                    }
+                    .padding(18)
+                    .glass(radius: 16)
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(Array(order.items.enumerated()), id: \.offset) { _, item in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("\(item.sku) · \(item.qty) шт.")
+                                    .font(ClientTheme.body(13, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Text(nativeSupplyStatusLabel(item.fulfillmentStatus))
+                                    .font(ClientTheme.body(11))
+                                    .foregroundStyle(ClientTheme.lime)
+                                if let promisedDate = item.promisedDate {
+                                    Text("Обещанная дата: \(promisedDate.formatted(date: .abbreviated, time: .omitted))")
+                                        .font(ClientTheme.body(11))
+                                        .foregroundStyle(ClientTheme.muted)
+                                }
+                            }
+                        }
+                        if let schedule = order.paymentSchedule, !schedule.isEmpty {
+                            Divider().overlay(ClientTheme.line)
+                            Text("График оплаты")
+                                .font(ClientTheme.body(13, weight: .bold))
+                                .foregroundStyle(.white)
+                            ForEach(schedule) { receivable in
+                                Text("\(nativeReceivableLabel(receivable.kind)): \(Money.som(receivable.settledAmount)) / \(Money.som(receivable.amount)) · \(receivable.status)")
+                                    .font(ClientTheme.body(11))
+                                    .foregroundStyle(ClientTheme.muted)
+                            }
+                        }
+                        if let cancellation {
+                            Divider().overlay(ClientTheme.line)
+                            Text("Отмена/возврат: \(cancellation.status)")
+                                .font(ClientTheme.body(12, weight: .bold))
+                                .foregroundStyle(ClientTheme.coral)
+                            Text(Money.som(cancellation.approvedRefundAmount ?? cancellation.requestedRefundAmount))
+                                .font(ClientTheme.body(11))
+                                .foregroundStyle(ClientTheme.muted)
+                        }
+                    }
+                    .padding(16)
+                    .glass(radius: 16)
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 8)], spacing: 8) {
+                        NavigationLink {
+                            ClientReceiptView(environment: environment, auth: auth, order: order)
+                        } label: {
+                            ClientStatusAction(symbol: "doc.text", title: "Чек", tint: Design3.textBright)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("order-status-receipt")
+
+                        NavigationLink {
+                            DevicesView(environment: environment, auth: auth)
+                        } label: {
+                            ClientStatusAction(symbol: "shield.checkered", title: "Гарантия", tint: Design3.textBright)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("order-status-warranty")
+
+                        NavigationLink {
+                            CustomerSupportView(environment: environment, auth: auth)
+                        } label: {
+                            ClientStatusAction(symbol: "bubble.left.and.bubble.right", title: "WhatsApp", tint: Design3.textBright)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("order-status-whatsapp")
+
+                        Button {
+                            if cancellation == nil, cancellationPreview?.requestEnabled == true, cancellationPreview?.canCancel == true {
+                                showCancelConfirm = true
+                            } else {
+                                showSupport = true
+                            }
+                        } label: {
+                            ClientStatusAction(
+                                symbol: "xmark.circle",
+                                title: cancellation == nil ? "Отменить" : "Отмена отправлена",
+                                tint: ClientTheme.coral
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("order-status-cancel")
+                    }
+                    Button {
+                        repeatOrder()
+                    } label: {
+                        ClientStatusAction(symbol: "arrow.triangle.2.circlepath", title: "Повторить заказ", tint: ClientTheme.lime)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("order-status-repeat")
+                    if let repeatMessage {
+                        Text(repeatMessage)
+                            .font(ClientTheme.body(12, weight: .semibold))
+                            .foregroundStyle(repeatFailed ? ClientTheme.coral : ClientTheme.lime)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 10)
+                            .background((repeatFailed ? ClientTheme.coral : ClientTheme.lime).opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke((repeatFailed ? ClientTheme.coral : ClientTheme.lime).opacity(0.24)))
+                            .accessibilityIdentifier("order-status-repeat-message")
+                    }
+                    Text("Статус заказа и оплаты обновляется сервером. Повторное нажатие не создаёт новый заказ.")
+                        .font(ClientTheme.body(11))
+                        .foregroundStyle(ClientTheme.muted)
+                        .lineSpacing(3)
+                }
+                .padding(16)
+            }
+            .background(ClientTheme.background)
+            .navigationTitle("Статус заказа")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Закрыть") { dismiss() }
+                }
+            }
+            .sheet(isPresented: $showCancelConfirm) {
+                NavigationStack {
+                    Form {
+                        if let preview = cancellationPreview {
+                            Section("Предварительный расчёт") {
+                                LabeledContent("Возврат", value: Money.som(preview.estimatedRefundAmount))
+                                LabeledContent("Политика", value: preview.ownerReviewRequired ? "Решение владельца" : "Автоматический возврат")
+                                Text(preview.note)
+                            }
+                        }
+                        Section("Причина") {
+                            TextField("Почему вы хотите отменить заказ", text: $cancellationReason, axis: .vertical)
+                            if let cancellationError { Text(cancellationError).foregroundStyle(ClientTheme.coral) }
+                        }
+                        Button(isRequestingCancellation ? "Отправляем…" : "Отправить запрос") {
+                            Task { await requestCancellation() }
+                        }
+                        .disabled(isRequestingCancellation || cancellationReason.trimmingCharacters(in: .whitespacesAndNewlines).count < 3)
+                    }
+                    .navigationTitle("Отмена заказа")
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Закрыть") { showCancelConfirm = false }
+                        }
+                    }
+                }
+                .preferredColorScheme(.dark)
+            }
+            .sheet(isPresented: $showSupport) {
+                NavigationStack {
+                    CustomerSupportView(environment: environment, auth: auth)
+                }
+                .tint(ClientTheme.lime)
+                .preferredColorScheme(.dark)
+            }
+        }
+        .tint(ClientTheme.lime)
+        .preferredColorScheme(.dark)
+        .task {
+            async let ledgerTask: Void = loadLedger()
+            async let cancellationTask: Void = loadCancellation()
+            _ = await (ledgerTask, cancellationTask)
+        }
+    }
+
+    @MainActor
+    private func loadLedger() async {
+        guard let token = auth.session?.accessToken else { return }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            ledger = ClientUIFixture.orderLedger
+            return
+        }
+#endif
+        // A failed ledger read keeps the status-based timeline without timestamps.
+        ledger = try? await APIClient(baseURL: environment.apiBaseURL).get("orders/\(order.id)/ledger", token: token)
+    }
+
+    @MainActor
+    private func loadCancellation() async {
+        guard let token = auth.session?.accessToken else { return }
+        let api = APIClient(baseURL: environment.apiBaseURL)
+        cancellationPreview = try? await api.get("orders/mine/\(order.id)/cancellation-preview", token: token)
+        let current: OrderCancellation? = try? await api.get("orders/mine/\(order.id)/cancellations/current", token: token)
+        cancellation = current
+    }
+
+    @MainActor
+    private func requestCancellation() async {
+        guard let token = auth.session?.accessToken else { return }
+        isRequestingCancellation = true
+        cancellationError = nil
+        defer { isRequestingCancellation = false }
+        do {
+            let request = CreateOrderCancellationRequest(
+                reason: cancellationReason.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            let scope = order.id
+            let key = try mutationIntents.key(
+                namespace: "client-order-cancellation",
+                scope: scope,
+                body: request
+            )
+            cancellation = try await APIClient(baseURL: environment.apiBaseURL).post(
+                NativeMutationEndpoint.orderCancellation(orderId: order.id),
+                body: request,
+                token: token,
+                idempotencyKey: key
+            )
+            mutationIntents.complete(namespace: "client-order-cancellation", scope: scope, idempotencyKey: key)
+            showCancelConfirm = false
+        } catch {
+            cancellationError = error.localizedDescription
+        }
+    }
+
+    /// Re-adds the order's real positions (orders/mine items) to the cart,
+    /// resolving SKUs against the loaded catalog and capping at available stock.
+    @MainActor
+    private func repeatOrder() {
+#if DEBUG
+        let catalog = UITestBootstrap.startsSignedIn ? ClientUIFixture.products : products
+#else
+        let catalog = products
+#endif
+        var added = 0
+        var missing = 0
+        var alreadyInCart = 0
+        for item in order.items {
+            guard let product = catalog.first(where: { $0.sku == item.sku }), product.availableUnits > 0 else {
+                missing += 1
+                continue
+            }
+            let inCart = cart[product.id] ?? 0
+            let allowed = min(product.availableUnits - inCart, item.qty)
+            if allowed > 0 {
+                cart[product.id] = inCart + allowed
+                added += 1
+            } else {
+                if inCart > 0 {
+                    alreadyInCart += 1
+                } else {
+                    missing += 1
+                }
+            }
+        }
+        repeatFailed = added == 0
+        if added > 0, missing == 0 {
+            repeatMessage = "Товары добавлены в корзину"
+        } else if added > 0 {
+            repeatMessage = "Добавлено \(added) из \(order.items.count) позиций — остальных нет в наличии"
+        } else if alreadyInCart > 0, missing == 0 {
+            repeatMessage = "Товары уже в корзине"
+        } else {
+            repeatMessage = "Эти товары сейчас недоступны в каталоге"
+        }
+    }
+}
+
+private struct ClientNotificationOrderView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let orderId: String
+    let products: [Product]
+    @Binding var cart: [String: Int]
+    @State private var order: CustomerOrder?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Group {
+            if let order {
+                ClientOrderStatusView(order: order, environment: environment, auth: auth, products: products, cart: $cart)
+            } else if isLoading {
+                ZStack {
+                    ClientTheme.background.ignoresSafeArea()
+                    ProgressView("Открываем заказ")
+                        .tint(ClientTheme.lime)
+                }
+            } else {
+                ZStack {
+                    ClientTheme.background.ignoresSafeArea()
+                    ClientDataErrorView(
+                        message: errorMessage ?? "Заказ недоступен",
+                        retry: { Task { await load() } }
+                    )
+                    .padding(16)
+                }
+            }
+        }
+        .task { await load() }
+    }
+
+    private func load() async {
+        guard let token = auth.session?.accessToken else {
+            errorMessage = "Войдите в аккаунт, чтобы открыть заказ."
+            isLoading = false
+            return
+        }
+        do {
+            order = try await APIClient(baseURL: environment.apiBaseURL).get("orders/\(orderId)", token: token)
+            errorMessage = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
+}
+
+private struct ClientReceiptView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let order: CustomerOrder
+    @State private var receipt: CustomerOrderReceipt?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Электронный чек")
+                        .font(ClientTheme.display(24, weight: .black))
+                        .foregroundStyle(.white)
+                    Text("Заказ #\(order.id.suffix(6))")
+                        .font(ClientTheme.body(13, weight: .medium))
+                        .foregroundStyle(ClientTheme.muted)
+                    if isLoading {
+                        ProgressView("Запрашиваем чек")
+                            .tint(ClientTheme.lime)
+                            .frame(maxWidth: .infinity, minHeight: 260)
+                    } else if let errorMessage {
+                        ClientCallout(symbol: "doc.text.magnifyingglass", title: "Чек пока недоступен", detail: errorMessage)
+                    } else if let receipt {
+                        Text(receipt.markup)
+                            .font(Design3.mono(13, .regular))
+                            .foregroundStyle(Design3.textBright)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(18)
+                            .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+                    }
+                }
+                .padding(16)
+            }
+        }
+        .navigationTitle("Чек")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(ClientTheme.lime)
+        .preferredColorScheme(.dark)
+        .task { await load() }
+    }
+
+    private func load() async {
+        guard let token = auth.session?.accessToken else {
+            errorMessage = "Войдите в аккаунт, чтобы открыть чек."
+            isLoading = false
+            return
+        }
+        do {
+            receipt = try await APIClient(baseURL: environment.apiBaseURL).get(
+                "orders/\(order.id)/receipt",
+                token: token
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
+}
+
+private struct ClientStatusAction: View {
+    let symbol: String
+    let title: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: symbol)
+            Text(title).font(ClientTheme.body(13, weight: .medium))
+        }
+        .foregroundStyle(tint)
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .glass(radius: 11)
+        .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+    }
+}
+
+private func nativeSupplyStatusLabel(_ status: String?) -> String {
+    switch status {
+    case "awaiting_deposit": "Ожидает задатка"
+    case "procurement_draft": "Закупка проверяется"
+    case "supplier_ordered": "Заказан поставщику"
+    case "in_transit": "В пути"
+    case "received", "quality_check": "Поступил, проверяем"
+    case "ready": "Готов"
+    case "handed_over": "Выдан"
+    case "quarantined": "На решении владельца"
+    case "customer_cancelled", "cancelled": "Отменён"
+    default: status ?? "Обрабатывается"
+    }
+}
+
+private func nativeReceivableLabel(_ kind: String) -> String {
+    switch kind {
+    case "supply_deposit": "Задаток"
+    case "stock_sale": "Складской товар"
+    case "supply_balance": "Остаток заказного товара"
+    case "delivery": "Доставка"
+    default: kind
+    }
+}
+
+private struct OrdersView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let refreshRevision: Int
+    let products: [Product]
+    @Binding var cart: [String: Int]
+    @State private var orders: [CustomerOrder] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                ClientTheme.background.ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Мои заказы")
+                                .font(ClientTheme.display(24, weight: .black))
+                                .foregroundStyle(.white)
+                            Text("Статусы, выдача и доставка")
+                                .font(ClientTheme.body(13))
+                                .foregroundStyle(ClientTheme.muted)
+                        }
+                        if auth.isRestoring || isLoading {
+                            ProgressView("Загружаем заказы")
+                                .tint(ClientTheme.lime)
+                                .frame(maxWidth: .infinity, minHeight: 260)
+                        } else if auth.session == nil {
+                            EmptyStateView(title: "Войдите в аккаунт", detail: "История заказов доступна после входа по SMS-коду.", symbol: "person.badge.key")
+                        } else if let errorMessage {
+                            ClientCallout(symbol: "wifi.exclamationmark", title: "Заказы недоступны", detail: errorMessage)
+                        } else if orders.isEmpty {
+                            EmptyStateView(title: "Заказов пока нет", detail: "Здесь появятся покупки из магазина и приложения.", symbol: "shippingbox")
+                        } else {
+                            ForEach(orders) { order in
+                                NavigationLink {
+                                    ClientOrderStatusView(order: order, environment: environment, auth: auth, products: products, cart: $cart)
+                                } label: {
+                                    ClientOrderCard(order: order)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityElement(children: .combine)
+                                .accessibilityIdentifier("client-order-card-\(order.id)")
+                            }
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+            .navigationTitle("Мои заказы")
+            .navigationBarTitleDisplayMode(.inline)
+            .task(id: "\(auth.session?.accessToken ?? "guest")-\(refreshRevision)") { await load() }
+            .refreshable { await load() }
+        }
+        .tint(ClientTheme.lime)
+        .preferredColorScheme(.dark)
+    }
+
+    private func load() async {
+        guard let token = auth.session?.accessToken else {
+            orders = []
+            return
+        }
+        isLoading = true
+        defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            switch UITestBootstrap.accountFixtureMode {
+            case .loaded:
+                orders = ClientUIFixture.orders
+                errorMessage = nil
+            case .empty:
+                orders = []
+                errorMessage = nil
+            case .error:
+                orders = []
+                errorMessage = "Не удалось загрузить заказы в UI-тестовом контуре"
+            }
+            return
+        }
+#endif
+        do {
+            orders = try await APIClient(baseURL: environment.apiBaseURL).get("orders/mine", token: token)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct ClientOrderCard: View {
+    let order: CustomerOrder
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Заказ #\(order.id.suffix(6))")
+                        .font(ClientTheme.body(15, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text(order.createdAt, format: .dateTime.day().month().year())
+                        .font(ClientTheme.body(11))
+                        .foregroundStyle(ClientTheme.muted)
+                }
+                Spacer()
+                Text(order.status)
+                    .font(ClientTheme.body(11, weight: .semibold))
+                    .foregroundStyle(statusColor)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(statusColor.opacity(0.14), in: Capsule())
+            }
+            HStack {
+                Label("\(order.items.reduce(0) { $0 + $1.qty }) тов.", systemImage: "shippingbox")
+                Spacer()
+                Text(Money.som(order.total))
+                    .font(ClientTheme.display(15, weight: .bold))
+                    .foregroundStyle(ClientTheme.lime)
+            }
+            .font(ClientTheme.body(12, weight: .medium))
+            .foregroundStyle(ClientTheme.muted)
+            HStack {
+                Text(order.fulfillmentType == "courier" ? "Курьерская доставка" : "Самовывоз")
+                Spacer()
+                Image(systemName: "chevron.right")
+            }
+            .font(ClientTheme.body(12, weight: .medium))
+            .foregroundStyle(ClientTheme.muted)
+        }
+        .padding(15)
+        .glass(radius: 16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("client-order-card-\(order.id)")
+    }
+
+    private var statusColor: Color {
+        let value = order.status.lowercased()
+        if value.contains("cancel") || value.contains("reject") || value.contains("fail") { return ClientTheme.coral }
+        if value.contains("complete") || value.contains("deliver") || value.contains("ready") { return ClientTheme.lime }
+        return ClientTheme.gold
+    }
+}
+
+#if DEBUG
+private enum ClientUIFixture {
+    private static let referenceDate = Date(timeIntervalSince1970: 1_750_000_000)
+    private static let warrantyDate = Date(timeIntervalSince1970: 1_767_280_000)
+
+    static let products = [
+        Product(id: "ui-product-iphone", sku: "UI-IPHONE-17", name: "iPhone 17 Pro Max", price: 115_000, category: "Смартфоны", availableUnits: 3),
+        Product(id: "ui-product-samsung", sku: "UI-SAMSUNG-S25", name: "Samsung Galaxy S25", price: 89_900, category: "Смартфоны", availableUnits: 5),
+        Product(id: "ui-product-macbook", sku: "UI-MACBOOK-AIR", name: "MacBook Air M4", price: 124_900, category: "Ноутбуки", availableUnits: 2),
+        Product(id: "ui-product-airpods", sku: "UI-AIRPODS-PRO", name: "AirPods Pro 3", price: 24_900, category: "Аудио", availableUnits: 8),
+        Product(id: "ui-product-airpods2", sku: "UI-AIRPODS-PRO2", name: "AirPods Pro 2", price: 24_900, category: "Аудио", availableUnits: 8),
+        Product(id: "ui-product-watch", sku: "UI-WATCH-S10", name: "Apple Watch Series 10", price: 39_900, category: "Часы", availableUnits: 4),
+        Product(id: "ui-product-ipad", sku: "UI-IPAD-AIR", name: "iPad Air M3", price: 69_900, category: "Планшеты", availableUnits: 1)
+    ]
+
+    static let orders: [CustomerOrder] = [
+        CustomerOrder(
+            id: "ui-order-2401",
+            channel: "web",
+            fulfillmentType: "pickup",
+            pickupPoint: "ЦУМ, Бишкек",
+            deliveryAddress: nil,
+            deliverySlot: nil,
+            pickupCode: "AL-2401",
+            status: "ready_for_pickup",
+            total: 24900,
+            createdAt: referenceDate,
+            items: [CustomerOrderItem(sku: "UI-AIRPODS-PRO2", qty: 1, price: 24900, imei: nil)]
+        )
+    ]
+
+    /// Fixture ledger for ui-order-2401 (ready_for_pickup): four steps done, pickup pending.
+    static let orderLedger: [OrderLedgerEvent] = [
+        OrderLedgerEvent(id: "ui-ledger-4", type: "order.packed", actor: "ui-staff", timestamp: referenceDate.addingTimeInterval(7_800)),
+        OrderLedgerEvent(id: "ui-ledger-3", type: "order.picking", actor: "ui-staff", timestamp: referenceDate.addingTimeInterval(4_200)),
+        OrderLedgerEvent(id: "ui-ledger-2", type: "payment.received", actor: "ui-customer", timestamp: referenceDate.addingTimeInterval(60)),
+        OrderLedgerEvent(id: "ui-ledger-1", type: "order.created", actor: "ui-customer", timestamp: referenceDate)
+    ]
+
+    static let notifications: [CustomerNotification] = [
+        CustomerNotification(
+            id: "ui-notification-order",
+            template: "order_ready",
+            title: "Заказ №4102 собирается",
+            detail: "Скоро передадим курьеру",
+            symbol: "shippingbox.fill",
+            route: "order",
+            referenceId: "ui-order-2401",
+            createdAt: referenceDate,
+            readAt: nil
+        ),
+        CustomerNotification(
+            id: "ui-notification-price",
+            template: "price_drop",
+            title: "Цена снизилась",
+            detail: "Apple Watch S9 теперь дешевле на 5 000",
+            symbol: "tag.fill",
+            route: "product",
+            referenceId: "ui-product-watch",
+            createdAt: referenceDate.addingTimeInterval(-3600),
+            readAt: nil
+        ),
+        CustomerNotification(
+            id: "ui-notification-warranty",
+            template: "warranty_created",
+            title: "Гарантия скоро истекает",
+            detail: "AirPods Pro — осталось 12 дней",
+            symbol: "shield.fill",
+            route: "warranty",
+            referenceId: "ui-warranty-2401",
+            createdAt: referenceDate.addingTimeInterval(-86400),
+            readAt: nil
+        ),
+        CustomerNotification(
+            id: "ui-notification-bonus",
+            template: "loyalty_earned",
+            title: "Начислены бонусы",
+            detail: "+300 за отзыв",
+            symbol: "gift.fill",
+            route: "bonuses",
+            referenceId: nil,
+            createdAt: referenceDate.addingTimeInterval(-172800),
+            readAt: referenceDate.addingTimeInterval(-172000)
+        )
+    ]
+
+    static let returns: [CustomerReturn] = [
+        CustomerReturn(
+            id: "ui-return-2401",
+            orderId: "ui-order-2401",
+            reason: "Не подошёл цвет устройства",
+            status: "under_review",
+            refundId: nil,
+            refundAmount: 89900,
+            isFullOrder: true,
+            createdAt: referenceDate,
+            items: [CustomerReturnItem(id: "ui-return-item-2401", orderItemId: "ui-order-item-2401", qty: 1, refundAmount: 89900)],
+            order: CustomerReturnOrder(
+                id: "ui-order-2401",
+                total: 89900,
+                createdAt: referenceDate,
+                items: [CustomerReturnOrderItem(id: "ui-order-item-2401", sku: "IPHONE-15-128-BLK", qty: 1, price: 89900)]
+            )
+        )
+    ]
+
+    static let loyalty = CustomerLoyalty(
+        balance: 4820,
+        conversion: 1,
+        level: "Gold",
+        nextLevelSpend: 18500,
+        coupons: [
+            CustomerCoupon(id: "ui-coupon-1", title: "Скидка на аксессуары", code: "ALI-GOLD", valueLabel: "−10%", expiresAt: warrantyDate, active: true),
+            CustomerCoupon(id: "ui-coupon-2", title: "Бесплатная доставка", code: "DELIVERY-GOLD", valueLabel: "0 сом", expiresAt: warrantyDate, active: true)
+        ],
+        history: [
+            LoyaltyHistoryEntry(id: "ui-loyalty-1", kind: "earned", label: "Покупка iPhone 15", amount: 899, expiresAt: nil, createdAt: referenceDate),
+            LoyaltyHistoryEntry(id: "ui-loyalty-2", kind: "spent", label: "Скидка в заказе", amount: -120, expiresAt: nil, createdAt: referenceDate)
+        ]
+    )
+
+    static let addresses = [
+        CustomerAddress(id: "ui-address-1", title: "Дом", text: "Бишкек, ул. Киевская, 125, кв. 42", comment: "Домофон 42", isPrimary: true, createdAt: referenceDate, updatedAt: referenceDate),
+        CustomerAddress(id: "ui-address-2", title: "Работа", text: "Бишкек, пр. Манаса, 40", comment: nil, isPrimary: false, createdAt: referenceDate, updatedAt: referenceDate)
+    ]
+
+    static let settings = CustomerSettings(
+        id: "ui-settings-1",
+        phone: "+996 700 00 12 34",
+        name: "Айбек",
+        consent: true,
+        push: true,
+        whatsapp: true,
+        service: true,
+        promos: false
+    )
+
+    static let devices = [
+        CustomerDevice(
+            imei: "352099999999001",
+            product: "iPhone 15 128 GB Black",
+            status: "sold",
+            warrantyUntil: "2026-01-15",
+            daysLeft: 182,
+            warranty: DeviceWarrantySummary(id: "ui-warranty-1", status: "active", sla: warrantyDate)
+        )
+    ]
+}
+#endif
+
+private struct CustomerReturnsView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let products: [Product]
+    @State private var returns: [CustomerReturn] = []
+    @State private var orders: [CustomerOrder] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var showingRequest = false
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            if isLoading {
+                ProgressView("Загружаем возвраты").tint(ClientTheme.lime)
+            } else if let errorMessage {
+                ClientDataErrorView(message: errorMessage, retry: { Task { await load() } })
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Возврат товара")
+                            .font(ClientTheme.display(20, weight: .bold))
+                            .foregroundStyle(.white)
+                        if returns.isEmpty {
+                            EmptyStateView(title: "Возвратов пока нет", detail: "Заявку можно оформить по завершённому заказу.", symbol: "arrow.uturn.backward.circle")
+                        } else {
+                            ForEach(returns) { item in
+                                returnCard(item)
+                            }
+                        }
+
+                        Button { showingRequest = true } label: {
+                            Text("Оформить возврат")
+                                .font(ClientTheme.body(14, weight: .bold))
+                                .foregroundStyle(.black)
+                                .frame(maxWidth: .infinity, minHeight: 46)
+                                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(orders.isEmpty)
+                        if orders.isEmpty {
+                            Text("Нет заказов для оформления возврата")
+                                .font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+        }
+        .navigationTitle("Возвраты")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(ClientTheme.lime)
+        .task { await load() }
+        .refreshable { await load() }
+        .sheet(isPresented: $showingRequest) {
+            NavigationStack {
+                CustomerReturnRequestView(environment: environment, auth: auth, orders: orders, products: products) {
+                    showingRequest = false
+                    Task { await load() }
+                }
+            }
+            .preferredColorScheme(.dark)
+        }
+    }
+
+    @MainActor
+    private func load() async {
+        guard let token = auth.session?.accessToken else { return }
+        isLoading = true
+        defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            switch UITestBootstrap.accountFixtureMode {
+            case .loaded:
+                returns = ClientUIFixture.returns
+                orders = ClientUIFixture.orders
+                errorMessage = nil
+            case .empty:
+                returns = []
+                orders = []
+                errorMessage = nil
+            case .error:
+                returns = []
+                orders = []
+                errorMessage = "Не удалось загрузить возвраты в UI-тестовом контуре"
+            }
+            return
+        }
+#endif
+        do {
+            async let loadedReturns: [CustomerReturn] = APIClient(baseURL: environment.apiBaseURL).get("returns/mine", token: token)
+            async let loadedOrders: [CustomerOrder] = APIClient(baseURL: environment.apiBaseURL).get("orders/mine", token: token)
+            returns = try await loadedReturns
+            orders = try await loadedOrders
+            errorMessage = nil
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func statusLabel(_ status: String) -> String {
+        ["requested": "Заявка создана", "under_review": "На проверке", "approved": "Одобрено", "rejected": "Отклонено", "processing": "Обрабатывается", "paid": "Возврат выполнен", "reconciled": "Сверено"][status] ?? status
+    }
+
+    private func statusColor(_ status: String) -> Color {
+        switch status {
+        case "rejected": return ClientTheme.coral
+        case "paid", "reconciled", "approved": return ClientTheme.lime
+        default: return .orange
+        }
+    }
+
+    private func returnCard(_ item: CustomerReturn) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                ClientReturnProductTile()
+                    .frame(width: 54, height: 54)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(returnProductTitle(item))
+                        .font(ClientTheme.body(13, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text(Money.som(item.refundAmount))
+                        .font(ClientTheme.body(12))
+                        .foregroundStyle(ClientTheme.muted)
+                    Text("Возврат #\(item.id.suffix(6)) · \(item.createdAt.formatted(.dateTime.day().month()))")
+                        .font(ClientTheme.body(11))
+                        .foregroundStyle(Design3.textSubtle)
+                }
+                Spacer()
+                Text(statusLabel(item.status))
+                    .font(ClientTheme.body(11, weight: .bold))
+                    .foregroundStyle(statusColor(item.status))
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(statusColor(item.status).opacity(0.12), in: Capsule())
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                timelineRow(title: "Заявка принята", isActive: true)
+                timelineRow(title: "Проверка товара", isActive: item.status != "requested")
+                timelineRow(title: "Возврат денег", isActive: ["paid", "reconciled"].contains(item.status))
+            }
+            .padding(14)
+            .background(Design3.surface, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Причина возврата")
+                    .font(ClientTheme.body(13))
+                    .foregroundStyle(ClientTheme.muted)
+                Text(item.reason)
+                    .font(ClientTheme.body(13))
+                    .foregroundStyle(Design3.textBright)
+                    .frame(maxWidth: .infinity, minHeight: 52, alignment: .topLeading)
+                    .padding(12)
+                    .background(Design3.surface, in: RoundedRectangle(cornerRadius: 11))
+                    .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+            }
+
+            Text("📷 Фото товара приложены при оформлении")
+                .font(ClientTheme.body(12))
+                .foregroundStyle(Design3.textFaint)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(Design3.surface, in: RoundedRectangle(cornerRadius: 11))
+                .overlay(RoundedRectangle(cornerRadius: 11).stroke(Design3.hairline, style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glass(radius: 14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+    }
+
+    private func timelineRow(title: String, isActive: Bool) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: isActive ? "circle.fill" : "circle")
+                .font(ClientTheme.body(9, weight: .bold))
+                .foregroundStyle(isActive ? ClientTheme.lime : Design3.textFaint)
+            Text(title)
+                .font(ClientTheme.body(12))
+                .foregroundStyle(isActive ? ClientTheme.muted : Design3.textFaint)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+    }
+
+    private func returnProductTitle(_ item: CustomerReturn) -> String {
+        guard let sku = item.order?.items.first(where: { orderItem in
+            item.items.contains { $0.orderItemId == orderItem.id }
+        })?.sku ?? item.order?.items.first?.sku else {
+            return item.isFullOrder ? "Товар из заказа" : "Выбранный товар"
+        }
+        return productTitle(for: sku)
+    }
+
+    private func productTitle(for sku: String) -> String {
+        let uppercased = sku.uppercased()
+        if uppercased.contains("AIRPODS") { return "AirPods Pro 2" }
+        if uppercased.contains("IPHONE") { return "iPhone 15 128 GB Black" }
+        if uppercased.contains("WATCH") { return "Apple Watch S9" }
+        if uppercased.contains("MACBOOK") { return "MacBook Air" }
+        return sku
+    }
+}
+
+private struct CustomerReturnRequestView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let orders: [CustomerOrder]
+    let products: [Product]
+    let onCreated: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var orderId: String
+    @State private var reason = "Не подошёл цвет"
+    @State private var selectedReason = "Не подошёл цвет"
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
+    @State private var selectedPhoto: PhotosPickerItem?
+
+    private let returnReasons = ["Не подошёл цвет", "Нашёл дешевле", "Передумал", "Другое"]
+
+    init(environment: AppEnvironment, auth: CustomerAuthStore, orders: [CustomerOrder], products: [Product], onCreated: @escaping () -> Void) {
+        self.environment = environment
+        self.auth = auth
+        self.orders = orders
+        self.products = products
+        self.onCreated = onCreated
+        _orderId = State(initialValue: orders.first?.id ?? "")
+    }
+
+    /// Catalog used to resolve order-item SKUs to product names.
+    private var catalog: [Product] {
+#if DEBUG
+        if UITestBootstrap.startsSignedIn { return ClientUIFixture.products }
+#endif
+        return products
+    }
+
+    private var selectedOrder: CustomerOrder? {
+        orders.first(where: { $0.id == orderId })
+    }
+
+    private var selectedItem: CustomerOrderItem? {
+        selectedOrder?.items.first
+    }
+
+    private func itemTitle(_ item: CustomerOrderItem) -> String {
+        catalog.first(where: { $0.sku == item.sku })?.name ?? item.sku
+    }
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Возврат товара")
+                        .font(ClientTheme.display(20, weight: .bold)).foregroundStyle(.white)
+                    Text("Выберите товар из заказа \(clientDisplayOrderNumber(orderId))")
+                        .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted)
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("Заказ").font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.muted)
+                        Picker("Заказ", selection: $orderId) {
+                            ForEach(orders) { order in
+                                Text("#\(order.id.suffix(6)) · \(Money.som(order.total))")
+                                    .tag(order.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(ClientTheme.lime)
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .glass(radius: 13)
+                    }
+                    if let item = selectedItem {
+                        HStack(spacing: 12) {
+                            ClientReturnProductTile()
+                                .frame(width: 54, height: 54)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(itemTitle(item))
+                                    .font(ClientTheme.body(13, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                Text("\(Money.som(item.price))\(item.qty > 1 ? " · \(item.qty) шт" : "")")
+                                    .font(ClientTheme.body(12))
+                                    .foregroundStyle(ClientTheme.muted)
+                            }
+                            Spacer()
+                            Image(systemName: "checkmark")
+                                .font(ClientTheme.body(14, weight: .bold))
+                                .foregroundStyle(ClientTheme.lime)
+                        }
+                        .padding(12)
+                        .glass(radius: 14)
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.lime))
+                    }
+
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("Причина возврата").font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted)
+                        ForEach(returnReasons, id: \.self) { option in
+                            Button {
+                                selectedReason = option
+                                if option != "Другое" {
+                                    reason = option
+                                }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Circle()
+                                        .stroke(selectedReason == option ? ClientTheme.lime : Design3.textFaint, lineWidth: 2)
+                                        .frame(width: 18, height: 18)
+                                        .overlay {
+                                            if selectedReason == option {
+                                                Circle().fill(ClientTheme.lime).frame(width: 8, height: 8)
+                                            }
+                                        }
+                                    Text(option)
+                                        .font(ClientTheme.body(13))
+                                        .foregroundStyle(Design3.textBright)
+                                    Spacer()
+                                }
+                                .padding(12)
+                                .glass(radius: 11)
+                                .overlay(RoundedRectangle(cornerRadius: 11).stroke(selectedReason == option ? ClientTheme.lime : ClientTheme.line))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("return-reason-\(option)")
+                        }
+                        TextField("Опишите, что не подошло", text: $reason, axis: .vertical)
+                            .lineLimit(3...7)
+                            .foregroundStyle(.white).padding(13)
+                            .glass(radius: 13)
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                            .accessibilityIdentifier("return-reason-details")
+                    }
+                    let hasSelectedPhoto = selectedPhoto != nil
+                    PhotosPicker(selection: $selectedPhoto, matching: .images, photoLibrary: .shared()) {
+                        Label(
+                            hasSelectedPhoto ? "Фото выбрано" : "Добавить фото состояния",
+                            systemImage: hasSelectedPhoto ? "checkmark.circle.fill" : "camera.fill"
+                        )
+                        .font(ClientTheme.body(12, weight: .semibold))
+                        .foregroundStyle(hasSelectedPhoto ? ClientTheme.lime : ClientTheme.muted)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .glass(radius: 11)
+                        .overlay(RoundedRectangle(cornerRadius: 11).stroke(hasSelectedPhoto ? ClientTheme.lime : ClientTheme.line, style: StrokeStyle(lineWidth: 1, dash: hasSelectedPhoto ? [] : [5, 4])))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("return-photo-picker")
+                    if let errorMessage { Text(errorMessage).font(ClientTheme.body(12)).foregroundStyle(.red) }
+                    Button { Task { await submit() } } label: {
+                        HStack { Spacer(); if isSubmitting { ProgressView().tint(.black) } else { Text("Отправить заявку") }; Spacer() }
+                            .font(ClientTheme.body(15, weight: .bold)).foregroundStyle(.black).frame(height: 50)
+                            .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("return-submit")
+                    .disabled(isSubmitting || orderId.isEmpty || reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .padding(18)
+            }
+        }
+        .navigationTitle("Оформить возврат")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Отмена") { dismiss() } } }
+        .tint(ClientTheme.lime)
+    }
+
+    @MainActor
+    private func submit() async {
+        guard let token = auth.session?.accessToken else { return }
+        let cleanReason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        isSubmitting = true
+        errorMessage = nil
+        defer { isSubmitting = false }
+        do {
+            let created: CustomerReturn = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "returns/mine",
+                body: CreateCustomerReturnRequest(orderId: orderId, reason: cleanReason),
+                token: token,
+                idempotencyKey: UUID().uuidString
+            )
+            if let selectedPhoto, let imageData = try await selectedPhoto.loadTransferable(type: Data.self) {
+                _ = try await APIClient(baseURL: environment.apiBaseURL).uploadEvidence(
+                    imageData: imageData,
+                    entityType: "return",
+                    entityId: created.id,
+                    label: "return_condition",
+                    token: token,
+                    idempotencyKey: "return-evidence-\(created.id)"
+                )
+            }
+            onCreated()
+            dismiss()
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct ClientReturnProductTile: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 10)
+            .fill(LinearGradient(colors: [Design3.surfaceRaised, Design3.surface], startPoint: .topLeading, endPoint: .bottomTrailing))
+            .overlay {
+                Image(systemName: "shippingbox")
+                    .font(ClientTheme.body(24, weight: .semibold))
+                    .foregroundStyle(Design3.textBright.opacity(0.72))
+            }
+    }
+}
+
+private struct CustomerTradeInsView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var tradeIns: [CustomerTradeIn] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var showingForm = false
+    @State private var selectedCondition = 1
+    @State private var showingEstimate = false
+
+    private let conditions = [
+        ("Как новый", "Без царапин, полный комплект"),
+        ("Хорошее", "Есть мелкие следы использования"),
+        ("Нужен ремонт", "Экран, батарея или корпус требуют проверки")
+    ]
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            if isLoading {
+                ProgressView("Загружаем trade-in").tint(ClientTheme.lime)
+            } else if let errorMessage {
+                ClientDataErrorView(message: errorMessage, retry: { Task { await load() } })
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Trade-in оценка")
+                                .font(ClientTheme.display(20, weight: .black))
+                                .foregroundStyle(.white)
+                            Text("Оцените старое устройство за 30 секунд")
+                                .font(ClientTheme.body(13))
+                                .foregroundStyle(ClientTheme.muted)
+                                .padding(.leading, 30)
+                        }
+
+                        if showingEstimate {
+                            VStack(spacing: 8) {
+                                Text("Предварительная оценка")
+                                    .font(ClientTheme.body(13))
+                                    .foregroundStyle(ClientTheme.muted)
+                                Text("28 000–32 000")
+                                    .font(ClientTheme.display(34, weight: .black))
+                                    .foregroundStyle(ClientTheme.lime)
+                                Text("Точная цена — после диагностики в магазине. Можно зачесть в счёт нового устройства.")
+                                    .font(ClientTheme.body(12))
+                                    .foregroundStyle(Design3.textMuted)
+                                    .multilineTextAlignment(.center)
+                                    .lineSpacing(3)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(22)
+                            .background(
+                                LinearGradient(
+                                    colors: [Design3.surfaceRaised, ClientTheme.surface],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                in: RoundedRectangle(cornerRadius: 18)
+                            )
+                            .overlay(RoundedRectangle(cornerRadius: 18).stroke(ClientTheme.line))
+                            .accessibilityIdentifier("tradein-estimate-card")
+
+                            Button {
+                                showingForm = true
+                            } label: {
+                                Text("Выбрать новое устройство")
+                                    .font(ClientTheme.body(15, weight: .bold))
+                                    .foregroundStyle(.black)
+                                    .frame(maxWidth: .infinity, minHeight: 50)
+                                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("tradein-open-request")
+
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    showingEstimate = false
+                                }
+                            } label: {
+                                Text("Оценить другое")
+                                    .font(ClientTheme.body(13))
+                                    .foregroundStyle(ClientTheme.muted)
+                                    .frame(maxWidth: .infinity, minHeight: 38)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Text("Модель")
+                                .font(ClientTheme.body(13))
+                                .foregroundStyle(ClientTheme.muted)
+                            Text("iPhone 13 · 128 ГБ")
+                                .font(ClientTheme.body(14))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(13)
+                                .glass(radius: 12)
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+
+                            Text("Состояние")
+                                .font(ClientTheme.body(13))
+                                .foregroundStyle(ClientTheme.muted)
+                                .padding(.top, 2)
+                            ForEach(Array(conditions.enumerated()), id: \.offset) { index, condition in
+                                Button {
+                                    selectedCondition = index
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Circle()
+                                            .stroke(selectedCondition == index ? ClientTheme.lime : Design3.hairline, lineWidth: 2)
+                                            .frame(width: 18, height: 18)
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(condition.0)
+                                                .font(ClientTheme.body(13))
+                                                .foregroundStyle(.white)
+                                            Text(condition.1)
+                                                .font(ClientTheme.body(11))
+                                                .foregroundStyle(Design3.textMuted)
+                                        }
+                                        Spacer()
+                                    }
+                                    .padding(12)
+                                    .glass(radius: 11)
+                                    .overlay(RoundedRectangle(cornerRadius: 11).stroke(selectedCondition == index ? ClientTheme.lime : ClientTheme.line))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("tradein-condition-\(index)")
+                            }
+
+                            Text("📷 Фото устройства (4 ракурса)")
+                                .font(ClientTheme.body(12))
+                                .foregroundStyle(Design3.textFaint)
+                                .frame(maxWidth: .infinity, minHeight: 54)
+                                .glass(radius: 11)
+                                .overlay(RoundedRectangle(cornerRadius: 11).stroke(Design3.hairline, style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+                                .accessibilityIdentifier("tradein-photo-placeholder")
+
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    showingEstimate = true
+                                }
+                            } label: {
+                                Text("Узнать цену")
+                                    .font(ClientTheme.body(15, weight: .bold))
+                                    .foregroundStyle(.black)
+                                    .frame(maxWidth: .infinity, minHeight: 50)
+                                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("tradein-evaluate")
+                        }
+
+                        if !tradeIns.isEmpty {
+                            Text("Мои заявки")
+                                .font(ClientTheme.body(12, weight: .semibold))
+                                .foregroundStyle(ClientTheme.muted)
+                                .padding(.top, 6)
+                            ForEach(tradeIns) { tradeIn in
+                                CustomerTradeInCard(tradeIn: tradeIn, environment: environment, auth: auth)
+                            }
+                        }
+
+                        Button { showingForm = true } label: {
+                            Label("Сохранить заявку", systemImage: "doc.badge.plus")
+                                .font(ClientTheme.body(14, weight: .bold))
+                                .foregroundStyle(ClientTheme.lime)
+                                .frame(maxWidth: .infinity, minHeight: 48)
+                                .background(ClientTheme.line, in: RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("tradein-save-request")
+                    }
+                    .padding(16)
+                }
+            }
+        }
+        .navigationTitle("Trade-in")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(ClientTheme.lime)
+        .task { await load() }
+        .refreshable { await load() }
+        .sheet(isPresented: $showingForm) {
+            NavigationStack {
+                CustomerTradeInFormView(environment: environment, auth: auth) {
+                    showingForm = false
+                    Task { await load() }
+                }
+            }
+            .preferredColorScheme(.dark)
+        }
+    }
+
+    @MainActor
+    private func load() async {
+        isLoading = true
+        defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            tradeIns = []
+            errorMessage = nil
+            return
+        }
+#endif
+        guard let token = auth.session?.accessToken else { return }
+        do {
+            tradeIns = try await APIClient(baseURL: environment.apiBaseURL).get("tradeins/mine", token: token)
+            errorMessage = nil
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct CustomerTradeInCard: View {
+    let tradeIn: CustomerTradeIn
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var isUploadingEvidence = false
+    @State private var evidenceMessage: String?
+    @State private var evidenceIdempotencyKey = UUID().uuidString
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .foregroundStyle(ClientTheme.lime)
+                    .frame(width: 38, height: 38)
+                    .background(ClientTheme.lime.opacity(0.12), in: RoundedRectangle(cornerRadius: 11))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(tradeIn.model)
+                        .font(ClientTheme.body(14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                    Text(tradeIn.contractId ?? "Договор формируется")
+                        .font(Design3.mono(11))
+                        .foregroundStyle(ClientTheme.muted)
+                }
+                Spacer()
+                Text(Money.som(tradeIn.price))
+                    .font(ClientTheme.body(14, weight: .bold))
+                    .foregroundStyle(ClientTheme.lime)
+            }
+            HStack {
+                Text("Состояние: \(tradeIn.grade)")
+                Spacer()
+                Text("Паспорт \(tradeIn.sellerPassportMasked)")
+            }
+            .font(ClientTheme.body(11))
+            .foregroundStyle(ClientTheme.muted)
+            if let imei = tradeIn.imei, !imei.isEmpty {
+                Text("IMEI \(imei)")
+                    .font(Design3.mono(11))
+                    .foregroundStyle(ClientTheme.muted)
+            }
+            PhotosPicker(selection: $selectedPhoto, matching: .images, photoLibrary: .shared()) {
+                Label("Добавить фото устройства", systemImage: "camera.fill")
+                    .font(ClientTheme.body(12, weight: .semibold))
+                    .foregroundStyle(ClientTheme.lime)
+                    .frame(maxWidth: .infinity, minHeight: 40)
+                    .background(ClientTheme.line, in: RoundedRectangle(cornerRadius: 11))
+            }
+            .disabled(isUploadingEvidence)
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("tradein-evidence-\(tradeIn.id)")
+            if isUploadingEvidence {
+                ProgressView("Загружаем фото…")
+                    .tint(ClientTheme.lime)
+                    .font(ClientTheme.body(11))
+            }
+            if let evidenceMessage {
+                Text(evidenceMessage)
+                    .font(ClientTheme.body(11))
+                    .foregroundStyle(evidenceMessage == "Фото добавлено в Evidence Vault" ? ClientTheme.lime : ClientTheme.coral)
+            }
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glass(radius: 14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+        .onChange(of: selectedPhoto) { _, item in
+            guard let item else { return }
+            Task { await uploadEvidence(item) }
+        }
+    }
+
+    @MainActor
+    private func uploadEvidence(_ item: PhotosPickerItem) async {
+        isUploadingEvidence = true
+        evidenceMessage = nil
+        defer {
+            isUploadingEvidence = false
+            selectedPhoto = nil
+        }
+        do {
+            guard let imageData = try await item.loadTransferable(type: Data.self) else {
+                throw APIError.invalidResponse
+            }
+            guard let token = auth.session?.accessToken else {
+                throw APIError.rejected(status: 401, message: "Войдите в аккаунт, чтобы прикрепить фото")
+            }
+            _ = try await APIClient(baseURL: environment.apiBaseURL).uploadEvidence(
+                imageData: imageData,
+                entityType: "tradein",
+                entityId: tradeIn.id,
+                label: "tradein_device",
+                token: token,
+                idempotencyKey: evidenceIdempotencyKey
+            )
+            evidenceMessage = "Фото добавлено в Evidence Vault"
+            evidenceIdempotencyKey = UUID().uuidString
+        } catch is CancellationError {
+        } catch {
+            evidenceMessage = "Не удалось загрузить фото: \(error.localizedDescription)"
+        }
+    }
+}
+
+private struct CustomerTradeInFormView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let onCreated: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var model = ""
+    @State private var imei = ""
+    @State private var grade = "B"
+    @State private var price = ""
+    @State private var sellerPassport = ""
+    @State private var idempotencyKey = UUID().uuidString
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
+
+    private let grades = [("A", "Отличное"), ("B", "Хорошее"), ("C", "Нужна диагностика")]
+
+    private var parsedPrice: Int? {
+        let digits = price.filter(\.isNumber)
+        guard let value = Int(digits), value > 0 else { return nil }
+        return value
+    }
+
+    private var canSubmit: Bool {
+        !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !sellerPassport.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        parsedPrice != nil && !isSubmitting
+    }
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Новая оценка")
+                        .font(ClientTheme.display(25, weight: .black))
+                        .foregroundStyle(.white)
+                    Text("Владелец заявки определяется вашим customer JWT. Если сеть прервётся, повторная отправка использует тот же ключ и не создаст второй договор.")
+                        .font(ClientTheme.body(12))
+                        .foregroundStyle(ClientTheme.muted)
+                        .lineSpacing(3)
+
+                    tradeInField("Модель", placeholder: "iPhone 13 Pro 256GB", text: $model)
+                    tradeInField("IMEI / серийный номер", placeholder: "Можно оставить пустым", text: $imei)
+                    tradeInField("Паспорт / ID продавца", placeholder: "Для защищённого договора", text: $sellerPassport)
+                    tradeInField("Предварительная цена", placeholder: "42000", text: $price, keyboard: .numberPad)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Состояние")
+                            .font(ClientTheme.body(12, weight: .semibold))
+                            .foregroundStyle(ClientTheme.muted)
+                        ForEach(grades, id: \.0) { option in
+                            Button {
+                                grade = option.0
+                                rotateKey()
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: grade == option.0 ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(grade == option.0 ? ClientTheme.lime : ClientTheme.muted)
+                                    Text(option.0).font(ClientTheme.body(13, weight: .bold)).foregroundStyle(.white)
+                                    Text(option.1).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
+                                    Spacer()
+                                }
+                                .padding(12)
+                                .glass(radius: 12)
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(grade == option.0 ? ClientTheme.lime : ClientTheme.line))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(ClientTheme.body(12))
+                            .foregroundStyle(ClientTheme.coral)
+                    }
+
+                    Button { Task { await submit() } } label: {
+                        HStack {
+                            Spacer()
+                            if isSubmitting { ProgressView().tint(.black) } else { Text("Создать оценку") }
+                            Spacer()
+                        }
+                        .font(ClientTheme.body(15, weight: .bold))
+                        .foregroundStyle(.black)
+                        .frame(height: 50)
+                        .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canSubmit)
+                    .opacity(canSubmit ? 1 : 0.45)
+                }
+                .padding(18)
+            }
+        }
+        .navigationTitle("Trade-in")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Отмена") { dismiss() } } }
+        .tint(ClientTheme.lime)
+        .onChange(of: model) { _, _ in rotateKey() }
+        .onChange(of: imei) { _, _ in rotateKey() }
+        .onChange(of: price) { _, _ in rotateKey() }
+        .onChange(of: sellerPassport) { _, _ in rotateKey() }
+    }
+
+    @ViewBuilder
+    private func tradeInField(
+        _ title: String,
+        placeholder: String,
+        text: Binding<String>,
+        keyboard: UIKeyboardType = .default
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(ClientTheme.body(12, weight: .semibold))
+                .foregroundStyle(ClientTheme.muted)
+            TextField(placeholder, text: text)
+                .keyboardType(keyboard)
+                .textInputAutocapitalization(.sentences)
+                .foregroundStyle(.white)
+                .padding(13)
+                .glass(radius: 13)
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+        }
+    }
+
+    private func rotateKey() {
+        idempotencyKey = UUID().uuidString
+    }
+
+    @MainActor
+    private func submit() async {
+        guard let token = auth.session?.accessToken, let parsedPrice else { return }
+        isSubmitting = true
+        errorMessage = nil
+        defer { isSubmitting = false }
+        do {
+            let _: CustomerTradeIn = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "tradeins",
+                body: CreateCustomerTradeInRequest(
+                    model: model.trimmingCharacters(in: .whitespacesAndNewlines),
+                    imei: imei.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : imei.trimmingCharacters(in: .whitespacesAndNewlines),
+                    grade: grade,
+                    price: parsedPrice,
+                    sellerPassport: sellerPassport.trimmingCharacters(in: .whitespacesAndNewlines)
+                ),
+                token: token,
+                idempotencyKey: idempotencyKey
+            )
+            onCreated()
+            dismiss()
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct AccountView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let pushStatus: String
+    let orderRefreshRevision: Int
+    let products: [Product]
+    @Binding var cart: [String: Int]
+    let onEnablePush: () -> Void
+    let onLogout: () -> Void
+    @State private var phone = "+996"
+    @State private var code = ""
+    @State private var codeRequested = false
+    @State private var isExportingData = false
+    @State private var isDeletingAccount = false
+    @State private var showDeleteAccountConfirm = false
+    @State private var accountDataError: String?
+    @State private var exportShareFile: ExportShareFile?
+    @State private var loyalty: CustomerLoyalty?
+    @State private var profileName: String?
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                ClientTheme.background.ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        if auth.isRestoring {
+                            ProgressView("Восстанавливаем сессию")
+                                .tint(ClientTheme.lime)
+                                .frame(maxWidth: .infinity, minHeight: 260)
+                        } else if let session = auth.session {
+                            signedInContent(session)
+                        } else {
+                            signInContent
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+            .navigationTitle("Кабинет")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .tint(ClientTheme.lime)
+        .preferredColorScheme(.dark)
+        .task(id: auth.session?.accessToken) { await loadAccountSummary() }
+    }
+
+    @ViewBuilder
+    private func signedInContent(_ session: CustomerSession) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 13) {
+                Text(profileInitial)
+                    .font(ClientTheme.display(22, weight: .black))
+                    .foregroundStyle(.white)
+                    .frame(width: 52, height: 52)
+                    .background(
+                        LinearGradient(colors: [ClientTheme.coral, Color(red: 0.91, green: 0.255, blue: 0.055)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: Circle()
+                    )
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(displayName)
+                            .font(ClientTheme.display(16, weight: .bold))
+                            .foregroundStyle(.white)
+                        if let loyalty {
+                            Text(loyalty.level.uppercased())
+                                .font(Design3.mono(9, .bold))
+                                .foregroundStyle(.black)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(ClientTheme.gold, in: Capsule())
+                        }
+                    }
+                    Text(maskedPhone(session.phone))
+                        .font(Design3.mono(12))
+                        .foregroundStyle(ClientTheme.muted)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glass(radius: 16)
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+
+            NavigationLink {
+                CustomerLoyaltyView(environment: environment, auth: auth)
+            } label: {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(loyalty.map { "Уровень \($0.level)" } ?? "Бонусы и купоны")
+                            .font(ClientTheme.body(13, weight: .semibold))
+                            .foregroundStyle(Design3.textBright)
+                        Spacer()
+                        if let loyalty {
+                            Text("\(clientGroupedDigits(loyalty.balance)) бонусов")
+                                .font(Design3.mono(13, .medium))
+                                .foregroundStyle(ClientTheme.lime)
+                        }
+                    }
+                    GeometryReader { proxy in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(ClientTheme.background)
+                            Capsule().fill(LinearGradient(colors: [ClientTheme.lime, Color(red: 0.56, green: 0.831, blue: 0.059)], startPoint: .leading, endPoint: .trailing))
+                                .frame(width: max(0, proxy.size.width * loyaltyProgress))
+                        }
+                    }
+                    .frame(height: 7)
+                    Text(loyalty.map { $0.nextLevelSpend > 0 ? "До следующего уровня осталось \(clientGroupedDigits($0.nextLevelSpend)) сом" : "У вас максимальный уровень" } ?? "Баланс и купоны — в разделе бонусов")
+                        .font(ClientTheme.body(11))
+                        .foregroundStyle(Design3.textMuted)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    LinearGradient(colors: [Design3.surfaceRaised, ClientTheme.surface], startPoint: .topLeading, endPoint: .bottomTrailing),
+                    in: RoundedRectangle(cornerRadius: 16)
+                )
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("account-loyalty-card")
+
+            Text("Меню")
+                .font(ClientTheme.body(12, weight: .semibold))
+                .foregroundStyle(ClientTheme.muted)
+                .padding(.top, 2)
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 10)], spacing: 10) {
+                AccountMenuTile(title: "Мои заказы", detail: "1 активный", symbol: "shippingbox.fill", badge: "1 активный") {
+                    OrdersView(environment: environment, auth: auth, refreshRevision: orderRefreshRevision, products: products, cart: $cart)
+                }
+                AccountMenuTile(title: "Устройства", detail: "IMEI и гарантия", symbol: "shield.checkered") {
+                    DevicesView(environment: environment, auth: auth)
+                }
+                AccountMenuTile(title: "Возвраты", detail: "Заявки и refund", symbol: "arrow.uturn.backward.circle.fill") {
+                    CustomerReturnsView(environment: environment, auth: auth, products: products)
+                }
+                AccountMenuTile(title: "Поддержка", detail: "Обращения и ответы", symbol: "bubble.left.and.bubble.right.fill") {
+                    CustomerSupportView(environment: environment, auth: auth)
+                }
+                AccountMenuTile(title: "Адреса", detail: "Доставка по умолчанию", symbol: "mappin.and.ellipse") {
+                    CustomerAddressesView(environment: environment, auth: auth)
+                }
+                AccountMenuTile(title: "Trade-in", detail: "Оценка устройства", symbol: "arrow.triangle.2.circlepath", badge: "оценка") {
+                    CustomerTradeInsView(environment: environment, auth: auth)
+                }
+                // Убраны плитки OrderTracking / Installment / SupportChat / Waitlist /
+                // Referral: экраны рендерили `.sample`-фикстуры (заказ №4102, курьер
+                // «Данияр», «Тикет создан» без сети) и вводили в заблуждение (Guideline
+                // 2.3). Waitlist и referral на сервере не существуют; трекинг дублирует
+                // «Мои заказы», живой чат — «Поддержку». Сами экраны оставлены: они
+                // достижимы только из UI-тестов через DEBUG-флаг (ClientDebugFeature).
+                AccountMenuTile(title: "Настройки", detail: "Уведомления и согласия", symbol: "slider.horizontal.3") {
+                    CustomerSettingsView(environment: environment, auth: auth)
+                }
+                AccountMenuTile(title: "Офлайн", detail: pushStatus, symbol: "arrow.triangle.2.circlepath") {
+                    OfflineQueueView(environment: environment, auth: auth)
+                }
+            }
+
+            Button {
+                onEnablePush()
+            } label: {
+                Label("Включить push", systemImage: "bell.badge")
+                    .font(ClientTheme.body(14, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+            }
+            .buttonStyle(.plain)
+        }
+
+        Text("Мои данные")
+            .font(ClientTheme.body(12, weight: .semibold))
+            .foregroundStyle(ClientTheme.muted)
+            .padding(.top, 2)
+
+        VStack(spacing: 10) {
+            Button {
+                Task { await exportMyData() }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.down.doc.fill")
+                        .foregroundStyle(ClientTheme.lime)
+                    Text("Скачать мои данные")
+                        .font(ClientTheme.body(14, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    if isExportingData { ProgressView().tint(ClientTheme.lime) }
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity)
+                .glass(radius: 13)
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+            }
+            .buttonStyle(.plain)
+            .disabled(isExportingData || isDeletingAccount)
+
+            Button {
+                showDeleteAccountConfirm = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "trash.fill")
+                        .foregroundStyle(ClientTheme.coral)
+                    Text("Удалить аккаунт")
+                        .font(ClientTheme.body(14, weight: .semibold))
+                        .foregroundStyle(ClientTheme.coral)
+                    Spacer()
+                    if isDeletingAccount { ProgressView().tint(ClientTheme.coral) }
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity)
+                .glass(radius: 13)
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+            }
+            .buttonStyle(.plain)
+            .disabled(isExportingData || isDeletingAccount)
+
+            if let accountDataError {
+                Text(accountDataError)
+                    .font(ClientTheme.body(12))
+                    .foregroundStyle(.red)
+            }
+        }
+
+        Button {
+            Task {
+                await auth.logout()
+                onLogout()
+            }
+        } label: {
+            Text("Выйти из аккаунта")
+                .font(ClientTheme.body(14, weight: .semibold))
+                .foregroundStyle(ClientTheme.coral)
+                .frame(maxWidth: .infinity, minHeight: 46)
+                .glass(radius: 13)
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+        }
+        .buttonStyle(.plain)
+        .alert("Удалить аккаунт?", isPresented: $showDeleteAccountConfirm) {
+            Button("Удалить навсегда", role: .destructive) {
+                Task { await deleteAccount() }
+            }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("Профиль, адреса и сессии будут удалены без восстановления. Заказы и история покупок останутся у магазина — они нужны для бухгалтерии.")
+        }
+        .sheet(item: $exportShareFile) { file in
+            ActivityShareSheet(items: [file.url])
+        }
+    }
+
+    @MainActor
+    private func exportMyData() async {
+        guard let token = auth.session?.accessToken else { return }
+        isExportingData = true
+        accountDataError = nil
+        defer { isExportingData = false }
+        do {
+            let data = try await APIClient(baseURL: environment.apiBaseURL).getData("customers/me/export", token: token)
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent("alistore-my-data-\(formatter.string(from: Date())).json")
+            try data.write(to: fileURL, options: .atomic)
+            exportShareFile = ExportShareFile(url: fileURL)
+        } catch is CancellationError {
+        } catch {
+            accountDataError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func deleteAccount() async {
+        guard let token = auth.session?.accessToken else { return }
+        isDeletingAccount = true
+        accountDataError = nil
+        do {
+            let _: DeleteAccountResponse = try await APIClient(baseURL: environment.apiBaseURL).delete("customers/me", token: token)
+            await auth.logout()
+            onLogout()
+        } catch is CancellationError {
+            isDeletingAccount = false
+        } catch {
+            accountDataError = error.localizedDescription
+            isDeletingAccount = false
+        }
+    }
+
+    private var signInContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Войдите в кабинет")
+                .font(ClientTheme.display(25, weight: .black))
+                .foregroundStyle(.white)
+            Text("Заказы, гарантия и поддержка будут доступны после входа по SMS-коду.")
+                .font(ClientTheme.body(13))
+                .foregroundStyle(ClientTheme.muted)
+                .lineSpacing(3)
+            TextField("+996 555 000 000", text: $phone)
+                .keyboardType(.phonePad)
+                .textContentType(.telephoneNumber)
+                .foregroundStyle(.white)
+                .padding(14)
+                .glass(radius: 13)
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+            if codeRequested {
+                TextField("6-значный код", text: $code)
+                    .keyboardType(.numberPad)
+                    .textContentType(.oneTimeCode)
+                    .foregroundStyle(.white)
+                    .padding(14)
+                    .glass(radius: 13)
+                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.lime))
+                if let devCode = auth.devCode {
+                    Text("Код для тестового контура: \(devCode)")
+                        .font(ClientTheme.body(12))
+                        .foregroundStyle(ClientTheme.muted)
+                }
+            }
+            if let error = auth.errorMessage {
+                Text(error).font(ClientTheme.body(12)).foregroundStyle(.red)
+            }
+            Button {
+                Task {
+                    if codeRequested {
+                        await auth.verify(phone: normalizedPhone, code: code.filter(\.isNumber))
+                    } else {
+                        codeRequested = await auth.requestOTP(phone: normalizedPhone)
+                    }
+                }
+            } label: {
+                HStack {
+                    Spacer()
+                    if auth.isLoading {
+                        ProgressView().tint(.black)
+                    } else {
+                        Text(codeRequested ? "Войти" : "Получить код")
+                    }
+                    Spacer()
+                }
+                .font(ClientTheme.body(15, weight: .bold))
+                .foregroundStyle(.black)
+                .frame(height: 50)
+                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+            }
+            .buttonStyle(.plain)
+            .disabled(auth.isLoading || normalizedPhone.filter(\.isNumber).count < 9 || (codeRequested && code.filter(\.isNumber).count != 6))
+        }
+        .padding(18)
+        .glass(radius: 18)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(ClientTheme.line))
+    }
+
+    private var normalizedPhone: String {
+        let digits = phone.filter(\.isNumber)
+        return "+\(digits)"
+    }
+
+    /// Real profile name from customers/me/settings; neutral placeholder until it loads.
+    private var displayName: String {
+        let trimmed = (profileName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Покупатель" : trimmed
+    }
+
+    private var profileInitial: String {
+        String(displayName.prefix(1))
+    }
+
+    /// Web-parity loyalty progress (apps/web account page): remaining spend maps to 4...100%.
+    private var loyaltyProgress: CGFloat {
+        guard let loyalty else { return 0.04 }
+        let percent = max(4, min(100, 100 - loyalty.nextLevelSpend / 1000))
+        return CGFloat(percent) / 100
+    }
+
+    @MainActor
+    private func loadAccountSummary() async {
+        guard let token = auth.session?.accessToken else { return }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            loyalty = UITestBootstrap.accountFixtureMode == .loaded ? ClientUIFixture.loyalty : nil
+            profileName = "Нурбек"
+            return
+        }
+#endif
+        let api = APIClient(baseURL: environment.apiBaseURL)
+        loyalty = try? await api.get("customers/me/loyalty", token: token)
+        if let settings: CustomerSettings = try? await api.get("customers/me/settings", token: token) {
+            profileName = settings.name
+        }
+    }
+
+    private func maskedPhone(_ phone: String) -> String {
+        let digits = phone.filter(\.isNumber)
+        guard digits.count >= 9 else { return phone }
+        let country = String(digits.prefix(3))
+        let operatorCode = String(digits.dropFirst(3).prefix(3))
+        let tail = String(digits.suffix(4))
+        return "+\(country) \(operatorCode) •• \(tail.prefix(2)) \(tail.suffix(2))"
+    }
+}
+
+private struct AccountMenuTile<Destination: View>: View {
+    let title: String
+    let detail: String
+    let symbol: String
+    var badge: String?
+    @ViewBuilder let destination: () -> Destination
+
+    var body: some View {
+        NavigationLink(destination: destination) {
+            VStack(alignment: .leading, spacing: 9) {
+                Image(systemName: symbol)
+                    .foregroundStyle(ClientTheme.lime)
+                    .font(ClientTheme.body(17, weight: .semibold))
+                    .frame(width: 34, height: 34)
+                    .background(ClientTheme.lime.opacity(0.12), in: RoundedRectangle(cornerRadius: 11))
+                Text(title)
+                    .font(ClientTheme.body(13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                if let badge {
+                    Text(badge)
+                        .font(ClientTheme.body(11, weight: .semibold))
+                        .foregroundStyle(ClientTheme.lime)
+                        .lineLimit(1)
+                        .frame(minHeight: 26, alignment: .topLeading)
+                } else {
+                    Text(detail)
+                        .font(ClientTheme.body(10))
+                        .foregroundStyle(ClientTheme.muted)
+                        .lineLimit(2)
+                        .frame(minHeight: 26, alignment: .topLeading)
+                }
+            }
+            .padding(13)
+            .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+            .glass(radius: 14)
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct CustomerLoyaltyView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var loyalty: CustomerLoyalty?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            if isLoading {
+                ProgressView("Загружаем бонусы").tint(ClientTheme.lime)
+            } else if let errorMessage {
+                ClientDataErrorView(message: errorMessage, retry: { Task { await load() } })
+            } else if let loyalty {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "chevron.left")
+                                .font(ClientTheme.body(17, weight: .bold))
+                                .foregroundStyle(.white)
+                            Text("Бонусы и купоны")
+                                .font(ClientTheme.display(20, weight: .bold))
+                                .foregroundStyle(.white)
+                            Spacer()
+                        }
+
+                        VStack(spacing: 6) {
+                            Text("Доступно бонусов")
+                                .font(ClientTheme.body(13, weight: .medium))
+                                .foregroundStyle(Color(red: 1, green: 0.878, blue: 0.835))
+                            Text(groupedNumber(loyalty.balance))
+                                .font(ClientTheme.display(40, weight: .black))
+                                .foregroundStyle(.white)
+                                .accessibilityIdentifier("loyalty-balance-value")
+                            Text("\(loyalty.conversion) бонус = \(loyalty.conversion) сом · \(loyalty.level)-уровень")
+                                .font(ClientTheme.body(12, weight: .medium))
+                                .foregroundStyle(Color(red: 1, green: 0.878, blue: 0.835))
+                        }
+                        .padding(22)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            LinearGradient(
+                                colors: [ClientTheme.coral, Color(red: 0.91, green: 0.255, blue: 0.059)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            in: RoundedRectangle(cornerRadius: 18)
+                        )
+
+                        if !loyalty.coupons.isEmpty {
+                            Text("Мои купоны")
+                                .font(ClientTheme.body(13, weight: .semibold))
+                                .foregroundStyle(ClientTheme.muted)
+                                .padding(.top, 2)
+                            ForEach(loyalty.coupons) { coupon in
+                                HStack(spacing: 12) {
+                                    Text(couponIcon(coupon))
+                                        .font(ClientTheme.body(24))
+                                        .frame(width: 30)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(coupon.title)
+                                            .font(ClientTheme.body(13, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                        HStack(spacing: 6) {
+                                            Text(coupon.code)
+                                                .font(Design3.mono(11, .semibold))
+                                                .foregroundStyle(ClientTheme.muted)
+                                            if let expiresAt = coupon.expiresAt {
+                                                Text("до \(expiresAt, format: .dateTime.day().month().year())")
+                                                    .font(ClientTheme.body(11))
+                                                    .foregroundStyle(ClientTheme.muted)
+                                            }
+                                        }
+                                    }
+                                    Spacer()
+                                    Text(coupon.valueLabel)
+                                        .font(ClientTheme.body(12, weight: .black))
+                                        .foregroundStyle(.black)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 7)
+                                        .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 8))
+                                }
+                                .padding(14)
+                                .glass(radius: 13)
+                                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                            }
+                        }
+
+                        Text("История")
+                            .font(ClientTheme.body(13, weight: .semibold))
+                            .foregroundStyle(ClientTheme.muted)
+                        if loyalty.history.isEmpty {
+                            EmptyStateView(title: "История пока пуста", detail: "Начисления и списания появятся после покупки.", symbol: "clock.arrow.circlepath")
+                        } else {
+                            ForEach(loyalty.history) { entry in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(entry.label)
+                                            .font(ClientTheme.body(13, weight: .semibold))
+                                            .foregroundStyle(ClientTheme.muted)
+                                        Text(entry.createdAt, format: .dateTime.day().month().year())
+                                            .font(ClientTheme.body(11))
+                                            .foregroundStyle(Design3.textSubtle)
+                                    }
+                                    Spacer()
+                                    Text("\(entry.amount >= 0 ? "+" : "")\(entry.amount)")
+                                        .font(Design3.mono(13, .semibold))
+                                        .foregroundStyle(entry.amount >= 0 ? ClientTheme.lime : ClientTheme.coral)
+                                }
+                                .padding(.vertical, 10)
+                                .overlay(alignment: .bottom) {
+                                    Rectangle().fill(ClientTheme.surface).frame(height: 1)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 20)
+                }
+            } else {
+                EmptyStateView(title: "Бонусов пока нет", detail: "Бонусный баланс появится после первой покупки.", symbol: "gift")
+            }
+        }
+        .navigationTitle("Бонусы")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(ClientTheme.lime)
+        .task { await load() }
+        .refreshable { await load() }
+    }
+
+    private func couponIcon(_ coupon: CustomerCoupon) -> String {
+        let value = "\(coupon.title) \(coupon.code)".lowercased()
+        if value.contains("достав") || value.contains("delivery") { return "🚚" }
+        if value.contains("аксесс") { return "🎧" }
+        return "🎟"
+    }
+
+    private func groupedNumber(_ value: Int) -> String {
+        let digits = Array(String(value))
+        let reversed = digits.reversed().enumerated().flatMap { index, character -> [Character] in
+            index > 0 && index % 3 == 0 ? [" ", character] : [character]
+        }
+        return String(reversed.reversed())
+    }
+
+    @MainActor
+    private func load() async {
+        guard let token = auth.session?.accessToken else { return }
+        isLoading = true
+        defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            switch UITestBootstrap.accountFixtureMode {
+            case .loaded:
+                loyalty = ClientUIFixture.loyalty
+                errorMessage = nil
+            case .empty:
+                loyalty = nil
+                errorMessage = nil
+            case .error:
+                loyalty = nil
+                errorMessage = "Не удалось получить бонусный баланс в UI-тестовом контуре"
+            }
+            return
+        }
+#endif
+        do {
+            loyalty = try await APIClient(baseURL: environment.apiBaseURL).get("customers/me/loyalty", token: token)
+            errorMessage = nil
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct CustomerAddressesView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var addresses: [CustomerAddress] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var editor: AddressEditorRoute?
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            if isLoading {
+                ProgressView("Загружаем адреса").tint(ClientTheme.lime)
+            } else if let errorMessage {
+                ClientDataErrorView(message: errorMessage, retry: { Task { await load() } })
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "chevron.left")
+                                .font(ClientTheme.body(17, weight: .bold))
+                                .foregroundStyle(.white)
+                            Text("Адреса доставки")
+                                .font(ClientTheme.display(20, weight: .bold))
+                                .foregroundStyle(.white)
+                            Spacer()
+                        }
+                        .padding(.bottom, 2)
+
+                        if addresses.isEmpty {
+                            EmptyStateView(title: "Адресов пока нет", detail: "Добавьте адрес, чтобы быстрее оформить доставку.", symbol: "mappin.and.ellipse")
+                        } else {
+                            ForEach(addresses) { address in
+                                Button { editor = AddressEditorRoute(address: address) } label: {
+                                    addressRow(address)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        Button { editor = AddressEditorRoute(address: nil) } label: {
+                            Text("+ Добавить адрес")
+                                .font(ClientTheme.body(13, weight: .semibold))
+                                .foregroundStyle(ClientTheme.lime)
+                                .frame(maxWidth: .infinity, minHeight: 50)
+                                .glass(radius: 14)
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line, style: StrokeStyle(lineWidth: 1, dash: [6, 5])))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 20)
+                }
+            }
+        }
+        .navigationTitle("Адреса доставки")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(ClientTheme.lime)
+        .task { await load() }
+        .refreshable { await load() }
+        .sheet(item: $editor) { route in
+            NavigationStack {
+                CustomerAddressEditorView(environment: environment, auth: auth, address: route.address) {
+                    editor = nil
+                    Task { await load() }
+                }
+            }
+            .preferredColorScheme(.dark)
+        }
+    }
+
+    private func addressRow(_ address: CustomerAddress) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(address.title)
+                    .font(ClientTheme.body(14, weight: .semibold))
+                    .foregroundStyle(.white)
+                Spacer()
+                if address.isPrimary {
+                    Text("основной")
+                        .font(ClientTheme.body(10, weight: .semibold))
+                        .foregroundStyle(ClientTheme.lime)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(ClientTheme.lime.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
+                }
+            }
+            Text(address.text)
+                .font(ClientTheme.body(13))
+                .foregroundStyle(ClientTheme.muted)
+                .multilineTextAlignment(.leading)
+            VStack(alignment: .leading, spacing: 5) {
+                if let comment = address.comment, !comment.isEmpty {
+                    Text(comment)
+                        .font(ClientTheme.body(11))
+                        .foregroundStyle(ClientTheme.muted.opacity(0.78))
+                }
+            }
+            Text("Удалить")
+                .font(ClientTheme.body(12, weight: .semibold))
+                .foregroundStyle(Design3.danger)
+                .padding(.top, 1)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glass(radius: 14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(address.isPrimary ? ClientTheme.lime.opacity(0.5) : ClientTheme.line))
+    }
+
+    @MainActor
+    private func load() async {
+        guard let token = auth.session?.accessToken else { return }
+        isLoading = true
+        defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            switch UITestBootstrap.accountFixtureMode {
+            case .loaded:
+                addresses = ClientUIFixture.addresses
+                errorMessage = nil
+            case .empty:
+                addresses = []
+                errorMessage = nil
+            case .error:
+                addresses = []
+                errorMessage = "Не удалось загрузить адреса в UI-тестовом контуре"
+            }
+            return
+        }
+#endif
+        do {
+            addresses = try await APIClient(baseURL: environment.apiBaseURL).get("customers/me/addresses", token: token)
+            errorMessage = nil
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct AddressEditorRoute: Identifiable {
+    let id = UUID()
+    let address: CustomerAddress?
+}
+
+private struct CustomerAddressEditorView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let address: CustomerAddress?
+    let onSaved: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var title: String
+    @State private var text: String
+    @State private var comment: String
+    @State private var isPrimary: Bool
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    init(environment: AppEnvironment, auth: CustomerAuthStore, address: CustomerAddress?, onSaved: @escaping () -> Void) {
+        self.environment = environment
+        self.auth = auth
+        self.address = address
+        self.onSaved = onSaved
+        _title = State(initialValue: address?.title ?? "Дом")
+        _text = State(initialValue: address?.text ?? "")
+        _comment = State(initialValue: address?.comment ?? "")
+        _isPrimary = State(initialValue: address?.isPrimary ?? false)
+    }
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(address == nil ? "Новый адрес" : "Изменить адрес")
+                        .font(ClientTheme.display(24, weight: .black)).foregroundStyle(.white)
+                    clientField("Название", text: $title, placeholder: "Дом, работа")
+                    clientField("Адрес", text: $text, placeholder: "Улица, дом, квартира", axis: .vertical)
+                    clientField("Комментарий", text: $comment, placeholder: "Подъезд, этаж", axis: .vertical)
+                    Toggle("Использовать по умолчанию", isOn: $isPrimary)
+                        .font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
+                        .tint(ClientTheme.lime)
+                    if let errorMessage { Text(errorMessage).font(ClientTheme.body(12)).foregroundStyle(.red) }
+                    Button { Task { await save() } } label: {
+                        HStack { Spacer(); if isSaving { ProgressView().tint(.black) } else { Text("Сохранить") }; Spacer() }
+                            .font(ClientTheme.body(15, weight: .bold)).foregroundStyle(.black).frame(height: 50)
+                            .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSaving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    if address != nil {
+                        Button(role: .destructive) { Task { await delete() } } label: {
+                            Text("Удалить адрес").font(ClientTheme.body(14, weight: .semibold)).frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .disabled(isSaving)
+                    }
+                }
+                .padding(18)
+            }
+        }
+        .navigationTitle(address == nil ? "Добавить адрес" : "Адрес")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Отмена") { dismiss() } } }
+        .tint(ClientTheme.lime)
+    }
+
+    private func clientField(_ label: String, text: Binding<String>, placeholder: String, axis: Axis = .horizontal) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(label).font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.muted)
+            TextField(placeholder, text: text, axis: axis)
+                .lineLimit(3...6)
+                .foregroundStyle(.white).padding(13)
+                .glass(radius: 13)
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+        }
+    }
+
+    @MainActor
+    private func save() async {
+        guard let token = auth.session?.accessToken else { return }
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanComment = comment.trimmingCharacters(in: .whitespacesAndNewlines)
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            if let address {
+                let _: CustomerAddress = try await APIClient(baseURL: environment.apiBaseURL).patch(
+                    "customers/me/addresses/\(address.id)",
+                    body: UpdateCustomerAddressRequest(title: cleanTitle, text: cleanText, comment: cleanComment.isEmpty ? nil : cleanComment, isPrimary: isPrimary),
+                    token: token
+                )
+            } else {
+                let _: CustomerAddress = try await APIClient(baseURL: environment.apiBaseURL).post(
+                    "customers/me/addresses",
+                    body: CreateCustomerAddressRequest(title: cleanTitle, text: cleanText, comment: cleanComment.isEmpty ? nil : cleanComment, isPrimary: isPrimary),
+                    token: token,
+                    idempotencyKey: UUID().uuidString
+                )
+            }
+            onSaved()
+            dismiss()
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func delete() async {
+        guard let token = auth.session?.accessToken, let address else { return }
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            let _: DeleteCustomerAddressResponse = try await APIClient(baseURL: environment.apiBaseURL).delete("customers/me/addresses/\(address.id)", token: token)
+            onSaved()
+            dismiss()
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct DeleteCustomerAddressResponse: Decodable, Sendable {
+    let id: String
+}
+
+private struct DeleteAccountResponse: Decodable, Sendable {
+    let id: String
+    let deleted: Bool
+}
+
+/// Wraps the exported JSON file so `.sheet(item:)` can present the system share sheet.
+private struct ExportShareFile: Identifiable {
+    let url: URL
+    var id: URL { url }
+}
+
+private struct ActivityShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+private struct CustomerSettingsView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var settings: CustomerSettings?
+    @State private var name = ""
+    @State private var consent = false
+    @State private var push = true
+    @State private var whatsapp = true
+    @State private var service = true
+    @State private var promos = false
+    @State private var isLoading = true
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+    @State private var savedMessage: String?
+    @State private var emailInput = ""
+    @State private var emailCode = ""
+    @State private var emailRequested = false
+    @State private var attachedEmail: String?
+    @State private var emailMessage: String?
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            if isLoading {
+                ProgressView("Загружаем настройки").tint(ClientTheme.lime)
+            } else if let errorMessage, settings == nil {
+                ClientDataErrorView(message: errorMessage, retry: { Task { await load() } })
+            } else if settings == nil {
+                EmptyStateView(title: "Настройки пока недоступны", detail: "Профиль появится после синхронизации аккаунта.", symbol: "person.crop.circle.badge.questionmark")
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Профиль")
+                            .font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.muted)
+                        TextField("Имя", text: $name)
+                            .foregroundStyle(.white).padding(13)
+                            .glass(radius: 13)
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                        if let settings {
+                            Text(settings.phone).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
+                        }
+
+                        emailSection
+
+                        Text("Уведомления")
+                            .font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.muted).padding(.top, 8)
+                        settingsToggle("Push-уведомления", detail: "Статусы заказов и важные события", isOn: $push)
+                        settingsToggle("Сервисные сообщения", detail: "Гарантия, поддержка и доставка", isOn: $service)
+                        settingsToggle("WhatsApp", detail: "Сообщения по выбранным заказам", isOn: $whatsapp)
+                        settingsToggle("Промо и предложения", detail: "Скидки, акции и бонусные кампании", isOn: $promos)
+                        settingsToggle("Маркетинговое согласие", detail: "Разрешение на персональные предложения", isOn: $consent)
+
+                        if let errorMessage { Text(errorMessage).font(ClientTheme.body(12)).foregroundStyle(.red) }
+                        if let savedMessage { Text(savedMessage).font(ClientTheme.body(12, weight: .semibold)).foregroundStyle(ClientTheme.lime) }
+                        Button { Task { await save() } } label: {
+                            HStack { Spacer(); if isSaving { ProgressView().tint(.black) } else { Text("Сохранить настройки") }; Spacer() }
+                                .font(ClientTheme.body(15, weight: .bold)).foregroundStyle(.black).frame(height: 50)
+                                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isSaving)
+                    }
+                    .padding(16)
+                }
+            }
+        }
+        .navigationTitle("Настройки")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(ClientTheme.lime)
+        .task { await load() }
+        .refreshable { await load() }
+    }
+
+    /// Привязка почты как второго способа входа. Адрес принимается только после
+    /// кода, пришедшего на него: иначе можно было бы «занять» чужой ящик и
+    /// оставить его владельца без своего способа входа.
+    @ViewBuilder
+    private var emailSection: some View {
+        Text("Почта для входа")
+            .font(ClientTheme.body(12, weight: .semibold))
+            .foregroundStyle(ClientTheme.muted)
+            .padding(.top, 8)
+
+        if let attached = attachedEmail ?? settings?.email {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.seal.fill").foregroundStyle(ClientTheme.lime)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(attached).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
+                    Text("Можно входить по этому адресу").font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                }
+                Spacer()
+            }
+            .padding(13)
+            .glass(radius: 13)
+            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+            .accessibilityIdentifier("client-attached-email")
+        } else {
+            TextField("you@example.com", text: $emailInput)
+                .keyboardType(.emailAddress)
+                .textContentType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .foregroundStyle(.white)
+                .padding(13)
+                .glass(radius: 13)
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                .accessibilityIdentifier("client-attach-email")
+            if emailRequested {
+                TextField("6-значный код из письма", text: $emailCode)
+                    .keyboardType(.numberPad)
+                    .textContentType(.oneTimeCode)
+                    .foregroundStyle(.white)
+                    .padding(13)
+                    .glass(radius: 13)
+                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.lime))
+                    .accessibilityIdentifier("client-attach-code")
+                if let devCode = auth.devCode {
+                    Text("Код для тестового контура: \(devCode)")
+                        .font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                }
+            }
+            if let emailMessage {
+                Text(emailMessage).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
+            }
+            Button { Task { await attachEmail() } } label: {
+                HStack { Spacer(); Text(emailRequested ? "Подтвердить адрес" : "Отправить код на почту"); Spacer() }
+                    .font(ClientTheme.body(14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(height: 44)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+            }
+            .buttonStyle(.plain)
+            .disabled(auth.isLoading || !canSubmitEmail)
+            .accessibilityIdentifier("client-attach-submit")
+        }
+    }
+
+    private var canSubmitEmail: Bool {
+        if emailRequested { return emailCode.filter(\.isNumber).count == 6 }
+        let value = emailInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.count <= 254, let separatorIndex = value.firstIndex(of: "@") else { return false }
+        let domain = value[value.index(after: separatorIndex)...]
+        return separatorIndex != value.startIndex && domain.contains(".") && !value.contains(" ")
+    }
+
+    private func attachEmail() async {
+        guard let token = auth.session?.accessToken else {
+            emailMessage = "Нужно войти в аккаунт"
+            return
+        }
+        if emailRequested {
+            let attachmentConfirmed = await auth.confirmEmailAttach(
+                email: emailInput,
+                code: emailCode.filter(\.isNumber),
+                token: token
+            )
+            if attachmentConfirmed {
+                attachedEmail = CustomerAuthStore.normalizedEmail(emailInput)
+                emailRequested = false
+                emailCode = ""
+                emailMessage = nil
+            } else {
+                emailMessage = auth.errorMessage
+            }
+        } else {
+            emailRequested = await auth.requestEmailAttach(email: emailInput, token: token)
+            emailMessage = emailRequested ? "Код отправлен на \(CustomerAuthStore.normalizedEmail(emailInput))" : auth.errorMessage
+        }
+    }
+
+    private func settingsToggle(_ title: String, detail: String, isOn: Binding<Bool>) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
+                Text(detail).font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+            }
+            Spacer()
+            Toggle("", isOn: isOn).labelsHidden().tint(ClientTheme.lime)
+        }
+        .padding(13)
+        .glass(radius: 14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+    }
+
+    @MainActor
+    private func load() async {
+        guard let token = auth.session?.accessToken else { return }
+        isLoading = true
+        defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            switch UITestBootstrap.accountFixtureMode {
+            case .loaded:
+                let loaded = ClientUIFixture.settings
+                settings = loaded
+                name = loaded.name
+                consent = loaded.consent
+                push = loaded.push
+                whatsapp = loaded.whatsapp
+                service = loaded.service
+                promos = loaded.promos
+                errorMessage = nil
+            case .empty:
+                settings = nil
+                errorMessage = nil
+            case .error:
+                settings = nil
+                errorMessage = "Не удалось загрузить настройки в UI-тестовом контуре"
+            }
+            return
+        }
+#endif
+        do {
+            let loaded: CustomerSettings = try await APIClient(baseURL: environment.apiBaseURL).get("customers/me/settings", token: token)
+            settings = loaded
+            name = loaded.name
+            consent = loaded.consent
+            push = loaded.push
+            whatsapp = loaded.whatsapp
+            service = loaded.service
+            promos = loaded.promos
+            errorMessage = nil
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func save() async {
+        guard let token = auth.session?.accessToken else { return }
+        isSaving = true
+        errorMessage = nil
+        savedMessage = nil
+        defer { isSaving = false }
+        do {
+            let updated: CustomerSettings = try await APIClient(baseURL: environment.apiBaseURL).patch(
+                "customers/me/settings",
+                body: UpdateCustomerSettingsRequest(name: name.trimmingCharacters(in: .whitespacesAndNewlines), consent: consent, push: push, whatsapp: whatsapp, service: service, promos: promos),
+                token: token
+            )
+            settings = updated
+            name = updated.name
+            consent = updated.consent
+            push = updated.push
+            whatsapp = updated.whatsapp
+            service = updated.service
+            promos = updated.promos
+            savedMessage = "Настройки сохранены"
+        } catch is CancellationError {
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct ClientDataErrorView: View {
+    let message: String
+    let retry: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "wifi.exclamationmark").font(.title).foregroundStyle(ClientTheme.coral)
+            Text("Данные временно недоступны").font(ClientTheme.body(16, weight: .bold)).foregroundStyle(.white)
+            Text(message).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted).multilineTextAlignment(.center)
+            Button("Повторить", systemImage: "arrow.clockwise", action: retry)
+                .font(ClientTheme.body(13, weight: .semibold)).tint(ClientTheme.lime)
+        }
+        .padding(24)
+        .frame(maxWidth: 330)
+        .glass(radius: 16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+    }
+}
+
+private struct CustomerSupportView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var tickets: [CustomerSupportTicket] = []
+    @State private var isLoading = true
+    @State private var loadError: String?
+    @State private var subject = ""
+    @State private var details = ""
+    @State private var priority = "normal"
+    @State private var submissionKey = UUID().uuidString
+    @State private var isSubmitting = false
+    @State private var submissionError: String?
+    @State private var isFormOpen = false
+
+    private var normalizedSubject: String {
+        subject.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var normalizedDetails: String? {
+        let value = details.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            if isLoading {
+                ProgressView("Загружаем поддержку")
+                    .tint(ClientTheme.lime)
+                    .foregroundStyle(ClientTheme.muted)
+            } else if let loadError {
+                ClientDataErrorView(message: loadError, retry: { Task { await load() } })
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(spacing: 8) {
+                            ClientSupportChannel(icon: "💬", title: "WhatsApp", tint: ClientTheme.lime, background: Color(red: 0.122, green: 0.239, blue: 0.18), bordered: false)
+                            ClientSupportChannel(icon: "✈️", title: "Telegram", tint: Color(red: 0.498, green: 0.69, blue: 0.925), background: Color(red: 0.118, green: 0.2, blue: 0.275), bordered: false)
+                            ClientSupportChannel(icon: "📞", title: "Звонок", tint: Color(red: 0.847, green: 0.812, blue: 0.776), background: ClientTheme.surface, bordered: true)
+                        }
+
+                        Text("Частые вопросы")
+                            .font(ClientTheme.body(13, weight: .semibold))
+                            .foregroundStyle(ClientTheme.muted)
+                        ForEach(["Как отследить заказ?", "Условия возврата и обмена", "Как работает рассрочка?", "Гарантия на Б/У технику"], id: \.self) { question in
+                            HStack {
+                                Text(question)
+                                    .font(ClientTheme.body(13))
+                                    .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
+                                Spacer()
+                                Text("▾")
+                                    .font(ClientTheme.body(13, weight: .semibold))
+                                    .foregroundStyle(Design3.textFaint)
+                            }
+                            .padding(13)
+                            .glass(radius: 11)
+                            .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+                        }
+
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                isFormOpen.toggle()
+                            }
+                        } label: {
+                            Text("Создать обращение")
+                                .font(ClientTheme.body(15, weight: .bold))
+                                .foregroundStyle(.black)
+                                .frame(maxWidth: .infinity, minHeight: 50)
+                                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("support-open-form")
+
+                        if isFormOpen {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Создать обращение")
+                                    .font(ClientTheme.body(15, weight: .bold))
+                                    .foregroundStyle(.white)
+                                TextField("Тема обращения", text: $subject)
+                                    .font(ClientTheme.body(14))
+                                    .foregroundStyle(.white)
+                                    .padding(13)
+                                    .background(ClientTheme.background, in: RoundedRectangle(cornerRadius: 11))
+                                    .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+                                    .accessibilityIdentifier("support-subject")
+                                TextEditor(text: $details)
+                                    .scrollContentBackground(.hidden)
+                                    .font(ClientTheme.body(14))
+                                    .foregroundStyle(.white)
+                                    .frame(minHeight: 92)
+                                    .padding(9)
+                                    .background(ClientTheme.background, in: RoundedRectangle(cornerRadius: 11))
+                                    .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+                                    .accessibilityIdentifier("support-details")
+                                HStack(spacing: 8) {
+                                    Text("Срочность")
+                                        .font(ClientTheme.body(12, weight: .semibold))
+                                        .foregroundStyle(ClientTheme.muted)
+                                    Spacer()
+                                    ForEach([("normal", "Обычная"), ("high", "Высокая"), ("urgent", "Срочная")], id: \.0) { option in
+                                        Button(option.1) { priority = option.0 }
+                                            .font(ClientTheme.body(10, weight: .semibold))
+                                            .foregroundStyle(priority == option.0 ? .black : ClientTheme.muted)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 6)
+                                            .background(priority == option.0 ? ClientTheme.lime : ClientTheme.line, in: Capsule())
+                                    }
+                                }
+                                if let submissionError {
+                                    Text(submissionError)
+                                        .font(ClientTheme.body(12))
+                                        .foregroundStyle(ClientTheme.coral)
+                                }
+                                Button {
+                                    Task { await submit() }
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        if isSubmitting {
+                                            ProgressView().tint(.black)
+                                        } else {
+                                            Label("Отправить обращение", systemImage: "paperplane.fill")
+                                        }
+                                        Spacer()
+                                    }
+                                    .font(ClientTheme.body(14, weight: .bold))
+                                    .foregroundStyle(.black)
+                                    .frame(minHeight: 48)
+                                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 11))
+                                }
+                                .disabled(isSubmitting || normalizedSubject.isEmpty)
+                                .accessibilityIdentifier("support-submit")
+                            }
+                            .padding(16)
+                            .glass(radius: 14)
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+                        }
+
+                        Text("Мои обращения")
+                            .font(ClientTheme.body(12, weight: .semibold))
+                            .foregroundStyle(ClientTheme.muted)
+                        if tickets.isEmpty {
+                            ClientStateCard(title: "Обращений пока нет", detail: "Создайте обращение, и команда ответит в приложении.", symbol: "bubble.left.and.bubble.right")
+                        } else {
+                            ForEach(tickets) { ticket in
+                                ClientSupportTicketCard(ticket: ticket, statusLabel: statusLabel(ticket.status), priorityLabel: priorityLabel(ticket.priority))
+                                    .accessibilityIdentifier("support-ticket-\(ticket.id)")
+                            }
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+        }
+        .navigationTitle("Поддержка")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(ClientTheme.lime)
+        .preferredColorScheme(.dark)
+        .task { await load() }
+        .refreshable { await load() }
+        .onChange(of: subject) { _, _ in renewSubmissionKey() }
+        .onChange(of: details) { _, _ in renewSubmissionKey() }
+        .onChange(of: priority) { _, _ in renewSubmissionKey() }
+    }
+
+    @MainActor
+    private func load() async {
+        isLoading = true
+        defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            tickets = []
+            loadError = nil
+            return
+        }
+#endif
+        guard let token = auth.session?.accessToken else { return }
+        do {
+            let loaded: [CustomerSupportTicket] = try await APIClient(baseURL: environment.apiBaseURL).get(
+                "support/tickets/mine",
+                token: token
+            )
+            guard !Task.isCancelled else { return }
+            tickets = loaded
+            loadError = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func submit() async {
+        guard let token = auth.session?.accessToken, !normalizedSubject.isEmpty else { return }
+        let request = OpenCustomerSupportTicketRequest(
+            subject: normalizedSubject,
+            body: normalizedDetails,
+            priority: priority
+        )
+        let key = submissionKey
+        isSubmitting = true
+        submissionError = nil
+        defer { isSubmitting = false }
+        do {
+            let ticket: CustomerSupportTicket = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "support/tickets/mine",
+                body: request,
+                token: token,
+                idempotencyKey: key
+            )
+            tickets.removeAll { $0.id == ticket.id }
+            tickets.insert(ticket, at: 0)
+            subject = ""
+            details = ""
+            priority = "normal"
+            submissionKey = UUID().uuidString
+        } catch is CancellationError {
+            return
+        } catch {
+            submissionError = error.localizedDescription
+        }
+    }
+
+    private func renewSubmissionKey() {
+        guard !isSubmitting else { return }
+        submissionKey = UUID().uuidString
+    }
+
+    private func statusLabel(_ status: String) -> String {
+        ["new": "Новое", "in_progress": "В работе", "waiting": "Ожидает", "resolved": "Решено", "closed": "Закрыто"][status] ?? status
+    }
+
+    private func priorityLabel(_ priority: String) -> String {
+        ["normal": "Обычная", "high": "Высокая", "urgent": "Срочная"][priority] ?? priority
+    }
+}
+
+private struct ClientSupportChannel: View {
+    let icon: String
+    let title: String
+    let tint: Color
+    let background: Color
+    let bordered: Bool
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Text(icon)
+                .font(ClientTheme.body(24))
+            Text(title)
+                .font(ClientTheme.body(12, weight: .medium))
+                .foregroundStyle(tint)
+        }
+        .frame(maxWidth: .infinity, minHeight: 88)
+        .background(background, in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(bordered ? ClientTheme.line : .clear))
+    }
+}
+
+private struct ClientSupportTicketCard: View {
+    let ticket: CustomerSupportTicket
+    let statusLabel: String
+    let priorityLabel: String
+
+    private var statusColor: Color {
+        ["resolved", "closed"].contains(ticket.status) ? ClientTheme.muted : ClientTheme.lime
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(ticket.subject)
+                    .font(ClientTheme.body(14, weight: .bold))
+                    .foregroundStyle(.white)
+                Spacer()
+                Text(statusLabel)
+                    .font(ClientTheme.body(11, weight: .semibold))
+                    .foregroundStyle(statusColor)
+            }
+            if let body = ticket.body, !body.isEmpty {
+                Text(body)
+                    .font(ClientTheme.body(12))
+                    .foregroundStyle(ClientTheme.muted)
+                    .lineLimit(2)
+            }
+            HStack {
+                Text(priorityLabel)
+                Spacer()
+                Text(ticket.createdAt, format: .dateTime.day().month().year())
+            }
+            .font(ClientTheme.body(11))
+            .foregroundStyle(ClientTheme.muted)
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glass(radius: 14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+    }
+}
+
+private struct OfflineQueueView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \PendingMutation.createdAt) private var mutations: [PendingMutation]
+
+    var body: some View {
+        Group {
+            if mutations.isEmpty {
+                EmptyStateView(title: "Очередь пуста", detail: "Все операции синхронизированы.", symbol: "checkmark.icloud")
+            } else {
+                List(mutations) { mutation in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Заказ").font(.headline)
+                            Spacer()
+                            Text(stateLabel(mutation.state))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(stateColor(mutation.state))
+                        }
+                        Text(String(mutation.idempotencyKey.prefix(12))).font(.caption.monospaced()).foregroundStyle(.secondary)
+                        if let error = mutation.lastError { Text(error).font(.caption).foregroundStyle(.red) }
+                        Button("Повторить", systemImage: "arrow.clockwise") {
+                            Task { await retry(mutation) }
+                        }
+                        // `syncing` тоже разрешаем: если отправка зависла (таймаут, не
+                        // краш), авто-повтор в этот заход не сработает — даём вернуть
+                        // заказ вручную. Дубль исключён idempotencyKey.
+                        .disabled(auth.session == nil)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+        .navigationTitle("Синхронизация")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func retry(_ mutation: PendingMutation) async {
+        guard let token = auth.session?.accessToken else { return }
+        await OfflineOrderQueue.replay(
+            mutation,
+            api: APIClient(baseURL: environment.apiBaseURL),
+            token: token,
+            context: modelContext
+        )
+    }
+
+    private func stateLabel(_ state: String) -> String {
+        ["queued": "В очереди", "syncing": "Отправка", "conflict": "Конфликт", "failed": "Ошибка"][state] ?? state
+    }
+
+    private func stateColor(_ state: String) -> Color {
+        switch state {
+        case "conflict", "failed": return .red
+        case "syncing": return .orange
+        default: return .secondary
+        }
+    }
+}
+
+private struct DevicesView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    @State private var devices: [CustomerDevice] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    var body: some View {
+        ZStack {
+            ClientTheme.background.ignoresSafeArea()
+            if isLoading {
+                ProgressView("Загружаем устройства")
+                    .tint(ClientTheme.lime)
+                    .foregroundStyle(ClientTheme.muted)
+            } else if let errorMessage {
+                ClientStateCard(
+                    title: "Устройства недоступны",
+                    detail: errorMessage,
+                    symbol: "wifi.exclamationmark"
+                )
+            } else if devices.isEmpty {
+                ClientStateCard(
+                    title: "Устройств пока нет",
+                    detail: "Купленные устройства появятся после оплаты заказа.",
+                    symbol: "iphone"
+                )
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Все покупки с гарантией AliStore")
+                            .font(ClientTheme.body(13))
+                            .foregroundStyle(ClientTheme.muted)
+                        ForEach(devices) { device in
+                            ClientDeviceCard(environment: environment, auth: auth, device: device)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                }
+            }
+        }
+        .navigationTitle("Мои устройства")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+        .refreshable { await load() }
+    }
+
+    private func load() async {
+        guard let token = auth.session?.accessToken else { return }
+        isLoading = true
+        defer { isLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            switch UITestBootstrap.accountFixtureMode {
+            case .loaded:
+                devices = ClientUIFixture.devices
+                errorMessage = nil
+            case .empty:
+                devices = []
+                errorMessage = nil
+            case .error:
+                devices = []
+                errorMessage = "Не удалось загрузить устройства в UI-тестовом контуре"
+            }
+            return
+        }
+#endif
+        do {
+            devices = try await APIClient(baseURL: environment.apiBaseURL).get("customers/me/devices", token: token)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct ClientDeviceCard: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let device: CustomerDevice
+
+    private var isCovered: Bool { device.daysLeft.map { $0 > 0 } ?? false }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(ClientTheme.coral.opacity(0.16))
+                    Image(systemName: device.product.localizedCaseInsensitiveContains("mac") ? "laptopcomputer" : "iphone.gen3")
+                        .font(ClientTheme.body(24, weight: .medium))
+                        .foregroundStyle(ClientTheme.coral)
+                }
+                .frame(width: 54, height: 54)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(device.product)
+                        .font(ClientTheme.body(15, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text("IMEI \(device.imei)")
+                        .font(Design3.mono(11))
+                        .foregroundStyle(ClientTheme.muted)
+                    Text("Статус: \(device.status)")
+                        .font(ClientTheme.body(11))
+                        .foregroundStyle(ClientTheme.muted)
+                }
+                Spacer(minLength: 6)
+                Text(isCovered ? "Активна" : "Завершена")
+                    .font(ClientTheme.body(11, weight: .semibold))
+                    .foregroundStyle(isCovered ? ClientTheme.lime : ClientTheme.muted)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background((isCovered ? ClientTheme.lime : ClientTheme.muted).opacity(0.14), in: Capsule())
+            }
+
+            HStack(spacing: 0) {
+                ClientDeviceFact(title: "Гарантия до", value: formattedDate(device.warrantyUntil) ?? "Не указана")
+                Spacer()
+                ClientDeviceFact(
+                    title: "Осталось",
+                    value: device.daysLeft.map { $0 > 0 ? "\($0) дн." : "0 дн." } ?? "Не указано",
+                    accent: isCovered
+                )
+            }
+            .padding(.top, 2)
+
+            HStack(spacing: 8) {
+                NavigationLink {
+                    WarrantyRequestView(environment: environment, auth: auth, device: device)
+                } label: {
+                    Label("Гарантия", systemImage: "shield.checkered")
+                        .font(ClientTheme.body(12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(ClientTheme.line, in: RoundedRectangle(cornerRadius: 9))
+                }
+                .accessibilityLabel("Открыть гарантию для \(device.product)")
+                NavigationLink {
+                    CustomerSupportView(environment: environment, auth: auth)
+                } label: {
+                    Label("Сервис", systemImage: "wrench.and.screwdriver")
+                        .font(ClientTheme.body(12, weight: .semibold))
+                        .foregroundStyle(ClientTheme.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(ClientTheme.line.opacity(0.65), in: RoundedRectangle(cornerRadius: 9))
+                }
+                .accessibilityLabel("Открыть обращение в сервис")
+                NavigationLink {
+                    CustomerTradeInsView(environment: environment, auth: auth)
+                } label: {
+                    Label("Trade-in", systemImage: "arrow.triangle.2.circlepath")
+                        .font(ClientTheme.body(12, weight: .semibold))
+                        .foregroundStyle(ClientTheme.lime)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(ClientTheme.line.opacity(0.65), in: RoundedRectangle(cornerRadius: 9))
+                }
+                .accessibilityLabel("Открыть Trade-in")
+            }
+        }
+        .padding(16)
+        .glass(radius: 16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+    }
+}
+
+private struct ClientDeviceFact: View {
+    let title: String
+    let value: String
+    var accent = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title.uppercased())
+                .font(ClientTheme.body(9, weight: .semibold))
+                .foregroundStyle(ClientTheme.muted)
+            Text(value)
+                .font(ClientTheme.body(13, weight: .semibold))
+                .foregroundStyle(accent ? ClientTheme.lime : .white)
+        }
+    }
+}
+
+private struct ClientStateCard: View {
+    let title: String
+    let detail: String
+    let symbol: String
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(ClientTheme.body(28, weight: .medium))
+                .foregroundStyle(ClientTheme.lime)
+            Text(title)
+                .font(ClientTheme.body(17, weight: .bold))
+                .foregroundStyle(.white)
+            Text(detail)
+                .font(ClientTheme.body(13))
+                .foregroundStyle(ClientTheme.muted)
+                .multilineTextAlignment(.center)
+        }
+        .padding(24)
+        .frame(maxWidth: 360)
+        .glass(radius: 16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+        .padding(16)
+    }
+}
+
+private struct WarrantyRequestView: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+    let device: CustomerDevice
+    @State private var problem = ""
+    @State private var isSubmitting = false
+    @State private var created: WarrantyCase?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                ClientWarrantyCertificate(device: device)
+                ClientWarrantyActionRow(environment: environment, auth: auth)
+                if let warranty = device.warranty {
+                    ClientWarrantyStatusCard(warranty: warranty)
+                } else if let created {
+                    ClientWarrantyStatusCard(warranty: created)
+                } else {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Опишите неисправность")
+                            .font(ClientTheme.body(14, weight: .bold))
+                            .foregroundStyle(.white)
+                        TextEditor(text: $problem)
+                            .scrollContentBackground(.hidden)
+                            .foregroundStyle(.white)
+                            .font(ClientTheme.body(14))
+                            .frame(minHeight: 116)
+                            .padding(10)
+                            .background(ClientTheme.background, in: RoundedRectangle(cornerRadius: 11))
+                            .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+                            .accessibilityIdentifier("client-warranty-problem")
+                        if let errorMessage {
+                            Text(errorMessage)
+                                .font(ClientTheme.body(12))
+                                .foregroundStyle(Design3.danger)
+                        }
+                        Button {
+                            Task { await submit() }
+                        } label: {
+                            HStack {
+                                Spacer()
+                                if isSubmitting {
+                                    ProgressView().tint(.black)
+                                } else {
+                                    Text("Открыть гарантийное обращение")
+                                }
+                                Spacer()
+                            }
+                            .font(ClientTheme.body(14, weight: .bold))
+                            .foregroundStyle(.black)
+                            .frame(minHeight: 48)
+                            .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 11))
+                        }
+                        .disabled(isSubmitting || problem.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityIdentifier("client-open-warranty")
+                    }
+                    .padding(16)
+                    .glass(radius: 14)
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+                }
+                ClientWarrantyCoverageCard()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+        .scrollIndicators(.hidden)
+        .background(ClientTheme.background.ignoresSafeArea())
+        .navigationTitle("Гарантия")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func submit() async {
+        guard let session = auth.session else { return }
+        isSubmitting = true
+        errorMessage = nil
+        defer { isSubmitting = false }
+        do {
+            created = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "warranty",
+                body: OpenWarrantyRequest(imei: device.imei, customerId: session.customerId, problem: problem.trimmingCharacters(in: .whitespacesAndNewlines)),
+                token: session.accessToken,
+                idempotencyKey: UUID().uuidString
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct ClientWarrantyCertificate: View {
+    let device: CustomerDevice
+    private var isCovered: Bool { device.daysLeft.map { $0 > 0 } ?? false }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label {
+                    Text("Гарантийный талон")
+                        .font(ClientTheme.body(14, weight: .bold))
+                } icon: {
+                    Text("A")
+                        .font(ClientTheme.body(13, weight: .black))
+                        .foregroundStyle(.white)
+                        .frame(width: 24, height: 24)
+                        .background(ClientTheme.coral, in: RoundedRectangle(cornerRadius: 7))
+                }
+                .foregroundStyle(.white)
+                Spacer()
+                Text(isCovered ? "Активна" : "Завершена")
+                    .font(ClientTheme.body(11, weight: .semibold))
+                    .foregroundStyle(isCovered ? ClientTheme.lime : ClientTheme.muted)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background((isCovered ? ClientTheme.lime : ClientTheme.muted).opacity(0.14), in: Capsule())
+            }
+            Text(warrantyProductTitle)
+                .font(ClientTheme.display(20, weight: .bold))
+                .foregroundStyle(.white)
+            Text("IMEI \(device.imei)")
+                .font(Design3.mono(12))
+                .foregroundStyle(ClientTheme.muted)
+            HStack(spacing: 0) {
+                ClientDeviceFact(title: "Гарантия до", value: formattedDate(device.warrantyUntil) ?? "Не указана")
+                Spacer()
+                ClientDeviceFact(
+                    title: "Осталось",
+                    value: device.daysLeft.map { $0 > 0 ? "\($0) дней" : "0 дней" } ?? "Не указано",
+                    accent: isCovered
+                )
+            }
+        }
+        .padding(20)
+        .background(
+            LinearGradient(
+                colors: [Design3.surfaceRaised, ClientTheme.surface],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 18)
+        )
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(ClientTheme.line))
+    }
+
+    private var warrantyProductTitle: String {
+        if device.product.localizedCaseInsensitiveContains("iPhone 15") {
+            return "iPhone 15 · 128 ГБ"
+        }
+        return device.product
+    }
+}
+
+private struct ClientWarrantyActionRow: View {
+    let environment: AppEnvironment
+    let auth: CustomerAuthStore
+
+    var body: some View {
+        HStack(spacing: 8) {
+            NavigationLink {
+                CustomerSupportView(environment: environment, auth: auth)
+            } label: {
+                Text("Обращение в сервис")
+                    .font(ClientTheme.body(13, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 11))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("warranty-open-service")
+
+            Button {} label: {
+                Text("🧾 Чек")
+                    .font(ClientTheme.body(13, weight: .medium))
+                    .foregroundStyle(Design3.textBright)
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .glass(radius: 11)
+                    .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("warranty-receipt")
+        }
+    }
+}
+
+private struct ClientWarrantyStatusCard: View {
+    let warranty: DeviceWarrantySummaryOrCase
+
+    init(warranty: DeviceWarrantySummary) {
+        self.warranty = DeviceWarrantySummaryOrCase(status: warranty.status, sla: warranty.sla, problem: nil)
+    }
+
+    init(warranty: WarrantyCase) {
+        self.warranty = DeviceWarrantySummaryOrCase(status: warranty.status, sla: warranty.sla, problem: warranty.problem)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("Обращение в сервис")
+                .font(ClientTheme.body(14, weight: .bold))
+                .foregroundStyle(.white)
+            HStack {
+                Text("Статус")
+                    .foregroundStyle(ClientTheme.muted)
+                Spacer()
+                Text(warranty.status)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(ClientTheme.lime)
+            }
+            HStack {
+                Text("Рассмотрим до")
+                    .foregroundStyle(ClientTheme.muted)
+                Spacer()
+                Text(warranty.sla.formatted(.dateTime.day().month().year()))
+                    .foregroundStyle(.white)
+            }
+            if let problem = warranty.problem, !problem.isEmpty {
+                Text(problem)
+                    .font(ClientTheme.body(13))
+                    .foregroundStyle(.white)
+                    .padding(.top, 4)
+            }
+        }
+        .font(ClientTheme.body(13))
+        .padding(16)
+        .glass(radius: 14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+    }
+}
+
+private struct DeviceWarrantySummaryOrCase {
+    let status: String
+    let sla: Date
+    let problem: String?
+}
+
+private struct ClientWarrantyCoverageCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("Что покрывается")
+                .font(ClientTheme.body(14, weight: .bold))
+                .foregroundStyle(.white)
+            Text("✓ Заводской брак\n✓ Неисправности экрана, батареи\n✗ Механические повреждения, влага")
+                .font(ClientTheme.body(12))
+                .foregroundStyle(ClientTheme.muted)
+                .lineSpacing(5)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glass(radius: 14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
+    }
+}
+
+private func formattedDate(_ value: String?) -> String? {
+    guard let value else { return nil }
+    let formatter = ISO8601DateFormatter()
+    guard let date = formatter.date(from: value) else { return value }
+    return date.formatted(.dateTime.day().month().year())
+}
+
+private struct CatalogView: View {
+    private enum CatalogSort: String, CaseIterable {
+        case name
+        case priceAsc = "price_asc"
+        case priceDesc = "price_desc"
+        case stockDesc = "stock_desc"
+
+        var title: String {
+            switch self {
+            case .name: "По названию"
+            case .priceAsc: "Сначала дешевле"
+            case .priceDesc: "Сначала дороже"
+            case .stockDesc: "Больше в наличии"
+            }
+        }
+    }
+
+    let environment: AppEnvironment
+    let products: [Product]
+    let isLoading: Bool
+    let errorMessage: String?
+    @Binding var cart: [String: Int]
+    @Binding var favorites: Set<String>
+    @State private var search = ""
+    @State private var selectedCategory = ""
+    @State private var selectedSort: CatalogSort = .name
+    @State private var stockOnly = false
+    @State private var remoteProducts: [Product]?
+    @State private var remoteLoading = false
+    @State private var remoteError: String?
+
+    private var categoryOptions: [(label: String, value: String)] {
+        let values = Set(products.map(\.category)).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        return [("Все", "")] + values.map { ($0.capitalized, $0) }
+    }
+
+    private var isFiltered: Bool {
+        !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !selectedCategory.isEmpty ||
+        stockOnly ||
+        selectedSort != .name
+    }
+
+    private var localFallbackProducts: [Product] {
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        var result = products.filter { product in
+            let matchesQuery = SmartSearch.matches(query, fields: [product.name, product.category, product.sku])
+            let matchesCategory = selectedCategory.isEmpty || product.category == selectedCategory
+            let matchesStock = !stockOnly || product.availableUnits > 0
+            return matchesQuery && matchesCategory && matchesStock
+        }
+        switch selectedSort {
+        case .name:
+            result.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        case .priceAsc:
+            result.sort { $0.price == $1.price ? $0.name < $1.name : $0.price < $1.price }
+        case .priceDesc:
+            result.sort { $0.price == $1.price ? $0.name < $1.name : $0.price > $1.price }
+        case .stockDesc:
+            result.sort { $0.availableUnits == $1.availableUnits ? $0.name < $1.name : $0.availableUnits > $1.availableUnits }
+        }
+        return result
+    }
+
+    private var visibleProducts: [Product] {
+        remoteProducts ?? localFallbackProducts
+    }
+
+    private var filterKey: String {
+        [search, selectedCategory, selectedSort.rawValue, stockOnly ? "stock" : "all"].joined(separator: "|")
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                ClientTheme.background.ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("Каталог")
+                                .font(ClientTheme.display(20, weight: .bold))
+                                .foregroundStyle(.white)
+                            Spacer()
+                            Text("\(visibleProducts.count)")
+                                .font(ClientTheme.body(12, weight: .semibold))
+                                .foregroundStyle(ClientTheme.muted)
+                        }
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(categoryOptions, id: \.value) { option in
+                                    Button {
+                                        selectedCategory = option.value
+                                    } label: {
+                                        Text(option.label)
+                                            .font(ClientTheme.body(12, weight: .semibold))
+                                            .foregroundStyle(selectedCategory == option.value ? .black : ClientTheme.muted)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 9)
+                                            .background(selectedCategory == option.value ? ClientTheme.lime : ClientTheme.surface, in: Capsule())
+                                            .overlay(Capsule().stroke(selectedCategory == option.value ? ClientTheme.lime : ClientTheme.line))
+                                    }
+                                    .accessibilityLabel("Категория: \(option.label)")
+                                }
+                            }
+                        }
+
+                        HStack(spacing: 8) {
+                            Menu {
+                                ForEach(CatalogSort.allCases, id: \.rawValue) { sort in
+                                    Button {
+                                        selectedSort = sort
+                                    } label: {
+                                        Label(sort.title, systemImage: sort == selectedSort ? "checkmark" : "")
+                                    }
+                                }
+                            } label: {
+                                Label(selectedSort.title, systemImage: "arrow.up.arrow.down")
+                                    .font(ClientTheme.body(12, weight: .semibold))
+                                    .foregroundStyle(ClientTheme.muted)
+                                    .frame(maxWidth: .infinity, minHeight: 38)
+                                    .glass(radius: 10)
+                                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(ClientTheme.line))
+                            }
+                            .accessibilityLabel("Сортировка")
+
+                            Button {
+                                stockOnly.toggle()
+                            } label: {
+                                Label("В наличии", systemImage: stockOnly ? "checkmark" : "shippingbox")
+                                    .font(ClientTheme.body(12, weight: .semibold))
+                                    .foregroundStyle(stockOnly ? .black : ClientTheme.muted)
+                                    .frame(maxWidth: .infinity, minHeight: 38)
+                                    .background(stockOnly ? ClientTheme.lime : ClientTheme.surface, in: RoundedRectangle(cornerRadius: 10))
+                                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(stockOnly ? ClientTheme.lime : ClientTheme.line))
+                            }
+                            .accessibilityLabel("Только в наличии")
+                        }
+
+                        if let remoteError {
+                            Label("Офлайн-каталог: \(remoteError)", systemImage: "wifi.exclamationmark")
+                                .font(ClientTheme.body(11))
+                                .foregroundStyle(Design3.gold)
+                        }
+
+                        if isLoading || remoteLoading {
+                            ProgressView("Загружаем каталог")
+                                .tint(ClientTheme.lime)
+                                .frame(maxWidth: .infinity, minHeight: 120)
+                        } else if let errorMessage, products.isEmpty {
+                            ClientDataErrorView(message: errorMessage, retry: {})
+                        } else if visibleProducts.isEmpty {
+                            EmptyStateView(title: "Ничего не найдено", detail: "Попробуйте изменить фильтры.", symbol: "magnifyingglass")
+                        } else {
+                            LazyVGrid(columns: productGridColumns, spacing: 12) {
+                                ForEach(visibleProducts) { product in
+                                    NavigationLink {
+                                        ProductDetail(environment: environment, product: product, cart: $cart, favorites: $favorites)
+                                    } label: {
+                                        NativeProductCard(product: product, cart: $cart, favorites: $favorites)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityIdentifier("client-product-\(product.id)")
+                                }
+                            }
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+            // Экран рисует собственную шапку и собственный заголовок секции
+            // «Каталог», поэтому крупный навигационный заголовок был вторым и
+            // наезжал на карточки при прокрутке. `.inline` его схлопывает.
+            .navigationTitle("Каталог")
+            .navigationBarTitleDisplayMode(.inline)
+            // В iOS 26 `.searchable` по умолчанию всплывает нижней плашкой и
+            // закрывает нижний ряд товаров вместе с кнопками «В корзину».
+            // Ящик под навбаром оставляет сетку полностью видимой.
+            .searchable(
+                text: $search,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Техника и бренды"
+            )
+        }
+        .task(id: filterKey) { await loadFilteredCatalog() }
+    }
+
+    private func loadFilteredCatalog() async {
+        guard isFiltered else {
+            remoteProducts = nil
+            remoteError = nil
+            return
+        }
+
+        try? await Task.sleep(nanoseconds: 250_000_000)
+        guard !Task.isCancelled else { return }
+        remoteLoading = true
+        defer { remoteLoading = false }
+
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        var queryItems = ["limit=100", "sort=\(selectedSort.rawValue)"]
+        if !query.isEmpty, let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            queryItems.append("q=\(encoded)")
+        }
+        if !selectedCategory.isEmpty, let encoded = selectedCategory.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            queryItems.append("category=\(encoded)")
+        }
+        if stockOnly { queryItems.append("stockOnly=true") }
+
+        do {
+            let response: CatalogResponse = try await APIClient(baseURL: environment.apiBaseURL).get("catalog/products?\(queryItems.joined(separator: "&"))")
+            remoteProducts = response.items
+            remoteError = nil
+        } catch is CancellationError {
+        } catch {
+            remoteProducts = nil
+            remoteError = error.localizedDescription
+        }
+    }
+}
+
+private struct ClientHomeView: View {
+    let environment: AppEnvironment
+    let products: [Product]
+    let isLoading: Bool
+    let errorMessage: String?
+    @Binding var cart: [String: Int]
+    @Binding var favorites: Set<String>
+    let openCatalog: () -> Void
+
+    private let categories = [("Смартфоны", "iphone"), ("Ноутбуки", "laptopcomputer"), ("Аудио", "airpodsmax"), ("Часы", "applewatch"), ("Планшеты", "ipad")]
+
+    // «Для вас» — client-side ranking by favourite-category affinity, then availability.
+    private var personalizedProducts: [Product] {
+        guard !favorites.isEmpty else { return Array(products.prefix(6)) }
+        let favoriteCategories = Set(products.filter { favorites.contains($0.id) }.map(\.category))
+        let ranked = products.sorted { lhs, rhs in
+            let lhsAffinity = favoriteCategories.contains(lhs.category) ? 1 : 0
+            let rhsAffinity = favoriteCategories.contains(rhs.category) ? 1 : 0
+            if lhsAffinity != rhsAffinity { return lhsAffinity > rhsAffinity }
+            return lhs.availableUnits > rhs.availableUnits
+        }
+        return Array(ranked.prefix(6))
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack(spacing: 10) {
+                        // Сроки и стоимость доставки задаются оператором и приходят
+                        // в checkout-options. Пока они не прочитаны с сервера, обещать
+                        // «1–2 часа» и «бесплатно» нельзя: это тот же класс, за который
+                        // Apple отклоняла сборку дважды.
+                        ServiceCard(title: "Доставка", detail: "условия при оформлении", symbol: "bolt.fill", highlighted: true)
+                        ServiceCard(title: "Самовывоз", detail: "из магазина", symbol: "building.2")
+                        ServiceCard(title: "Trade-in", detail: "обмен старого", symbol: "arrow.triangle.2.circlepath")
+                    }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(categories, id: \.0) { category in
+                                Button(action: openCatalog) {
+                                    VStack(spacing: 8) {
+                                        Image(systemName: category.1).font(.title3)
+                                        Text(category.0).font(.caption2)
+                                    }
+                                    .foregroundStyle(.white)
+                                    .frame(width: 82, height: 70)
+                                    .glass(radius: 12)
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+                                }
+                            }
+                        }
+                    }
+                    Button(action: openCatalog) {
+                        ZStack(alignment: .bottomTrailing) {
+                            LinearGradient(colors: [Design3.surfaceRaised, ClientTheme.background], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            Image("client-product-iphone")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 150, height: 150)
+                                .rotationEffect(.degrees(-8))
+                                .opacity(0.82)
+                                .padding(.trailing, 8)
+                                .padding(.bottom, 8)
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("НОВИНКА · В НАЛИЧИИ").font(.caption2.monospaced().weight(.bold)).foregroundStyle(ClientTheme.lime)
+                                Text("iPhone 17 Pro Max").font(.title2.weight(.heavy)).foregroundStyle(.white)
+                                Text("от 115 000 сом · рассрочка 0%").font(.caption).foregroundStyle(ClientTheme.muted)
+                                Text("Смотреть").font(.subheadline.weight(.bold)).foregroundStyle(.black).padding(.horizontal, 18).frame(height: 40).background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 10)).padding(.top, 6)
+                                Spacer(minLength: 0)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(22)
+                        }
+                        .frame(height: 174)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(ClientTheme.line))
+                    }
+                    .buttonStyle(.plain)
+                    if !products.isEmpty {
+                        HStack {
+                            Text("✨ Для вас").font(ClientTheme.display(18, weight: .bold))
+                            Spacer()
+                            Text("подобрано").font(ClientTheme.body(11, weight: .semibold)).foregroundStyle(Design3.orange)
+                        }
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(personalizedProducts) { product in
+                                    NavigationLink {
+                                        ProductDetail(environment: environment, product: product, cart: $cart, favorites: $favorites)
+                                    } label: {
+                                        NativeProductCard(product: product, cart: $cart, favorites: $favorites)
+                                            .frame(width: 168)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityIdentifier("client-product-\(product.id)")
+                                }
+                            }
+                            .padding(.horizontal, 2)
+                        }
+                        .accessibilityIdentifier("home-for-you")
+                    }
+                    HStack {
+                    Text("🔥 Хиты продаж").font(ClientTheme.display(18, weight: .bold))
+                        Spacer()
+                        Button("Все", action: openCatalog).foregroundStyle(ClientTheme.lime)
+                    }
+                    if isLoading {
+                        ProgressView().tint(ClientTheme.lime).frame(maxWidth: .infinity)
+                    } else if let errorMessage {
+                        Text(errorMessage).font(.caption).foregroundStyle(.red)
+                    } else if products.isEmpty {
+                        Text("Каталог скоро наполнится").foregroundStyle(ClientTheme.muted).frame(maxWidth: .infinity).padding(30).glass(radius: 16)
+                    } else {
+                        LazyVGrid(columns: productGridColumns, spacing: 12) {
+                            ForEach(products.prefix(6)) { product in
+                                NavigationLink {
+                                    ProductDetail(environment: environment, product: product, cart: $cart, favorites: $favorites)
+                                } label: {
+                                    NativeProductCard(product: product, cart: $cart, favorites: $favorites)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("client-product-\(product.id)")
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .background(ClientTheme.background)
+            // Крупный навигационный заголовок «AliStore» рисовался поверх
+            // собственной шапки приложения: два заголовка подряд, и его пустая
+            // область съедала около 150 pt над сгибом на первом же экране
+            // магазина — там, где должен стоять товар. Бренд уже назван в шапке.
+            // У каталога это чинили `.inline`; здесь бар не нужен вовсе.
+            .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+}
+
+private struct FavoritesView: View {
+    let environment: AppEnvironment
+    let products: [Product]
+    @Binding var cart: [String: Int]
+    @Binding var favorites: Set<String>
+    private var items: [Product] { products.filter { favorites.contains($0.id) } }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                ClientTheme.background.ignoresSafeArea()
+                if items.isEmpty {
+                    ContentUnavailableView("Нет избранного", systemImage: "heart", description: Text("Сохраняйте товары, чтобы быстро вернуться к ним."))
+                } else {
+                    ScrollView {
+                        LazyVGrid(columns: productGridColumns, spacing: 12) {
+                            ForEach(items) { product in
+                                NavigationLink {
+                                    ProductDetail(environment: environment, product: product, cart: $cart, favorites: $favorites)
+                                } label: {
+                                    NativeProductCard(product: product, cart: $cart, favorites: $favorites)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("client-product-\(product.id)")
+                            }
+                        }
+                        .padding(16)
+                    }
+                }
+            }
+            .navigationTitle("Избранное")
+        }
+    }
+}
+
+private struct NativeProductCard: View {
+    let product: Product
+    @Binding var cart: [String: Int]
+    @Binding var favorites: Set<String>
+
+    private var availabilityText: String {
+        product.availableUnits > 0
+            ? (product.availableUnits < 5 ? "Осталось \(product.availableUnits) шт" : "В наличии")
+            : "Нет в наличии"
+    }
+    private var isFavorite: Bool { favorites.contains(product.id) }
+
+    private func toggleFavorite() {
+        if isFavorite { favorites.remove(product.id) } else { favorites.insert(product.id) }
+    }
+    private func addToCart() {
+        cart[product.id] = min(product.availableUnits, (cart[product.id] ?? 0) + 1)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack(alignment: .topTrailing) {
+                ClientProductImage(product: product, cornerRadius: 12).frame(height: 120)
+                Button { toggleFavorite() } label: { Image(systemName: isFavorite ? "heart.fill" : "heart").foregroundStyle(isFavorite ? ClientTheme.coral : .white).frame(width: 44, height: 44) }
+            }
+            Text(product.name).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white).lineLimit(2).frame(minHeight: 38, alignment: .top)
+            Text(Money.som(product.price)).font(ClientTheme.display(16, weight: .black)).foregroundStyle(.white)
+            Text(availabilityText)
+                .font(ClientTheme.body(10)).foregroundStyle(product.availableUnits > 0 ? ClientTheme.muted : Design3.danger)
+            Button { addToCart() } label: { Text(product.availableUnits > 0 ? "В корзину" : "Уведомить").font(ClientTheme.body(12, weight: .bold)).frame(maxWidth: .infinity).frame(height: 38).background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(.black) }.disabled(product.availableUnits == 0)
+        }
+        .padding(10)
+        .glass(radius: 16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(ClientTheme.line))
+        // VoiceOver: карточка — один элемент с описанием, а «В корзину» и
+        // избранное вынесены в действия ротора. Иначе на каждую карточку было
+        // по пять свайпов; на экране с полусотней товаров это сотни свайпов.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(product.name). \(Money.som(product.price)). \(availabilityText)")
+        .accessibilityAction(named: product.availableUnits > 0 ? "В корзину" : "Уведомить о наличии") {
+            if product.availableUnits > 0 { addToCart() }
+        }
+        .accessibilityAction(named: isFavorite ? "Убрать из избранного" : "В избранное") { toggleFavorite() }
+    }
+}
+
+private struct ServiceCard: View {
+    let title: String
+    let detail: String
+    let symbol: String
+    var highlighted = false
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: symbol).font(.title3)
+            Spacer(minLength: 2)
+            Text(title).font(.caption.weight(.bold)).lineLimit(2)
+            Text(detail).font(.caption2).foregroundStyle(highlighted ? .white.opacity(0.8) : ClientTheme.muted)
+        }
+        .foregroundStyle(.white)
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 104, alignment: .leading)
+        .background(highlighted ? ClientTheme.coral : ClientTheme.surface, in: RoundedRectangle(cornerRadius: 15))
+        .overlay(RoundedRectangle(cornerRadius: 15).stroke(highlighted ? Color.clear : ClientTheme.line))
+    }
+}
+
+private struct ProductDetail: View {
+    let environment: AppEnvironment
+    let product: Product
+    @Binding var cart: [String: Int]
+    @Binding var favorites: Set<String>
+    @State private var detail: CatalogProductDetail?
+    @State private var detailError: String?
+    @State private var detailLoading = false
+
+    private var displayProduct: Product { detail?.product ?? product }
+
+    private var displayVariants: [Product] {
+        let variants = detail?.variants ?? []
+        return variants.isEmpty ? [displayProduct] : variants
+    }
+
+    private var displayRelated: [Product] {
+        detail?.related ?? []
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .topTrailing) {
+                    ClientProductImage(product: displayProduct, cornerRadius: 0)
+                        .frame(height: 260)
+                    Button {
+                        if favorites.contains(displayProduct.id) { favorites.remove(displayProduct.id) } else { favorites.insert(displayProduct.id) }
+                    } label: {
+                        Image(systemName: favorites.contains(displayProduct.id) ? "heart.fill" : "heart")
+                            .foregroundStyle(favorites.contains(displayProduct.id) ? ClientTheme.coral : .white)
+                            .frame(width: 44, height: 44)
+                            .background(.black.opacity(0.5), in: Circle())
+                    }
+                    .padding(14)
+                }
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(displayProduct.availableUnits > 0 ? "В НАЛИЧИИ" : "НЕТ В НАЛИЧИИ")
+                        .font(Design3.mono(11, .bold))
+                        .foregroundStyle(displayProduct.availableUnits > 0 ? ClientTheme.lime : ClientTheme.coral)
+                    Text(displayProduct.name).font(ClientTheme.display(22, weight: .black)).foregroundStyle(.white)
+                    Text(Money.som(displayProduct.price))
+                        .font(ClientTheme.display(26, weight: .black)).foregroundStyle(.white)
+                    // Разряды здесь были отключены явно (`.grouping(.never)`), из-за чего
+                    // под ценой «39 900 сом» стояло «3325 сом» — тот же экран печатал
+                    // деньги двумя разными способами.
+                    Text("или \(Money.som(displayProduct.price / 12)) × 12 мес")
+                        .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.lime)
+                    HStack(spacing: 8) {
+                        ForEach(displayVariants) { variant in
+                            if variant.id == displayProduct.id {
+                                variantChip(variant, title: "Текущий")
+                            } else {
+                                NavigationLink {
+                                    ProductDetail(environment: environment, product: variant, cart: $cart, favorites: $favorites)
+                                } label: {
+                                    variantChip(variant, title: variant.name)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    if detailLoading {
+                        ProgressView("Загружаем карточку")
+                            .tint(ClientTheme.lime)
+                            .frame(maxWidth: .infinity, minHeight: 40)
+                    } else if let detailError {
+                        ClientDataErrorView(message: detailError, retry: { Task { await loadDetail() } })
+                    }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
+                        ProductTrustCell(symbol: "shield.checkered", text: "Гарантия 12 мес")
+                        ProductTrustCell(symbol: "bolt.fill", text: "Срок и стоимость — при оформлении")
+                        ProductTrustCell(symbol: "building.2.fill", text: "Самовывоз сегодня")
+                        ProductTrustCell(symbol: "arrow.uturn.left", text: "Возврат 14 дней")
+                    }
+                    Text("Характеристики").font(ClientTheme.display(15, weight: .bold)).foregroundStyle(.white).padding(.top, 8)
+                    detailRow("SKU", value: displayProduct.sku)
+                    detailRow("Категория", value: displayProduct.category)
+                    detailRow("Доступно", value: "\(displayProduct.availableUnits) шт")
+                    if let description = displayProduct.attrs?.description?.trimmingCharacters(in: .whitespacesAndNewlines), !description.isEmpty {
+                        Text("Описание").font(ClientTheme.display(15, weight: .bold)).foregroundStyle(.white).padding(.top, 8)
+                        Text(description)
+                            .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted).lineSpacing(4)
+                    }
+                    if !displayRelated.isEmpty {
+                        Text("Похожие товары")
+                            .font(ClientTheme.display(15, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.top, 8)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(displayRelated) { related in
+                                    NavigationLink {
+                                        ProductDetail(environment: environment, product: related, cart: $cart, favorites: $favorites)
+                                    } label: {
+                                        NativeProductCard(product: related, cart: $cart, favorites: $favorites)
+                                            .frame(width: 184)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                    Button {
+                        cart[displayProduct.id] = min(displayProduct.availableUnits, (cart[displayProduct.id] ?? 0) + 1)
+                    } label: {
+                        Text(displayProduct.availableUnits > 0 ? "Добавить в корзину" : "Нет в наличии")
+                            .font(ClientTheme.body(15, weight: .bold)).foregroundStyle(.black)
+                            .frame(maxWidth: .infinity).frame(height: 50)
+                            .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .disabled(displayProduct.availableUnits == 0)
+                    .padding(.top, 6)
+                }
+                .padding(16)
+            }
+        }
+        .background(ClientTheme.background)
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: displayProduct.id) { await loadDetail() }
+    }
+
+    private func loadDetail() async {
+        detailLoading = true
+        defer { detailLoading = false }
+#if DEBUG
+        if UITestBootstrap.startsAtVisualEvidence {
+            let related = ClientUIFixture.products.filter { $0.id != product.id }.prefix(2)
+            detail = CatalogProductDetail(
+                product: product,
+                variants: Array(ClientUIFixture.products.prefix(2)),
+                related: Array(related)
+            )
+            detailError = nil
+            return
+        }
+#endif
+        do {
+            detail = try await APIClient(baseURL: environment.apiBaseURL).get("catalog/products/\(product.id)")
+            detailError = nil
+        } catch is CancellationError {
+        } catch {
+            detailError = error.localizedDescription
+        }
+    }
+
+    private func variantChip(_ variant: Product, title: String) -> some View {
+        Text(title)
+            .font(ClientTheme.body(13, weight: .medium))
+            .foregroundStyle(variant.id == displayProduct.id ? ClientTheme.lime : ClientTheme.muted)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(variant.id == displayProduct.id ? ClientTheme.lime.opacity(0.1) : ClientTheme.surface, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(variant.id == displayProduct.id ? ClientTheme.lime : ClientTheme.line))
+    }
+
+    @ViewBuilder
+    private func detailRow(_ title: String, value: String) -> some View {
+        HStack { Text(title).font(ClientTheme.body(13)).foregroundStyle(ClientTheme.muted); Spacer(); Text(value).font(ClientTheme.body(13)).foregroundStyle(Design3.textBright) }
+            .padding(.vertical, 8).overlay(alignment: .bottom) { Rectangle().fill(ClientTheme.surface).frame(height: 1) }
+    }
+}
+
+private struct ProductTrustCell: View {
+    let symbol: String
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: symbol).foregroundStyle(ClientTheme.lime)
+            Text(text).font(ClientTheme.body(12)).foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776)).lineLimit(2)
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(minHeight: 54)
+        .glass(radius: 12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+    }
+}

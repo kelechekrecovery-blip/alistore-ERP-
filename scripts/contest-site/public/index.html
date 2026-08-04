@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Выбор победителей в Инстаграм, Тикток, Youtube и Вконтакте — рандомайзер</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&family=Open+Sans+Condensed:wght@300;700&display=swap">
+<style>
+  /*
+    Раскладка и визуальный строй повторяют lizaonair.com: тёмный экран,
+    крупный узкий заголовок с ротацией соцсетей, красная строка ввода со
+    «Стартом», лента последних конкурсов и счётчики внизу.
+    Имя, знак и превью чужих постов не копируются; счётчики — наши настоящие.
+  */
+  :root {
+    --page: #222222;
+    --stage: #444444;
+    --ink: #aaaaaa;
+    --ink-dim: #8d8d8d;
+    --ink-bright: #dedede;
+    --red: 205, 32, 32;
+    --line: #565656;
+    --condensed: "Open Sans Condensed", "Oswald", "Arial Narrow", "Helvetica Neue", sans-serif;
+    --sans: "Open Sans", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html { background: var(--page); }
+  body {
+    margin: 0; min-height: 100vh; background: var(--stage);
+    color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column;
+  }
+
+  /* Мягкая виньетка и сетка точек вместо фотоподложки оригинала. */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,0.05), transparent 60%),
+      radial-gradient(100% 100% at 50% 100%, rgba(0,0,0,0.45), transparent 65%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 3px);
+  }
+  .layer { position: relative; z-index: 1; }
+
+  /* ------------------------------------------------------------- шапка */
+  .topbar {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 1.4rem clamp(1rem, 4vw, 3rem) 0;
+  }
+  .help { color: var(--ink); text-decoration: none; font-size: 1.05rem; }
+  .help:hover { color: var(--ink-bright); }
+  .topright { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 0.6rem; }
+  .auth { color: var(--ink-bright); font-size: 0.95rem; background: none; border: none;
+          cursor: pointer; font-family: var(--sans); padding: 0; }
+  .auth:hover { text-decoration: underline; }
+
+  .networks { display: flex; gap: 0.55rem; }
+  .net {
+    width: 42px; height: 42px; border-radius: 50%; border: 2px solid transparent;
+    display: grid; place-items: center; cursor: pointer; padding: 0;
+    font-family: var(--condensed); font-size: 0.95rem; font-weight: 700; color: #fff;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+  }
+  .net:hover { transform: translateY(-2px); }
+  .net[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 3px rgba(0,0,0,0.35); }
+  .net.ig { background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fd5949 45%, #d6249f 60%, #285AEB 90%); }
+  .net.fb { background: #1877F2; }
+  .net.yt { background: #FF0000; }
+  .net.vk { background: #0077FF; }
+  .net.tt { background: #111; }
+  .net:disabled { cursor: not-allowed; opacity: 0.5; }
+
+  /* --------------------------------------------------------------- герой */
+  main { flex: 1; display: flex; flex-direction: column; align-items: center;
+         justify-content: center; padding: 2.5rem clamp(1rem, 4vw, 3rem) 1rem; text-align: center; }
+
+  h1 {
+    font-family: var(--condensed); font-weight: 300; color: var(--ink);
+    font-size: clamp(1.9rem, 1.2rem + 3.2vw, 3rem); line-height: 1.08;
+    margin: 0 0 0.7rem; letter-spacing: 0.01em;
+  }
+  .rotator { display: inline-grid; vertical-align: baseline; text-align: left; }
+  .rotator > span {
+    grid-area: 1 / 1; opacity: 0; transform: translateY(0.28em);
+    animation: cycle 12s infinite; white-space: nowrap;
+  }
+  .rotator > span:nth-child(1) { animation-delay: 0s; }
+  .rotator > span:nth-child(2) { animation-delay: 3s; }
+  .rotator > span:nth-child(3) { animation-delay: 6s; }
+  .rotator > span:nth-child(4) { animation-delay: 9s; }
+  @keyframes cycle {
+    0%    { opacity: 0; transform: translateY(0.28em); }
+    4%    { opacity: 1; transform: translateY(0); }
+    25%   { opacity: 1; transform: translateY(0); }
+    29%   { opacity: 0; transform: translateY(-0.28em); }
+    100%  { opacity: 0; transform: translateY(-0.28em); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rotator > span { animation: none; opacity: 0; }
+    .rotator > span:nth-child(1) { opacity: 1; }
+  }
+
+  .tagline { color: var(--ink-dim); font-size: clamp(0.95rem, 0.85rem + 0.5vw, 1.3rem); margin: 0 0 2.2rem; }
+
+  /* -------------------------------------------------------- строка ввода */
+  .starter { display: flex; gap: 0.65rem; width: min(860px, 100%); }
+  .starter input {
+    flex: 1; height: 46px; border: 0; border-radius: 2px;
+    background: rgba(var(--red), 0.6); color: #fff;
+    font-family: var(--sans); font-size: 16px; font-weight: 600;
+    padding: 0 1rem; text-align: center;
+  }
+  .starter input::placeholder { color: rgba(255,255,255,0.72); font-weight: 600; }
+  .starter input:focus { outline: none; background: rgba(var(--red), 0.75); }
+  .starter input:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .starter button {
+    min-width: 150px; height: 46px; border: 0; border-radius: 2px;
+    background: rgba(var(--red), 0.85); color: #fff;
+    font-family: var(--sans); font-size: 14px; cursor: pointer;
+  }
+  .starter button:hover { background: rgba(var(--red), 1); }
+  .starter button:disabled { opacity: 0.55; cursor: progress; }
+
+  .err { color: #ff9c8c; font-size: 0.88rem; margin: 0.8rem 0 0; min-height: 1.2em; }
+
+  /* ------------------------------------------------------------ настройки */
+  .panel {
+    width: min(860px, 100%); margin-top: 1.4rem; text-align: left;
+    background: rgba(0,0,0,0.22); border: 1px solid var(--line); border-radius: 2px;
+    padding: 1.1rem; display: none; flex-direction: column; gap: 0.9rem;
+  }
+  .panel.open { display: flex; }
+  .panel label { display: flex; flex-direction: column; gap: 0.3rem;
+                 font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-dim); }
+  .panel textarea, .panel input[type=number], .panel input[type=text] {
+    background: rgba(0,0,0,0.3); border: 1px solid var(--line); border-radius: 2px;
+    color: var(--ink-bright); font-family: var(--sans); font-size: 0.9rem;
+    padding: 0.45rem 0.6rem; width: 100%; text-transform: none; letter-spacing: 0;
+  }
+  .panel textarea { min-height: 8rem; resize: vertical; line-height: 1.45; }
+  .panel .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 0.8rem; }
+  .panel .check { flex-direction: row; align-items: center; gap: 0.45rem;
+                  text-transform: none; letter-spacing: 0; font-size: 0.85rem; color: var(--ink); }
+  .panel .check input { width: auto; }
+  .panel .hint { text-transform: none; letter-spacing: 0; font-size: 0.78rem; color: var(--ink-dim); }
+  .panel .go {
+    align-self: flex-start; border: 0; border-radius: 2px; padding: 0.6rem 1.6rem;
+    background: rgba(var(--red), 0.85); color: #fff; font-size: 14px; cursor: pointer;
+  }
+  .panel .go:hover { background: rgba(var(--red), 1); }
+  .panel .go:disabled { opacity: 0.55; cursor: progress; }
+
+  /* --------------------------------------------------------------- лента */
+  .strip { margin-top: 3rem; width: min(1000px, 100%); }
+  .strip h2 { font-family: var(--sans); font-weight: 400; font-size: 1rem;
+              color: var(--ink); margin: 0 0 0.8rem; }
+  .tiles { display: flex; gap: 0.55rem; justify-content: center; flex-wrap: wrap; }
+  .tile {
+    width: 104px; height: 104px; border-radius: 2px; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 0.45rem; text-decoration: none; color: #d8d8d8;
+    background: linear-gradient(150deg, #6b6b6b, #333);
+    opacity: 0.6; transition: opacity 140ms ease, transform 140ms ease;
+    font-family: var(--condensed);
+  }
+  .tile:hover { opacity: 1; transform: translateY(-2px); }
+  .tile b { font-size: 0.82rem; font-weight: 700; line-height: 1.15; word-break: break-all; }
+  .tile span { font-size: 0.7rem; color: #b6b6b6; }
+  .tile-empty { display: grid; place-items: center; color: #8d8d8d; font-family: var(--sans);
+                font-size: 0.78rem; opacity: 0.45; }
+
+  .counters { margin-top: 1.6rem; color: var(--ink); font-size: 0.95rem; line-height: 1.7; }
+  .counters b { color: var(--ink-bright); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* -------------------------------------------------------------- подвал */
+  footer { padding: 1.6rem clamp(1rem, 4vw, 3rem); color: var(--ink-dim); font-size: 0.85rem; }
+  footer a { color: var(--ink-dim); }
+  footer a:hover { color: var(--ink-bright); }
+</style>
+</head>
+<body>
+
+<div class="layer topbar">
+  <a class="help" href="#how">👋 Помощь</a>
+  <div class="topright">
+    <button class="auth" id="auth">Авторизация</button>
+    <div class="networks" role="group" aria-label="Соцсеть">
+      <button class="net ig" aria-pressed="true" title="Instagram">IG</button>
+      <button class="net fb" disabled title="Facebook — скоро">FB</button>
+      <button class="net yt" disabled title="YouTube — скоро">YT</button>
+      <button class="net vk" disabled title="ВКонтакте — скоро">VK</button>
+      <button class="net tt" disabled title="TikTok — скоро">TT</button>
+    </div>
+  </div>
+</div>
+
+<main class="layer">
+  <h1>
+    Выбор победителей
+    <span class="rotator" aria-hidden="true">
+      <span>в Инстаграм</span>
+      <span>на Youtube</span>
+      <span>Вконтакте</span>
+      <span>в Тикток</span>
+    </span>
+  </h1>
+  <p class="tagline">помогаем провести розыгрыш быстро и честно</p>
+
+  <form class="starter" id="starter">
+    <input id="post-url" placeholder="вставьте ссылку на пост"
+           value="https://www.instagram.com/reel/DbEt11Dz8Xj/" aria-label="Ссылка на пост">
+    <button type="submit" id="start">Старт</button>
+  </form>
+  <p class="err" id="err"></p>
+
+  <section class="panel" id="panel">
+    <label>Участники
+      <textarea id="comments" spellcheck="false"></textarea>
+      <span class="hint">
+        По одному в строке: <code>username</code> или <code>username — текст комментария</code>.
+        Либо JSON-выгрузка комментариев. Автозагрузку с поста включим, когда будет доступ к Graph API.
+      </span>
+    </label>
+    <div class="grid">
+      <label>Победителей<input type="number" id="winners" min="1" max="50" value="1"></label>
+      <label>Запасных<input type="number" id="reserves" min="0" max="50" value="2"></label>
+      <label>Исключить<input type="text" id="excluded" value="alistore_kg"></label>
+    </div>
+    <label>Призы по местам<input type="text" id="prizes" value="iPhone 15 Pro, Чехол PITAKA, Скидка 10%"></label>
+    <label class="check">
+      <input type="checkbox" id="tickets-per-comment">
+      Больше комментариев — больше шансов
+    </label>
+    <button class="go" id="go">Разыграть</button>
+  </section>
+
+  <section class="strip" id="how">
+    <h2>Последние розыгрыши</h2>
+    <div class="tiles" id="tiles"></div>
+    <p class="counters" id="counters"></p>
+  </section>
+</main>
+
+<footer class="layer">
+  © 2026 ★ AliStore · рандомайзер розыгрышей ·
+  <a href="https://drand.love" target="_blank" rel="noopener">маяк drand</a> ·
+  сид раскрывается, результат пересчитывается
+</footer>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const SAMPLE = `aigerim_k — Катышам, ийгилик каалайм баарына
+nurbek_77 — Alistore дон телефон алгам, сапаты жакшы
+gulnara_j — Апама MacBook белек кылдым, тейлөө абдан жакшы болду
+azamat_dev — Бишкектеги дукондон iPhone алгам, кепилдик боюнча алмаштырып беришти
+aida_m — Хочу выиграть для мамы, она всю жизнь работала учителем
+eldar_kg — Рассрочка аркылуу ноутбук алгам, банк 15 мүнөттө бекитти
+meerim_o — Мага чехол керек эле, конкурска катышам
+talant_bek — Жалал-Абаддан заказ кылгам, эки күндө жеткирип беришти
+sabira_t — Инишиме окууга ноутбук алып бермекчимин
+nazgul_a — Эки жыл мурун телефон алгам, азырга чейин иштейт
+ulan_m — Брал MacBook Air в рассрочку, всё честно оформили
+kanat_j — Айфон керек болуп жатат, катышам`;
+
+$('comments').value = SAMPLE;
+
+$('auth').addEventListener('click', () => {
+  $('err').textContent = 'Аккаунты пока не нужны — розыгрыш работает без входа.';
+});
+
+$('starter').addEventListener('submit', (event) => {
+  event.preventDefault();
+  $('err').textContent = '';
+  $('panel').classList.add('open');
+  $('comments').focus();
+});
+
+$('go').addEventListener('click', async () => {
+  $('err').textContent = '';
+  $('go').disabled = true;
+  $('go').textContent = 'Тянем маяк…';
+
+  try {
+    const res = await fetch('/api/draw', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        postUrl: $('post-url').value,
+        comments: $('comments').value,
+        winners: $('winners').value,
+        reserves: $('reserves').value,
+        excluded: $('excluded').value,
+        ticketsPerComment: $('tickets-per-comment').checked,
+        prizes: $('prizes').value.split(',').map((s) => s.trim()).filter(Boolean),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    location.href = data.url;
+  } catch (error) {
+    $('err').textContent = error.message;
+    $('go').disabled = false;
+    $('go').textContent = 'Разыграть';
+  }
+});
+
+const { draws, totals } = await (await fetch('/api/recent')).json();
+
+$('tiles').innerHTML = draws.length
+  ? draws.map((d) => `<a class="tile" href="/r/${d.id}">
+      <b>@${esc(d.winners[0] ?? '—')}</b>
+      <span>${d.entrants} уч. · #${esc(d.id)}</span>
+    </a>`).join('')
+  : '<div class="tile tile-empty">пока пусто</div>';
+
+const plural = (n, one, few, many) => {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+  return many;
+};
+const fmt = (n) => n.toLocaleString('ru-RU');
+
+$('counters').innerHTML =
+  `Всего обработано <b>${fmt(totals.comments)}</b> ${plural(totals.comments, 'комментарий', 'комментария', 'комментариев')}<br>` +
+  `Проведено <b>${fmt(totals.draws)}</b> ${plural(totals.draws, 'розыгрыш', 'розыгрыша', 'розыгрышей')}`;
+</script>
+</body>
+</html>

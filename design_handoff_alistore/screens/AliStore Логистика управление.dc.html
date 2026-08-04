@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0E0C0A; } ::selection { background: #C6FF3D; color: #14110E; }</style>
+</helmet>
+
+<div style="background: #0E0C0A; font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 60px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #221E19; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+  <div style="max-width: 1080px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">Логистика</span>
+      <a href="AliStore Курьер Workflow.dc.html" style="margin-left: auto; text-decoration: none;"><span style="font-size: 13px; color: #7FB0EC;">Курьеры →</span></a>
+    </div>
+    <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+        <div onClick="{{ t.pick }}" style="background: {{ t.bg }}; color: {{ t.fg }}; border: 1px solid {{ t.border }}; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;">{{ t.label }}</div>
+      </sc-for>
+    </div>
+
+    <!-- ZONES/SLOTS -->
+    <sc-if value="{{ isZones }}" hint-placeholder-val="{{ true }}">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 14px;">Зоны доставки</div>
+          <sc-for list="{{ zones }}" as="z" hint-placeholder-count="4">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #1A1611;"><span style="width: 12px; height: 12px; border-radius: 50%; background: {{ z.dot }};"></span><span style="font-size: 13px; color: #D8CFC6; flex: 1;">{{ z.name }}</span><span style="font-size: 12px; color: #8A7F76;">{{ z.time }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #C6FF3D;">{{ z.price }}</span></div>
+          </sc-for>
+        </div>
+        <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 14px;">Слоты на сегодня</div>
+          <sc-for list="{{ slots }}" as="s" hint-placeholder-count="4">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #1A1611;"><span style="font-size: 13px; color: #D8CFC6; flex: 1;">{{ s.time }}</span><div style="flex: 1; height: 6px; background: #221E19; border-radius: 999px; overflow: hidden;"><div style="height: 100%; width: {{ s.load }}; background: {{ s.color }};"></div></div><span style="font-size: 12px; color: {{ s.color }};">{{ s.label }}</span></div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Клиент видит свободные слоты и стоимость по своей зоне при оформлении. Перегруженные слоты закрываются автоматически.</div>
+    </sc-if>
+
+    <!-- PICKUP POINTS -->
+    <sc-if value="{{ isPvz }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid #2E2822; font-size: 11px; color: #8A7F76;"><span>Точка выдачи</span><span>Тип</span><span>Заказов ждёт</span><span>Статус</span></div>
+        <sc-for list="{{ pvz }}" as="p" hint-placeholder-count="4">
+          <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid #1A1611; align-items: center;"><span style="font-size: 13px; color: #fff;">{{ p.name }}</span><span style="font-size: 12px; color: #A79C92;">{{ p.type }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: #E5B23C;">{{ p.waiting }}</span><span><span style="background: {{ p.bg }}; color: {{ p.fg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ p.status }}</span></span></div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Свои магазины + партнёрские ПВЗ на карте. Клиент выбирает удобную точку самовывоза при заказе.</div>
+    </sc-if>
+
+    <!-- ROUTES -->
+    <sc-if value="{{ isRoutes }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+        <div style="display: flex; align-items: center; margin-bottom: 16px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">Маршрут курьера · Данияр · рейс R-08</span><span style="margin-left: auto; background: rgba(198,255,61,0.12); color: #C6FF3D; border-radius: 6px; padding: 4px 10px; font-size: 12px;">AI-оптимизирован</span></div>
+        <div style="display: flex; flex-direction: column;">
+          <sc-for list="{{ route }}" as="r" hint-placeholder-count="5">
+            <div style="display: flex; gap: 12px;"><div style="display: flex; flex-direction: column; align-items: center;"><span style="width: 28px; height: 28px; border-radius: 50%; background: {{ r.dotBg }}; color: {{ r.dotFg }}; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;">{{ r.n }}</span><span style="width: 2px; flex: 1; background: #2E2822; min-height: 14px;"></span></div><div style="padding-bottom: 16px; flex: 1;"><div style="font-size: 14px; color: #fff;">{{ r.addr }}</div><div style="font-size: 12px; color: #8A7F76;">Заказ {{ r.order }} · {{ r.eta }}</div></div></div>
+          </sc-for>
+        </div>
+        <div style="display: flex; gap: 16px; margin-top: 8px; font-size: 12px; color: #8A7F76;"><span>📍 5 точек</span><span>🛣 18 км</span><span>⏱ ~2 ч</span><span style="color: #C6FF3D;">−30% времени vs без оптимизации</span></div>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tab: "zones" };
+  renderVals() {
+    const t = this.state.tab;
+    const tabDef = [["zones","Зоны и слоты"],["pvz","Точки выдачи"],["routes","Маршруты"]];
+    const tabs = tabDef.map(x => ({ label: x[1], pick: () => this.setState({ tab: x[0] }),
+      bg: t === x[0] ? "#FF5B2E" : "#16130F", fg: t === x[0] ? "#fff" : "#A79C92", border: t === x[0] ? "#FF5B2E" : "#2E2822" }));
+    const zones = [
+      { name:"Центр", dot:"#C6FF3D", time:"1–2 ч", price:"беспл." },
+      { name:"Спальные районы", dot:"#7FD3A0", time:"2–4 ч", price:"300" },
+      { name:"Пригород", dot:"#E5B23C", time:"сегодня", price:"500" },
+      { name:"Регионы", dot:"#7FB0EC", time:"1–3 дня", price:"почта" }
+    ];
+    const slot = (time,load,label,color) => ({ time, load, label, color });
+    const slots = [
+      slot("10:00–12:00","40%","свободно","#C6FF3D"),
+      slot("12:00–14:00","70%","мало","#E5B23C"),
+      slot("14:00–16:00","100%","занято","#FF8A7A"),
+      slot("18:00–20:00","55%","свободно","#C6FF3D")
+    ];
+    const ps = (st,ok) => ({ status:st, bg: ok?"rgba(198,255,61,0.12)":"rgba(229,178,60,0.15)", fg: ok?"#C6FF3D":"#E5B23C" });
+    const pvz = [
+      { name:"AliStore Центр", type:"свой магазин", waiting:"8", ...ps("работает",true) },
+      { name:"AliStore Ош", type:"свой магазин", waiting:"3", ...ps("работает",true) },
+      { name:"ПВЗ Джал", type:"партнёр", waiting:"5", ...ps("работает",true) },
+      { name:"ПВЗ Аламедин", type:"партнёр", waiting:"0", ...ps("открытие",false) }
+    ];
+    const rt = (n,addr,order,eta,done) => ({ n: done?"✓":n, addr, order, eta, dotBg: done?"#2E7D46":"#FF5B2E", dotFg:"#fff" });
+    const route = [
+      rt(1,"ул. Киевская 95","№4102","доставлено",true),
+      rt(2,"пр. Чуй 155","№4098","доставлено",true),
+      rt(3,"ул. Ахунбаева 42","№4120","~14:30"),
+      rt(4,"мкр Джал 23","№4131","~15:10"),
+      rt(5,"ул. Токтогула 88","№4140","~15:45")
+    ];
+    return { tabs, isZones:t==="zones", isPvz:t==="pvz", isRoutes:t==="routes", zones, slots, pvz, route };
+  }
+}
+</script>
+</body>
+</html>

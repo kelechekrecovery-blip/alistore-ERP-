@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #0B0A08; }
+a { color: #FF7A4D; text-decoration: none; } a:hover { color: #FF9A6E; }
+::selection { background: #FF5B2E; color: #fff; }
+.sc::-webkit-scrollbar{width:8px;} .sc::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.13);border-radius:4px;} .sc::-webkit-scrollbar-track{background:transparent;}
+@keyframes barGrow{from{transform:scaleY(0);}to{transform:scaleY(1);}}
+@keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(26px,-22px) scale(1.1);}}
+@keyframes pulseDot{0%,100%{opacity:1;}50%{opacity:0.3;}}
+</style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; font-family: 'Golos Text', sans-serif;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.14); color: #fff; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <div style="position: relative; width: 1280px; height: 844px; border-radius: 26px; overflow: hidden; display: flex; border: 1px solid rgba(255,255,255,0.09); box-shadow: 0 50px 120px rgba(0,0,0,0.62); background: radial-gradient(circle at 16% 6%, #2B221B 0%, #14100C 44%, #0B0A08 100%);">
+
+    <!-- AMBIENT BLOBS -->
+    <div style="position: absolute; inset: 0; z-index: 0; overflow: hidden;">
+      <div style="position: absolute; top: -150px; left: -100px; width: 470px; height: 470px; border-radius: 50%; background: radial-gradient(circle, rgba(255,91,46,0.55), transparent 68%); filter: blur(22px); animation: floatBlob 15s ease-in-out infinite;"></div>
+      <div style="position: absolute; bottom: -170px; right: -90px; width: 540px; height: 540px; border-radius: 50%; background: radial-gradient(circle, rgba(38,168,190,0.42), transparent 68%); filter: blur(26px); animation: floatBlob 19s ease-in-out infinite reverse;"></div>
+      <div style="position: absolute; top: 40%; left: 42%; width: 430px; height: 430px; border-radius: 50%; background: radial-gradient(circle, rgba(170,220,70,0.24), transparent 66%); filter: blur(28px); animation: floatBlob 17s ease-in-out infinite;"></div>
+      <div style="position: absolute; top: -90px; right: 24%; width: 380px; height: 380px; border-radius: 50%; background: radial-gradient(circle, rgba(150,90,230,0.32), transparent 66%); filter: blur(26px);"></div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div style="position: relative; z-index: 2; width: 226px; flex-shrink: 0; padding: 18px 12px; display: flex; flex-direction: column; background: linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.015)); -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%); border-right: 1px solid rgba(255,255,255,0.10); box-shadow: inset -1px 0 0 rgba(255,255,255,0.04);">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px;">
+        <div style="width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 18px; box-shadow: 0 6px 18px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4);">A</div>
+        <div><div style="font-family: 'Sora'; font-weight: 800; font-size: 15px; color: #fff;">AliStore ERP</div><div style="font-size: 10px; color: #8A7F76;">Владелец · Нурбек</div></div>
+      </div>
+      <sc-for list="{{ menu }}" as="m" hint-placeholder-count="7">
+        <div onClick="{{ m.go }}" style="display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 12px; margin-bottom: 3px; cursor: pointer; background: {{ m.bg }}; border: 1px solid {{ m.bd }}; box-shadow: {{ m.sh }};"><span style="font-size: 15px;">{{ m.icon }}</span><span style="font-size: 13px; font-weight: {{ m.weight }}; color: {{ m.color }};">{{ m.label }}</span><sc-if value="{{ m.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="margin-left: auto; background: #FF5B2E; color: #fff; border-radius: 999px; font-size: 10px; font-weight: 700; padding: 1px 7px; box-shadow: 0 2px 8px rgba(255,91,46,0.5);">{{ m.badge }}</span></sc-if></div>
+      </sc-for>
+      <div style="margin-top: auto; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); border-radius: 14px; padding: 13px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);">
+        <div style="display: flex; align-items: center; gap: 7px;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #4ED17A; box-shadow: 0 0 8px #4ED17A; animation: pulseDot 2s infinite;"></span><span style="font-size: 11px; color: #B8AEA4;">Сеть · онлайн</span></div>
+        <div style="display: flex; gap: 6px; margin-top: 10px;">
+          <div style="flex: 1; text-align: center; background: rgba(255,255,255,0.04); border-radius: 8px; padding: 7px 4px;"><div style="font-family: 'JetBrains Mono'; font-size: 13px; color: #fff;">3</div><div style="font-size: 9px; color: #8A7F76;">филиала</div></div>
+          <div style="flex: 1; text-align: center; background: rgba(255,255,255,0.04); border-radius: 8px; padding: 7px 4px;"><div style="font-family: 'JetBrains Mono'; font-size: 13px; color: #fff;">18</div><div style="font-size: 9px; color: #8A7F76;">касс</div></div>
+          <div style="flex: 1; text-align: center; background: rgba(255,255,255,0.04); border-radius: 8px; padding: 7px 4px;"><div style="font-family: 'JetBrains Mono'; font-size: 13px; color: #4ED17A;">24</div><div style="font-size: 9px; color: #8A7F76;">онлайн</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="sc" style="position: relative; z-index: 1; flex: 1; overflow-y: auto;">
+      <!-- TOPBAR -->
+      <div style="position: sticky; top: 0; z-index: 6; padding: 13px 24px; display: flex; align-items: center; gap: 14px; background: linear-gradient(180deg, rgba(18,14,10,0.6), rgba(18,14,10,0.32)); -webkit-backdrop-filter: blur(26px) saturate(180%); backdrop-filter: blur(26px) saturate(180%); border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <div><div style="font-family: 'Sora'; font-weight: 700; font-size: 20px; color: #fff;">{{ pageTitle }}</div><div style="font-size: 12px; color: #8A7F76;">{{ pageSub }}</div></div>
+        <div style="margin-left: auto; display: flex; gap: 10px; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 8px; width: 240px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 11px; padding: 9px 13px;"><span style="font-size: 13px; opacity: 0.6;">🔍</span><span style="font-size: 12.5px; color: #857B72;">Поиск: товар, чек, клиент…</span></div>
+          <div style="position: relative; width: 38px; height: 38px; border-radius: 11px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 15px; cursor: pointer;">🔔<span style="position: absolute; top: -4px; right: -4px; background: #FF5B2E; color: #fff; border-radius: 999px; font-size: 9px; font-weight: 700; padding: 1px 5px; box-shadow: 0 2px 6px rgba(255,91,46,0.5);">5</span></div>
+          <div onClick="{{ goAI }}" style="display: flex; align-items: center; gap: 7px; background: linear-gradient(135deg,#FF7A4D,#E8410F); border-radius: 11px; padding: 9px 15px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 6px 18px rgba(255,91,46,0.4), inset 0 1px 0 rgba(255,255,255,0.35);">🤖 AI-ассистент</div>
+          <div style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg,#3A322B,#2A241F); border: 1px solid rgba(255,255,255,0.14); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 700;">Н</div>
+        </div>
+      </div>
+
+      <div style="padding: 20px 24px 28px;">
+
+        <!-- ============ DASHBOARD ============ -->
+        <sc-if value="{{ isDash }}" hint-placeholder-val="{{ true }}">
+
+          <sc-if value="{{ showAiInsight }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; align-items: center; gap: 14px; padding: 13px 18px; margin-bottom: 14px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,122,77,0.14), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,122,77,0.28); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="width: 38px; height: 38px; flex-shrink: 0; border-radius: 11px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 6px 18px rgba(255,91,46,0.4), inset 0 1px 0 rgba(255,255,255,0.4);">🤖</div>
+              <div style="flex: 1;"><div style="font-family: 'JetBrains Mono'; font-size: 10.5px; color: #FF9A6E; letter-spacing: 0.08em;">AI-СВОДКА · СЕЙЧАС</div><div style="font-size: 13.5px; color: #EDE6DE; line-height: 1.45; margin-top: 3px;">Выручка на <b style="color:#C6FF3D;">12% выше</b> среднего вторника. В кассе Ош 340к — превышен лимит, рекомендую инкассацию. iPhone 15 хватит на <b style="color:#FF9A6E;">2 дня</b>.</div></div>
+              <div onClick="{{ goAI }}" style="flex-shrink: 0; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; padding: 9px 15px; font-size: 13px; color: #fff; cursor: pointer; white-space: nowrap;">Спросить AI →</div>
+            </div>
+          </sc-if>
+
+          <a href="AliStore Пульт целостности.dc.html" style="text-decoration: none;">
+            <div style="display: flex; align-items: center; gap: 14px; padding: 12px 18px; margin-bottom: 14px; border-radius: 16px; background: linear-gradient(160deg, rgba(78,209,122,0.1), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(78,209,122,0.24); box-shadow: 0 10px 28px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.14);">
+              <div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; background: conic-gradient(#4ED17A 360deg, rgba(255,255,255,0.09) 0); display: flex; align-items: center; justify-content: center;"><div style="width: 26px; height: 26px; border-radius: 50%; background: #14100C; display: flex; align-items: center; justify-content: center; font-family: 'Sora'; font-weight: 800; font-size: 10px; color: #4ED17A;">100</div></div>
+              <div style="flex: 1;"><div style="font-size: 13.5px; color: #fff; font-weight: 600;">Целостность экосистемы: всё сходится</div><div style="font-size: 11.5px; color: #8A7F76; margin-top: 2px;">8/8 инвариантов · деньги = банк = склад = статус · проверка каждые 30 сек</div></div>
+              <span style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #7EE6A0;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #4ED17A; box-shadow: 0 0 8px #4ED17A; animation: pulseDot 2s infinite;"></span>здоров</span>
+              <span style="color: #7EE6A0; font-size: 16px;">→</span>
+            </div>
+          </a>
+
+          <!-- KPI STRIP -->
+          <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px;">
+            <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="6">
+              <div style="position: relative; padding: 15px 14px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.16);">
+                <div style="display: flex; align-items: center; justify-content: space-between;"><span style="font-size: 11px; color: #A79C92;">{{ k.label }}</span><span style="font-size: 14px; opacity: 0.85;">{{ k.icon }}</span></div>
+                <div style="font-family: 'Sora'; font-weight: 800; font-size: 20px; color: {{ k.color }}; margin-top: 8px; letter-spacing: -0.02em; white-space: nowrap;">{{ k.value }}</div>
+                <div style="font-size: 11px; color: {{ k.deltaColor }}; margin-top: 3px;">{{ k.delta }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- MICRO RIBBON -->
+          <div style="display: flex; padding: 13px 4px; margin-bottom: 14px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.018)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 28px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.14);">
+            <sc-for list="{{ micro }}" as="x" hint-placeholder-count="8">
+              <div style="flex: 1; padding: 0 14px; border-right: 1px solid rgba(255,255,255,0.08);"><div style="font-size: 10.5px; color: #8A7F76;">{{ x.label }}</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: {{ x.color }}; margin-top: 4px;">{{ x.value }}</div></div>
+            </sc-for>
+          </div>
+
+          <!-- CHART + GOAL/BRANCHES -->
+          <div style="display: grid; grid-template-columns: 2.2fr 1fr; gap: 14px; margin-bottom: 14px;">
+            <div style="padding: 18px 20px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                <div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">Выручка · 7 дней</div><div style="font-size: 11px; color: #8A7F76; margin-top: 2px;">Итого 6.84 млн · <span style="color:#C6FF3D;">▲ 9% к прошлой неделе</span></div></div>
+                <div style="margin-left: auto; display: flex; gap: 14px; align-items: center;">
+                  <span style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #A79C92;"><span style="width: 10px; height: 10px; border-radius: 3px; background: linear-gradient(180deg,#FF7A4D,#FF5B2E);"></span>Эта неделя</span>
+                  <span style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #A79C92;"><span style="width: 10px; height: 10px; border-radius: 3px; background: rgba(255,255,255,0.18);"></span>Прошлая</span>
+                </div>
+              </div>
+              <div style="display: flex; align-items: flex-end; gap: 12px; height: 168px; margin-top: 14px;">
+                <sc-for list="{{ bars }}" as="b" hint-placeholder-count="7">
+                  <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px;">
+                    <div style="width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 3px; height: 150px;">
+                      <sc-if value="{{ showLastWeek }}" hint-placeholder-val="{{ true }}"><div style="width: 30%; height: {{ b.lh }}; background: rgba(255,255,255,0.16); border-radius: 4px 4px 0 0; transform-origin: bottom; animation: barGrow .6s cubic-bezier(.2,.7,.3,1) both;"></div></sc-if>
+                      <div style="width: 34%; height: {{ b.h }}; background: linear-gradient(180deg,#FF9A6E,#FF5B2E); border-radius: 4px 4px 0 0; box-shadow: 0 0 14px rgba(255,91,46,0.45); transform-origin: bottom; animation: barGrow .6s cubic-bezier(.2,.7,.3,1) both;"></div>
+                    </div>
+                    <span style="font-size: 10px; color: #8A7F76;">{{ b.day }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Цель дня</div>
+              <div style="display: flex; justify-content: space-between; font-size: 12px; margin: 12px 0 6px;"><span style="color: #A79C92;">1.24 из 1.5 млн</span><span style="color: #C6FF3D; font-weight: 700;">83%</span></div>
+              <div style="height: 10px; background: rgba(255,255,255,0.09); border-radius: 999px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,0.4);"><div style="width: 83%; height: 100%; background: linear-gradient(90deg,#8FD40F,#C6FF3D); box-shadow: 0 0 12px rgba(198,255,61,0.6);"></div></div>
+              <div style="height: 1px; background: rgba(255,255,255,0.08); margin: 16px 0 12px;"></div>
+              <div style="font-size: 12px; color: #A79C92; margin-bottom: 12px;">Филиалы</div>
+              <sc-for list="{{ branches }}" as="b" hint-placeholder-count="3">
+                <div style="margin-bottom: 13px;">
+                  <div style="display: flex; justify-content: space-between; align-items: baseline;"><span style="font-size: 13px; color: #fff;">{{ b.name }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #D8CFC6;">{{ b.rev }}</span></div>
+                  <div style="display: flex; gap: 9px; align-items: center; margin-top: 6px;"><div style="flex: 1; height: 6px; background: rgba(255,255,255,0.09); border-radius: 999px; overflow: hidden;"><div style="width: {{ b.w }}; height: 100%; background: {{ b.barColor }};"></div></div><span style="font-size: 11px; color: {{ b.pctColor }}; width: 34px; text-align: right;">{{ b.pct }}</span></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <!-- TOP PRODUCTS / PAYMENTS / CATEGORIES -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px;">
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 14px;">Топ товаров сегодня</div>
+              <sc-for list="{{ topProd }}" as="p" hint-placeholder-count="5">
+                <div style="margin-bottom: 12px;">
+                  <div style="display: flex; justify-content: space-between;"><span style="font-size: 13px; color: #fff;">{{ p.name }}</span><span style="font-family: 'JetBrains Mono'; font-size: 11px; color: #8A7F76;">{{ p.units }}</span></div>
+                  <div style="display: flex; gap: 9px; align-items: center; margin-top: 5px;"><div style="flex: 1; height: 6px; background: rgba(255,255,255,0.09); border-radius: 999px; overflow: hidden;"><div style="width: {{ p.w }}; height: 100%; background: linear-gradient(90deg,#FF7A4D,#FF5B2E);"></div></div><span style="font-family: 'JetBrains Mono'; font-size: 11px; color: #C6FF3D; width: 58px; text-align: right;">{{ p.rev }}</span></div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 4px;">Способы оплаты</div>
+              <div style="display: flex; height: 14px; border-radius: 7px; overflow: hidden; margin: 14px 0 16px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.45);">
+                <sc-for list="{{ paySeg }}" as="s" hint-placeholder-count="4"><div style="width: {{ s.w }}; height: 100%; background: {{ s.color }};"></div></sc-for>
+              </div>
+              <sc-for list="{{ paySeg }}" as="s" hint-placeholder-count="4">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;"><span style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #D8CFC6;"><span style="width: 9px; height: 9px; border-radius: 3px; background: {{ s.color }};"></span>{{ s.label }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #fff;">{{ s.pct }}</span></div>
+              </sc-for>
+            </div>
+
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 14px;">Категории · доля</div>
+              <sc-for list="{{ cats2 }}" as="c" hint-placeholder-count="5">
+                <div style="margin-bottom: 11px;">
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span style="font-size: 12.5px; color: #fff;">{{ c.name }}</span><span style="font-family: 'JetBrains Mono'; font-size: 11px; color: #8A7F76;">{{ c.pct }}</span></div>
+                  <div style="height: 7px; background: rgba(255,255,255,0.09); border-radius: 999px; overflow: hidden;"><div style="width: {{ c.w }}; height: 100%; background: {{ c.color }};"></div></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <!-- HOURLY / CHANNELS / CASHFLOW -->
+          <div style="display: grid; grid-template-columns: 1.7fr 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center; margin-bottom: 4px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Продажи по часам</span><span style="margin-left: auto; font-size: 11px; color: #8A7F76;">пик 18:00 · 214к</span></div>
+              <div style="display: flex; align-items: flex-end; gap: 5px; height: 108px; margin-top: 14px;">
+                <sc-for list="{{ hours }}" as="h" hint-placeholder-count="12">
+                  <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;"><div style="width: 100%; height: {{ h.h }}; background: linear-gradient(180deg,#FF9A6E,#FF5B2E); border-radius: 3px 3px 0 0; transform-origin: bottom; animation: barGrow .5s cubic-bezier(.2,.7,.3,1) both;"></div><span style="font-size: 8.5px; color: #857B72;">{{ h.t }}</span></div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 4px;">Каналы продаж</div>
+              <div style="display: flex; height: 14px; border-radius: 7px; overflow: hidden; margin: 14px 0 16px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.45);">
+                <sc-for list="{{ channels }}" as="c" hint-placeholder-count="3"><div style="width: {{ c.w }}; height: 100%; background: {{ c.color }};"></div></sc-for>
+              </div>
+              <sc-for list="{{ channels }}" as="c" hint-placeholder-count="3">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;"><span style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #D8CFC6;"><span style="width: 9px; height: 9px; border-radius: 3px; background: {{ c.color }};"></span>{{ c.label }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #fff;">{{ c.pct }}</span></div>
+              </sc-for>
+            </div>
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 8px;">Движение денег</div>
+              <sc-for list="{{ cashflow }}" as="cf" hint-placeholder-count="4">
+                <div style="display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12.5px;"><span style="color: #B8AEA4;">{{ cf.label }}</span><span style="font-family: 'JetBrains Mono'; color: {{ cf.color }};">{{ cf.value }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+
+          <!-- LIVE FEED + DECISIONS -->
+          <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px;">
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center; margin-bottom: 6px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Лента событий</span><span style="margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11px; color: #8A7F76;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #4ED17A; box-shadow: 0 0 8px #4ED17A; animation: pulseDot 2s infinite;"></span>в реальном времени</span></div>
+              <sc-for list="{{ feed }}" as="f" hint-placeholder-count="6">
+                <div style="display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                  <span style="font-family: 'JetBrains Mono'; font-size: 11px; color: #857B72; width: 40px;">{{ f.time }}</span>
+                  <span style="font-size: 15px; width: 22px; text-align: center;">{{ f.icon }}</span>
+                  <div style="flex: 1;"><div style="font-size: 13px; color: #fff;">{{ f.text }}</div><div style="font-size: 11px; color: #8A7F76;">{{ f.meta }}</div></div>
+                  <span style="font-family: 'JetBrains Mono'; font-size: 12.5px; color: {{ f.amtColor }};">{{ f.amt }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ showAlerts }}" hint-placeholder-val="{{ true }}">
+              <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+                <div style="display: flex; align-items: center; margin-bottom: 14px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Требуют решения</span><span style="margin-left: auto; background: rgba(255,91,46,0.2); color: #FF9A6E; border-radius: 999px; font-size: 11px; font-weight: 700; padding: 2px 9px;">4</span></div>
+                <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="4">
+                  <div style="background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.07); border-left: 3px solid {{ d.color }}; border-radius: 11px; padding: 11px 13px; margin-bottom: 9px;"><div style="font-size: 13px; color: #fff; line-height: 1.4;">{{ d.text }}</div><div onClick="{{ d.act }}" style="font-size: 12px; color: #FF9A6E; margin-top: 5px; cursor: pointer;">{{ d.action }} →</div></div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+          <!-- INCOMING / SERVICE -->
+          <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 14px; margin-top: 14px;">
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center; margin-bottom: 12px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Закупки в пути</span><span style="margin-left: auto; font-size: 11px; color: #8A7F76;">4 партии · 3.2 млн</span></div>
+              <sc-for list="{{ incoming }}" as="i" hint-placeholder-count="4">
+                <div style="display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="font-size: 15px;">📦</span><div style="flex: 1;"><div style="font-size: 13px; color: #fff;">{{ i.name }}</div><div style="font-size: 11px; color: #8A7F76;">{{ i.eta }}</div></div><span style="background: {{ i.bg }}; color: {{ i.fg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ i.status }}</span></div>
+              </sc-for>
+            </div>
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 12px;">Сервис-центр</div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <sc-for list="{{ service }}" as="s" hint-placeholder-count="4">
+                  <div style="background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 12px;"><div style="font-family: 'Sora'; font-weight: 800; font-size: 20px; color: {{ s.color }};">{{ s.value }}</div><div style="font-size: 11px; color: #8A7F76; margin-top: 2px;">{{ s.label }}</div></div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <!-- MTD / ONLINE ORDERS / SHIFT -->
+          <div style="display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 14px; margin-top: 14px;">
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">План месяца · июль</span><span style="margin-left: auto; font-size: 11px; color: #8A7F76;">день 18 из 31</span></div>
+              <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 12px;"><span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">17.2</span><span style="font-size: 12px; color: #8A7F76;">из 30 млн ·</span><span style="font-size: 12px; color: #C6FF3D; font-weight: 700;">57%</span></div>
+              <div style="height: 10px; background: rgba(255,255,255,0.09); border-radius: 999px; overflow: hidden; margin-top: 10px; position: relative; box-shadow: inset 0 1px 2px rgba(0,0,0,0.4);"><div style="width: 57%; height: 100%; background: linear-gradient(90deg,#FF7A4D,#FF5B2E); box-shadow: 0 0 12px rgba(255,91,46,0.5);"></div><div style="position: absolute; left: 58%; top: -2px; bottom: -2px; width: 2px; background: rgba(255,255,255,0.5);"></div></div>
+              <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 8px;"><span style="color: #8A7F76;">│ отметка времени 58%</span><span style="color: #C6FF3D;">прогноз: 31.4 млн · 105% ✓</span></div>
+            </div>
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 12px;">Онлайн-заказы · сейчас</div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <sc-for list="{{ onlineOrders }}" as="o" hint-placeholder-count="4">
+                  <div style="background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 11px 12px;"><div style="font-family: 'Sora'; font-weight: 800; font-size: 20px; color: {{ o.color }};">{{ o.v }}</div><div style="font-size: 11px; color: #8A7F76; margin-top: 2px;">{{ o.label }}</div></div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center; margin-bottom: 12px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Смена сейчас</span><span style="margin-left: auto; font-size: 11px; color: #E5B23C;">опозданий: 1</span></div>
+              <sc-for list="{{ shifts }}" as="sh" hint-placeholder-count="3">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="width: 7px; height: 7px; border-radius: 50%; background: {{ sh.dot }};"></span><span style="font-size: 13px; color: #fff; flex: 1;">{{ sh.name }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: {{ sh.color }};">{{ sh.staff }}</span></div>
+              </sc-for>
+              <div style="font-size: 11px; color: #FF8A7A; margin-top: 10px;">⚠ Ош: нет кассира после 18:00</div>
+            </div>
+          </div>
+
+          <!-- INSTALLMENTS / DEAD STOCK / AUDIT -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-top: 14px;">
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center; margin-bottom: 12px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Рассрочка · просрочки</span><span style="margin-left: auto; font-family: 'JetBrains Mono'; font-size: 12px; color: #FF8A7A;">589 000</span></div>
+              <sc-for list="{{ aging }}" as="a" hint-placeholder-count="3">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="background: {{ a.bg }}; color: {{ a.fg }}; border-radius: 6px; padding: 2px 8px; font-size: 11px; white-space: nowrap;">{{ a.bucket }}</span><span style="font-size: 12px; color: #B8AEA4; flex: 1;">{{ a.who }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: {{ a.fg }};">{{ a.sum }}</span></div>
+              </sc-for>
+              <div style="font-size: 11px; color: #8A7F76; margin-top: 10px;">Автонапоминания в WhatsApp: включены</div>
+            </div>
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center; margin-bottom: 12px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Неликвид · 45+ дней</span><span style="margin-left: auto; font-size: 11px; color: #E5B23C;">заморожено 486к</span></div>
+              <sc-for list="{{ deadStock }}" as="d" hint-placeholder-count="3">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><div style="flex: 1;"><div style="font-size: 13px; color: #fff;">{{ d.name }}</div><div style="font-size: 11px; color: #8A7F76;">{{ d.qty }}</div></div><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #E5B23C;">{{ d.days }}</span></div>
+              </sc-for>
+              <div style="font-size: 12px; color: #FF9A6E; margin-top: 10px; cursor: pointer;">Сделать скидку −15% на всё → </div>
+            </div>
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,138,122,0.09), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,138,122,0.22); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center; margin-bottom: 12px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Контроль · за сегодня</span><span style="margin-left: auto; background: rgba(255,138,122,0.18); color: #FF8A7A; border-radius: 999px; font-size: 11px; font-weight: 700; padding: 2px 9px;">6</span></div>
+              <sc-for list="{{ audit }}" as="a" hint-placeholder-count="3">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="font-size: 14px;">{{ a.icon }}</span><div style="flex: 1;"><div style="font-size: 12.5px; color: #fff;">{{ a.text }}</div><div style="font-size: 11px; color: #8A7F76;">{{ a.meta }}</div></div><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: #FF8A7A;">{{ a.n }}</span></div>
+              </sc-for>
+              <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 10px;"><span style="color: #8A7F76;">Списания за июль</span><span style="font-family: 'JetBrains Mono'; color: #FF8A7A;">−42 300 · 7 шт</span></div>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ============ WAREHOUSE ============ -->
+        <sc-if value="{{ isWarehouse }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;">
+            <sc-for list="{{ whChips }}" as="c" hint-placeholder-count="4">
+              <div onClick="{{ c.pick }}" style="padding: 8px 15px; border-radius: 999px; font-size: 12.5px; cursor: pointer; background: {{ c.bg }}; color: {{ c.color }}; border: 1px solid {{ c.bd }};">{{ c.label }}</div>
+            </sc-for>
+            <div style="margin-left: auto; display: flex; gap: 8px;">
+              <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 8px 14px; font-size: 12.5px; color: #D8CFC6; cursor: pointer;">↧ Экспорт</div>
+              <div style="background: linear-gradient(135deg,#FF7A4D,#E8410F); border-radius: 10px; padding: 8px 14px; font-size: 12.5px; color: #fff; font-weight: 600; cursor: pointer; box-shadow: 0 4px 14px rgba(255,91,46,0.35);">＋ Приёмка</div>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px;">
+            <div style="padding: 16px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 12px; color: #A79C92;">Позиций (SKU)</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">1 247</div></div>
+            <div style="padding: 16px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 12px; color: #A79C92;">Склад на сумму</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">42.8 млн</div></div>
+            <div style="padding: 16px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 12px; color: #A79C92;">Мало остатка</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #E5B23C;">8</div></div>
+            <div style="padding: 16px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,138,122,0.12), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,138,122,0.25); box-shadow: 0 10px 28px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 12px; color: #A79C92;">Критично</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #FF8A7A;">2</div></div>
+          </div>
+          <div style="border-radius: 18px; overflow: hidden; background: linear-gradient(160deg, rgba(255,255,255,0.075), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+            <div style="display: grid; grid-template-columns: 1.8fr 0.9fr 0.9fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.09); font-size: 12px; color: #8A7F76;"><span>Товар</span><span>Филиал</span><span>Остаток</span><span>Цена</span><span>Статус</span></div>
+            <sc-for list="{{ stock }}" as="r" hint-placeholder-count="6">
+              <div style="display: grid; grid-template-columns: 1.8fr 0.9fr 0.9fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;"><span style="font-size: 13px; color: #fff;">{{ r.name }}</span><span style="font-size: 12px; color: #B8AEA4;">{{ r.br }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: {{ r.qtyColor }};">{{ r.qty }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: #D8CFC6;">{{ r.price }}</span><span><span style="background: {{ r.bg }}; color: {{ r.fg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ r.status }}</span></span></div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- ============ FINANCE ============ -->
+        <sc-if value="{{ isFinance }}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px;">
+            <div style="padding: 16px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 12px; color: #A79C92;">Выручка</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: #fff;">8.42 млн</div></div>
+            <div style="padding: 16px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 12px; color: #A79C92;">Себестоимость</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: #fff;">6.10 млн</div></div>
+            <div style="padding: 16px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 12px; color: #A79C92;">Валовая</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: #C6FF3D;">2.32 млн</div></div>
+            <div style="padding: 16px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,122,77,0.12), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,122,77,0.22); box-shadow: 0 10px 28px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 12px; color: #A79C92;">Чистая</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: #FF8A5F;">1.14 млн</div></div>
+          </div>
+          <div style="padding: 20px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+            <div style="display: flex; align-items: center; margin-bottom: 14px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">Отчёт P&amp;L · июнь</span><span onClick="{{ exportXls }}" style="margin-left: auto; background: rgba(198,255,61,0.14); border: 1px solid rgba(198,255,61,0.25); color: #C6FF3D; border-radius: 9px; padding: 8px 14px; font-size: 12px; cursor: pointer;">↓ Excel</span></div>
+            <sc-for list="{{ pnl }}" as="p" hint-placeholder-count="5">
+              <div style="display: flex; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 13px;"><span style="color: {{ p.color }};">{{ p.label }}</span><span style="font-family: 'JetBrains Mono'; color: {{ p.color }};">{{ p.value }}</span></div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- ============ TASKS ============ -->
+        <sc-if value="{{ isTasks }}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;">
+            <sc-for list="{{ columns }}" as="col" hint-placeholder-count="3">
+              <div style="padding: 16px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.14);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{ col.dot }};"></span><span style="font-size: 13px; font-weight: 700; color: #fff;">{{ col.title }}</span><span style="color: #8A7F76; font-size: 12px;">{{ col.count }}</span></div>
+                <sc-for list="{{ col.cards }}" as="c" hint-placeholder-count="2">
+                  <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px; margin-bottom: 8px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);"><div style="font-size: 13px; color: #fff; line-height: 1.4;">{{ c.text }}</div><div style="display: flex; align-items: center; gap: 6px; margin-top: 9px;"><span style="background: {{ c.tagBg }}; color: {{ c.tagFg }}; border-radius: 5px; padding: 2px 7px; font-size: 10px;">{{ c.tag }}</span><span style="margin-left: auto; font-size: 11px; color: #8A7F76;">{{ c.who }}</span></div></div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- ============ KPI / STAFF ============ -->
+        <sc-if value="{{ isKpi }}" hint-placeholder-val="{{ false }}">
+          <div style="border-radius: 18px; overflow: hidden; background: linear-gradient(160deg, rgba(255,255,255,0.075), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+            <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.09); font-size: 12px; color: #8A7F76;"><span>Сотрудник</span><span>Продажи</span><span>KPI</span><span>Бонус</span><span>Штраф</span></div>
+            <sc-for list="{{ staff }}" as="e" hint-placeholder-count="6">
+              <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr; padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;"><span style="font-size: 13px; color: #fff;">{{ e.name }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: #D8CFC6;">{{ e.sales }}</span><span><span style="background: {{ e.kpiBg }}; color: {{ e.kpiFg }}; border-radius: 6px; padding: 3px 9px; font-size: 12px; font-family: 'JetBrains Mono';">{{ e.kpi }}</span></span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: #C6FF3D;">{{ e.bonus }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: {{ e.penColor }};">{{ e.pen }}</span></div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- ============ CRM ============ -->
+        <sc-if value="{{ isCrm }}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px;">
+            <sc-for list="{{ crmSeg }}" as="c" hint-placeholder-count="4">
+              <div style="padding: 16px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 22px;">{{ c.icon }}</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: #fff; margin-top: 8px;">{{ c.count }}</div><div style="font-size: 12px; color: #8A7F76;">{{ c.label }}</div></div>
+            </sc-for>
+          </div>
+          <div style="padding: 20px; border-radius: 18px; background: linear-gradient(135deg, rgba(150,90,230,0.14), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+            <div style="font-size: 12px; color: #C6FF3D; font-family: 'JetBrains Mono'; margin-bottom: 8px;">🤖 AI РЕКОМЕНДАЦИЯ</div>
+            <div style="font-size: 14px; color: #fff; line-height: 1.5;">340 клиентов не покупали 60+ дней. Запустить кампанию реактивации со скидкой −10% через WhatsApp — прогноз возврата ~12%.</div>
+            <a href="AliStore CRM Кампании.dc.html"><div style="display: inline-block; background: #C6FF3D; color: #14110E; border-radius: 10px; padding: 10px 18px; font-weight: 700; font-size: 13px; margin-top: 14px; cursor: pointer; box-shadow: 0 6px 18px rgba(198,255,61,0.35);">Открыть кампании →</div></a>
+          </div>
+        </sc-if>
+
+        <!-- ============ ALL DEPARTMENTS ============ -->
+        <sc-if value="{{ isDepts }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size: 12.5px; color: #8A7F76; margin-bottom: 14px;">Полноценные экраны отделов — каждый открывается отдельно в едином стиле.</div>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px;">
+            <sc-for list="{{ depts }}" as="d" hint-placeholder-count="9">
+              <a href="{{ d.href }}" style="text-decoration: none;">
+                <div style="display: flex; align-items: center; gap: 14px; padding: 17px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.16);" style-hover="border: 1px solid rgba(255,122,77,0.45); box-shadow: 0 14px 34px rgba(0,0,0,0.44), 0 4px 16px rgba(255,91,46,0.22), inset 0 1px 0 rgba(255,255,255,0.2);">
+                  <div style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 13px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 21px;">{{ d.icon }}</div>
+                  <div style="flex: 1;"><div style="font-size: 14px; font-weight: 700; color: #fff;">{{ d.name }}</div><div style="font-size: 11.5px; color: #8A7F76; margin-top: 2px;">{{ d.desc }}</div></div>
+                  <span style="color: #FF9A6E; font-size: 16px;">→</span>
+                </div>
+              </a>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- ============ APP CONTROL (god mode) ============ -->
+        <sc-if value="{{ isAppCtl }}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 12px; margin-bottom: 14px;">
+            <sc-for list="{{ appStats }}" as="s" hint-placeholder-count="6">
+              <div style="padding: 14px; border-radius: 15px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 11px; color: #A79C92;">{{ s.label }}</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 19px; color: {{ s.color }}; margin-top: 6px; white-space: nowrap;">{{ s.value }}</div></div>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ maintOn }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; align-items: center; gap: 12px; padding: 13px 18px; margin-bottom: 14px; border-radius: 14px; background: linear-gradient(160deg, rgba(255,138,122,0.16), rgba(255,255,255,0.02)); border: 1px solid rgba(255,138,122,0.32);"><span style="font-size: 18px;">🛑</span><span style="font-size: 13px; color: #FF9A8A;">Режим обслуживания ВКЛЮЧЁН — покупатели видят заглушку, покупки приостановлены.</span></div>
+          </sc-if>
+
+          <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 14px; margin-bottom: 14px;">
+            <!-- push composer -->
+            <div style="padding: 18px 20px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 14px;">Push-уведомление</div>
+              <input value="{{ pushTitle }}" onChange="{{ setPushTitle }}" placeholder="Заголовок" style="width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 11px 13px; font-size: 13.5px; color: #fff; outline: none; font-family: 'Golos Text', sans-serif; margin-bottom: 9px;">
+              <input value="{{ pushText }}" onChange="{{ setPushText }}" placeholder="Текст сообщения" style="width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 11px 13px; font-size: 13px; color: #D8CFC6; outline: none; font-family: 'Golos Text', sans-serif; margin-bottom: 14px;">
+              <div style="font-size: 12px; color: #A79C92; margin-bottom: 8px;">Сегмент получателей</div>
+              <div style="display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 14px;">
+                <sc-for list="{{ pushSegs }}" as="p" hint-placeholder-count="5">
+                  <div onClick="{{ p.pick }}" style="padding: 8px 13px; border-radius: 999px; font-size: 12px; cursor: pointer; background: {{ p.bg }}; color: {{ p.fg }}; border: 1px solid {{ p.bd }};">{{ p.label }}</div>
+                </sc-for>
+              </div>
+              <div style="display: flex; gap: 8px; margin-bottom: 16px;"><span style="background: linear-gradient(135deg,#FF7A4D,#E8410F); color: #fff; border-radius: 8px; padding: 6px 13px; font-size: 12px; font-weight: 600;">Push</span><span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #B8AEA4; border-radius: 8px; padding: 6px 13px; font-size: 12px;">WhatsApp</span><span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #B8AEA4; border-radius: 8px; padding: 6px 13px; font-size: 12px;">SMS</span></div>
+              <div style="display: flex; align-items: flex-start; gap: 12px; padding: 13px; border-radius: 13px; background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.08); margin-bottom: 16px;">
+                <div style="width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">A</div>
+                <div style="flex: 1;"><div style="font-size: 13px; color: #fff; font-weight: 600;">{{ pushTitle }}</div><div style="font-size: 12px; color: #A79C92; margin-top: 2px; line-height: 1.35;">{{ pushText }}</div></div>
+                <span style="font-size: 10px; color: #6E645C;">сейчас</span>
+              </div>
+              <div style="display: flex; gap: 8px;"><div style="flex: 1; text-align: center; background: linear-gradient(135deg,#FF7A4D,#E8410F); color: #fff; border-radius: 11px; padding: 12px; font-size: 13.5px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 18px rgba(255,91,46,0.4), inset 0 1px 0 rgba(255,255,255,0.3);">Отправить сейчас</div><div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #D8CFC6; border-radius: 11px; padding: 12px 18px; font-size: 13.5px; cursor: pointer;">Запланировать</div></div>
+            </div>
+            <!-- god actions -->
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,138,122,0.08), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,138,122,0.2); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;"><span style="font-size: 16px;">⚡</span><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Режим бога</span></div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><div onClick="{{ toggleMaint }}" style="width: 40px; height: 23px; flex-shrink: 0; border-radius: 999px; background: {{ maintBg }}; position: relative; cursor: pointer;"><div style="position: absolute; top: 2px; left: {{ maintKnob }}; width: 19px; height: 19px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: left .2s;"></div></div><div style="flex: 1;"><div style="font-size: 13px; color: #fff;">Режим обслуживания</div><div style="font-size: 11px; color: #8A7F76;">заглушка, покупки на паузе</div></div></div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><div onClick="{{ toggleForce }}" style="width: 40px; height: 23px; flex-shrink: 0; border-radius: 999px; background: {{ forceBg }}; position: relative; cursor: pointer;"><div style="position: absolute; top: 2px; left: {{ forceKnob }}; width: 19px; height: 19px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: left .2s;"></div></div><div style="flex: 1;"><div style="font-size: 13px; color: #fff;">Форсировать обновление до 3.0</div><div style="font-size: 11px; color: #8A7F76;">старые версии блокируются</div></div></div>
+              <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px;">
+                <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #D8CFC6; border-radius: 10px; padding: 11px; font-size: 13px; cursor: pointer; text-align: center;">📢 Broadcast баннер на главную</div>
+                <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #D8CFC6; border-radius: 10px; padding: 11px; font-size: 13px; cursor: pointer; text-align: center;">🔄 Сбросить кэш приложения</div>
+                <div style="background: rgba(255,138,122,0.12); border: 1px solid rgba(255,138,122,0.28); color: #FF9A8A; border-radius: 10px; padding: 11px; font-size: 13px; cursor: pointer; text-align: center;">🚪 Разлогинить всех</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- feature flags -->
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 12px;">Функции приложения · вкл/выкл удалённо</div>
+          <div style="display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 14px;">
+            <sc-for list="{{ appFeat }}" as="f" hint-placeholder-count="8">
+              <div style="display: flex; align-items: center; gap: 11px; padding: 14px; border-radius: 15px; background: linear-gradient(160deg, rgba(255,255,255,0.075), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 22px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.14);">
+                <span style="font-size: 18px;">{{ f.icon }}</span>
+                <div style="flex: 1;"><div style="font-size: 13px; color: #fff; font-weight: 600;">{{ f.name }}</div><div style="font-size: 10.5px; color: {{ f.stFg }};">{{ f.stTxt }}</div></div>
+                <div onClick="{{ f.toggle }}" style="width: 38px; height: 22px; flex-shrink: 0; border-radius: 999px; background: {{ f.swBg }}; position: relative; cursor: pointer;"><div style="position: absolute; top: 2px; left: {{ f.knob }}; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: left .2s;"></div></div>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- sent push -->
+          <div style="border-radius: 18px; overflow: hidden; background: linear-gradient(160deg, rgba(255,255,255,0.075), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+            <div style="display: grid; grid-template-columns: 2fr 1.2fr 1fr 0.7fr; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.09); font-size: 11px; color: #8A7F76;"><span>Отправленные push</span><span>Сегмент</span><span>Когда</span><span>Open</span></div>
+            <sc-for list="{{ sentPush }}" as="p" hint-placeholder-count="3">
+              <div style="display: grid; grid-template-columns: 2fr 1.2fr 1fr 0.7fr; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;"><span style="font-size: 13px; color: #fff;">{{ p.title }}</span><span style="font-size: 12px; color: #B8AEA4;">{{ p.seg }}</span><span style="font-size: 12px; color: #8A7F76;">{{ p.when }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #C6FF3D;">{{ p.open }}</span></div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- ============ CEO AI ============ -->
+        <sc-if value="{{ isCeo }}" hint-placeholder-val="{{ false }}">
+          <div style="position: relative; overflow: hidden; padding: 22px 24px; margin-bottom: 14px; border-radius: 20px; background: linear-gradient(135deg, rgba(255,122,77,0.2), rgba(150,90,230,0.15) 60%, rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(24px) saturate(190%); backdrop-filter: blur(24px) saturate(190%); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 16px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.2);">
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <div style="position: relative; width: 60px; height: 60px; border-radius: 18px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; font-size: 30px; box-shadow: 0 10px 26px rgba(255,91,46,0.5), inset 0 1px 0 rgba(255,255,255,0.4);">🧠<span style="position: absolute; bottom: -3px; right: -3px; width: 16px; height: 16px; border-radius: 50%; background: #4ED17A; border: 2px solid #14100C; box-shadow: 0 0 8px #4ED17A; animation: pulseDot 2s infinite;"></span></div>
+              <div style="flex: 1;">
+                <div style="display: flex; align-items: center; gap: 10px;"><span style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: #fff;">АЛИ · AI-директор</span><span style="background: rgba(78,209,122,0.16); color: #7EE6A0; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 600;">{{ ceoStatus }}</span></div>
+                <div style="font-size: 13px; color: #D8CFC6; margin-top: 4px; max-width: 640px; line-height: 1.5;">Управляю всей экосистемой AliStore: закупки, цены, филиалы, маркетинг и финансы. Цель — рост прибыли и масштабирование сети с минимальным ручным контролем.</div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 11px; color: #B8AEA4; margin-bottom: 7px;">Уровень автономии</div>
+                <div style="display: flex; gap: 6px;">
+                  <sc-for list="{{ autonomy }}" as="a" hint-placeholder-count="3">
+                    <div onClick="{{ a.pick }}" style="padding: 8px 13px; border-radius: 10px; font-size: 12px; cursor: pointer; background: {{ a.bg }}; color: {{ a.color }}; border: 1px solid {{ a.bd }}; box-shadow: {{ a.sh }};">{{ a.label }}</div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 18px;">
+              <sc-for list="{{ ceoImpact }}" as="i" hint-placeholder-count="5">
+                <div style="flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 13px; padding: 11px 13px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);"><div style="font-family: 'Sora'; font-weight: 800; font-size: 19px; color: {{ i.color }};">{{ i.v }}</div><div style="font-size: 10.5px; color: #8A7F76; margin-top: 2px;">{{ i.l }}</div></div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; margin-bottom: 14px;">
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center; margin-bottom: 6px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Поток мышления</span><span style="margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11px; color: #8A7F76;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #4ED17A; box-shadow: 0 0 8px #4ED17A; animation: pulseDot 2s infinite;"></span>live</span></div>
+              <sc-for list="{{ thinking }}" as="t" hint-placeholder-count="5">
+                <div style="display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="font-family: 'JetBrains Mono'; font-size: 11px; color: #857B72; width: 40px; flex-shrink: 0;">{{ t.time }}</span><div style="flex: 1;"><div style="font-size: 13px; color: #EDE6DE; line-height: 1.45;">{{ t.text }}</div><span style="display: inline-block; margin-top: 5px; background: {{ t.tagBg }}; color: {{ t.tagFg }}; border-radius: 5px; padding: 1px 8px; font-size: 10.5px;">{{ t.tag }}</span></div></div>
+              </sc-for>
+            </div>
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 4px;">Цели (OKR)</div>
+              <div style="font-size: 11px; color: #8A7F76; margin-bottom: 14px;">Ведёт автономно</div>
+              <sc-for list="{{ okr }}" as="o" hint-placeholder-count="4">
+                <div style="margin-bottom: 14px;"><div style="display: flex; justify-content: space-between; margin-bottom: 6px;"><span style="font-size: 12.5px; color: #fff;">{{ o.label }}</span><span style="font-family: 'JetBrains Mono'; font-size: 11px; color: {{ o.color }};">{{ o.pct }}</span></div><div style="height: 7px; background: rgba(255,255,255,0.09); border-radius: 999px; overflow: hidden;"><div style="width: {{ o.w }}; height: 100%; background: {{ o.bar }};"></div></div></div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 12px;">Инициативы в работе · ведёт сам</div>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 14px;">
+            <sc-for list="{{ initiatives }}" as="n" hint-placeholder-count="4">
+              <div style="padding: 16px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.16);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;"><span style="font-size: 20px;">{{ n.icon }}</span><span style="margin-left: auto; background: {{ n.stBg }}; color: {{ n.stFg }}; border-radius: 6px; padding: 2px 8px; font-size: 10px;">{{ n.status }}</span></div>
+                <div style="font-size: 13.5px; font-weight: 600; color: #fff; line-height: 1.35;">{{ n.name }}</div>
+                <div style="font-size: 11px; color: #8A7F76; margin-top: 4px; line-height: 1.4;">{{ n.desc }}</div>
+                <div style="height: 6px; background: rgba(255,255,255,0.09); border-radius: 999px; overflow: hidden; margin: 11px 0 7px;"><div style="width: {{ n.w }}; height: 100%; background: linear-gradient(90deg,#FF7A4D,#FF5B2E);"></div></div>
+                <div style="font-size: 11px; color: #B8AEA4;">Дальше: {{ n.next }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px;">
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,138,122,0.09), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,138,122,0.22); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Решения на одобрение</span><sc-if value="{{ autopilot }}" hint-placeholder-val="{{ false }}"><span style="background: rgba(198,255,61,0.14); color: #C6FF3D; border-radius: 6px; padding: 2px 8px; font-size: 10.5px;">автопилот · АЛИ решает сам</span></sc-if><span style="margin-left: auto; background: rgba(255,122,77,0.18); color: #FF9A6E; border-radius: 999px; font-size: 11px; font-weight: 700; padding: 2px 9px;">{{ ceoDecCount }}</span></div>
+              <sc-for list="{{ ceoDecisions }}" as="d" hint-placeholder-count="4">
+                <div style="background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.08); border-radius: 13px; padding: 13px; margin-bottom: 9px;">
+                  <div style="display: flex; align-items: flex-start; gap: 10px;"><div style="flex: 1;"><div style="font-size: 13.5px; color: #fff; font-weight: 600;">{{ d.text }}</div><div style="font-size: 11.5px; color: #8A7F76; margin-top: 3px;">{{ d.detail }}</div></div><span style="background: rgba(198,255,61,0.12); color: #C6FF3D; border-radius: 6px; padding: 2px 8px; font-size: 10.5px; white-space: nowrap;">{{ d.impact }}</span></div>
+                  <div style="display: flex; gap: 8px; margin-top: 11px;"><div onClick="{{ d.approve }}" style="flex: 1; text-align: center; background: linear-gradient(135deg,#8FD40F,#6FA80C); color: #14110E; border-radius: 9px; padding: 8px; font-size: 12.5px; font-weight: 700; cursor: pointer;">✓ Одобрить</div><div onClick="{{ d.reject }}" style="flex: 1; text-align: center; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #B8AEA4; border-radius: 9px; padding: 8px; font-size: 12.5px; cursor: pointer;">Отклонить</div></div>
+                </div>
+              </sc-for>
+              <sc-if value="{{ ceoAllDone }}" hint-placeholder-val="{{ false }}"><div style="text-align: center; padding: 20px; font-size: 13px; color: #7EE6A0;">✓ Все решения обработаны — АЛИ продолжает работу</div></sc-if>
+            </div>
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 3px;">Команда AI-агентов</div>
+              <div style="font-size: 11px; color: #8A7F76; margin-bottom: 12px;">Подчиняются директору</div>
+              <sc-for list="{{ subAgents }}" as="a" hint-placeholder-count="5">
+                <div style="display: flex; align-items: center; gap: 11px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="font-size: 17px;">{{ a.icon }}</span><div style="flex: 1;"><div style="font-size: 13px; color: #fff;">{{ a.name }}</div><div style="font-size: 11px; color: #8A7F76;">{{ a.role }}</div></div><span style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: {{ a.stColor }};"><span style="width: 6px; height: 6px; border-radius: 50%; background: {{ a.dot }};"></span>{{ a.status }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ============ INSIGHTS ============ -->
+        <sc-if value="{{ isInsights }}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px;">
+            <sc-for list="{{ behavior }}" as="b" hint-placeholder-count="6">
+              <div style="padding: 14px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 11px; color: #A79C92;">{{ b.label }}</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 19px; color: {{ b.color }}; margin-top: 7px; white-space: nowrap;">{{ b.value }}</div><div style="font-size: 10.5px; color: #8A7F76; margin-top: 3px;">{{ b.sub }}</div></div>
+            </sc-for>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 14px; padding: 13px 18px; margin-bottom: 14px; border-radius: 16px; background: linear-gradient(160deg, rgba(229,178,60,0.13), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(229,178,60,0.28); box-shadow: 0 10px 28px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.14);">
+            <span style="font-size: 18px;">🛒</span>
+            <div style="flex: 1; font-size: 13px; color: #EDE6DE;">Брошенные корзины за неделю: <b style="color:#E5B23C;">1 380</b> на сумму <b style="color:#E5B23C;">4.2 млн сом</b> · чаще всего бросают на шаге доставки</div>
+            <div style="background: rgba(255,255,255,0.09); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 8px 14px; font-size: 12.5px; color: #fff; cursor: pointer;">Догнать push-скидкой −5% →</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 14px; margin-bottom: 14px;">
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,122,77,0.12), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,122,77,0.25); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Искали — не нашли</span><span style="margin-left: auto; font-size: 11px; color: #FF9A6E;">упущенный спрос · 7 дн</span></div>
+              <div style="font-size: 11px; color: #8A7F76; margin: 4px 0 8px;">Запросы в поиске приложения и сайта</div>
+              <sc-for list="{{ unmet }}" as="u" hint-placeholder-count="4">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><div style="flex: 1;"><div style="font-size: 13px; color: #fff;">{{ u.q }}</div><div style="font-size: 11px; color: #8A7F76;">{{ u.why }}</div></div><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #FF9A6E;">{{ u.n }}</span></div>
+              </sc-for>
+              <div style="font-size: 12px; color: #FF9A6E; margin-top: 10px; cursor: pointer;">Добавить в план закупки →</div>
+            </div>
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center; margin-bottom: 14px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Воронка покупки · приложение + сайт</span><span style="margin-left: auto; font-size: 11px; color: #FF8A7A;">узкое место: карточка → корзина</span></div>
+              <sc-for list="{{ funnel }}" as="f" hint-placeholder-count="5">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                  <span style="font-size: 12px; color: #B8AEA4; width: 92px;">{{ f.label }}</span>
+                  <div style="flex: 1; height: 22px; background: rgba(255,255,255,0.06); border-radius: 7px; overflow: hidden;"><div style="width: {{ f.w }}; height: 100%; background: {{ f.color }}; border-radius: 7px; display: flex; align-items: center; padding-left: 10px; font-family: 'JetBrains Mono'; font-size: 11px; color: #14110E; font-weight: 600; min-width: 52px;">{{ f.n }}</div></div>
+                  <span style="font-family: 'JetBrains Mono'; font-size: 11px; color: {{ f.pctColor }}; width: 44px; text-align: right;">{{ f.pct }}</span>
+                </div>
+              </sc-for>
+              <div style="font-size: 11px; color: #8A7F76; margin-top: 4px;">Проценты — конверсия из предыдущего шага</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 14px;">
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center; margin-bottom: 12px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">RFM-сегменты</span><span style="margin-left: auto; font-size: 11px; color: #8A7F76;">4 210 клиентов</span></div>
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                <sc-for list="{{ rfm }}" as="g" hint-placeholder-count="9">
+                  <div style="background: {{ g.bg }}; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 11px;"><div style="font-family: 'Sora'; font-weight: 800; font-size: 17px; color: {{ g.fg }};">{{ g.n }}</div><div style="font-size: 10.5px; color: #B8AEA4; margin-top: 2px;">{{ g.label }}</div><div style="font-size: 9.5px; color: #8A7F76; margin-top: 2px;">{{ g.hint }}</div></div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="display: flex; align-items: center; margin-bottom: 12px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Голос клиента</span><span style="margin-left: auto; font-size: 11px; color: #8A7F76;">темы отзывов · 30 дн</span></div>
+              <sc-for list="{{ voice }}" as="v" hint-placeholder-count="4">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{ v.color }}; flex-shrink: 0;"></span><span style="font-size: 13px; color: #fff; flex: 1;">{{ v.t }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: {{ v.color }};">{{ v.trend }} {{ v.n }}</span></div>
+              </sc-for>
+              <div style="font-size: 12px; color: #FF9A6E; margin-top: 10px; cursor: pointer;">Все 57 отзывов →</div>
+            </div>
+            <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+              <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 3px;">Сбор данных · механики</div>
+              <div style="font-size: 11px; color: #8A7F76; margin-bottom: 10px;">Что собирает информацию о клиентах</div>
+              <sc-for list="{{ collectors }}" as="c" hint-placeholder-count="6">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><div style="flex: 1;"><div style="font-size: 12.5px; color: #fff;">{{ c.t }}</div><div style="font-size: 10.5px; color: #8A7F76;">{{ c.sub }}</div></div><div onClick="{{ c.toggle }}" style="width: 34px; height: 20px; border-radius: 999px; background: {{ c.swBg }}; position: relative; cursor: pointer; flex-shrink: 0;"><div style="position: absolute; top: 2px; left: {{ c.knob }}; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: left .2s;"></div></div></div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ============ PAYMENTS / QR ============ -->
+        <sc-if value="{{ isPay }}" hint-placeholder-val="{{ false }}">
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px;">
+            <sc-for list="{{ payStats }}" as="p" hint-placeholder-count="4">
+              <div style="padding: 15px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 11px; color: #A79C92;">{{ p.label }}</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 21px; color: {{ p.color }}; margin-top: 7px; white-space: nowrap;">{{ p.value }}</div><div style="font-size: 10.5px; color: #8A7F76; margin-top: 3px;">{{ p.sub }}</div></div>
+            </sc-for>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 14px;">
+            <div>
+              <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+                <div style="display: flex; align-items: center; margin-bottom: 12px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">QR-кошельки</span><span style="margin-left: auto; font-size: 11px; color: #8A7F76;">кассир видит только QR — реквизиты скрыты</span></div>
+                <sc-for list="{{ wallets }}" as="w" hint-placeholder-count="3">
+                  <div onClick="{{ w.sel }}" style="display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 8px; border-radius: 13px; cursor: pointer; background: {{ w.selBg }}; border: 1px solid {{ w.selBd }};">
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-family: 'Sora'; font-weight: 800; font-size: 15px; color: #fff;">{{ w.av }}</div>
+                    <div style="flex: 1;">
+                      <div style="display: flex; align-items: center; gap: 7px;"><span style="font-size: 13.5px; font-weight: 600; color: #fff;">{{ w.name }}</span><sc-if value="{{ w.main }}" hint-placeholder-val="{{ false }}"><span style="background: rgba(198,255,61,0.14); color: #C6FF3D; border-radius: 5px; padding: 1px 7px; font-size: 10px;">основной</span></sc-if><sc-if value="{{ w.personal }}" hint-placeholder-val="{{ false }}"><span style="background: rgba(255,122,77,0.16); color: #FF9A6E; border-radius: 5px; padding: 1px 7px; font-size: 10px;">личный · вне бизнес-счёта</span></sc-if></div>
+                      <div style="font-size: 11px; color: #8A7F76; margin-top: 2px;">{{ w.owner }} · {{ w.num }}</div>
+                    </div>
+                    <div style="text-align: right; margin-right: 4px;"><div style="font-family: 'JetBrains Mono'; font-size: 12.5px; color: #D8CFC6;">{{ w.today }}</div><div style="font-size: 10px; color: #8A7F76;">сегодня</div></div>
+                    <div onClick="{{ w.toggle }}" style="width: 36px; height: 21px; border-radius: 999px; background: {{ w.swBg }}; position: relative; cursor: pointer; flex-shrink: 0;"><div style="position: absolute; top: 2px; left: {{ w.knob }}; width: 17px; height: 17px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: left .2s;"></div></div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="margin-top: 14px; padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+                <div style="display: flex; align-items: center; margin-bottom: 10px;"><span style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Правила маршрутизации</span><span style="margin-left: auto; font-size: 11px; color: #8A7F76;">применяются автоматически на кассе</span></div>
+                <sc-for list="{{ rules }}" as="r" hint-placeholder-count="4">
+                  <div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><div onClick="{{ r.toggle }}" style="width: 36px; height: 21px; border-radius: 999px; background: {{ r.swBg }}; position: relative; cursor: pointer; flex-shrink: 0;"><div style="position: absolute; top: 2px; left: {{ r.knob }}; width: 17px; height: 17px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: left .2s;"></div></div><div style="flex: 1;"><div style="font-size: 13px; color: #fff;">{{ r.text }}</div><div style="font-size: 11px; color: #8A7F76;">{{ r.sub }}</div></div></div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div>
+              <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+                <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff;">Предпросмотр кассы</div>
+                <div style="font-size: 11px; color: #8A7F76; margin: 3px 0 12px;">Что видит кассир и покупатель · POS Центр</div>
+                <div style="background: #FDFBF7; border-radius: 16px; padding: 16px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 #fff;">
+                  <div style="font-size: 12px; color: #6E645C; font-weight: 600;">{{ qrBank }}</div>
+                  <div style="display: inline-block; margin: 10px 0 8px; white-space: pre; font-family: 'JetBrains Mono'; font-size: 12px; line-height: 7.6px; letter-spacing: 0.5px; color: #14110E;">{{ qrText }}</div>
+                  <div style="font-family: 'JetBrains Mono'; font-size: 16px; color: #14110E; font-weight: 600;">156 000 сом</div>
+                  <div style="font-size: 10.5px; color: #8A7F76; margin-top: 3px;">{{ qrNum }}</div>
+                </div>
+                <div style="font-size: 11.5px; color: #B8AEA4; line-height: 1.5; margin-top: 12px; background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 12px;">{{ selNote }}</div>
+              </div>
+              <div style="margin-top: 14px; padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+                <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 12px;">Добавить QR вручную</div>
+                <input value="{{ formName }}" onChange="{{ setFormName }}" placeholder="Название · напр. Мбанк резерв" style="width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 10px 12px; font-size: 13px; color: #fff; outline: none; font-family: 'Golos Text', sans-serif; margin-bottom: 9px;">
+                <input value="{{ formNum }}" onChange="{{ setFormNum }}" placeholder="Номер счёта или телефона" style="width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 10px 12px; font-size: 13px; color: #fff; outline: none; font-family: 'Golos Text', sans-serif; margin-bottom: 11px;">
+                <div style="display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 13px;">
+                  <sc-for list="{{ bankChips }}" as="b" hint-placeholder-count="4">
+                    <div onClick="{{ b.pick }}" style="padding: 7px 13px; border-radius: 999px; font-size: 12px; cursor: pointer; background: {{ b.bg }}; color: {{ b.color }}; border: 1px solid {{ b.bd }};">{{ b.label }}</div>
+                  </sc-for>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; border: 1px dashed rgba(255,255,255,0.2); border-radius: 10px; padding: 11px 12px; margin-bottom: 13px; cursor: pointer;"><span style="font-size: 15px;">🖼️</span><span style="font-size: 12px; color: #8A7F76;">Или загрузите изображение QR из банка</span></div>
+                <div onClick="{{ addWallet }}" style="background: linear-gradient(135deg,#FF7A4D,#E8410F); border-radius: 11px; padding: 12px; text-align: center; color: #fff; font-size: 13.5px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 18px rgba(255,91,46,0.4), inset 0 1px 0 rgba(255,255,255,0.35);">Добавить кошелёк</div>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ============ AI ============ -->
+        <sc-if value="{{ isAI }}" hint-placeholder-val="{{ false }}">
+          <div style="max-width: 720px;">
+            <sc-for list="{{ chat }}" as="c" hint-placeholder-count="4">
+              <div style="display: flex; justify-content: {{ c.align }}; margin-bottom: 12px;"><div style="max-width: 78%; background: {{ c.bg }}; color: {{ c.fg }}; border: 1px solid {{ c.bd }}; border-radius: {{ c.radius }}; padding: 13px 16px; font-size: 14px; line-height: 1.5; box-shadow: 0 6px 18px rgba(0,0,0,0.3);">{{ c.text }}</div></div>
+            </sc-for>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px;">
+              <sc-for list="{{ prompts }}" as="p" hint-placeholder-count="3">
+                <div onClick="{{ p.ask }}" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; padding: 9px 15px; font-size: 13px; color: #FF9A6E; cursor: pointer;">{{ p.label }}</div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:884},&quot;showAiInsight&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Дашборд&quot;},&quot;showAlerts&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Дашборд&quot;},&quot;showLastWeek&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;График выручки&quot;}}">
+class Component extends DCLogic {
+  state = { route:"dash", chat:[{q:false,text:"Я вижу все данные сети в реальном времени. Спросите про деньги, склад, сотрудников, клиентов или задачи."}],
+    whFilter:"all", autonomy:1, decidedCeo:[], ceoActions:37, ceoSaved:2.1,
+    appFeat:[true,true,true,true,false,true,true,true], maint:false, forceUpd:false, pushSegIdx:1,
+    pushTitle:"−10% на аксессуары сегодня", pushText:"Только сегодня: скидка на чехлы, стёкла и зарядки при покупке в приложении.",
+    thinking:[
+      {time:"09:42",text:"iPhone 15 закончится через 2 дня по текущей скорости продаж. Готовлю закупку у лучшего поставщика.",tag:"закупки",tagBg:"rgba(255,122,77,0.14)",tagFg:"#FF9A6E"},
+      {time:"09:40",text:"Филиал Ош: конверсия ниже сети на 18%. Причина — нет кассира после 18:00. Предлагаю найм.",tag:"персонал",tagBg:"rgba(229,178,60,0.14)",tagFg:"#E5B23C"},
+      {time:"09:38",text:"Рост запросов «Redmi Note 13»: 47 поисков за неделю, нет в наличии. Добавил в план закупки.",tag:"спрос",tagBg:"rgba(127,176,236,0.14)",tagFg:"#7FB0EC"},
+      {time:"09:35",text:"12 позиций неконкурентны на маркетплейсе. Рекомендую снижение цены на 4%.",tag:"цены",tagBg:"rgba(181,122,224,0.14)",tagFg:"#B57AE0"},
+      {time:"09:31",text:"Кэш в кассе Ош превысил лимит 300к. Поставил задачу на инкассацию.",tag:"финансы",tagBg:"rgba(198,255,61,0.12)",tagFg:"#C6FF3D"}
+    ],
+    walletSel:0, walletsOn:[true,true,true], extraWallets:[], rulesOn:[true,true,false,true],
+    collectorsOn:[true,true,true,false,true,false], formName:"", formNum:"", formBank:"" };
+  go(r){ this.setState({route:r}); }
+
+  componentDidMount(){ this._ceoTimer=setInterval(()=>this.tickCeo(), 2600); }
+  componentWillUnmount(){ clearInterval(this._ceoTimer); }
+  clock(){ const d=new Date(); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+  tickCeo(){
+    const s=this.state;
+    if(s.route!=="ceo" || s.autonomy===0) return;
+    const pool=[
+      {text:"Продажи Galaxy S24 ускорились +14% — предлагаю дозаказ 15 шт до конца недели.",tag:"закупки",tagBg:"rgba(255,122,77,0.14)",tagFg:"#FF9A6E",save:0.06},
+      {text:"Маркетплейс Wildberries: наши цены на AirPods выше рынка. Скорректировал −3%.",tag:"цены",tagBg:"rgba(181,122,224,0.14)",tagFg:"#B57AE0",save:0.04},
+      {text:"38 клиентов открыли приложение, но не купили за 24ч — запустил push со скидкой.",tag:"маркетинг",tagBg:"rgba(255,138,170,0.14)",tagFg:"#FF9AB8",save:0.03},
+      {text:"Прогноз выручки на завтра: 1.31 млн (±6%). Планирую смены под пиковые часы.",tag:"аналитика",tagBg:"rgba(127,176,236,0.14)",tagFg:"#7FB0EC",save:0},
+      {text:"Поставщик Alfa снизил цену на iPhone на 2% при заказе от 40 шт — фиксирую условие.",tag:"закупки",tagBg:"rgba(255,122,77,0.14)",tagFg:"#FF9A6E",save:0.09},
+      {text:"Филиал Каракол: подобрал 2 помещения, окупаемость 12–14 мес. Готовлю расчёт.",tag:"развитие",tagBg:"rgba(198,255,61,0.12)",tagFg:"#C6FF3D",save:0},
+      {text:"Возвраты AirPods выросли до 3% — вероятен брак партии. Уведомил поставщика.",tag:"качество",tagBg:"rgba(229,178,60,0.14)",tagFg:"#E5B23C",save:0.02},
+      {text:"Кэш в Джалал-Абаде близок к лимиту — запланировал инкассацию на 17:00.",tag:"финансы",tagBg:"rgba(198,255,61,0.12)",tagFg:"#C6FF3D",save:0}
+    ];
+    const ev=pool[Math.floor(Math.random()*pool.length)];
+    const thinking=[{time:this.clock(),text:ev.text,tag:ev.tag,tagBg:ev.tagBg,tagFg:ev.tagFg},...s.thinking].slice(0,8);
+    const patch={thinking, ceoActions:s.ceoActions+1, ceoSaved:Math.round((s.ceoSaved+ev.save)*100)/100};
+    if(s.autonomy===2){ const next=[0,1,2,3].find(i=>!s.decidedCeo.includes(i)); if(next!==undefined && Math.random()<0.55) patch.decidedCeo=[...s.decidedCeo,next]; }
+    this.setState(patch);
+  }
+
+  renderVals(){
+    const s=this.state, r=s.route, R=x=>r===x;
+    const P=this.props;
+
+    const badges={tasks:"3",ceo:String(5-s.decidedCeo.length)};
+    const menuDef=[["dash","Дашборд","▦"],["depts","Все отделы","🗂️"],["appctl","Приложение","📱"],["ceo","AI-директор","🧠"],["insights","Клиент-аналитика","🔬"],["warehouse","Склад","📦"],["finance","Финансы","💰"],["pay","QR-оплаты","🏦"],["tasks","Задачи","✅"],["kpi","KPI и ЗП","📊"],["crm","CRM","👥"],["ai","AI-чат","🤖"]];
+    const menu=menuDef.map(m=>{const on=r===m[0]; return {icon:m[2],label:m[1],go:()=>this.go(m[0]),
+      bg:on?"linear-gradient(180deg, rgba(255,91,46,0.28), rgba(255,91,46,0.08))":"transparent",
+      bd:on?"rgba(255,91,46,0.4)":"transparent",
+      sh:on?"inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 14px rgba(255,91,46,0.22)":"none",
+      color:on?"#fff":"#B8AEA4",weight:on?700:500,
+      hasBadge:!!badges[m[0]] && badges[m[0]]!=="0",badge:badges[m[0]]};});
+
+    const titles={dash:["Дашборд","Обзор сети · вторник, 17 июля"],depts:["Все отделы","Каждый отдел — отдельный экран"],appctl:["Управление приложением","Режим бога · полный контроль над клиентским приложением"],ceo:["AI-директор «АЛИ»","Автономно управляет экосистемой"],insights:["Клиент-аналитика","Всё, что известно о покупателях"],warehouse:["Склад","1 247 позиций · 3 филиала"],finance:["Финансы","Июнь 2026"],pay:["QR-оплаты и кошельки","Маршрутизация платежей по счетам"],tasks:["Задачи","Kanban команды"],kpi:["KPI и зарплаты","Июнь 2026"],crm:["CRM","4 210 клиентов"],ai:["AI-чат","Знает всю систему"]};
+
+    const kpis=[
+      {label:"Выручка сегодня",value:"1.24 млн",color:"#fff",delta:"▲ 12% ко вчера",deltaColor:"#C6FF3D",icon:"💰"},
+      {label:"Чеков",value:"47",color:"#fff",delta:"▲ 5 ко вчера",deltaColor:"#C6FF3D",icon:"🧾"},
+      {label:"Средний чек",value:"26 400",color:"#fff",delta:"▲ 3%",deltaColor:"#C6FF3D",icon:"🛒"},
+      {label:"Наличные в кассе",value:"312к",color:"#fff",delta:"3 филиала",deltaColor:"#8A7F76",icon:"💵"},
+      {label:"Долги / рассрочка",value:"1.8 млн",color:"#fff",delta:"⚠ 6 просрочек",deltaColor:"#FF8A7A",icon:"⏳"},
+      {label:"Маржа",value:"27.4%",color:"#fff",delta:"▲ 1.2 пп",deltaColor:"#C6FF3D",icon:"📈"}
+    ];
+
+    const micro=[
+      {label:"Конверсия",value:"34%",color:"#C6FF3D"},
+      {label:"Возвраты",value:"2.1%",color:"#FF8A7A"},
+      {label:"Новых клиентов",value:"12",color:"#C6FF3D"},
+      {label:"Онлайн-доля",value:"28%",color:"#7FB0EC"},
+      {label:"Ср. время сделки",value:"7 мин",color:"#fff"},
+      {label:"Позиций / чек",value:"1.8",color:"#fff"},
+      {label:"Отмены",value:"3",color:"#E5B23C"},
+      {label:"NPS",value:"72",color:"#C6FF3D"}
+    ];
+    const hoursRaw=[["10",30],["11",48],["12",66],["13",58],["14",80],["15",72],["16",90],["17",104],["18",108],["19",96],["20",70],["21",44]];
+    const hours=hoursRaw.map(h=>({t:h[0],h:h[1]+"px"}));
+    const channels=[
+      {label:"Офлайн · магазины",pct:"58%",w:"58%",color:"#FF7A4D"},
+      {label:"Онлайн · сайт/прил.",pct:"28%",w:"28%",color:"#7FB0EC"},
+      {label:"Маркетплейсы",pct:"14%",w:"14%",color:"#C6FF3D"}
+    ];
+    const cashflow=[
+      {label:"Приход (продажи)",value:"+1 240 000",color:"#C6FF3D"},
+      {label:"Расход (закупки)",value:"−380 000",color:"#FF8A7A"},
+      {label:"Инкассация",value:"−600 000",color:"#8A7F76"},
+      {label:"Остаток в кассах",value:"312 000",color:"#fff"}
+    ];
+    const incoming=[
+      {name:"iPhone 15 ×40",eta:"прибытие через 2 дня",status:"в пути",bg:"rgba(127,176,236,0.15)",fg:"#7FB0EC"},
+      {name:"Galaxy S24 ×20",eta:"прибыло на склад Центр",status:"на приёмке",bg:"rgba(198,255,61,0.12)",fg:"#C6FF3D"},
+      {name:"MacBook Air ×10",eta:"прибытие через 5 дней",status:"оформлено",bg:"rgba(229,178,60,0.15)",fg:"#E5B23C"},
+      {name:"AirPods Pro ×50",eta:"прибытие через 3 дня",status:"в пути",bg:"rgba(127,176,236,0.15)",fg:"#7FB0EC"}
+    ];
+    const service=[
+      {value:"6",label:"Новые заявки",color:"#7FB0EC"},
+      {value:"11",label:"В ремонте",color:"#E5B23C"},
+      {value:"4",label:"Готовы к выдаче",color:"#C6FF3D"},
+      {value:"2",label:"Просрочено",color:"#FF8A7A"}
+    ];
+    const onlineOrders=[
+      {v:"4",label:"Новые",color:"#7FB0EC"},
+      {v:"2",label:"На сборке",color:"#E5B23C"},
+      {v:"6",label:"В доставке",color:"#FF9A6E"},
+      {v:"35",label:"Выдано сегодня",color:"#C6FF3D"}
+    ];
+    const shifts=[
+      {name:"Центр",staff:"4/4",dot:"#4ED17A",color:"#C6FF3D"},
+      {name:"Ош",staff:"2/3",dot:"#E5B23C",color:"#E5B23C"},
+      {name:"Джалал-Абад",staff:"2/2",dot:"#4ED17A",color:"#C6FF3D"}
+    ];
+    const aging=[
+      {bucket:"1–7 дн",who:"3 клиента",sum:"84 000",bg:"rgba(229,178,60,0.15)",fg:"#E5B23C"},
+      {bucket:"8–30 дн",who:"2 клиента",sum:"310 000",bg:"rgba(255,122,77,0.16)",fg:"#FF9A6E"},
+      {bucket:"30+ дн",who:"Т. Максатов",sum:"195 000",bg:"rgba(255,138,122,0.18)",fg:"#FF8A7A"}
+    ];
+    const deadStock=[
+      {name:"iPhone 13 mini",qty:"4 шт · 236к",days:"84 дн"},
+      {name:"Xiaomi Pad 5",qty:"3 шт · 96к",days:"67 дн"},
+      {name:"JBL Flip 5",qty:"6 шт · 154к",days:"55 дн"}
+    ];
+    const audit=[
+      {icon:"🏷️",text:"Скидка выше лимита",meta:"Сайкал · Ош · −12%",n:"2"},
+      {icon:"↩️",text:"Возврат без чека",meta:"Ош · 13:40",n:"1"},
+      {icon:"✖️",text:"Отмена чека",meta:"Центр · 2 продавца",n:"3"}
+    ];
+    const barsRaw=[["Пн",96,84],["Вт",112,98],["Ср",80,90],["Чт",134,108],["Пт",150,122],["Сб",160,140],["Вс",122,112]];
+    const bars=barsRaw.map(b=>({day:b[0],h:b[1]+"px",lh:b[2]+"px"}));
+
+    const branches=[
+      {name:"Центр",rev:"620к",pct:"104%",w:"100%",barColor:"linear-gradient(90deg,#8FD40F,#C6FF3D)",pctColor:"#C6FF3D"},
+      {name:"Ош",rev:"340к",pct:"82%",w:"82%",barColor:"linear-gradient(90deg,#D89A2E,#E5B23C)",pctColor:"#E5B23C"},
+      {name:"Джалал-Абад",rev:"280к",pct:"96%",w:"96%",barColor:"linear-gradient(90deg,#8FD40F,#C6FF3D)",pctColor:"#C6FF3D"}
+    ];
+
+    const topProd=[
+      {name:"iPhone 15",units:"12 шт",rev:"1.32 млн",w:"100%"},
+      {name:"Galaxy S24",units:"9 шт",rev:"899к",w:"68%"},
+      {name:"AirPods Pro 2",units:"24 шт",rev:"598к",w:"45%"},
+      {name:"MacBook Air M2",units:"3 шт",rev:"570к",w:"43%"},
+      {name:"iPad Air",units:"6 шт",rev:"449к",w:"34%"}
+    ];
+
+    const paySeg=[
+      {label:"Наличные",pct:"42%",w:"42%",color:"#C6FF3D"},
+      {label:"Карта",pct:"31%",w:"31%",color:"#7FB0EC"},
+      {label:"Рассрочка",pct:"19%",w:"19%",color:"#E5B23C"},
+      {label:"QR / перевод",pct:"8%",w:"8%",color:"#FF7A4D"}
+    ];
+
+    const cats2=[
+      {name:"Смартфоны",pct:"48%",w:"48%",color:"linear-gradient(90deg,#FF7A4D,#FF5B2E)"},
+      {name:"Ноутбуки",pct:"21%",w:"21%",color:"#7FB0EC"},
+      {name:"Аудио",pct:"14%",w:"14%",color:"#C6FF3D"},
+      {name:"Планшеты",pct:"10%",w:"10%",color:"#E5B23C"},
+      {name:"Часы",pct:"7%",w:"7%",color:"#B57AE0"}
+    ];
+
+    const feed=[
+      {time:"14:32",icon:"🟢",text:"Продажа · iPhone 15",meta:"Центр · Азизбек",amt:"+109 900",amtColor:"#C6FF3D"},
+      {time:"14:20",icon:"↩️",text:"Возврат · AirPods Pro 2",meta:"Ош · Сайкал",amt:"−24 900",amtColor:"#FF8A7A"},
+      {time:"14:05",icon:"🛒",text:"Онлайн-заказ #4102",meta:"Доставка · Бишкек",amt:"+156 000",amtColor:"#C6FF3D"},
+      {time:"13:48",icon:"📦",text:"Приёмка · Galaxy S24 ×20",meta:"Склад Центр",amt:"",amtColor:"#8A7F76"},
+      {time:"13:30",icon:"💳",text:"Рассрочка одобрена",meta:"Нурбек А. · 6 мес",amt:"189 900",amtColor:"#D8CFC6"},
+      {time:"13:12",icon:"🧾",text:"Z-отчёт закрыт",meta:"Джалал-Абад",amt:"",amtColor:"#8A7F76"}
+    ];
+
+    const decisions=[
+      {text:"iPhone 15 — остаток на 2 дня",action:"Оформить закупку 40 шт",color:"#FF5B2E",act:()=>this.go("warehouse")},
+      {text:"Apple Watch S9 — критично, 2 шт",action:"Срочная закупка",color:"#FF8A7A",act:()=>this.go("warehouse")},
+      {text:"Филиал Ош отстаёт −18% по KPI",action:"Открыть KPI",color:"#E5B23C",act:()=>this.go("kpi")},
+      {text:"340 уснувших клиентов",action:"Запустить реактивацию",color:"#7FB0EC",act:()=>this.go("crm")}
+    ];
+
+    const whChipDef=[["all","Все"],["low","Мало остатка"],["critical","Критично"],["phones","Смартфоны"]];
+    const whChips=whChipDef.map(c=>{const on=s.whFilter===c[0];return{label:c[1],pick:()=>this.setState({whFilter:c[0]}),
+      bg:on?"rgba(255,122,77,0.18)":"rgba(255,255,255,0.05)",color:on?"#FF9A6E":"#B8AEA4",bd:on?"rgba(255,122,77,0.3)":"rgba(255,255,255,0.1)"};});
+    const stockAll=[
+      {name:"iPhone 15 128",br:"Центр",qty:"8",qtyColor:"#E5B23C",price:"109 900",status:"мало",bg:"rgba(229,178,60,0.15)",fg:"#E5B23C",f:["low","phones"]},
+      {name:"MacBook Air M2",br:"Центр",qty:"3",qtyColor:"#E5B23C",price:"189 900",status:"мало",bg:"rgba(229,178,60,0.15)",fg:"#E5B23C",f:["low"]},
+      {name:"AirPods Pro 2",br:"Ош",qty:"25",qtyColor:"#C6FF3D",price:"24 900",status:"ок",bg:"rgba(198,255,61,0.12)",fg:"#C6FF3D",f:[]},
+      {name:"Galaxy S24",br:"Центр",qty:"6",qtyColor:"#C6FF3D",price:"99 900",status:"ок",bg:"rgba(198,255,61,0.12)",fg:"#C6FF3D",f:["phones"]},
+      {name:"iPad Air",br:"Джалал-Абад",qty:"5",qtyColor:"#C6FF3D",price:"74 900",status:"ок",bg:"rgba(198,255,61,0.12)",fg:"#C6FF3D",f:[]},
+      {name:"Apple Watch S9",br:"Ош",qty:"2",qtyColor:"#FF8A7A",price:"44 900",status:"критично",bg:"rgba(255,138,122,0.15)",fg:"#FF8A7A",f:["critical","low"]}
+    ];
+    const stock=stockAll.filter(x=>s.whFilter==="all"||x.f.includes(s.whFilter));
+
+    const depts=[
+      {icon:"📦",name:"Складской учёт",desc:"IMEI, остатки, комиссионка",href:"AliStore Складской учёт 3.0.dc.html"},
+      {icon:"💰",name:"Финансы",desc:"касса, ЗП, поставщики",href:"AliStore Финансы 3.0.dc.html"},
+      {icon:"📊",name:"Аналитика",desc:"ABC, когорты, лидборд",href:"AliStore Аналитика 3.0.dc.html"},
+      {icon:"🛒",name:"Закупки",desc:"заказы, приёмка, поставщики",href:"AliStore Закупки 3.0.dc.html"},
+      {icon:"🔧",name:"Сервис-центр",desc:"ремонт, гарантия, подмена",href:"AliStore Сервис-центр 3.0.dc.html"},
+      {icon:"🏷️",name:"Управление товарами",desc:"товары, варианты, бандлы",href:"AliStore Управление товарами 3.0.dc.html"},
+      {icon:"🚚",name:"Логистика",desc:"зоны, слоты, курьеры",href:"AliStore Логистика 3.0.dc.html"},
+      {icon:"👔",name:"HR",desc:"смены, KPI, зарплата",href:"AliStore HR 3.0.dc.html"},
+      {icon:"📣",name:"Маркетинг CMS",desc:"контент, баннеры, акции",href:"AliStore Маркетинг CMS 3.0.dc.html"},
+      {icon:"📈",name:"Маркетинг-центр",desc:"движок роста, автоворонки",href:"AliStore Маркетинг-центр.dc.html"},
+      {icon:"🏬",name:"Операционка точки",desc:"открытие/закрытие, инциденты",href:"AliStore Операционка точки 3.0.dc.html"},
+      {icon:"🧾",name:"POS / касса",desc:"продажа, смена, чеки",href:"AliStore POS 3.0.dc.html"},
+      {icon:"🛡️",name:"Безопасность",desc:"роли, доступы, аудит",href:"AliStore Безопасность 3.0.dc.html"},
+      {icon:"⚖️",name:"Юридическое",desc:"документы, согласия",href:"AliStore Юридическое 3.0.dc.html"}
+    ];
+
+    // ---- APP CONTROL (god mode) ----
+    const appStats=[
+      {label:"Онлайн сейчас",value:"1 284",color:"#C6FF3D"},{label:"DAU",value:"6 410",color:"#fff"},
+      {label:"Установки 7д",value:"312",color:"#C6FF3D"},{label:"Версия",value:"3.0.1",color:"#7FB0EC"},
+      {label:"Crash-free",value:"99.7%",color:"#C6FF3D"},{label:"Push-подписка",value:"68%",color:"#fff"}
+    ];
+    const featDef=[["Trade-in","♻️"],["Рефералы","🤝"],["Рассрочка 0%","💳"],["Отзывы и рейтинги","⭐"],["Тёмная тема","🌙"],["Чат поддержки","💬"],["Сторис","📸"],["Оплата QR","🏦"]];
+    const appFeat=featDef.map((f,i)=>({name:f[0],icon:f[1],on:s.appFeat[i],
+      toggle:()=>{const x=[...s.appFeat];x[i]=!x[i];this.setState({appFeat:x});},
+      swBg:s.appFeat[i]?"#4ED17A":"rgba(255,255,255,0.15)",knob:s.appFeat[i]?"19px":"2px",
+      stFg:s.appFeat[i]?"#7EE6A0":"#8A7F76",stTxt:s.appFeat[i]?"включено":"выключено"}));
+    const segDef=["Все · 4 210","Уснувшие · 340","VIP/Gold · 128","С рассрочкой · 86","Брошенная корзина · 52"];
+    const pushSegs=segDef.map((label,i)=>{const on=s.pushSegIdx===i;return{label,pick:()=>this.setState({pushSegIdx:i}),
+      bg:on?"linear-gradient(135deg,#FF7A4D,#E8410F)":"rgba(255,255,255,0.06)",fg:on?"#fff":"#B8AEA4",bd:on?"rgba(255,255,255,0.25)":"rgba(255,255,255,0.1)"};});
+    const sentPush=[
+      {title:"iPhone 17 Pro Max в наличии",seg:"Все · 4 210",when:"вчера 18:00",open:"42%"},
+      {title:"Ваша рассрочка: платёж 10 авг",seg:"С рассрочкой · 86",when:"вчера 10:00",open:"71%"},
+      {title:"−10%, возвращайтесь",seg:"Уснувшие · 340",when:"2 дня назад",open:"18%"}
+    ];
+
+    // ---- CEO AI ----
+    const autoDef=["Советник","Полу-авто","Автопилот"];
+    const autonomy=autoDef.map((label,i)=>{const on=s.autonomy===i;return{label,pick:()=>this.setState({autonomy:i}),
+      bg:on?"linear-gradient(135deg,#FF7A4D,#E8410F)":"rgba(255,255,255,0.06)",color:on?"#fff":"#B8AEA4",
+      bd:on?"rgba(255,255,255,0.25)":"rgba(255,255,255,0.1)",sh:on?"0 6px 16px rgba(255,91,46,0.4), inset 0 1px 0 rgba(255,255,255,0.3)":"none"};});
+    const ceoStatusMap=["● наблюдает и советует","● предлагает решения","● действует автономно"];
+    const ceoStatus=ceoStatusMap[s.autonomy];
+    const ceoImpact=[
+      {v:"+18%",l:"прибыль с запуска",color:"#C6FF3D"},
+      {v:"−12%",l:"издержки",color:"#C6FF3D"},
+      {v:s.ceoSaved.toFixed(1)+" млн",l:"сэкономлено, сом",color:"#fff"},
+      {v:"4",l:"инициативы",color:"#FF9A6E"},
+      {v:String(s.ceoActions),l:"решений принято",color:"#fff"}
+    ];
+    const thinking=s.thinking;
+    const okr=[
+      {label:"Прибыль сети +25% к Q4",pct:"62%",w:"62%",color:"#C6FF3D",bar:"linear-gradient(90deg,#8FD40F,#C6FF3D)"},
+      {label:"Открыть 4-й филиал (Каракол)",pct:"40%",w:"40%",color:"#FF9A6E",bar:"linear-gradient(90deg,#FF7A4D,#FF5B2E)"},
+      {label:"Онлайн-доля до 40%",pct:"70%",w:"70%",color:"#7FB0EC",bar:"linear-gradient(90deg,#7FB0EC,#5E8FD0)"},
+      {label:"NPS ≥ 75",pct:"96%",w:"96%",color:"#C6FF3D",bar:"linear-gradient(90deg,#8FD40F,#C6FF3D)"}
+    ];
+    const initiatives=[
+      {icon:"🏬",name:"Открытие филиала Каракол",desc:"Анализ локаций, окупаемость ~14 мес",status:"анализ",stBg:"rgba(127,176,236,0.15)",stFg:"#7FB0EC",w:"40%",next:"выбрать помещение"},
+      {icon:"🛒",name:"Выход на маркетплейсы",desc:"Интеграция каталога на 3 площадки",status:"внедрение",stBg:"rgba(229,178,60,0.15)",stFg:"#E5B23C",w:"65%",next:"синхронизация цен"},
+      {icon:"📦",name:"Оптимизация закупок",desc:"Переговоры с 2 поставщиками, −6%",status:"почти готово",stBg:"rgba(198,255,61,0.12)",stFg:"#C6FF3D",w:"80%",next:"подписать договор"},
+      {icon:"💲",name:"Динамические цены",desc:"Модель обучена, A/B на филиале Центр",status:"тест",stBg:"rgba(181,122,224,0.15)",stFg:"#B57AE0",w:"55%",next:"оценить результат A/B"}
+    ];
+    const ceoDecDef=[
+      {text:"⚠ Расхождение сверки: система ≠ банк на 290 сом",detail:"АЛИ поймал через пульт целостности — вероятно комиссия эквайера. Разобрать до закрытия дня.",impact:"блок закрытия"},
+      {text:"Закупка iPhone 15 ×40",detail:"поставщик Alfa · 3.2 млн · лучшая цена из 3",impact:"+2 дня запаса"},
+      {text:"Поднять цену AirPods Pro 2 на +4%",detail:"спрос высокий, конкуренты дороже на 6%",impact:"+48к/мес"},
+      {text:"Нанять вечернего кассира в Ош",detail:"окупаемость 3 недели",impact:"−18% упущенных"},
+      {text:"WhatsApp-реактивация 340 клиентов",detail:"скидка −10%, бюджет 18к",impact:"~40 возвратов"}
+    ];
+    const ceoDecisions=ceoDecDef.map((d,i)=>({...d,
+      approve:()=>this.setState({decidedCeo:[...s.decidedCeo,i]}),
+      reject:()=>this.setState({decidedCeo:[...s.decidedCeo,i]})})).filter((d,i)=>!s.decidedCeo.includes(i));
+    const subAgents=[
+      {icon:"🛍️",name:"Закупщик",role:"остатки, поставщики, переговоры",status:"активен",stColor:"#7EE6A0",dot:"#4ED17A"},
+      {icon:"📣",name:"Маркетолог",role:"кампании, реактивация, акции",status:"активен",stColor:"#7EE6A0",dot:"#4ED17A"},
+      {icon:"📊",name:"Аналитик",role:"спрос, цены, прогнозы",status:"активен",stColor:"#7EE6A0",dot:"#4ED17A"},
+      {icon:"💰",name:"Финансист",role:"кэшфлоу, инкассация, налоги",status:"активен",stColor:"#7EE6A0",dot:"#4ED17A"},
+      {icon:"🎧",name:"Поддержка",role:"отзывы, жалобы, возвраты",status:"обучается",stColor:"#E5B23C",dot:"#E5B23C"}
+    ];
+
+    // ---- CUSTOMER INSIGHTS ----
+    const behavior=[
+      {label:"Активны в прил.",value:"1 840",sub:"за 7 дней",color:"#fff"},
+      {label:"Установок",value:"312",sub:"▲ 24 за неделю",color:"#C6FF3D"},
+      {label:"Ср. сессия",value:"4:12",sub:"минут",color:"#fff"},
+      {label:"Push разрешили",value:"68%",sub:"канал связи",color:"#7FB0EC"},
+      {label:"Повторные",value:"41%",sub:"за 90 дней",color:"#C6FF3D"},
+      {label:"Профиль заполнен",value:"57%",sub:"есть контакты",color:"#E5B23C"}
+    ];
+    const unmet=[
+      {q:"Redmi Note 13",why:"нет в наличии",n:"47"},
+      {q:"PlayStation 5",why:"нет в каталоге",n:"38"},
+      {q:"Наушники до 2000",why:"нет бюджетного сегмента",n:"29"},
+      {q:"iPhone 15 красный",why:"нет цвета",n:"21"}
+    ];
+    const funnel=[
+      {label:"Открыли прил.",n:"12 400",w:"100%",pct:"—",pctColor:"#8A7F76",color:"linear-gradient(90deg,#7FB0EC,#5E8FD0)"},
+      {label:"Смотрели товар",n:"7 100",w:"58%",pct:"57%",pctColor:"#C6FF3D",color:"linear-gradient(90deg,#8FD40F,#C6FF3D)"},
+      {label:"В корзину",n:"2 800",w:"36%",pct:"39%",pctColor:"#FF8A7A",color:"linear-gradient(90deg,#FF9A6E,#FF5B2E)"},
+      {label:"Оформили",n:"1 420",w:"22%",pct:"51%",pctColor:"#C6FF3D",color:"linear-gradient(90deg,#FF7A4D,#E8410F)"},
+      {label:"Оплатили",n:"1 180",w:"16%",pct:"83%",pctColor:"#C6FF3D",color:"linear-gradient(90deg,#8FD40F,#C6FF3D)"}
+    ];
+    const rfm=[
+      {n:"128",label:"Чемпионы",hint:"часто, много",bg:"rgba(198,255,61,0.1)",fg:"#C6FF3D"},
+      {n:"340",label:"Лояльные",hint:"регулярно",bg:"rgba(198,255,61,0.07)",fg:"#C6FF3D"},
+      {n:"210",label:"Перспективные",hint:"растут",bg:"rgba(127,176,236,0.1)",fg:"#7FB0EC"},
+      {n:"96",label:"Новички",hint:"1 покупка",bg:"rgba(127,176,236,0.08)",fg:"#7FB0EC"},
+      {n:"420",label:"Нужно внимание",hint:"снижают",bg:"rgba(229,178,60,0.1)",fg:"#E5B23C"},
+      {n:"180",label:"В зоне риска",hint:"давно нет",bg:"rgba(229,178,60,0.12)",fg:"#E5B23C"},
+      {n:"340",label:"Уснувшие",hint:"60+ дней",bg:"rgba(255,138,122,0.1)",fg:"#FF8A7A"},
+      {n:"88",label:"Потерянные",hint:"90+ дней",bg:"rgba(255,138,122,0.13)",fg:"#FF8A7A"},
+      {n:"128",label:"VIP",hint:"чек >100к",bg:"rgba(181,122,224,0.12)",fg:"#B57AE0"}
+    ];
+    const voice=[
+      {t:"Быстрая доставка",trend:"▲",n:"32",color:"#C6FF3D"},
+      {t:"Хорошие цены",trend:"▲",n:"24",color:"#C6FF3D"},
+      {t:"Очереди на кассе",trend:"▲",n:"14",color:"#FF8A7A"},
+      {t:"Мало моделей Android",trend:"▲",n:"9",color:"#E5B23C"}
+    ];
+    const collDef=[
+      {t:"Программа лояльности",sub:"телефон + история покупок"},
+      {t:"Wi-Fi в магазинах",sub:"вход по номеру телефона"},
+      {t:"Push-уведомления",sub:"поведение в приложении"},
+      {t:"QR-опрос после покупки",sub:"оценка и отзыв"},
+      {t:"Гарантийная регистрация",sub:"модель устройства + контакты"},
+      {t:"Реферальная программа",sub:"связи между клиентами"}
+    ];
+    const collectors=collDef.map((c,i)=>({...c,toggle:()=>{const a=[...s.collectorsOn];a[i]=!a[i];this.setState({collectorsOn:a});},
+      swBg:s.collectorsOn[i]?"#4ED17A":"rgba(255,255,255,0.15)",knob:s.collectorsOn[i]?"16px":"2px"}));
+
+    // ---- QR PAYMENTS ----
+    const payStats=[
+      {label:"Принято по QR сегодня",value:"1.26 млн",sub:"48 платежей",color:"#fff"},
+      {label:"На бизнес-счёт",value:"576к",sub:"отражается в P&L",color:"#C6FF3D"},
+      {label:"На личные счета",value:"680к",sub:"вне бизнес-отчётности",color:"#FF9A6E"},
+      {label:"Активных кошельков",value:String(s.walletsOn.filter(Boolean).length),sub:"наличие маршрутизации",color:"#7FB0EC"}
+    ];
+    const walletBase=[
+      {name:"Оптима · бизнес",owner:"ОсОО AliStore",num:"1250 **** 8842",av:"О",main:true,personal:false,today:"420 000"},
+      {name:"MBank · Нурбек",owner:"Нурбек А.",num:"+996 555 **** 12",av:"M",main:false,personal:true,today:"680 000"},
+      {name:"Demirbank · касса",owner:"ОсОО AliStore",num:"1180 **** 3390",av:"D",main:false,personal:false,today:"156 000"}
+    ];
+    const walletDef=walletBase.concat(s.extraWallets);
+    const wallets=walletDef.map((w,i)=>({...w,sel:()=>this.setState({walletSel:i}),
+      selBg:s.walletSel===i?"rgba(255,122,77,0.12)":"rgba(255,255,255,0.04)",
+      selBd:s.walletSel===i?"rgba(255,122,77,0.3)":"rgba(255,255,255,0.07)",
+      toggle:()=>{const a=[...s.walletsOn];a[i]=!a[i];this.setState({walletsOn:a});},
+      swBg:s.walletsOn[i]?"#4ED17A":"rgba(255,255,255,0.15)",knob:s.walletsOn[i]?"17px":"2px"}));
+    const selW=walletDef[s.walletSel]||walletDef[0];
+    const qrBank=selW.name; const qrNum=selW.num;
+    const qrText="█▀▀▀▀▀█ ▀▄▀ █▀▀▀▀▀█\n█ ███ █ █▀█ █ ███ █\n█ ▀▀▀ █ ▀▄█ █ ▀▀▀ █\n▀▀▀▀▀▀▀ █▄▀ ▀▀▀▀▀▀▀\n█▀▄█▀▄▀▀▄ ▀█▄▀█▄▀█▀\n▀ ▀▀▀▀▀█▄█▀▄█▀▀▄██▀\n█▀▀▀▀▀█ ▄▀█▄ █▀▄█▀▄\n█ ███ █ ▀██▄▀▄▀▀██▀\n█ ▀▀▀ █ █▀▄ ▄██▀▄▀▀";
+    const selNote=selW.personal
+      ? "Платёж уйдёт на личный счёт ("+selW.owner+"). Не отражается в бизнес-отчётности и P&L сети — подходит для крупных сумм."
+      : "Бизнес-счёт. Платёж отражается в финансах сети и попадает в P&L.";
+    const ruleDef=[
+      {text:"Суммы свыше 100 000 → MBank · Нурбек (личный)",sub:"крупные платежи не попадают в бизнес-счёт"},
+      {text:"Онлайн-заказы → Оптима · бизнес",sub:"официальная выручка сети"},
+      {text:"Рассрочка → Demirbank · касса",sub:"партнёрская программа банка"},
+      {text:"По умолчанию → основной кошелёк",sub:"если правила не сработали"}
+    ];
+    const rules=ruleDef.map((rr,i)=>({...rr,toggle:()=>{const a=[...s.rulesOn];a[i]=!a[i];this.setState({rulesOn:a});},
+      swBg:s.rulesOn[i]?"#4ED17A":"rgba(255,255,255,0.15)",knob:s.rulesOn[i]?"17px":"2px"}));
+    const bankList=["Оптима","MBank","Demirbank","Бакай"];
+    const bankChips=bankList.map(b=>({label:b,pick:()=>this.setState({formBank:b}),
+      bg:s.formBank===b?"rgba(255,122,77,0.18)":"rgba(255,255,255,0.05)",
+      color:s.formBank===b?"#FF9A6E":"#B8AEA4",bd:s.formBank===b?"rgba(255,122,77,0.3)":"rgba(255,255,255,0.1)"}));
+    const addWallet=()=>{ if(!s.formName&&!s.formBank)return;
+      const nw={name:(s.formBank||"Банк")+" · "+(s.formName||"кошелёк"),owner:"ОсОО AliStore",num:s.formNum||"— скрыто —",av:(s.formBank||"Б")[0],main:false,personal:false,today:"0"};
+      this.setState({extraWallets:[...s.extraWallets,nw],walletsOn:[...s.walletsOn,true],formName:"",formNum:"",formBank:""}); };
+
+    const pnl=[
+      {label:"Выручка",value:"8 420 000",color:"#fff"},
+      {label:"Себестоимость товаров",value:"−6 100 000",color:"#FF8A7A"},
+      {label:"Валовая прибыль",value:"2 320 000",color:"#C6FF3D"},
+      {label:"Операционные расходы",value:"−1 180 000",color:"#FF8A7A"},
+      {label:"Чистая прибыль",value:"1 140 000",color:"#C6FF3D"}
+    ];
+
+    const columns=[
+      {title:"К выполнению",dot:"#8A7F76",count:"2",cards:[{text:"Инвентаризация склада Центр",tag:"склад",tagBg:"rgba(127,176,236,0.15)",tagFg:"#7FB0EC",who:"Сыдык"},{text:"Обновить витрину новинками",tag:"витрина",tagBg:"rgba(229,178,60,0.15)",tagFg:"#E5B23C",who:"Сайкал"}]},
+      {title:"В работе",dot:"#E5B23C",count:"2",cards:[{text:"Закупка iPhone 15 ×40",tag:"закупка",tagBg:"rgba(255,91,46,0.15)",tagFg:"#FF8A5F",who:"Али"},{text:"Реактивация уснувших",tag:"CRM",tagBg:"rgba(198,255,61,0.12)",tagFg:"#C6FF3D",who:"Тахсир"}]},
+      {title:"Готово",dot:"#C6FF3D",count:"2",cards:[{text:"Приёмка партии AirPods",tag:"склад",tagBg:"rgba(127,176,236,0.15)",tagFg:"#7FB0EC",who:"Риезидин"},{text:"Z-отчёт за вчера",tag:"касса",tagBg:"rgba(198,255,61,0.12)",tagFg:"#C6FF3D",who:"Азизбек"}]}
+    ];
+
+    const staff=[
+      {name:"Азизбек",sales:"620к",kpi:"96%",kpiBg:"rgba(198,255,61,0.12)",kpiFg:"#C6FF3D",bonus:"+13 800",pen:"−1 000",penColor:"#FF8A7A"},
+      {name:"Сайкал",sales:"540к",kpi:"88%",kpiBg:"rgba(198,255,61,0.12)",kpiFg:"#C6FF3D",bonus:"+9 200",pen:"0",penColor:"#8A7F76"},
+      {name:"Сыдык",sales:"410к",kpi:"74%",kpiBg:"rgba(229,178,60,0.15)",kpiFg:"#E5B23C",bonus:"+4 100",pen:"−2 000",penColor:"#FF8A7A"},
+      {name:"Риезидин",sales:"480к",kpi:"82%",kpiBg:"rgba(198,255,61,0.12)",kpiFg:"#C6FF3D",bonus:"+7 400",pen:"0",penColor:"#8A7F76"},
+      {name:"Тахсир",sales:"390к",kpi:"71%",kpiBg:"rgba(229,178,60,0.15)",kpiFg:"#E5B23C",bonus:"+3 800",pen:"0",penColor:"#8A7F76"},
+      {name:"Али",sales:"560к",kpi:"91%",kpiBg:"rgba(198,255,61,0.12)",kpiFg:"#C6FF3D",bonus:"+11 200",pen:"0",penColor:"#8A7F76"}
+    ];
+
+    const crmSeg=[
+      {icon:"👥",count:"4 210",label:"Всего клиентов"},
+      {icon:"⭐",count:"128",label:"VIP / Gold"},
+      {icon:"😴",count:"340",label:"Уснувшие"},
+      {icon:"🎂",count:"19",label:"ДР на неделе"}
+    ];
+
+    const chat=s.chat.map(c=>({text:c.text,align:c.q?"flex-end":"flex-start",
+      bg:c.q?"linear-gradient(135deg,#FF7A4D,#E8410F)":"rgba(255,255,255,0.06)",
+      fg:c.q?"#fff":"#E5DCD3",
+      bd:c.q?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.1)",
+      radius:c.q?"14px 14px 4px 14px":"14px 14px 14px 4px"}));
+    const promptDef=[
+      ["Выручка за сегодня","Сегодня 1.24 млн сом (+12%), 47 чеков, средний чек 26 400. Лучший филиал — Центр (620к, 104% плана)."],
+      ["Что закупить?","Заканчивается iPhone 15 (2 дня) и Apple Watch S9 (критично, 2 шт). Рекомендую закупку на 3.2 млн — оформить?"],
+      ["Лучший продавец","Азизбек: 620к продаж, KPI 96%. Начислить бонус 13 800 сом?"]
+    ];
+    const prompts=promptDef.map(p=>({label:p[0],ask:()=>{ this.setState({chat:[...this.state.chat,{q:true,text:p[0]},{q:false,text:p[1]}]}); }}));
+
+    return {
+      menu, pageTitle:titles[r][0], pageSub:titles[r][1], goAI:()=>this.go("ai"),
+      isDash:R("dash"), isDepts:R("depts"), depts,
+      isAppCtl:R("appctl"), appStats, appFeat, pushSegs, sentPush,
+      pushTitle:s.pushTitle, pushText:s.pushText,
+      setPushTitle:e=>this.setState({pushTitle:e.target.value}), setPushText:e=>this.setState({pushText:e.target.value}),
+      maintOn:s.maint, maintBg:s.maint?"#FF8A7A":"rgba(255,255,255,0.15)", maintKnob:s.maint?"19px":"2px", toggleMaint:()=>this.setState({maint:!s.maint}),
+      forceOn:s.forceUpd, forceBg:s.forceUpd?"#4ED17A":"rgba(255,255,255,0.15)", forceKnob:s.forceUpd?"19px":"2px", toggleForce:()=>this.setState({forceUpd:!s.forceUpd}),
+      isCeo:R("ceo"), isInsights:R("insights"), isPay:R("pay"), isWarehouse:R("warehouse"), isFinance:R("finance"), isTasks:R("tasks"), isKpi:R("kpi"), isCrm:R("crm"), isAI:R("ai"),
+      showAiInsight: P.showAiInsight ?? true, showAlerts: P.showAlerts ?? true, showLastWeek: P.showLastWeek ?? true,
+      kpis, micro, bars, hours, channels, cashflow, incoming, service, onlineOrders, shifts, aging, deadStock, audit, branches, topProd, paySeg, cats2, feed, decisions,
+      whChips, stock, pnl, columns, staff, crmSeg, chat, prompts,
+      autonomy, ceoStatus, ceoImpact, thinking, okr, initiatives, ceoDecisions, ceoDecCount:ceoDecisions.length, ceoAllDone:ceoDecisions.length===0, autopilot:s.autonomy===2, subAgents,
+      behavior, unmet, funnel, rfm, voice, collectors,
+      payStats, wallets, rules, qrBank, qrText, qrNum, selNote, bankChips, addWallet,
+      formName:s.formName, formNum:s.formNum,
+      setFormName:e=>this.setState({formName:e.target.value}), setFormNum:e=>this.setState({formNum:e.target.value}),
+      exportXls:()=>{}
+    };
+  }
+}
+</script>
+</body>
+</html>

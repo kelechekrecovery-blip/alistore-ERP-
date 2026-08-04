@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "gate": "android-app-ui",
+  "command": "npm run android:ui",
+  "executionCommand": "npm run android:ui",
+  "exitCode": 0,
+  "packageCommandSha256": "976b672c6757de21fa7a3aac08211d3640d52c24961c853a21882ea21fbc381e",
+  "sourceTreeSha256": "00840f38304fb58a4f396709da313e9ace7107b31b836b080fd32e13eceb06d0",
+  "sourceCommit": "864bee6b1b0088ed603a2f3a5c9a8c63c6cd9aff",
+  "executionEnvironment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v25.9.0",
+    "gitPath": "/usr/bin/git",
+    "gitSha256": "a961f78075d8e7621ef4f5d764c64ef8a41bf66c0a98ab5cb6ca39b85ce31c93",
+    "npmCliPath": "/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js",
+    "npmCliSha256": "8e5f6f3429f8cdbe693cdc29904e9d5a7b127a494bd15c804bd54c7403bfcbe7",
+    "npmTreeSha256": "e67a8e00660f73aa621c1ddada5d5d28972e5118c50835b29d2731ce5b37a2e2",
+    "scriptShellPath": "/bin/sh",
+    "scriptShellSha256": "a3a314699fd6128c288842c9bbe3c8c82bd9dc22abfa7efad22ac4f6047d5d4f",
+    "nodePath": "/opt/homebrew/Cellar/node/25.9.0_3/bin/node",
+    "nodeSha256": "fba87e4402c55ea4fc7ca9b9838790c32534e3e77c9c7834c37073752d070678",
+    "nodeKegSha256": "65c4bb19d66915f662bc6ae9ba9d8dd7488ee97978105e2bcf288af29e9d0c34",
+    "nodeRuntimeLibrariesSha256": "9c394a51b03c0909bc87e05d2d738b06fda4a2a0500d8d7b9f8f9d39c383819a",
+    "browserPath": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "browserSha256": "8bb3895672713f92b34f0b3b8b5f9e8cf9047c6ad1f5fef7353e529dcee00f7b",
+    "browserAppTreeSha256": "54fa59ca563927b9d4a3e11e9b4676257e39054cce212766a6e15ada9a1d637c",
+    "packageLockSha256": "7c8423cca8cf0eed72f77b7fc2f38bb883db97fee05a88096ea73114d24f7792",
+    "nodeModulesTreeSha256": "4b8d641ec4404162a71e74dfdc454b0180ad26094b18678facfe5fe7ab5ea47e",
+    "playwrightCliPath": "/Users/alistore/Desktop/alistore-erp/node_modules/@playwright/test/cli.js",
+    "playwrightCliSha256": "79e23e6a249176295b8490567daa7717448a75866d6ea6f6b296ff3d23305c69",
+    "playwrightShim": {
+      "path": "/Users/alistore/Desktop/alistore-erp/node_modules/.bin/playwright",
+      "target": "/Users/alistore/Desktop/alistore-erp/node_modules/@playwright/test/cli.js",
+      "linkSha256": "9f09dcf8c128cb5828b07cd0290050ce16035f813a4fa1892bd4c591b5d01ece"
+    },
+    "jestCliPath": "/Users/alistore/Desktop/alistore-erp/node_modules/jest/bin/jest.js",
+    "jestCliSha256": "2a9b435eab8a343bd09fe285b2e2043ff9ff89fae4e1d1f46ba3df28659d8a2c",
+    "jestShim": {
+      "path": "/Users/alistore/Desktop/alistore-erp/node_modules/.bin/jest",
+      "target": "/Users/alistore/Desktop/alistore-erp/node_modules/jest/bin/jest.js",
+      "linkSha256": "4347cb0072e26d934e530c501804a4e292e646e9bd7bcadab22dd636369c2f5a"
+    },
+    "acceptanceDatabaseIdentity": "postgresql://127.0.0.1:5432/alistore_test",
+    "toolchain": "Android Debug Bridge version 1.0.41\nVersion 37.0.0-14910828\nInstalled as /Users/alistore/Library/Android/sdk/platform-tools/adb\nRunning on Darwin 25.3.0 (arm64)"
+  },
+  "executionEnvironmentSha256": "1e54b7f600e9d355151321afce68195b90ebe5c7874c83d88470158ba09aa843",
+  "completedAt": "2026-07-16T18:25:56.228Z"
+}

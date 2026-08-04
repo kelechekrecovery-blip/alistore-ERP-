@@ -1,0 +1,606 @@
+import XCTest
+
+@MainActor
+final class AliStoreClientUITests: XCTestCase {
+    override func setUp() async throws {
+        continueAfterFailure = false
+        terminateOtherAliStoreApps()
+    }
+
+    private func terminateOtherAliStoreApps() {
+        ["kg.alistore.staff", "kg.alistore.courier", "kg.alistore.pos"].forEach {
+            XCUIApplication(bundleIdentifier: $0).terminate()
+        }
+    }
+
+    func testShowsPrototypeLoginShellWhenSignedOut() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Войти или создать аккаунт"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.textFields["client-phone"].exists)
+        XCTAssertTrue(app.buttons["Продолжить как гость →"].exists)
+    }
+
+    func testLoginOffersAppleSignInAlongsideCodeChannels() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Войти или создать аккаунт"].waitForExistence(timeout: 10))
+        // Apple стоит рядом с кодом, а не вместо него: телефон остаётся первичным
+        // идентификатором, без него не работают доставка и COD.
+        XCTAssertTrue(app.buttons["client-apple-signin"].exists)
+        XCTAssertTrue(app.textFields["client-phone"].exists)
+        XCTAssertTrue(app.buttons["Продолжить как гость →"].exists)
+
+        // Кнопка не исчезает при переключении канала — она общая для обоих.
+        app.buttons["client-channel-email"].tap()
+        XCTAssertTrue(app.textFields["client-email"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["client-apple-signin"].exists)
+    }
+
+    func testLoginOffersEmailChannelAlongsidePhone() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Войти или создать аккаунт"].waitForExistence(timeout: 10))
+        // Телефон — канал по умолчанию: по нему заводится аккаунт.
+        XCTAssertTrue(app.textFields["client-phone"].exists)
+        XCTAssertFalse(app.textFields["client-email"].exists)
+
+        app.buttons["client-channel-email"].tap()
+
+        let email = app.textFields["client-email"]
+        XCTAssertTrue(email.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.textFields["client-phone"].exists)
+        XCTAssertTrue(app.buttons["client-request-otp"].exists)
+        // Кнопка не активна, пока адрес не похож на адрес.
+        XCTAssertFalse(app.buttons["client-request-otp"].isEnabled)
+
+        email.tap()
+        email.typeText("owner@example.com")
+        XCTAssertTrue(app.buttons["client-request-otp"].isEnabled)
+
+        app.buttons["client-channel-phone"].tap()
+        XCTAssertTrue(app.textFields["client-phone"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.textFields["client-email"].exists)
+    }
+
+    func testAppleEnrollmentIsPhoneFirstCancelableAndKeepsGuestPath() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-apple-enrollment"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Подтвердите номер телефона"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.textFields["client-phone"].exists)
+        XCTAssertFalse(app.buttons["client-channel-email"].exists)
+        XCTAssertFalse(app.buttons["client-apple-signin"].exists)
+        XCTAssertTrue(app.buttons["client-apple-enrollment-cancel"].exists)
+        XCTAssertTrue(app.buttons["Продолжить как гость →"].exists)
+
+        app.buttons["client-apple-enrollment-cancel"].tap()
+        XCTAssertTrue(app.staticTexts["Войти или создать аккаунт"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["client-apple-signin"].exists)
+    }
+
+    func testGuestShellUsesPrototypeNavigation() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["Главная"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Каталог"].exists)
+        XCTAssertTrue(app.buttons["Избранное"].exists)
+        XCTAssertTrue(app.buttons["Корзина"].exists)
+        XCTAssertTrue(app.buttons["Кабинет"].exists)
+    }
+
+    func testProductOpensFromHomeAndFavorites() {
+        let home = XCUIApplication()
+        home.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]
+        home.launch()
+
+        // Главная — первый экран магазина. Карточка здесь была видимой, но
+        // немой: открыть товар можно было только через вкладку «Каталог».
+        let hit = home.buttons["client-product-ui-product-iphone"]
+        XCTAssertTrue(hit.waitForExistence(timeout: 10))
+        hit.firstMatch.tap()
+        XCTAssertTrue(home.staticTexts["Характеристики"].waitForExistence(timeout: 5))
+
+        let favorites = XCUIApplication()
+        favorites.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]
+        favorites.launch()
+        favorites.buttons["Избранное"].tap()
+        XCTAssertTrue(favorites.staticTexts["Избранное"].waitForExistence(timeout: 5))
+        let favouriteCard = favorites.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "client-product-")
+        ).firstMatch
+        XCTAssertTrue(favouriteCard.waitForExistence(timeout: 5))
+        favouriteCard.tap()
+        XCTAssertTrue(favorites.staticTexts["Характеристики"].waitForExistence(timeout: 5))
+    }
+
+    func testCatalogUsesPrototypeFiltersAndSortControls() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]
+        app.launch()
+
+        app.buttons["Каталог"].tap()
+        XCTAssertTrue(app.buttons["Категория: Все"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Только в наличии"].exists)
+        XCTAssertTrue(app.buttons["Сортировка"].exists)
+        XCTAssertTrue(app.staticTexts["Каталог"].exists)
+    }
+
+    func testCatalogExposesExactlyOneSearchEntryPoint() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]
+        app.launch()
+
+        // На главной кнопка поиска в шапке — единственный вход в поиск.
+        let headerSearch = app.buttons["Поиск техники и брендов"]
+        XCTAssertTrue(headerSearch.waitForExistence(timeout: 10))
+
+        app.buttons["Каталог"].tap()
+        XCTAssertTrue(app.buttons["Категория: Все"].waitForExistence(timeout: 10))
+
+        // На каталоге фильтрует поле в ящике навбара, поэтому кнопка шапки,
+        // уводившая на отдельный экран поиска, скрыта: два входа в одну
+        // функцию на одном экране — дефект, а не удобство.
+        XCTAssertTrue(app.searchFields["Техника и бренды"].waitForExistence(timeout: 5))
+        XCTAssertFalse(headerSearch.exists)
+
+        // Возврат на главную возвращает и кнопку.
+        app.buttons["Главная"].tap()
+        XCTAssertTrue(headerSearch.waitForExistence(timeout: 5))
+    }
+
+    func testHeaderRoutesToSearchCompareAndNotifications() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]
+        app.launch()
+
+        app.buttons["Сравнение"].tap()
+        XCTAssertTrue(app.navigationBars["Сравнение"].waitForExistence(timeout: 5))
+        app.buttons["Закрыть"].tap()
+
+        app.buttons["Уведомления"].tap()
+        XCTAssertTrue(app.navigationBars["Уведомления"].waitForExistence(timeout: 5))
+        app.buttons["Закрыть"].tap()
+
+        let search = app.buttons["Поиск техники и брендов"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.tap()
+        XCTAssertTrue(app.navigationBars["Поиск"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Популярные запросы"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["iPhone 15"].exists)
+        XCTAssertTrue(app.buttons["MacBook"].exists)
+        XCTAssertTrue(app.buttons["Б/У"].exists)
+        XCTAssertTrue(app.staticTexts["Результаты"].exists)
+        XCTAssertTrue(app.staticTexts["В наличии"].exists || app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Осталось")).firstMatch.exists)
+    }
+
+    func testSignedInNotificationsUseCustomerInboxShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-account"]
+        app.launch()
+
+        app.buttons["Уведомления"].tap()
+        XCTAssertTrue(app.navigationBars["Уведомления"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Заказ №4102 собирается"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Скоро передадим курьеру"].exists)
+        XCTAssertTrue(app.staticTexts["Цена снизилась"].exists)
+        XCTAssertTrue(app.staticTexts["Apple Watch S9 теперь дешевле на 5 000"].exists)
+        XCTAssertTrue(app.staticTexts["Гарантия скоро истекает"].exists)
+        XCTAssertTrue(app.staticTexts["Начислены бонусы"].exists)
+    }
+
+    func testGuestAccountUsesClientShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest"]
+        app.launch()
+
+        app.buttons["Кабинет"].tap()
+        XCTAssertTrue(app.navigationBars["Кабинет"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Войдите в кабинет"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Получить код"].exists)
+    }
+
+    func testSignedInAccountUsesPrototypeSummaryAndGrid() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-account"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Нурбек"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["GOLD"].exists)
+        XCTAssertTrue(app.staticTexts["Уровень Gold"].exists)
+        XCTAssertTrue(app.staticTexts["4 820 бонусов"].exists)
+        XCTAssertTrue(app.buttons["account-loyalty-card"].exists)
+        XCTAssertTrue(app.staticTexts["Меню"].exists)
+        XCTAssertTrue(app.staticTexts["Мои заказы"].exists)
+        XCTAssertTrue(app.staticTexts["Устройства"].exists)
+        XCTAssertTrue(app.staticTexts["Trade-in"].exists)
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["Офлайн"].exists)
+    }
+
+    func testSignedInOrderStatusUsesPrototypeActions() {
+        let app = launchSignedInAccount()
+        app.staticTexts["Мои заказы"].tap()
+        XCTAssertTrue(app.navigationBars["Мои заказы"].waitForExistence(timeout: 5))
+        let orderCard = app.descendants(matching: .any)["client-order-card-ui-order-2401"]
+        XCTAssertTrue(orderCard.waitForExistence(timeout: 5))
+
+        orderCard.tap()
+        XCTAssertTrue(app.staticTexts["Заказ №4102"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Заказ создан"].exists)
+        XCTAssertTrue(app.staticTexts["Оплата подтверждена"].exists)
+        XCTAssertTrue(app.staticTexts["Собираем заказ"].exists)
+        XCTAssertTrue(app.buttons["order-status-receipt"].exists)
+        XCTAssertTrue(app.buttons["order-status-warranty"].exists)
+        XCTAssertTrue(app.buttons["order-status-whatsapp"].exists)
+        XCTAssertTrue(app.buttons["order-status-cancel"].exists)
+        XCTAssertTrue(app.buttons["order-status-repeat"].exists)
+
+        app.buttons["order-status-repeat"].tap()
+        let repeatMessage = app.staticTexts["order-status-repeat-message"]
+        XCTAssertTrue(repeatMessage.waitForExistence(timeout: 5))
+        XCTAssertFalse(repeatMessage.label.contains("недоступны"))
+    }
+
+    func testSignedInAccountFixturesRenderLoyaltyAndReturns() {
+        let loyaltyApp = launchSignedInAccount()
+        loyaltyApp.buttons["account-loyalty-card"].tap()
+        XCTAssertTrue(loyaltyApp.navigationBars["Бонусы"].waitForExistence(timeout: 5))
+        XCTAssertTrue(loyaltyApp.staticTexts["Бонусы и купоны"].exists)
+        XCTAssertTrue(loyaltyApp.staticTexts["Доступно бонусов"].exists)
+        XCTAssertTrue(loyaltyApp.staticTexts["4,820"].exists || loyaltyApp.staticTexts["4 820"].exists)
+        XCTAssertTrue(loyaltyApp.staticTexts["1 бонус = 1 сом · Gold-уровень"].exists)
+        XCTAssertTrue(loyaltyApp.staticTexts["ALI-GOLD"].exists)
+        XCTAssertTrue(loyaltyApp.staticTexts["DELIVERY-GOLD"].exists)
+
+        let returnsApp = launchSignedInAccount()
+        returnsApp.staticTexts["Возвраты"].tap()
+        XCTAssertTrue(returnsApp.navigationBars["Возвраты"].waitForExistence(timeout: 5))
+        XCTAssertTrue(returnsApp.staticTexts["Возврат товара"].waitForExistence(timeout: 5))
+        XCTAssertTrue(returnsApp.staticTexts["iPhone 15 128 GB Black"].exists)
+        XCTAssertTrue(returnsApp.staticTexts["Заявка принята"].exists)
+        XCTAssertTrue(returnsApp.staticTexts["Проверка товара"].exists)
+        XCTAssertTrue(returnsApp.staticTexts["Возврат денег"].exists)
+        XCTAssertTrue(returnsApp.staticTexts["Причина возврата"].exists)
+        XCTAssertTrue(returnsApp.staticTexts["Не подошёл цвет устройства"].exists)
+        XCTAssertTrue(returnsApp.staticTexts["На проверке"].exists)
+    }
+
+    func testSignedInReturnRequestUsesPrototypeForm() {
+        let app = launchSignedInAccount()
+        app.staticTexts["Возвраты"].tap()
+        XCTAssertTrue(app.navigationBars["Возвраты"].waitForExistence(timeout: 5))
+        app.buttons["Оформить возврат"].tap()
+
+        XCTAssertTrue(app.navigationBars["Оформить возврат"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Возврат товара"].exists)
+        XCTAssertTrue(app.staticTexts["Выберите товар из заказа №4102"].exists)
+        XCTAssertTrue(app.staticTexts["AirPods Pro 2"].exists)
+        // Сумма форматируется через Money.som (ru_KG, неразрывные пробелы).
+        XCTAssertTrue(app.staticTexts["24\u{00A0}900\u{00A0}сом"].exists)
+        XCTAssertTrue(app.staticTexts["Причина возврата"].exists)
+        XCTAssertTrue(app.buttons["return-reason-Не подошёл цвет"].exists)
+        XCTAssertTrue(app.buttons["return-photo-picker"].exists)
+        XCTAssertTrue(app.buttons["return-submit"].exists)
+    }
+
+    func testSignedInAccountFixturesRenderAddressesAndSettings() {
+        let addressesApp = launchSignedInAccount()
+        addressesApp.staticTexts["Адреса"].tap()
+        XCTAssertTrue(addressesApp.navigationBars["Адреса доставки"].waitForExistence(timeout: 5))
+        XCTAssertTrue(addressesApp.staticTexts["Дом"].exists)
+        XCTAssertTrue(addressesApp.staticTexts["основной"].exists)
+        XCTAssertTrue(addressesApp.staticTexts["Бишкек, ул. Киевская, 125, кв. 42"].exists)
+        XCTAssertTrue(addressesApp.buttons["+ Добавить адрес"].exists)
+
+        let settingsApp = launchSignedInAccount()
+        settingsApp.swipeUp()
+        settingsApp.staticTexts["Настройки"].tap()
+        XCTAssertTrue(settingsApp.navigationBars["Настройки"].waitForExistence(timeout: 5))
+        XCTAssertTrue(settingsApp.staticTexts["Профиль"].exists)
+        XCTAssertTrue(settingsApp.textFields["Имя"].value as? String == "Айбек")
+        XCTAssertTrue(settingsApp.staticTexts["Push-уведомления"].exists)
+        XCTAssertTrue(settingsApp.staticTexts["Сервисные сообщения"].exists)
+    }
+
+    func testSignedInSupportUsesPrototypeChannelsAndFaq() {
+        let app = launchSignedInAccount()
+        app.staticTexts["Поддержка"].tap()
+        XCTAssertTrue(app.navigationBars["Поддержка"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["WhatsApp"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Telegram"].exists)
+        XCTAssertTrue(app.staticTexts["Звонок"].exists)
+        XCTAssertTrue(app.staticTexts["Частые вопросы"].exists)
+        XCTAssertTrue(app.staticTexts["Как отследить заказ?"].exists)
+        XCTAssertTrue(app.staticTexts["Условия возврата и обмена"].exists)
+        XCTAssertTrue(app.buttons["support-open-form"].exists)
+
+        app.buttons["support-open-form"].tap()
+        XCTAssertTrue(app.textFields["support-subject"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["support-submit"].exists)
+    }
+
+    func testSignedInTradeInUsesPrototypeEstimator() {
+        let app = launchSignedInAccount()
+        app.staticTexts["Trade-in"].tap()
+        XCTAssertTrue(app.navigationBars["Trade-in"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Trade-in оценка"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Оцените старое устройство за 30 секунд"].exists)
+        XCTAssertTrue(app.staticTexts["iPhone 13 · 128 ГБ"].exists)
+        XCTAssertTrue(app.buttons["tradein-condition-1"].exists)
+        XCTAssertTrue(app.staticTexts["tradein-photo-placeholder"].exists)
+        XCTAssertTrue(app.buttons["tradein-evaluate"].exists)
+
+        app.buttons["tradein-evaluate"].tap()
+        XCTAssertTrue(app.staticTexts["Предварительная оценка"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["28 000–32 000"].exists)
+        XCTAssertTrue(app.buttons["tradein-open-request"].exists)
+        XCTAssertTrue(app.buttons["tradein-save-request"].exists)
+    }
+
+    func testSignedInAccountFixturesRenderDeviceAndWarranty() {
+        let app = launchSignedInAccount()
+        app.staticTexts["Устройства"].tap()
+        XCTAssertTrue(app.navigationBars["Мои устройства"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["iPhone 15 128 GB Black"].exists)
+        XCTAssertTrue(app.staticTexts["IMEI 352099999999001"].exists)
+
+        app.buttons["Открыть гарантию для iPhone 15 128 GB Black"].tap()
+        XCTAssertTrue(app.navigationBars["Гарантия"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Гарантийный талон"].exists)
+        XCTAssertTrue(app.staticTexts["iPhone 15 · 128 ГБ"].exists)
+        XCTAssertTrue(app.staticTexts["Активна"].exists)
+        XCTAssertTrue(app.staticTexts["Обращение в сервис"].exists)
+        XCTAssertTrue(app.buttons["warranty-open-service"].exists)
+        XCTAssertTrue(app.buttons["warranty-receipt"].exists)
+        XCTAssertTrue(app.staticTexts["Что покрывается"].exists)
+        XCTAssertTrue(app.staticTexts["✓ Заводской брак\n✓ Неисправности экрана, батареи\n✗ Механические повреждения, влага"].exists)
+    }
+
+    func testSignedInAccountFixturesRenderEmptyStates() {
+        let loyaltyApp = launchSignedInAccount(arguments: ["--ui-testing-account-empty"])
+        loyaltyApp.buttons["account-loyalty-card"].tap()
+        XCTAssertTrue(loyaltyApp.staticTexts["Бонусов пока нет"].waitForExistence(timeout: 5))
+
+        let returnsApp = launchSignedInAccount(arguments: ["--ui-testing-account-empty"])
+        returnsApp.staticTexts["Возвраты"].tap()
+        XCTAssertTrue(returnsApp.staticTexts["Возвратов пока нет"].waitForExistence(timeout: 5))
+
+        let addressesApp = launchSignedInAccount(arguments: ["--ui-testing-account-empty"])
+        addressesApp.staticTexts["Адреса"].tap()
+        XCTAssertTrue(addressesApp.staticTexts["Адресов пока нет"].waitForExistence(timeout: 5))
+
+        let settingsApp = launchSignedInAccount(arguments: ["--ui-testing-account-empty"])
+        settingsApp.swipeUp()
+        settingsApp.staticTexts["Настройки"].tap()
+        XCTAssertTrue(settingsApp.staticTexts["Настройки пока недоступны"].waitForExistence(timeout: 5))
+
+        let devicesApp = launchSignedInAccount(arguments: ["--ui-testing-account-empty"])
+        devicesApp.staticTexts["Устройства"].tap()
+        XCTAssertTrue(devicesApp.staticTexts["Устройств пока нет"].waitForExistence(timeout: 5))
+    }
+
+    func testSignedInAccountFixturesRenderRetryableErrorState() {
+        let loyaltyApp = launchSignedInAccount(arguments: ["--ui-testing-account-error"])
+        loyaltyApp.buttons["account-loyalty-card"].tap()
+        XCTAssertTrue(loyaltyApp.staticTexts["Данные временно недоступны"].waitForExistence(timeout: 5))
+        XCTAssertTrue(loyaltyApp.buttons["Повторить"].exists)
+
+        let devicesApp = launchSignedInAccount(arguments: ["--ui-testing-account-error"])
+        devicesApp.staticTexts["Устройства"].tap()
+        XCTAssertTrue(devicesApp.staticTexts["Устройства недоступны"].waitForExistence(timeout: 5))
+    }
+
+    func testCheckoutUsesPrototypeStagesAndRequiresCustomerSession() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-checkout"]
+        app.launch()
+
+        app.buttons["Корзина"].tap()
+        XCTAssertTrue(app.staticTexts["Оформление"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Способ получения"].exists)
+        XCTAssertTrue(app.staticTexts["Самовывоз"].exists)
+        XCTAssertTrue(app.staticTexts["Курьер"].exists)
+        XCTAssertTrue(app.staticTexts["Войдите, чтобы оформить заказ"].exists)
+        XCTAssertFalse(app.buttons["Далее"].isEnabled)
+    }
+
+    func testCartRendersItemsQuantityAndCheckoutEntry() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-cart"]
+        app.launch()
+
+        app.buttons["Корзина"].tap()
+        XCTAssertTrue(app.staticTexts["Корзина"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["cart-checkout-button"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Итого"].exists)
+
+        app.buttons["cart-checkout-button"].tap()
+        XCTAssertTrue(app.staticTexts["Оформление"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Способ получения"].exists)
+    }
+
+    func testPaymentResultUsesPrototypeActionsAndReturnsToCatalog() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-payment-result"]
+        app.launch()
+
+        app.buttons["Корзина"].tap()
+        XCTAssertTrue(app.staticTexts["payment-result-title"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Заказ оформлен"].exists)
+        XCTAssertTrue(app.buttons["payment-track-button"].exists)
+
+        app.buttons["payment-catalog-button"].tap()
+        XCTAssertTrue(app.buttons["Каталог"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Каталог"].exists)
+    }
+
+    func testPaymentResultShowsFailureRecoveryActions() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-payment-failure"]
+        app.launch()
+
+        app.buttons["Корзина"].tap()
+        XCTAssertTrue(app.staticTexts["payment-result-title"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Оплата не прошла"].exists)
+        XCTAssertTrue(app.buttons["payment-retry-button"].exists)
+        XCTAssertTrue(app.buttons["payment-support-button"].exists)
+
+        app.buttons["payment-support-button"].tap()
+        XCTAssertTrue(app.navigationBars["Поддержка"].waitForExistence(timeout: 5))
+    }
+
+    func testClientPrototypeVisualEvidencePart1() {
+        let home = launchGuest()
+        capture(home, named: "client-home")
+
+        home.buttons["Каталог"].tap()
+        XCTAssertTrue(home.staticTexts["Каталог"].waitForExistence(timeout: 5))
+        capture(home, named: "client-catalog")
+
+        let productCard = home.buttons["client-product-ui-product-iphone"]
+        XCTAssertTrue(productCard.waitForExistence(timeout: 5))
+        productCard.tap()
+        XCTAssertTrue(home.staticTexts["iPhone 17 Pro Max"].waitForExistence(timeout: 5))
+        capture(home, named: "client-product-detail")
+
+        let favorites = launchGuest()
+        favorites.buttons["Избранное"].tap()
+        XCTAssertTrue(favorites.staticTexts["Избранное"].waitForExistence(timeout: 5))
+        XCTAssertTrue(favorites.staticTexts["iPhone 17 Pro Max"].waitForExistence(timeout: 5))
+        capture(favorites, named: "client-favorites")
+
+        let compare = launchGuest()
+        compare.buttons["Сравнение"].tap()
+        XCTAssertTrue(compare.navigationBars["Сравнение"].waitForExistence(timeout: 5))
+        XCTAssertTrue(compare.staticTexts["До 4 товаров"].waitForExistence(timeout: 5))
+        XCTAssertTrue(compare.staticTexts["iPhone 17 Pro Max"].waitForExistence(timeout: 5))
+        XCTAssertTrue(compare.staticTexts["ЛУЧШАЯ ЦЕНА"].waitForExistence(timeout: 5))
+        capture(compare, named: "client-compare")
+
+        let search = launchGuest()
+        let searchButton = search.buttons["Поиск техники и брендов"]
+        XCTAssertTrue(searchButton.waitForExistence(timeout: 5))
+        searchButton.tap()
+        XCTAssertTrue(search.navigationBars["Поиск"].waitForExistence(timeout: 5))
+        XCTAssertTrue(search.staticTexts["Популярные запросы"].waitForExistence(timeout: 5))
+        XCTAssertTrue(search.buttons["iPhone 15"].exists)
+        XCTAssertTrue(search.staticTexts["Осталось 3 шт"].exists)
+        capture(search, named: "client-search")
+    }
+
+    func testClientPrototypeVisualEvidencePart2() {
+        let cart = XCUIApplication()
+        cart.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-cart", "--ui-testing-visual-evidence"]
+        cart.launch()
+        cart.buttons["Корзина"].tap()
+        XCTAssertTrue(cart.staticTexts["Корзина"].waitForExistence(timeout: 10))
+        capture(cart, named: "client-cart")
+
+        let checkout = XCUIApplication()
+        checkout.launchArguments = ["--ui-testing-signed-in", "--ui-testing-account", "--ui-testing-checkout", "--ui-testing-visual-evidence"]
+        checkout.launch()
+        checkout.buttons["Корзина"].tap()
+        XCTAssertTrue(checkout.staticTexts["Оформление"].waitForExistence(timeout: 10))
+        XCTAssertTrue(checkout.staticTexts["Способ получения"].exists)
+        capture(checkout, named: "client-checkout")
+
+        let account = launchSignedInAccount()
+        capture(account, named: "client-account")
+
+        let orderStatus = launchSignedInAccount()
+        orderStatus.staticTexts["Мои заказы"].tap()
+        XCTAssertTrue(orderStatus.navigationBars["Мои заказы"].waitForExistence(timeout: 5))
+        let orderCard = orderStatus.descendants(matching: .any)["client-order-card-ui-order-2401"]
+        XCTAssertTrue(orderCard.waitForExistence(timeout: 5))
+        orderCard.tap()
+        XCTAssertTrue(orderStatus.staticTexts["Заказ №4102"].waitForExistence(timeout: 5))
+        XCTAssertTrue(orderStatus.buttons["order-status-repeat"].waitForExistence(timeout: 5))
+        capture(orderStatus, named: "client-order-status")
+
+        let devices = launchSignedInAccount()
+        devices.staticTexts["Устройства"].tap()
+        XCTAssertTrue(devices.navigationBars["Мои устройства"].waitForExistence(timeout: 5))
+        XCTAssertTrue(devices.buttons["Открыть гарантию для iPhone 15 128 GB Black"].waitForExistence(timeout: 5))
+        capture(devices, named: "client-devices")
+
+        let loyalty = launchSignedInAccount()
+        loyalty.buttons["account-loyalty-card"].tap()
+        XCTAssertTrue(loyalty.navigationBars["Бонусы"].waitForExistence(timeout: 5))
+        XCTAssertTrue(loyalty.staticTexts["Бонусы и купоны"].waitForExistence(timeout: 5))
+        capture(loyalty, named: "client-loyalty")
+    }
+
+    func testClientPrototypeVisualEvidencePart3() {
+        let returns = launchSignedInAccount()
+        returns.staticTexts["Возвраты"].tap()
+        XCTAssertTrue(returns.navigationBars["Возвраты"].waitForExistence(timeout: 5))
+        XCTAssertTrue(returns.staticTexts["Возврат товара"].waitForExistence(timeout: 5))
+        capture(returns, named: "client-returns")
+
+        let support = launchSignedInAccount()
+        support.staticTexts["Поддержка"].tap()
+        XCTAssertTrue(support.navigationBars["Поддержка"].waitForExistence(timeout: 5))
+        XCTAssertTrue(support.staticTexts["WhatsApp"].waitForExistence(timeout: 5))
+        capture(support, named: "client-support")
+
+        let tradeIn = launchSignedInAccount()
+        tradeIn.staticTexts["Trade-in"].tap()
+        XCTAssertTrue(tradeIn.navigationBars["Trade-in"].waitForExistence(timeout: 5))
+        XCTAssertTrue(tradeIn.buttons["tradein-evaluate"].waitForExistence(timeout: 5))
+        tradeIn.buttons["tradein-evaluate"].tap()
+        XCTAssertTrue(tradeIn.staticTexts["Предварительная оценка"].waitForExistence(timeout: 5))
+        capture(tradeIn, named: "client-trade-in")
+
+        let warranty = launchSignedInAccount()
+        warranty.staticTexts["Устройства"].tap()
+        XCTAssertTrue(warranty.navigationBars["Мои устройства"].waitForExistence(timeout: 5))
+        XCTAssertTrue(warranty.buttons["Открыть гарантию для iPhone 15 128 GB Black"].waitForExistence(timeout: 5))
+        warranty.buttons["Открыть гарантию для iPhone 15 128 GB Black"].tap()
+        XCTAssertTrue(warranty.navigationBars["Гарантия"].waitForExistence(timeout: 5))
+        XCTAssertTrue(warranty.staticTexts["Гарантийный талон"].waitForExistence(timeout: 5))
+        capture(warranty, named: "client-warranty")
+
+        let addresses = launchSignedInAccount()
+        addresses.staticTexts["Адреса"].tap()
+        XCTAssertTrue(addresses.navigationBars["Адреса доставки"].waitForExistence(timeout: 5))
+        XCTAssertTrue(addresses.staticTexts["Бишкек, ул. Киевская, 125, кв. 42"].waitForExistence(timeout: 5))
+        capture(addresses, named: "client-addresses")
+    }
+
+    private func launchSignedInAccount() -> XCUIApplication {
+        launchSignedInAccount(arguments: [])
+    }
+
+    private func launchSignedInAccount(arguments: [String]) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-account"] + arguments
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Нурбек"].waitForExistence(timeout: 10))
+        return app
+    }
+
+    private func launchGuest() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out", "--ui-testing-guest", "--ui-testing-visual-evidence"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Главная"].waitForExistence(timeout: 10))
+        return app
+    }
+
+    private func capture(_ app: XCUIApplication, named name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+}

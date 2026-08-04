@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  LaunchAgent боевого API (порт 4000).
+
+  Зачем: до 23.07.2026 боевой API был дочерним процессом приложения ChatGPT/Codex
+  (цепочка 59978 → 59918 → 59888 → 14785) и умирал вместе с ним, а перезапускать
+  его было некому. Плюс он работал через ts-node — режим разработки. Здесь снято
+  и то и другое: владелец процесса — launchd, запускается собранный dist.
+
+  ПОЧЕМУ node ВЫЗЫВАЕТСЯ НАПРЯМУЮ, А НЕ ЧЕРЕЗ bash-обёртку.
+  Репозиторий лежит в ~/Desktop, а это TCC-защищённая папка. Агент с
+  ProgramArguments = /bin/bash падал с кодом 126: «Operation not permitted».
+  Проверено пробными агентами: под launchd `/bin/bash` к Desktop не пускают,
+  а `node` — пускает, и launchd успешно выставляет сюда WorkingDirectory.
+  Поэтому обёртки на bash здесь принципиально нерабочие, и добавлять их обратно
+  не нужно: это будет стоить ещё одного простоя на диагностику.
+
+  WorkingDirectory обязателен: @nestjs/config читает `.env` относительно cwd.
+  Без него процесс поднимется без DATABASE_URL и JWT_SECRET.
+
+  KeepAlive лечит падение, но не зависание. Зависший процесс держит порт и не
+  отвечает — это работа сторожа scripts/keep-site-up.mjs, который бьёт по
+  health-check и делает launchctl kickstart.
+
+  Активировать только через readiness gate:
+    npm run launch:activate:api
+
+  Снять:
+    launchctl unload ~/Library/LaunchAgents/com.alistore.api.plist
+    rm ~/Library/LaunchAgents/com.alistore.api.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.alistore.api</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/alistore/.local/bin/node</string>
+    <string>/Users/alistore/Desktop/alistore-erp/apps/api/dist/main.js</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/alistore/Desktop/alistore-erp/apps/api</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- Required for production-only security guards and strict startup
+         preflight. Never expose api.ali.kg from a non-production process. -->
+    <key>NODE_ENV</key>
+    <string>production</string>
+    <!-- Sign in with Apple audiences are public identifiers, not secrets.
+         Keep both the web Services ID and native bundle ID here because
+         launchd values take precedence over the production env file. -->
+    <key>APPLE_CLIENT_ID</key>
+    <string>kg.alistore.web,kg.alistore.client</string>
+    <key>PATH</key>
+    <string>/Users/alistore/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <!-- Так же, как в npm-скрипте start:prod. -->
+    <key>NODE_PATH</key>
+    <string>./node_modules</string>
+    <!-- Public tunnel must never expose API documentation or sandbox confirmation. -->
+    <key>API_DOCS_ENABLED</key>
+    <string>false</string>
+    <key>PAYMENTS_SANDBOX_CONFIRM_ENABLED</key>
+    <string>false</string>
+  </dict>
+
+  <!-- Пауза между рестартами: без неё падение на старте (например, недоступный
+       Postgres) превращается в петлю перезапусков на сотни в минуту. -->
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/alistore-api-prod.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/alistore-api-prod.err.log</string>
+</dict>
+</plist>

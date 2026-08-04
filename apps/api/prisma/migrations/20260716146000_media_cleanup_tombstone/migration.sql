@@ -1,0 +1,2 @@
+ALTER TABLE "MediaCleanupTask"
+ADD COLUMN "deletePasses" INTEGER NOT NULL DEFAULT 0;

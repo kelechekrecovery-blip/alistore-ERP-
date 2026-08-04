@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "steps": [
+    {
+      "id": "pos-refund",
+      "packageScript": "ecosystem:pos-refund:e2e"
+    },
+    {
+      "id": "courier-cod",
+      "packageScript": "ecosystem:courier-cod:e2e"
+    },
+    {
+      "id": "service-loaner",
+      "packageScript": "ecosystem:service-loaner:e2e"
+    },
+    {
+      "id": "procurement-sale",
+      "packageScript": "ecosystem:procurement-sale:e2e"
+    }
+  ]
+}

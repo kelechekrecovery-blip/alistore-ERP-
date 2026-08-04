@@ -1,0 +1,66 @@
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { PassportStrategy } from '@nestjs/passport';
+import { ConfigService } from '@nestjs/config';
+import { ExtractJwt, Strategy } from 'passport-jwt';
+import { resolveJwtSecret } from './jwt-secret';
+import {
+  isStaffWebSessionRequest,
+  isWebSessionRequest,
+  readWebCookie,
+  STAFF_ACCESS_COOKIE,
+  WEB_ACCESS_COOKIE,
+} from './web-session';
+
+export interface JwtPayload {
+  sub: string;
+  phone?: string;
+  typ: string;
+  role?: string; // staff tokens carry a role for authorization
+  point?: string;
+  storePointId?: string;
+}
+
+/** What `request.user` becomes after a valid access token. */
+export interface AuthPrincipal {
+  customerId: string;
+  phone?: string;
+  typ: string;
+  role?: string;
+  point?: string;
+  storePointId?: string;
+}
+
+@Injectable()
+export class JwtStrategy extends PassportStrategy(Strategy) {
+  constructor(config: ConfigService) {
+    super({
+      jwtFromRequest: (request) => {
+        const bearer = ExtractJwt.fromAuthHeaderAsBearerToken()(request);
+        if (bearer) return bearer;
+        if (isStaffWebSessionRequest(request)) return readWebCookie(request, STAFF_ACCESS_COOKIE) ?? null;
+        return isWebSessionRequest(request) ? (readWebCookie(request, WEB_ACCESS_COOKIE) ?? null) : null;
+      },
+      ignoreExpiration: false,
+      secretOrKey: resolveJwtSecret(config),
+    });
+  }
+
+  validate(payload: JwtPayload): AuthPrincipal {
+    // Только access-токены. Гостевой capability подписан тем же секретом, но
+    // несёт `typ: 'guest_capability'` и узкий scope; без этой проверки он
+    // проходил `JwtAuthGuard` как полноценный `request.user`. Тот же контракт
+    // уже стоит на WebSocket-пути (`auth.service.ts` verifyAccessToken) —
+    // HTTP-путь его не имел.
+    if (payload.typ !== 'customer' && payload.typ !== 'staff') {
+      throw new UnauthorizedException('access_token_required');
+    }
+    return {
+      customerId: payload.sub,
+      phone: payload.phone,
+      typ: payload.typ,
+      role: payload.role,
+      point: payload.point,
+      storePointId: payload.storePointId,
+    };
+  }
+}

@@ -1,0 +1,477 @@
+{
+  "title": "AliStore supply release gate evidence",
+  "overall": "NOT_READY",
+  "startedAt": "2026-07-30T09:14:16.225Z",
+  "endedAt": "2026-07-30T09:14:16.480Z",
+  "durationSeconds": 0,
+  "planOnly": true,
+  "deploymentPerformed": false,
+  "storeReleasePerformed": false,
+  "git": {
+    "head": "d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c",
+    "status": "M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs"
+  },
+  "commitSnapshots": [
+    {
+      "id": "git_clean_baseline",
+      "head": "d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c",
+      "status": "M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs"
+    },
+    {
+      "id": "pass_1_git_before",
+      "head": "d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c",
+      "status": "M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs"
+    },
+    {
+      "id": "pass_1_git_after",
+      "head": "d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c",
+      "status": "M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs"
+    },
+    {
+      "id": "pass_2_git_before",
+      "head": "d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c",
+      "status": "M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs"
+    },
+    {
+      "id": "pass_2_git_after",
+      "head": "d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c",
+      "status": "M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs"
+    }
+  ],
+  "requiredLifecycleJourneys": [
+    "supply_only",
+    "mixed_pickup",
+    "mixed_courier_readiness",
+    "cancel_before_po",
+    "cancel_after_po",
+    "refund_retry",
+    "partial_handover",
+    "quarantine"
+  ],
+  "results": [
+    {
+      "id": "git_clean_baseline",
+      "status": "FAIL",
+      "detail": "gate requires the same clean commit; head=d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c status=M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs",
+      "command": null,
+      "evidence": {
+        "head": "d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c",
+        "status": "M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs"
+      }
+    },
+    {
+      "id": "pass_1_git_before",
+      "status": "FAIL",
+      "detail": "gate requires the same clean commit; head=d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c status=M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs",
+      "command": null,
+      "evidence": {
+        "head": "d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c",
+        "status": "M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs"
+      }
+    },
+    {
+      "id": "pass_1_supply_feature_flags",
+      "status": "PASS",
+      "detail": "all release-sensitive supply flags are false/unset",
+      "command": null
+    },
+    {
+      "id": "pass_1_prisma_validate",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm exec -w @alistore/api -- prisma validate"
+    },
+    {
+      "id": "pass_1_supply_migration_upgrade",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run test:supply-migration-upgrade -w @alistore/api"
+    },
+    {
+      "id": "pass_1_supply_lifecycle_journeys",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run test -w @alistore/api -- --runInBand test/order-to-order-request.e2e-spec.ts test/order-line-supply.e2e-spec.ts test/order-item-handover.e2e-spec.ts test/supply-quarantine.e2e-spec.ts"
+    },
+    {
+      "id": "pass_1_api_full",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "node scripts/run-isolated-api-tests.mjs"
+    },
+    {
+      "id": "pass_1_web_tests",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run test -w @alistore/web"
+    },
+    {
+      "id": "pass_1_web_build",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run build -w @alistore/web"
+    },
+    {
+      "id": "pass_1_playwright_db_migrations",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "playwright test"
+    },
+    {
+      "id": "pass_1_playwright_postdeploy_indexes",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "playwright test"
+    },
+    {
+      "id": "pass_1_playwright_cross_browser",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "playwright test"
+    },
+    {
+      "id": "pass_1_production_preflight_strict",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run launch:preflight:strict"
+    },
+    {
+      "id": "pass_1_production_readiness_strict",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run launch:readiness:strict"
+    },
+    {
+      "id": "pass_1_secret_scan",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "gitleaks dir --redact --no-banner ."
+    },
+    {
+      "id": "pass_1_dependency_scan",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "osv-scanner scan source -r ."
+    },
+    {
+      "id": "pass_1_ios_xcode_prerequisite",
+      "status": "BLOCKED",
+      "detail": "not probed in --plan mode",
+      "command": "xcodebuild -version"
+    },
+    {
+      "id": "pass_1_ios_swiftlint_prerequisite",
+      "status": "BLOCKED",
+      "detail": "not probed in --plan mode",
+      "command": "swiftlint version"
+    },
+    {
+      "id": "pass_1_ios_build",
+      "status": "BLOCKED",
+      "detail": "Xcode prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "pass_1_ios_test",
+      "status": "BLOCKED",
+      "detail": "Xcode prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "pass_1_ios_ui",
+      "status": "BLOCKED",
+      "detail": "Xcode prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "pass_1_ios_lint",
+      "status": "BLOCKED",
+      "detail": "swiftlint prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "pass_1_android_java_prerequisite",
+      "status": "BLOCKED",
+      "detail": "not probed in --plan mode",
+      "command": "/opt/homebrew/opt/openjdk@17/bin/java -version"
+    },
+    {
+      "id": "pass_1_android_build",
+      "status": "BLOCKED",
+      "detail": "Java 17 prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "pass_1_android_test_lint",
+      "status": "BLOCKED",
+      "detail": "Java 17 prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "pass_1_android_ui",
+      "status": "BLOCKED",
+      "detail": "Java 17 prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "pass_1_git_after",
+      "status": "FAIL",
+      "detail": "gate requires the same clean commit; head=d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c status=M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs",
+      "command": null,
+      "evidence": {
+        "head": "d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c",
+        "status": "M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs"
+      }
+    },
+    {
+      "id": "pass_2_git_before",
+      "status": "FAIL",
+      "detail": "gate requires the same clean commit; head=d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c status=M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs",
+      "command": null,
+      "evidence": {
+        "head": "d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c",
+        "status": "M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs"
+      }
+    },
+    {
+      "id": "pass_2_supply_feature_flags",
+      "status": "PASS",
+      "detail": "all release-sensitive supply flags are false/unset",
+      "command": null
+    },
+    {
+      "id": "pass_2_prisma_validate",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm exec -w @alistore/api -- prisma validate"
+    },
+    {
+      "id": "pass_2_supply_migration_upgrade",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run test:supply-migration-upgrade -w @alistore/api"
+    },
+    {
+      "id": "pass_2_supply_lifecycle_journeys",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run test -w @alistore/api -- --runInBand test/order-to-order-request.e2e-spec.ts test/order-line-supply.e2e-spec.ts test/order-item-handover.e2e-spec.ts test/supply-quarantine.e2e-spec.ts"
+    },
+    {
+      "id": "pass_2_api_full",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "node scripts/run-isolated-api-tests.mjs"
+    },
+    {
+      "id": "pass_2_web_tests",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run test -w @alistore/web"
+    },
+    {
+      "id": "pass_2_web_build",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run build -w @alistore/web"
+    },
+    {
+      "id": "pass_2_playwright_db_migrations",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "playwright test"
+    },
+    {
+      "id": "pass_2_playwright_postdeploy_indexes",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "playwright test"
+    },
+    {
+      "id": "pass_2_playwright_cross_browser",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "playwright test"
+    },
+    {
+      "id": "pass_2_production_preflight_strict",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run launch:preflight:strict"
+    },
+    {
+      "id": "pass_2_production_readiness_strict",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run launch:readiness:strict"
+    },
+    {
+      "id": "pass_2_secret_scan",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "gitleaks dir --redact --no-banner ."
+    },
+    {
+      "id": "pass_2_dependency_scan",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "osv-scanner scan source -r ."
+    },
+    {
+      "id": "pass_2_ios_xcode_prerequisite",
+      "status": "BLOCKED",
+      "detail": "not probed in --plan mode",
+      "command": "xcodebuild -version"
+    },
+    {
+      "id": "pass_2_ios_swiftlint_prerequisite",
+      "status": "BLOCKED",
+      "detail": "not probed in --plan mode",
+      "command": "swiftlint version"
+    },
+    {
+      "id": "pass_2_ios_build",
+      "status": "BLOCKED",
+      "detail": "Xcode prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "pass_2_ios_test",
+      "status": "BLOCKED",
+      "detail": "Xcode prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "pass_2_ios_ui",
+      "status": "BLOCKED",
+      "detail": "Xcode prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "pass_2_ios_lint",
+      "status": "BLOCKED",
+      "detail": "swiftlint prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "pass_2_android_java_prerequisite",
+      "status": "BLOCKED",
+      "detail": "not probed in --plan mode",
+      "command": "/opt/homebrew/opt/openjdk@17/bin/java -version"
+    },
+    {
+      "id": "pass_2_android_build",
+      "status": "BLOCKED",
+      "detail": "Java 17 prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "pass_2_android_test_lint",
+      "status": "BLOCKED",
+      "detail": "Java 17 prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "pass_2_android_ui",
+      "status": "BLOCKED",
+      "detail": "Java 17 prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "pass_2_git_after",
+      "status": "FAIL",
+      "detail": "gate requires the same clean commit; head=d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c status=M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs",
+      "command": null,
+      "evidence": {
+        "head": "d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c",
+        "status": "M .github/workflows/cd-staging.yml\n M .github/workflows/ci.yml\n M .gitignore\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientAuthScreenTest.kt\n M apps/android/core/src/androidTest/java/kg/alistore/core/ClientTradeInScreenTest.kt\n M apps/android/core/src/main/java/kg/alistore/core/ApiClient.kt\n M apps/android/core/src/main/java/kg/alistore/core/AuthSessionManager.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientAuthScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/ClientOrdersScreen.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/CourierSyncWorker.kt\n M apps/android/core/src/main/java/kg/alistore/core/EmailAuth.kt\n M apps/android/core/src/main/java/kg/alistore/core/Models.kt\n M apps/android/core/src/main/java/kg/alistore/core/PosOperationsScreens.kt\n M apps/android/core/src/main/java/kg/alistore/core/StaffSupplyActions.kt\n M apps/android/core/src/test/java/kg/alistore/core/ApiClientTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/AuthSessionManagerTest.kt\n M apps/android/core/src/test/java/kg/alistore/core/EmailAuthFormTest.kt\n M apps/api/jest.config.js\n M apps/api/package.json\n M apps/api/prisma/schema.prisma\n M apps/api/src/approvals/approvals.service.ts\n M apps/api/src/auth/auth.controller.ts\n M apps/api/src/auth/auth.dto.ts\n M apps/api/src/auth/auth.service.ts\n M apps/api/src/auth/smtp-email-otp.sender.ts\n M apps/api/src/auth/social-login.ts\n M apps/api/src/customers/customer-deletion.e2e-spec.ts\n M apps/api/src/pos/pos.service.ts\n M apps/api/src/support/support.service.ts\n M apps/api/src/telegram-agent/telegram-agent.module.ts\n M apps/api/src/telegram-agent/telegram-agent.service.ts\n M apps/api/test/auth-email-otp.e2e-spec.ts\n M apps/api/test/auth-review-login.e2e-spec.ts\n M apps/api/test/auth.e2e-spec.ts\n M apps/api/test/outbox.e2e-spec.ts\n M apps/api/test/pos-sale.e2e-spec.ts\n M apps/api/test/social-auth.spec.ts\n M apps/api/test/telegram-agent.e2e-spec.ts\n M apps/ios/Client/AliStoreClientApp.swift\n M apps/ios/POS/POSOperationsView.swift\n M apps/ios/Shared/CustomerAuthStore.swift\n M apps/ios/Shared/IdempotencyKeys.swift\n M apps/ios/Shared/Models.swift\n M apps/ios/Shared/SecureTokenStore.swift\n M apps/ios/Shared/UITestBootstrap.swift\n M apps/ios/Tests/APIClientTests.swift\n M apps/ios/Tests/CustomerEmailLoginTests.swift\n M apps/ios/Tests/CustomerSocialLoginTests.swift\n M apps/ios/Tests/IdempotencyKeysTests.swift\n M apps/ios/UITests/Client/AliStoreClientUITests.swift\n M apps/web/app/account/orders/[id]/OrderDetailClient.tsx\n M apps/web/app/account/settings/page.tsx\n M apps/web/app/checkout/page.tsx\n M apps/web/app/login/page.tsx\n M apps/web/app/product/[id]/ProductClient.tsx\n M apps/web/components/ProductCard.tsx\n M apps/web/components/mobile/MobileProduct.tsx\n M apps/web/components/mobile/MobileProductCard.tsx\n M apps/web/lib/api/auth.test.ts\n M apps/web/lib/api/auth.ts\n M apps/web/lib/api/orders.ts\n M apps/web/lib/auth.tsx\n M apps/web/lib/cart.tsx\n M docker/web.Dockerfile\n M docs/acceptance/artifacts/supply-release-gate-latest.json\n M e2e/checkout-to-order.spec.ts\n M e2e/web-email-login.spec.ts\n M infra/render.staging.yaml\n M pnpm-workspace.yaml\n M render.yaml\n M scripts/supply-release-gate.mjs\n?? apps/android/core/src/main/java/kg/alistore/core/StableCommandIntentStore.kt\n?? apps/android/core/src/test/java/kg/alistore/core/StableCommandIntentStoreTest.kt\n?? apps/api/prisma/migrations/20260730120000_add_recovery_otp_purpose/migration.sql\n?? apps/api/prisma/migrations/20260730130000_social_enrollment_v2/migration.sql\n?? apps/api/prisma/migrations/20260730140000_auth_security_hardening/migration.sql\n?? apps/api/prisma/migrations/20260730150000_refresh_rotation_grace/migration.sql\n?? apps/api/prisma/migrations/20260730160000_support_ticket_revision/migration.sql\n?? apps/api/prisma/migrations/20260730170000_review_login_guard_constraints/migration.sql\n?? apps/api/scripts/test-supply-migration-upgrade.mjs\n?? apps/api/test/auth-phone-normalization-migration.spec.ts\n?? apps/api/test/auth-review-login-migration.spec.ts\n?? apps/api/test/global-setup.js\n?? apps/api/test/global-setup.spec.ts\n?? apps/api/test/global-teardown.js\n?? apps/api/test/social-auth-v2.spec.ts\n?? apps/web/lib/auth.test.ts\n?? apps/web/lib/order-cancellation-idempotency.test.ts\n?? apps/web/lib/order-cancellation-idempotency.ts\n?? apps/web/lib/to-order.test.ts\n?? apps/web/lib/to-order.ts\n?? config/supply-release-cert-issuer.pem\n?? config/supply-release-cert-policy.json\n?? docs/AUTH-V2-ENGINEERING-PLAN.md\n?? docs/REFRESH-ROTATION-GRACE-ROLLOUT.md\n?? docs/acceptance/artifacts/supply-release-gate-2026-07-30T08-07-07-011Z.json\n?? e2e/web-telegram-enrollment.spec.ts\n?? scripts/__tests__/supply-release-gate.test.mjs"
+      }
+    },
+    {
+      "id": "same_clean_commit_two_full_passes",
+      "status": "FAIL",
+      "detail": "two complete passing gates on one unchanged clean commit were not demonstrated",
+      "command": null,
+      "evidence": {
+        "head": "d731d37bfb51ce9dcd61fde2e9b8f42f43e8775c",
+        "checkpoints": [
+          "git_clean_baseline",
+          "pass_1_git_before",
+          "pass_1_git_after",
+          "pass_2_git_before",
+          "pass_2_git_after"
+        ]
+      }
+    },
+    {
+      "id": "external_payment_gateway",
+      "status": "BLOCKED",
+      "detail": "SUPPLY_GATE_CERT_EVIDENCE is required; environment booleans are never certification evidence",
+      "command": null,
+      "evidence": null
+    },
+    {
+      "id": "external_refund_webhook",
+      "status": "BLOCKED",
+      "detail": "SUPPLY_GATE_CERT_EVIDENCE is required; environment booleans are never certification evidence",
+      "command": null,
+      "evidence": null
+    },
+    {
+      "id": "external_smtp",
+      "status": "BLOCKED",
+      "detail": "SUPPLY_GATE_CERT_EVIDENCE is required; environment booleans are never certification evidence",
+      "command": null,
+      "evidence": null
+    },
+    {
+      "id": "external_sms",
+      "status": "BLOCKED",
+      "detail": "SUPPLY_GATE_CERT_EVIDENCE is required; environment booleans are never certification evidence",
+      "command": null,
+      "evidence": null
+    },
+    {
+      "id": "external_fcm",
+      "status": "BLOCKED",
+      "detail": "SUPPLY_GATE_CERT_EVIDENCE is required; environment booleans are never certification evidence",
+      "command": null,
+      "evidence": null
+    },
+    {
+      "id": "external_apns",
+      "status": "BLOCKED",
+      "detail": "SUPPLY_GATE_CERT_EVIDENCE is required; environment booleans are never certification evidence",
+      "command": null,
+      "evidence": null
+    },
+    {
+      "id": "external_object_storage",
+      "status": "BLOCKED",
+      "detail": "SUPPLY_GATE_CERT_EVIDENCE is required; environment booleans are never certification evidence",
+      "command": null,
+      "evidence": null
+    },
+    {
+      "id": "external_fiscal_ofd",
+      "status": "BLOCKED",
+      "detail": "SUPPLY_GATE_CERT_EVIDENCE is required; environment booleans are never certification evidence",
+      "command": null,
+      "evidence": null
+    },
+    {
+      "id": "external_monitoring",
+      "status": "BLOCKED",
+      "detail": "SUPPLY_GATE_CERT_EVIDENCE is required; environment booleans are never certification evidence",
+      "command": null,
+      "evidence": null
+    },
+    {
+      "id": "external_pos_hardware",
+      "status": "BLOCKED",
+      "detail": "SUPPLY_GATE_CERT_EVIDENCE is required; environment booleans are never certification evidence",
+      "command": null,
+      "evidence": null
+    }
+  ]
+}

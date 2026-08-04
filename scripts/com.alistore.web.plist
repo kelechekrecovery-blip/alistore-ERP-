@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  LaunchAgent боевой витрины (порт 3000).
+
+  Зачем: до 23.07.2026 витрина была процессом-сиротой (PID 1213, PPID 1),
+  запущенным вручную. Супервизора не было — падение оставляло магазин лежать до
+  ручного вмешательства, и это наблюдалось снаружи как 502 на ali.kg.
+
+  node вызывается напрямую, без bash-обёртки — причина та же, что в
+  com.alistore.api.plist: репозиторий в TCC-защищённом ~/Desktop, и под launchd
+  туда пускают node, но не /bin/bash.
+
+
+  ПОЧЕМУ node ВЫЗЫВАЕТСЯ НАПРЯМУЮ, А НЕ ЧЕРЕЗ bash-обёртку.
+  Репозиторий лежит в ~/Desktop — это TCC-защищённая папка. Агент с
+  ProgramArguments = /bin/bash падал с кодом 126 «Operation not permitted»,
+  и сайт при пересадке лёг. Проверено пробными агентами 23.07.2026: под launchd
+  /bin/bash к Desktop не пускают, а node — пускает, и WorkingDirectory сюда
+  выставляется штатно. Обёртки на bash здесь принципиально нерабочие; не
+  возвращайте их — это будет стоить ещё одного простоя на диагностику.
+
+  Установить:
+    cp scripts/com.alistore.web.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.alistore.web.plist
+
+  Снять:
+    launchctl unload ~/Library/LaunchAgents/com.alistore.web.plist
+    rm ~/Library/LaunchAgents/com.alistore.web.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.alistore.web</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/alistore/.local/bin/node</string>
+    <string>/Users/alistore/Desktop/alistore-erp/node_modules/next/dist/bin/next</string>
+    <string>start</string>
+    <string>-p</string>
+    <string>3000</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/alistore/Desktop/alistore-erp/apps/web</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/alistore/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <!-- Клиентские NEXT_PUBLIC_*-значения вшиты на этапе сборки; эта переменная
+         нужна серверным запросам витрины к API. -->
+    <key>NEXT_PUBLIC_API_BASE</key>
+    <string>https://api.ali.kg/api</string>
+  </dict>
+
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/alistore-web-prod.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/alistore-web-prod.err.log</string>
+</dict>
+</plist>

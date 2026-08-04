@@ -3,7 +3,10 @@ import { AuditService } from '../src/audit/audit.service';
 import { UnitsService } from '../src/units/units.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { PaymentsService } from '../src/payments/payments.service';
+import { ApprovalsService } from '../src/approvals/approvals.service';
 import { ConflictError } from '../src/common/errors';
+
+const RUN = `${process.pid}-${Date.now()}`;
 
 /**
  * P0 acceptance tests (🔴) from «AliStore QA Test Scenarios», enforced end-to-end
@@ -25,7 +28,7 @@ describe('Business invariants (integration)', () => {
     const audit = new AuditService(prisma);
     units = new UnitsService(prisma);
     orders = new OrdersService(prisma, audit, units);
-    payments = new PaymentsService(prisma, audit, units);
+    payments = new PaymentsService(prisma, audit, units, new ApprovalsService(prisma, audit));
   });
 
   afterAll(async () => {
@@ -40,7 +43,9 @@ describe('Business invariants (integration)', () => {
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.deviceUnit.deleteMany();
+    await prisma.inventoryMovement.deleteMany();
     await prisma.product.deleteMany();
+    await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
   });
 
@@ -79,7 +84,7 @@ describe('Business invariants (integration)', () => {
     );
     await orders.reserve(o1.id, 'seller');
     await payments.pay(
-      { orderId: o1.id, method: 'cash', amount: 100000 },
+      { orderId: o1.id, method: 'card', amount: 100000, txnId: `invariant-sale-a-${RUN}` },
       'cashier',
     );
 
@@ -118,7 +123,7 @@ describe('Business invariants (integration)', () => {
     );
 
     const err = await payments
-      .pay({ orderId: order.id, method: 'cash', amount: 50000 }, 'cashier')
+      .pay({ orderId: order.id, method: 'cash', amount: 50000, txnId: `invariant-unreserved-${RUN}` }, 'cashier')
       .catch((e) => e);
     expect(err).toBeInstanceOf(ConflictError);
     expect(err.getStatus()).toBe(409);
@@ -145,7 +150,7 @@ describe('Business invariants (integration)', () => {
     );
     await orders.reserve(order.id, 'seller');
     await payments.pay(
-      { orderId: order.id, method: 'cash', amount: 100000 },
+      { orderId: order.id, method: 'card', amount: 100000, txnId: `invariant-sale-b-${RUN}` },
       'cashier',
     );
 

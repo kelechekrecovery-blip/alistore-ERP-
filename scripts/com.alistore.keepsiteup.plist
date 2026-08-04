@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  LaunchAgent-сторож: ловит ЗАВИСШИЕ витрину и API и возвращает их через
+  launchctl kickstart. Упавшие процессы поднимает сам launchd (KeepAlive в
+  com.alistore.api / com.alistore.web) — сторож закрывает то, чего KeepAlive не
+  умеет: живой процесс, который держит порт и не отвечает. Он же ведёт журнал
+  простоев с длительностью и показывает уведомление на экране.
+
+  node вызывается напрямую, без bash. Репозиторий лежит в TCC-защищённом
+  ~/Desktop: агент с /bin/bash падает с кодом 126 «Operation not permitted»,
+  а node туда пускают. Проверено пробными агентами 23.07.2026. Прежний
+  scripts/keep-site-up.sh по этой причине под launchd не работал вовсе и заменён
+  на scripts/keep-site-up.mjs — не возвращайте shell-вариант.
+
+  ВРЕМЕННАЯ мера. Причина простоев и план переезда — в
+  docs/PRODUCTION-ARCHITECTURE-REVIEW.md. Правильное решение: развернуть
+  render.yaml и увести DNS с туннеля; тогда сторож не нужен вовсе.
+
+  ВАЖНО: сторож не спасает от сна. Спящая машина не выполняет ничего, включая
+  этот процесс, а сон от закрытой крышки давал 22ч37м простоя из 52ч (23.07.2026).
+  Обязательное условие: sudo pmset -a disablesleep 1 и ноутбук в зарядке.
+
+  Включить (user-scoped, обратимо):
+    cp scripts/com.alistore.keepsiteup.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.alistore.keepsiteup.plist
+
+  Выключить:
+    launchctl unload ~/Library/LaunchAgents/com.alistore.keepsiteup.plist
+    rm ~/Library/LaunchAgents/com.alistore.keepsiteup.plist
+
+  Путь к репозиторию ниже при необходимости поправьте под свою машину.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.alistore.keepsiteup</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/alistore/.local/bin/node</string>
+    <string>/Users/alistore/Desktop/alistore-erp/scripts/keep-site-up.mjs</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/alistore/Desktop/alistore-erp</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- Скрипт сам крутит цикл раз в минуту; если процесс упадёт — перезапустить. -->
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/alistore/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin</string>
+  </dict>
+
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/alistore-keepalive.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/alistore-keepalive.err.log</string>
+</dict>
+</plist>

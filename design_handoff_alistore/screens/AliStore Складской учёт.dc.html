@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0E0C0A; } ::selection { background: #C6FF3D; color: #14110E; } .sc::-webkit-scrollbar{width:6px;} .sc::-webkit-scrollbar-thumb{background:#2E2822;border-radius:3px;}</style>
+</helmet>
+
+<div style="background: #0E0C0A; font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 60px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #221E19; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+  <div style="max-width: 1120px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">Складской учёт</span>
+      <a href="AliStore Inventory Count.dc.html" style="margin-left: auto; text-decoration: none;"><span style="font-size: 13px; color: #7FB0EC;">Инвентаризация →</span></a>
+    </div>
+    <div class="sc" style="display: flex; gap: 8px; overflow-x: auto; margin-bottom: 20px; padding-bottom: 4px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+        <div onClick="{{ t.pick }}" style="flex-shrink: 0; background: {{ t.bg }}; color: {{ t.fg }}; border: 1px solid {{ t.border }}; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">{{ t.label }}</div>
+      </sc-for>
+    </div>
+
+    <!-- ACCOUNTING TYPE -->
+    <sc-if value="{{ isType }}" hint-placeholder-val="{{ true }}">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+          <div style="font-size: 22px;">🔢</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-top: 8px;">Серийный (по IMEI/SN)</div><div style="font-size: 13px; color: #A79C92; margin-top: 6px; line-height: 1.5;">Техника: телефоны, ноутбуки, часы. Каждая единица уникальна, отслеживается поштучно, гарантия по IMEI.</div>
+          <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #7FB0EC; margin-top: 10px;">iPhone 15 · 8 IMEI на складе</div>
+        </div>
+        <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+          <div style="font-size: 22px;">📦</div><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-top: 8px;">Штучный (количеством)</div><div style="font-size: 13px; color: #A79C92; margin-top: 6px; line-height: 1.5;">Аксессуары: чехлы, стёкла, кабели. Учёт количеством, без серийников, продажа пачкой.</div>
+          <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #7FB0EC; margin-top: 10px;">Чехол iPhone · 38 шт</div>
+        </div>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Тип учёта задаётся на категории. Смешанный чек (телефон по IMEI + чехол количеством) обрабатывается корректно.</div>
+    </sc-if>
+
+    <!-- CONSIGNMENT -->
+    <sc-if value="{{ isConsign }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid #2E2822; font-size: 11px; color: #8A7F76;"><span>Товар</span><span>Владелец</span><span>Комиссия</span><span>Статус</span></div>
+        <sc-for list="{{ consign }}" as="c" hint-placeholder-count="3">
+          <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid #1A1611; align-items: center;"><span style="font-size: 13px; color: #fff;">{{ c.name }}</span><span style="font-size: 12px; color: #A79C92;">{{ c.owner }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #C6FF3D;">{{ c.fee }}</span><span><span style="background: {{ c.bg }}; color: {{ c.fg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ c.status }}</span></span></div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Комиссионный товар (чужой под реализацию): не наша себестоимость, при продаже — выплата владельцу минус комиссия. Отдельно в отчётах.</div>
+    </sc-if>
+
+    <!-- COMPLETENESS -->
+    <sc-if value="{{ isComplete }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width: 560px; background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 4px;">Комплектность при приёмке</div>
+        <div style="font-size: 13px; color: #8A7F76; margin-bottom: 16px;">iPhone 15 · IMEI 35••042 — что в коробке</div>
+        <sc-for list="{{ complete }}" as="c" hint-placeholder-count="4">
+          <div onClick="{{ c.toggle }}" style="display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #1A1611; cursor: pointer;"><span style="width: 22px; height: 22px; border-radius: 7px; border: 2px solid {{ c.on ? '#C6FF3D' : '#3A342E' }}; background: {{ c.on ? '#C6FF3D' : 'transparent' }}; color: #14110E; display: flex; align-items: center; justify-content: center; font-size: 12px;">{{ c.mark }}</span><span style="font-size: 14px; color: #D8CFC6;">{{ c.label }}</span></div>
+        </sc-for>
+        <div style="font-size: 12px; color: #6E645C; margin-top: 14px;">Фиксируется при приёмке и продаже. При возврате сверяется комплект — недостача влияет на возврат/уценку.</div>
+      </div>
+    </sc-if>
+
+    <!-- MISSORT -->
+    <sc-if value="{{ isMissort }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 4px;">Пересортица (пришло не то)</div>
+        <div style="font-size: 13px; color: #8A7F76; margin-bottom: 16px;">При приёмке PO-1182 факт не совпал с заказом.</div>
+        <sc-for list="{{ missort }}" as="m" hint-placeholder-count="2">
+          <div style="background: #100D0B; border: 1px solid #2E2822; border-radius: 12px; padding: 14px; margin-bottom: 10px;"><div style="display: flex; justify-content: space-between;"><span style="font-size: 13px; color: #FF8A7A;">Заказано: {{ m.ordered }}</span><span style="font-size: 13px; color: #E5B23C;">Пришло: {{ m.came }}</span></div><div style="font-size: 12px; color: #8A7F76; margin-top: 6px;">{{ m.action }}</div></div>
+        </sc-for>
+        <div style="display: flex; gap: 10px; margin-top: 6px;"><div style="background: #C6FF3D; color: #14110E; border-radius: 10px; padding: 11px 16px; font-size: 13px; font-weight: 700; cursor: pointer;">Акт пересортицы → поставщику</div></div>
+      </div>
+    </sc-if>
+
+    <!-- MARKDOWN -->
+    <sc-if value="{{ isMarkdown }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid #2E2822; font-size: 11px; color: #8A7F76;"><span>Товар</span><span>Причина</span><span>Было</span><span>Уценка</span></div>
+        <sc-for list="{{ markdown }}" as="m" hint-placeholder-count="3">
+          <div style="display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid #1A1611; align-items: center;"><span style="font-size: 13px; color: #fff;">{{ m.name }}</span><span style="font-size: 12px; color: #A79C92;">{{ m.reason }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #8A7F76; text-decoration: line-through;">{{ m.old }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: #C6FF3D;">{{ m.new }}</span></div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Уценка витринных образцов и товара с дефектом упаковки → отдельный ценник «витринный», approval по глубине скидки, отражение в марже.</div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tab: "type", complete: {0:true,1:true,2:true,3:false} };
+  renderVals() {
+    const t = this.state.tab;
+    const tabDef = [["type","Серийный/штучный"],["consign","Комиссионный"],["complete","Комплектность"],["missort","Пересортица"],["markdown","Уценка"]];
+    const tabs = tabDef.map(x => ({ label: x[1], pick: () => this.setState({ tab: x[0] }),
+      bg: t === x[0] ? "#FF5B2E" : "#16130F", fg: t === x[0] ? "#fff" : "#A79C92", border: t === x[0] ? "#FF5B2E" : "#2E2822" }));
+    const cs = (st,ok) => ({ status:st, bg: ok?"rgba(198,255,61,0.12)":"rgba(229,178,60,0.15)", fg: ok?"#C6FF3D":"#E5B23C" });
+    const consign = [
+      { name:"iPhone 12 (Б/У)", owner:"Клиент Б.", fee:"10%", ...cs("В продаже",true) },
+      { name:"PlayStation 5", owner:"Клиент Т.", fee:"12%", ...cs("В продаже",true) },
+      { name:"MacBook 2019", owner:"Клиент А.", fee:"10%", ...cs("Ожидает",false) }
+    ];
+    const compDef = ["Устройство","Кабель USB-C","Документация","Наушники (комплект)"];
+    const complete = compDef.map((c,i)=>({ label:c, on:!!this.state.complete[i], mark:this.state.complete[i]?"✓":"",
+      toggle:()=>{ const cc={...this.state.complete}; cc[i]=!cc[i]; this.setState({complete:cc}); } }));
+    const missort = [
+      { ordered:"iPhone 15 Синий 256 ×5", came:"iPhone 15 Чёрный 256 ×5", action:"Оприходовать как чёрный или вернуть поставщику" },
+      { ordered:"AirPods Pro ×30", came:"AirPods Pro ×28", action:"Недопоставка 2 шт → претензия поставщику" }
+    ];
+    const markdown = [
+      { name:"iPhone 14 (витрина)", reason:"Витринный образец", old:"74 900", new:"67 900" },
+      { name:"MacBook Air (упаковка)", reason:"Мятая коробка", old:"189 900", new:"179 900" },
+      { name:"AirPods (открытые)", reason:"Возврат, вскрыт", old:"24 900", new:"21 900" }
+    ];
+    return { tabs, isType:t==="type", isConsign:t==="consign", isComplete:t==="complete", isMissort:t==="missort", isMarkdown:t==="markdown",
+      consign, complete, missort, markdown };
+  }
+}
+</script>
+</body>
+</html>

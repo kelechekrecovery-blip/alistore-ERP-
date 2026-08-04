@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0E0C0A; } ::selection { background: #C6FF3D; color: #14110E; } .sc::-webkit-scrollbar{width:6px;} .sc::-webkit-scrollbar-thumb{background:#2E2822;border-radius:3px;}</style>
+</helmet>
+
+<div style="background: #0E0C0A; font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 60px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #221E19; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <div style="max-width: 1180px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">Финансы 2.0</span>
+      <span style="margin-left: auto; font-size: 13px; color: #8A7F76;">Касса · ЗП · поставщики · расходы · валюта</span>
+    </div>
+
+    <!-- tabs -->
+    <div class="sc" style="display: flex; gap: 8px; overflow-x: auto; margin-bottom: 20px; padding-bottom: 4px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="7">
+        <div onClick="{{ t.pick }}" style="flex-shrink: 0; background: {{ t.bg }}; color: {{ t.fg }}; border: 1px solid {{ t.border }}; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">{{ t.label }}</div>
+      </sc-for>
+    </div>
+
+    <!-- INKASSATSIYA -->
+    <sc-if value="{{ isCash }}" hint-placeholder-val="{{ true }}">
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px;">
+        <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 14px; padding: 18px;"><div style="font-size: 12px; color: #8A7F76;">В кассе сейчас</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">437 000</div></div>
+        <div style="background: #221E19; border: 1px solid #2E2822; border-radius: 14px; padding: 18px;"><div style="font-size: 12px; color: #8A7F76;">Лимит кассы</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #E5B23C;">300 000</div></div>
+        <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 14px; padding: 18px;"><div style="font-size: 12px; color: #8A7F76;">К инкассации</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #FF8A7A;">137 000</div></div>
+      </div>
+      <div style="background: #3A1F1C; border: 1px solid #5A2A22; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px;"><span style="font-size: 20px;">⚠️</span><span style="font-size: 13px; color: #FF8A7A;">Превышен лимит кассы на 137 000 сом — требуется инкассация в банк.</span></div>
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 14px;">Кассовые ордера (приход/расход)</div>
+        <sc-for list="{{ orders }}" as="o" hint-placeholder-count="4">
+          <div style="display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #1A1611;"><span style="font-size: 16px;">{{ o.icon }}</span><span style="font-size: 13px; color: #D8CFC6; flex: 1;">{{ o.reason }}</span><span style="font-size: 12px; color: #8A7F76;">{{ o.who }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: {{ o.color }}; width: 100px; text-align: right;">{{ o.amount }}</span></div>
+        </sc-for>
+        <div style="display: flex; gap: 10px; margin-top: 16px;"><div style="background: #C6FF3D; color: #14110E; border-radius: 10px; padding: 11px 16px; font-size: 13px; font-weight: 700; cursor: pointer;">🏦 Инкассация в банк</div><div style="background: #221E19; color: #D8CFC6; border-radius: 10px; padding: 11px 16px; font-size: 13px; cursor: pointer;">+ Приходный ордер</div><div style="background: #221E19; color: #D8CFC6; border-radius: 10px; padding: 11px 16px; font-size: 13px; cursor: pointer;">+ Расходный ордер</div></div>
+      </div>
+    </sc-if>
+
+    <!-- PAYROLL -->
+    <sc-if value="{{ isPayroll }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; overflow: hidden; margin-bottom: 16px;">
+        <div style="display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid #2E2822; font-size: 11px; color: #8A7F76;"><span>Сотрудник</span><span>Оклад</span><span>% продаж</span><span>Бонус KPI</span><span>Штраф</span><span>К выплате</span></div>
+        <sc-for list="{{ payroll }}" as="p" hint-placeholder-count="6">
+          <div style="display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid #1A1611; align-items: center; font-family: 'JetBrains Mono'; font-size: 12px;"><span style="font-family: 'Golos Text'; color: #fff;">{{ p.name }}</span><span style="color: #A79C92;">{{ p.base }}</span><span style="color: #A79C92;">{{ p.pct }}</span><span style="color: #7FD3A0;">{{ p.bonus }}</span><span style="color: #FF8A7A;">{{ p.penalty }}</span><span style="color: #C6FF3D; font-weight: 500;">{{ p.total }}</span></div>
+        </sc-for>
+        <div style="display: flex; align-items: center; padding: 14px 18px; background: #1A1611;"><span style="font-size: 13px; color: #8A7F76;">Итого к выплате за июнь</span><span style="margin-left: auto; font-family: 'Sora'; font-weight: 800; font-size: 20px; color: #C6FF3D;">312 400 сом</span></div>
+      </div>
+      <div style="display: flex; gap: 10px;"><div style="background: #C6FF3D; color: #14110E; border-radius: 11px; padding: 13px 20px; font-size: 14px; font-weight: 700; cursor: pointer;">Провести выплату (ведомость)</div><div style="background: #221E19; color: #D8CFC6; border-radius: 11px; padding: 13px 20px; font-size: 14px; cursor: pointer;">Экспорт ведомости</div></div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Выплата фиксируется в Payment Ledger и Event Ledger, каждый сотрудник видит свой расчётный лист.</div>
+    </sc-if>
+
+    <!-- SUPPLIERS -->
+    <sc-if value="{{ isSuppliers }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 100px; padding: 12px 18px; border-bottom: 1px solid #2E2822; font-size: 11px; color: #8A7F76;"><span>Поставщик</span><span>Счёт</span><span>Сумма</span><span>Срок</span><span></span></div>
+        <sc-for list="{{ bills }}" as="b" hint-placeholder-count="4">
+          <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 100px; padding: 13px 18px; border-bottom: 1px solid #1A1611; align-items: center;"><span style="font-size: 13px; color: #fff;">{{ b.name }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #7FB0EC;">{{ b.inv }}</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #D8CFC6;">{{ b.amount }}</span><span style="font-size: 12px; color: {{ b.dueColor }};">{{ b.due }}</span><span><span style="background: {{ b.payBg }}; color: {{ b.payFg }}; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;">{{ b.payLabel }}</span></span></div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Платёжный календарь: просроченные и близкие к сроку — сверху. Оплата → Payment Ledger.</div>
+    </sc-if>
+
+    <!-- EXPENSES -->
+    <sc-if value="{{ isExpenses }}" hint-placeholder-val="{{ false }}">
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;">
+        <sc-for list="{{ expCats }}" as="e" hint-placeholder-count="4">
+          <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 14px; padding: 16px;"><div style="font-size: 22px;">{{ e.icon }}</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 18px; color: #fff; margin-top: 8px;">{{ e.amount }}</div><div style="font-size: 12px; color: #8A7F76;">{{ e.label }}</div></div>
+        </sc-for>
+      </div>
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;"><div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 8px;">Добавить расход</div><div style="font-size: 13px; color: #8A7F76; line-height: 1.6;">Категория, сумма, дата, фото чека → в P&L и денежный поток. С привязкой к филиалу и подтверждением по лимиту.</div><div style="background: #C6FF3D; color: #14110E; border-radius: 10px; padding: 11px 16px; font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 14px; display: inline-block;">+ Новый расход</div></div>
+    </sc-if>
+
+    <!-- CASHFLOW -->
+    <sc-if value="{{ isCashflow }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px; margin-bottom: 16px;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 16px;">Прогноз денежного потока · 14 дней</div>
+        <div style="display: flex; align-items: flex-end; gap: 6px; height: 160px;">
+          <sc-for list="{{ flow }}" as="f" hint-placeholder-count="14">
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; height: 100%;"><div style="width: 100%; background: {{ f.color }}; border-radius: 4px 4px 0 0; height: {{ f.h }};"></div></div>
+          </sc-for>
+        </div>
+        <div style="font-size: 12px; color: #8A7F76; margin-top: 10px;">🟢 приход · 🔴 расход. AI прогнозирует кассовый разрыв через 12 дней (оплата поставщику X) — рекомендует перенос.</div>
+      </div>
+      <div style="background: #3A1F1C; border: 1px solid #5A2A22; border-radius: 12px; padding: 16px; font-size: 13px; color: #FF8A7A; line-height: 1.5;">⚠️ Прогноз разрыва: 18.07 остаток опустится ниже 0 (−240 000). Перенести оплату поставщику China Direct на 22.07 или ускорить продажи неликвида.</div>
+    </sc-if>
+
+    <!-- CURRENCY + BRANCHES -->
+    <sc-if value="{{ isCurrency }}" hint-placeholder-val="{{ false }}">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 14px;">Курсы валют</div>
+          <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1A1611;"><span style="font-size: 14px; color: #D8CFC6;">USD → сом (закуп)</span><span style="font-family: 'JetBrains Mono'; color: #C6FF3D;">89.40</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1A1611;"><span style="font-size: 14px; color: #D8CFC6;">USD → сом (продажа)</span><span style="font-family: 'JetBrains Mono'; color: #D8CFC6;">90.00</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 10px 0;"><span style="font-size: 14px; color: #D8CFC6;">Переоценка остатка</span><span style="font-family: 'JetBrains Mono'; color: #7FD3A0;">+142 000</span></div>
+          <div style="font-size: 12px; color: #6E645C; margin-top: 10px;">Закуп в $, продажа в сомах. Автопереоценка склада по курсу.</div>
+        </div>
+        <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 20px;">
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 14px;">Взаиморасчёты филиалов</div>
+          <sc-for list="{{ branches }}" as="b" hint-placeholder-count="3">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #1A1611;"><span style="font-size: 13px; color: #D8CFC6; flex: 1;">{{ b.pair }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: {{ b.color }};">{{ b.amount }}</span></div>
+          </sc-for>
+          <div style="background: #C6FF3D; color: #14110E; border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 14px; display: inline-block;">Внутренний перевод</div>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tab: "cash" };
+  renderVals() {
+    const t = this.state.tab;
+    const tabDef = [["cash","Касса и инкассация"],["payroll","Выплата ЗП"],["suppliers","Оплата поставщикам"],["expenses","Расходы"],["cashflow","Денежный поток"],["currency","Валюта и филиалы"]];
+    const tabs = tabDef.map(x => ({ label: x[1], pick: () => this.setState({ tab: x[0] }),
+      bg: t === x[0] ? "#FF5B2E" : "#16130F", fg: t === x[0] ? "#fff" : "#A79C92", border: t === x[0] ? "#FF5B2E" : "#2E2822" }));
+    const orders = [
+      { icon: "📥", reason: "Выручка смены (нал)", who: "Азизбек", amount: "+412 000", color: "#7FD3A0" },
+      { icon: "📤", reason: "Закуп воды/хозтовары", who: "Сайкал", amount: "−2 400", color: "#FF8A7A" },
+      { icon: "📥", reason: "Довнесение размена", who: "Владелец", amount: "+25 000", color: "#7FD3A0" },
+      { icon: "📤", reason: "Аванс сотруднику", who: "Сыдык", amount: "−15 000", color: "#FF8A7A" }
+    ];
+    const payroll = [
+      { name: "Азизбек", base: "40 000", pct: "18 600", bonus: "13 800", penalty: "−1 000", total: "71 400" },
+      { name: "Сайкал", base: "40 000", pct: "16 200", bonus: "9 200", penalty: "0", total: "65 400" },
+      { name: "Сыдык", base: "35 000", pct: "12 300", bonus: "4 100", penalty: "−2 000", total: "49 400" },
+      { name: "Риезидин", base: "38 000", pct: "14 400", bonus: "7 400", penalty: "0", total: "59 800" },
+      { name: "Тахсир", base: "35 000", pct: "11 700", bonus: "3 800", penalty: "0", total: "50 500" },
+      { name: "Али", base: "42 000", pct: "16 800", bonus: "11 200", penalty: "0", total: "70 000" }
+    ];
+    const bill = (name, inv, amount, due, dueColor, overdue) => ({ name, inv, amount, due, dueColor,
+      payLabel: overdue ? "Оплатить!" : "Оплатить", payBg: overdue ? "#FF8A7A" : "#C6FF3D", payFg: "#14110E" });
+    const bills = [
+      bill("China Direct", "INV-4402", "1 240 000", "просрочен 3 дн", "#FF8A7A", true),
+      bill("TechnoImport KG", "INV-4410", "820 000", "завтра", "#E5B23C"),
+      bill("Apple Distributor", "INV-4415", "2 100 000", "через 5 дн", "#8A7F76"),
+      bill("Bishkek Gadgets", "INV-4420", "180 000", "через 9 дн", "#8A7F76")
+    ];
+    const expCats = [
+      { icon: "🏬", amount: "180 000", label: "Аренда" },
+      { icon: "📢", amount: "95 000", label: "Реклама" },
+      { icon: "💡", amount: "34 000", label: "Коммуналка" },
+      { icon: "📦", amount: "28 000", label: "Прочее" }
+    ];
+    const flowRaw = [60,80,45,90,-40,70,55,-120,85,50,-60,95,-240,40];
+    const maxA = 240;
+    const flow = flowRaw.map(v => ({ h: Math.round(Math.abs(v)/maxA*100)+"%", color: v >= 0 ? "#7FD3A0" : "#FF8A7A" }));
+    const branches = [
+      { pair: "Центр → Ош", amount: "+120 000", color: "#7FD3A0" },
+      { pair: "Ош → Склад", amount: "−45 000", color: "#FF8A7A" },
+      { pair: "Джалал-Абад → Центр", amount: "+38 000", color: "#7FD3A0" }
+    ];
+    return { tabs, isCash: t==="cash", isPayroll: t==="payroll", isSuppliers: t==="suppliers", isExpenses: t==="expenses", isCashflow: t==="cashflow", isCurrency: t==="currency",
+      orders, payroll, bills, expCats, flow, branches };
+  }
+}
+</script>
+</body>
+</html>

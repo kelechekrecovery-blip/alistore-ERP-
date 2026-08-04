@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Результаты розыгрыша</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&family=Open+Sans+Condensed:wght@300;700&display=swap">
+<style>
+  :root {
+    --page: #222222;
+    --stage: #444444;
+    --ink: #aaaaaa;
+    --ink-dim: #8d8d8d;
+    --ink-bright: #dedede;
+    --red: 205, 32, 32;
+    --line: #565656;
+    --sunk: rgba(0,0,0,0.24);
+    --good: #7fca9d;
+    --good-bg: rgba(60,140,90,0.16);
+    --bad: #ff9c8c;
+    --bad-bg: rgba(190,60,40,0.16);
+    --warn: #e5c07b;
+    --warn-bg: rgba(160,120,30,0.16);
+    --condensed: "Open Sans Condensed", "Oswald", "Arial Narrow", "Helvetica Neue", sans-serif;
+    --sans: "Open Sans", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--page); }
+  body {
+    margin: 0; min-height: 100vh; background: var(--stage);
+    color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,0.05), transparent 60%),
+      radial-gradient(100% 100% at 50% 100%, rgba(0,0,0,0.45), transparent 65%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 3px);
+  }
+  .wrap { position: relative; z-index: 1; max-width: 48rem; margin-inline: auto;
+          padding: 2.5rem clamp(1rem, 4vw, 3rem) 4rem;
+          display: flex; flex-direction: column; gap: 1.6rem; }
+
+  a { color: #ff8f7d; }
+  .eyebrow { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.12em;
+             text-transform: uppercase; color: var(--ink-dim); margin: 0; }
+  h1 { font-family: var(--condensed); font-weight: 300; color: var(--ink);
+       font-size: clamp(1.9rem, 1.3rem + 2.4vw, 2.9rem); line-height: 1.1; margin: 0.3rem 0 0.4rem; }
+  .sub { margin: 0; color: var(--ink-dim); font-size: 0.9rem; }
+
+  .card { background: var(--sunk); border: 1px solid var(--line); border-radius: 2px;
+          padding: 1.2rem; display: flex; flex-direction: column; gap: 0.9rem; }
+  .card h2 { font-family: var(--condensed); font-weight: 400; font-size: 1.3rem;
+             color: var(--ink-bright); margin: 0; letter-spacing: 0.01em; }
+
+  .winner { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 0.9rem;
+            padding: 0.55rem 0; border-bottom: 1px solid var(--line); }
+  .winner:last-child { border-bottom: none; }
+  .winner .place { font-family: var(--mono); color: var(--ink-dim); min-width: 1.5rem; }
+  .winner .who { font-family: var(--condensed); font-size: 1.5rem; font-weight: 700; color: #fff; }
+  .winner .prize { margin-left: auto; font-size: 0.85rem; color: var(--ink); }
+  .winner.reserve .who { font-size: 1.05rem; font-weight: 400; color: var(--ink); }
+
+  .hash-label { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.08em;
+                text-transform: uppercase; color: var(--ink-dim); display: block; margin-bottom: 0.22rem; }
+  .hash { font-family: var(--mono); font-size: 0.74rem; word-break: break-all; color: #ffb0a2;
+          background: rgba(var(--red), 0.16); border: 1px solid rgba(var(--red), 0.35);
+          padding: 0.4rem 0.55rem; border-radius: 2px; display: block; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+           gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 2px; }
+  .stat { background: #3d3d3d; padding: 0.55rem 0.75rem; }
+  .stat dt { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.07em;
+             text-transform: uppercase; color: var(--ink-dim); }
+  .stat dd { margin: 0; font-family: var(--condensed); font-size: 1.6rem; font-weight: 700;
+             color: var(--ink-bright); font-variant-numeric: tabular-nums; }
+
+  button { appearance: none; border: 0; border-radius: 2px; cursor: pointer;
+           font-family: var(--sans); font-size: 14px; padding: 0.55rem 1.2rem;
+           background: rgba(var(--red), 0.85); color: #fff; }
+  button:hover { background: rgba(var(--red), 1); }
+  button.ghost { background: none; border: 1px solid var(--line); color: var(--ink); }
+  button.ghost:hover { color: var(--ink-bright); border-color: var(--ink-dim); }
+  button:focus-visible, a:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .row { display: flex; flex-wrap: wrap; gap: 0.55rem; align-items: center; }
+
+  .flash { border-radius: 2px; padding: 0.7rem 0.85rem; font-size: 0.86rem;
+           border: 1px solid; display: flex; flex-direction: column; gap: 0.2rem; }
+  .flash.ok { background: var(--good-bg); border-color: var(--good); color: var(--good); }
+  .flash.err { background: var(--bad-bg); border-color: var(--bad); color: var(--bad); }
+  .flash .mono { font-family: var(--mono); font-size: 0.74rem; }
+
+  .warn { background: var(--warn-bg); border: 1px solid var(--warn); color: var(--warn);
+          border-radius: 2px; padding: 0.8rem 0.95rem; font-size: 0.86rem; }
+
+  pre { margin: 0; font-family: var(--mono); font-size: 0.72rem; line-height: 1.5;
+        background: rgba(0,0,0,0.35); border: 1px solid var(--line);
+        padding: 0.75rem 0.85rem; border-radius: 2px; overflow-x: auto; color: var(--ink); }
+  .note { color: var(--ink-dim); font-size: 0.85rem; margin: 0; }
+  .hidden { display: none !important; }
+  .sib { display: flex; gap: 0.7rem; align-items: baseline; padding: 0.35rem 0;
+         border-bottom: 1px solid var(--line); font-size: 0.86rem; }
+  .sib:last-child { border-bottom: none; }
+  .sib.is-this { color: var(--ink-bright); font-weight: 700; }
+  .sib .sid { font-family: var(--mono); color: var(--ink-dim); }
+</style>
+</head>
+<body>
+<div class="wrap" id="root"><p class="note">Загружаем…</p></div>
+
+<script type="module">
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const id = location.pathname.split('/').pop();
+const root = document.getElementById('root');
+
+const res = await fetch(`/api/result/${id}`);
+if (!res.ok) {
+  root.innerHTML = '<p class="note">Такой розыгрыш не найден. <a href="/">На главную</a></p>';
+} else {
+  const r = await res.json();
+  const when = new Date(r.createdAt).toLocaleString('ru-RU', { timeZone: 'Asia/Bishkek' });
+  const beacon = r.beacon.source === 'drand' ? `drand, раунд ${r.beacon.round}` : 'указан вручную';
+
+  const rerollWarning = r.siblings.length > 1 ? `
+    <div class="warn">
+      По этому посту розыгрыш запускался <strong>${r.siblings.length} раз</strong>.
+      Засчитанным должен считаться тот, на который организатор сослался в посте —
+      остальные перечислены ниже, чтобы выбор из нескольких попыток был виден.
+    </div>` : '';
+
+  root.innerHTML = `
+    <div>
+      <p class="eyebrow">розыгрыш #${esc(r.id)} · ${esc(when)}</p>
+      <h1>Результаты</h1>
+      <p class="sub">Пост: <a href="${esc(r.post.url)}" target="_blank" rel="noopener">${esc(r.post.shortcode)}</a></p>
+    </div>
+
+    ${rerollWarning}
+
+    <section class="card">
+      <h2>Победители</h2>
+      ${r.winners.map((w) => `<div class="winner">
+        <span class="place">${w.rank}</span>
+        <span class="who">@${esc(w.username)}</span>
+        <span class="prize">${esc(r.prizes[w.rank - 1] ?? '')}</span>
+      </div>`).join('')}
+      ${r.reserves.length ? `<h2>Запасные</h2>${r.reserves.map((w) => `<div class="winner reserve">
+        <span class="place">${w.reserveRank}</span>
+        <span class="who">@${esc(w.username)}</span>
+      </div>`).join('')}` : ''}
+    </section>
+
+    <section class="card">
+      <h2>Как это проверить</h2>
+      <dl class="stats">
+        <div class="stat"><dt>Участников</dt><dd>${r.stats.entrants}</dd></div>
+        <div class="stat"><dt>Билетов</dt><dd>${r.stats.tickets}</dd></div>
+        <div class="stat"><dt>Отсеяно</dt><dd>${r.rejected.length}</dd></div>
+      </dl>
+      <div><span class="hash-label">Обязательство · SHA-256 от сида</span><code class="hash">${esc(r.commitment)}</code></div>
+      <div><span class="hash-label">Сид · раскрыт</span><code class="hash">${esc(r.seed)}</code></div>
+      <div><span class="hash-label">Публичный маяк · ${esc(beacon)}</span><code class="hash">${esc(r.beacon.value)}</code></div>
+      <div><span class="hash-label">Хеш списка участников</span><code class="hash">${esc(r.entriesHash)}</code></div>
+      <p class="note">Проверка пересчитывает розыгрыш заново. Если подменено хоть одно число — не сойдётся.</p>
+      <div class="row">
+        <button id="verify">Проверить розыгрыш</button>
+        <button class="ghost" id="copy">Скопировать ссылку</button>
+      </div>
+      <div id="verdict" class="flash hidden"></div>
+      <p class="note">Или в терминале, вообще не доверяя этому сайту:</p>
+      <pre>npm run contest:raffle -- verify \\
+  --entries entries.json \\
+  --seed ${esc(r.seed)} \\
+  --beacon ${esc(r.beacon.value)} \\
+  --commitment ${esc(r.commitment)} \\
+  --winners ${esc([...r.winners, ...r.reserves].map((w) => w.username).join(','))}</pre>
+    </section>
+
+    ${r.siblings.length > 1 ? `<section class="card">
+      <h2>Все прогоны по этому посту</h2>
+      ${r.siblings.map((s, i) => `<div class="sib ${s.id === r.id ? 'is-this' : ''}">
+        <span class="sid">#${i + 1}</span>
+        <a href="/r/${s.id}">${esc(s.id)}</a>
+        <span>${s.winners.map((w) => '@' + esc(w)).join(', ')}</span>
+      </div>`).join('')}
+    </section>` : ''}
+
+    <p class="note"><a href="/">← Новый розыгрыш</a></p>`;
+
+  document.getElementById('verify').addEventListener('click', async () => {
+    const out = document.getElementById('verdict');
+    const check = await (await fetch('/api/verify', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: r.id }),
+    })).json();
+
+    out.className = `flash ${check.ok ? 'ok' : 'err'}`;
+    out.innerHTML = check.ok
+      ? `<strong>Сходится.</strong><span class="mono">${check.recomputed.map((n) => '@' + esc(n)).join('  ')}</span>`
+      : `<strong>НЕ сходится.</strong>${check.failures.map((f) => `<span class="mono">${esc(f)}</span>`).join('')}`;
+    out.classList.remove('hidden');
+  });
+
+  document.getElementById('copy').addEventListener('click', async (event) => {
+    await navigator.clipboard.writeText(location.href);
+    event.target.textContent = 'Скопировано';
+    setTimeout(() => { event.target.textContent = 'Скопировать ссылку'; }, 1500);
+  });
+}
+</script>
+</body>
+</html>

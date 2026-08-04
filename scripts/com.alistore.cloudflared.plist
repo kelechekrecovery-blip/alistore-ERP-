@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.alistore.cloudflared</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/cloudflared</string>
+    <string>--logfile</string>
+    <string>/tmp/alistore-cloudflared.launchd.log</string>
+    <string>tunnel</string>
+    <string>run</string>
+    <string>--token-file</string>
+    <string>/Users/alistore/.config/alistore/cloudflare-tunnel-token</string>
+    <string>alistore-erp</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/alistore/Desktop/alistore-erp</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Interactive</string>
+  <key>StandardOutPath</key>
+  <string>/tmp/alistore-cloudflared.launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/alistore-cloudflared.launchd.err.log</string>
+</dict>
+</plist>

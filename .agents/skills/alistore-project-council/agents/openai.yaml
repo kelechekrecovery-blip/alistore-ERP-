@@ -1,0 +1,4 @@
+interface:
+  display_name: "AliStore Project Council"
+  short_description: "Многопрофильный совет с проверкой доказательств"
+  default_prompt: "Use $alistore-project-council to pressure-test this AliStore decision and return evidence, dissent, blockers, and a verification-ready plan when the verdict permits one."

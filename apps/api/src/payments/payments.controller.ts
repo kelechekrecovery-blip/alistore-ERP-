@@ -1,20 +1,243 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, HttpCode, Inject, Optional, Param, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import {
+  ApiAcceptedResponse,
+  ApiBearerAuth,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+  ApiUnprocessableEntityResponse,
+} from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { PaymentsService } from './payments.service';
-import { PayDto } from './payments.dto';
+import { PayDto, RefundDto, SettleOrderReceivableDto, VoidPaymentDto } from './payments.dto';
+import { PaymentIntentsService } from './payment-intents.service';
+import { CreatePaymentIntentDto, PaymentWebhookDto } from './payment-intents.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { PermissionGuard } from '../authz/permission.guard';
+import { ConfigService } from '@nestjs/config';
+import { PAYMENT_GATEWAY_PROVIDER, PaymentGatewayProvider } from './payment-gateway-provider';
+import { SandboxConfirmGuard } from './sandbox-confirm.guard';
+import { resolveCustomerPaymentMethods } from './payment-methods-availability';
+import { RequirePermission } from '../authz/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuthPrincipal } from '../auth/jwt.strategy';
+import { requireGuestCapability } from '../auth/guest-capability';
+import { StaffAuthService } from '../staff-auth/staff-auth.service';
+import { requireActiveStaff } from '../auth/staff-principal';
+import { RefundsService } from '../refunds/refunds.service';
 
-const SYSTEM_ACTOR = 'system';
-
+@ApiTags('payments')
 @Controller('payments')
 export class PaymentsController {
-  constructor(private readonly payments: PaymentsService) {}
+  constructor(
+    private readonly payments: PaymentsService,
+    private readonly intents: PaymentIntentsService,
+    private readonly staffAuth: StaffAuthService,
+    private readonly config: ConfigService,
+    @Inject(PAYMENT_GATEWAY_PROVIDER) private readonly gateway: PaymentGatewayProvider,
+    @Optional() private readonly refunds?: RefundsService,
+  ) {}
 
+  /**
+   * Способы оплаты, которые витрина вправе предложить. Публичный: гость на
+   * чекауте должен знать это до входа.
+   *
+   * F-01: список был константой во фронте, и покупатель видел «Картой» там, где
+   * сервер не мог довести оплату до конца — заказ навсегда оставался в
+   * `awaiting_payment`.
+   */
+  @ApiOperation({ summary: 'Payment methods the storefront may offer (server truth)' })
+  @ApiOkResponse({ description: '{ online: boolean, methods: PaymentMethod[] }' })
+  @Get('methods')
+  paymentMethods() {
+    return resolveCustomerPaymentMethods(
+      this.gateway.name,
+      (name: string) => this.config.get<string>(name),
+    );
+  }
+
+  @ApiOperation({ summary: 'List payments by order or cash shift' })
+  @ApiQuery({ name: 'orderId', required: false })
+  @ApiQuery({ name: 'shiftId', required: false })
+  @ApiOkResponse({ description: 'Payments ordered by newest first.' })
   @Get()
-  find(@Query('orderId') orderId?: string, @Query('shiftId') shiftId?: string) {
-    return this.payments.find({ orderId, shiftId });
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('payments', 'read')
+  async find(
+    @CurrentUser() user: AuthPrincipal,
+    @Query('orderId') orderId?: string,
+    @Query('shiftId') shiftId?: string,
+  ) {
+    const staffId = await requireActiveStaff(user, this.staffAuth);
+    return this.payments.findForStaff(staffId, { orderId, shiftId });
   }
 
+  @ApiOperation({
+    summary: 'Take payment, sell reserved units, and append ledger events',
+  })
+  @ApiCreatedResponse({ description: 'Payment received and order moved to paid.' })
+  @ApiConflictResponse({ description: 'Order is not reserved or IMEI cannot be sold.' })
+  @ApiUnprocessableEntityResponse({ description: 'Unknown order or invalid payload.' })
   @Post()
-  pay(@Body() dto: PayDto) {
-    return this.payments.pay(dto, SYSTEM_ACTOR);
+  // Без лимита этот маршрут — оракул перебора кодов подарочных карт: код
+  // приходит в теле, а балансовый GET /giftcards/:code закрыт 30/мин — закрыт
+  // был не тот маршрут. Владение заказом проверяется, поэтому лимит на попытки
+  // не мешает легальной оплате, но убивает перебор.
+  @UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async pay(
+    @CurrentUser() user: AuthPrincipal | undefined,
+    @Headers('x-guest-capability') capability: string | undefined,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: PayDto,
+  ) {
+    // Cash/card/installment must be taken by staff (counter/POS) or confirmed by the
+    // provider webhook — an unauthenticated caller may only pay by gift card, which is
+    // self-validating (redeemOnTx checks the code + balance). Closes the "mark any order
+    // paid for free" hole while keeping guest gift-card checkout working.
+    if ((!user || user.typ === 'customer') && dto.method !== 'gift_card') {
+      throw new UnauthorizedException('payment_requires_auth');
+    }
+    if (user?.typ === 'customer') {
+      return this.payments.payForCustomer(user.customerId, dto, user.customerId);
+    }
+    if (user?.typ === 'staff') {
+      const staffId = await requireActiveStaff(user, this.staffAuth);
+      return this.payments.pay(dto, `staff:${staffId}`, { staffId, idempotencyKey });
+    }
+    const guest = requireGuestCapability(capability, 'payments:gift_card');
+    return this.payments.payForCustomer(guest.sub, dto, `guest:${guest.sub}`);
   }
+
+  @ApiOperation({ summary: 'Take a POS deposit against an order receivable' })
+  @ApiCreatedResponse({ description: 'Deposit recorded as a liability; draft POs may be created.' })
+  @Post('receivables/:id/settle')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('payments', 'take_deposit')
+  async settleReceivable(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') receivableId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: SettleOrderReceivableDto,
+  ) {
+    const staffId = await requireActiveStaff(user, this.staffAuth);
+    return this.payments.settleReceivable(
+      receivableId,
+      dto,
+      `staff:${staffId}`,
+      { staffId, idempotencyKey },
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Create an online payment intent (reserve order → awaiting_payment)',
+  })
+  @ApiCreatedResponse({ description: 'Payment provider intent created.' })
+  @ApiConflictResponse({ description: 'Order cannot be reserved or paid.' })
+  @ApiUnprocessableEntityResponse({ description: 'Unknown order or amount mismatch.' })
+  @Post('intents')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  intent(
+    @Headers('x-guest-capability') capability: string | undefined,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: CreatePaymentIntentDto,
+  ) {
+    const guest = requireGuestCapability(capability, 'payments:intent');
+    return this.intents.createForCustomer(guest.sub, dto, idempotencyKey);
+  }
+
+  @ApiOperation({ summary: 'Create an online payment intent for the authenticated customer order' })
+  @ApiBearerAuth()
+  @ApiCreatedResponse({ description: 'Customer-owned payment provider intent created.' })
+  @Post('intents/mine')
+  @UseGuards(JwtAuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  customerIntent(
+    @CurrentUser() user: AuthPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: CreatePaymentIntentDto,
+  ) {
+    return this.intents.createForCustomer(user.customerId, dto, idempotencyKey);
+  }
+
+  @ApiOperation({
+    summary: 'Sandbox/provider webhook: confirm an online payment idempotently',
+  })
+  @ApiOkResponse({ description: 'Payment applied, or duplicate webhook deduped by txnId.' })
+  @ApiConflictResponse({ description: 'Order not payable.' })
+  @ApiUnprocessableEntityResponse({ description: 'Unknown order or invalid payload.' })
+  @Post('webhooks/sandbox')
+  @HttpCode(200)
+  @UseGuards(SandboxConfirmGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  webhook(
+    @Req() request: { rawBody?: Buffer; headers: Record<string, string | string[] | undefined> },
+    @Body() dto: PaymentWebhookDto,
+  ) {
+    return this.intents.webhook(dto, { rawBody: request.rawBody, headers: request.headers });
+  }
+
+  @ApiOperation({
+    summary: 'Request a refund — approval-gated (returns 202 { approvalId })',
+  })
+  @ApiParam({ name: 'id', description: 'Original payment id' })
+  @ApiAcceptedResponse({ description: 'Refund parked for approval; not yet executed.' })
+  @ApiConflictResponse({ description: 'Payment is not refundable.' })
+  @ApiUnprocessableEntityResponse({ description: 'Unknown payment or invalid amount.' })
+  @Post(':id/refund')
+  @HttpCode(202)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('payments', 'refund')
+  async refund(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: RefundDto,
+  ) {
+    const actor = await requireActiveStaff(user, this.staffAuth);
+    if (!dto.returnId) {
+      const payment = await this.payments.get(id);
+      if (payment?.orderId) throw new BadRequestException('Товарный refund требует Return; используйте POST /returns/:returnId/refunds');
+      return this.payments.refund(id, dto.amount, dto.reason, actor, undefined, {
+        shiftId: dto.shiftId,
+        externalReference: dto.externalReference,
+        allocations: dto.allocations,
+      });
+    }
+    if (!this.refunds) throw new BadRequestException('Refund aggregate service unavailable');
+    return this.refunds.request(dto.returnId, { reason: dto.reason, shiftId: dto.shiftId }, actor, requireRefundIdempotencyKey(idempotencyKey));
+  }
+
+  @ApiOperation({ summary: 'Void an unfinished pending payment without creating a refund' })
+  @ApiBearerAuth()
+  @Post(':id/void')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('payments', 'refund')
+  async voidPayment(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id') id: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: VoidPaymentDto,
+  ) {
+    const actor = await requireActiveStaff(user, this.staffAuth);
+    return this.payments.voidPending(id, dto.reason, actor, requireRefundIdempotencyKey(idempotencyKey));
+  }
+}
+
+function requireRefundIdempotencyKey(value: string | undefined) {
+  const key = value?.trim();
+  if (!key) throw new BadRequestException('Idempotency-Key обязателен');
+  if (key.length > 128) throw new BadRequestException('Idempotency-Key слишком длинный');
+  return key;
 }

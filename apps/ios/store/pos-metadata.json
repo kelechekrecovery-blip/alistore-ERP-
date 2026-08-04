@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "AliStore POS",
+    "bundleId": "kg.alistore.pos",
+    "primaryLocale": "ru-KG",
+    "category": "BUSINESS",
+    "contentRights": "DOES_NOT_USE_THIRD_PARTY_CONTENT"
+  },
+  "urls": {
+    "marketing": "https://ali.kg",
+    "support": "https://ali.kg/support",
+    "privacy": "https://ali.kg/privacy"
+  },
+  "review": {
+    "demoAccountRequired": true,
+    "demoAccountReference": "Enter an active limited-purpose cashier review account only in the App Store Connect Demo Account fields. Do not commit credentials.",
+    "notes": "AliStore POS is a limited employee resource for AliStore cashiers. It is intended for Unlisted App distribution, has no public registration and is not represented as a public multi-tenant subscription service. Account, shift and catalog availability must be verified before resubmission; hardware QA is not claimed.",
+    "appReviewNotes": "Paste this text into App Store Connect > App Review Information > Notes.\n\nDISTRIBUTION AND AUDIENCE\nAliStore POS is a limited employee resource for AliStore cashiers and is intended for Unlisted App distribution. It supports AliStore catalog lookup, sale preparation, shift status, server-issued receipts and till-operation history. It is not offered as a public multi-tenant subscription service and has no public self-service registration.\n\nDEMO ACCOUNT\nUse the username and matching credential entered in the Demo Account fields. Enter them exactly in the two Russian-labelled fields on the sign-in screen, then tap the sign-in button. The review path has no SMS or one-time-code step. The account must be active and two-factor authentication must be disabled before resubmission. No credential is included in these notes or in repository metadata.\n\nREVIEW DATA\nThe owner must verify successful sign-in, a review catalog and the required shift state immediately before resubmission. These notes do not claim that a shift, catalog state or sale record has been seeded until that gate passes.\n\nWHAT TO EXPECT\nAccess is role-based and authorized by the AliStore server. External receipt printers and payment terminals are separate deployment dependencies; these notes do not claim completed physical-hardware certification. The app does not track users and its privacy manifest declares NSPrivacyTracking=false.\n\nUNLISTED REQUEST\nAn Unlisted App distribution request must be submitted for this app. Please evaluate this submission for that limited employee audience rather than for public App Store discovery.\n\nCONTACT\nSupport: https://ali.kg/support."
+  },
+  "localizations": {
+    "ru-KG": {
+      "name": "AliStore POS",
+      "subtitle": "Касса для розничного магазина",
+      "promotionalText": "Продажи, чеки, состояние смены и история кассовых операций для розничного магазина.",
+      "description": "AliStore POS — кассовое приложение для розничных магазинов электроники. Кассир магазина находит товары, формирует продажу, готовит раздельную оплату, получает чек с сервера, контролирует состояние смены и просматривает историю операций. Доступ ролевой: магазин выдаёт учётные записи своим кассирам.",
+      "keywords": [
+        "касса",
+        "pos",
+        "розница",
+        "магазин",
+        "продажи",
+        "смена"
+      ]
+    }
+  },
+  "screenshots": {
+    "requiredPngCount": 6,
+    "devices": {
+      "iphone": {
+        "source": "apps/ios/build/AliStorePOSVisual-iphone-attachments",
+        "simulator": "iPhone 17 Pro Max",
+        "outputSlug": "iphone-6-9",
+        "expectedDimensions": {
+          "width": 1320,
+          "height": 2868
+        }
+      }
+    },
+    "requiredStates": [
+      "pos-sale",
+      "pos-cart",
+      "pos-receipt",
+      "pos-offline",
+      "pos-shift",
+      "pos-operations"
+    ]
+  },
+  "privacy": {
+    "tracking": false,
+    "dataSafetyReviewRequired": true,
+    "faceIdPurpose": "Быстрый и защищённый вход кассира в AliStore POS"
+  }
+}

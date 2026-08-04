@@ -1,0 +1,1696 @@
+// Legacy composition root: split by feature in a dedicated refactor.
+// swiftlint:disable file_length
+import AliStoreCore
+import SwiftData
+import SwiftUI
+import UIKit
+@preconcurrency import UserNotifications
+
+private extension Notification.Name {
+    static let staffAPNsToken = Notification.Name("alistore.staff.apns.token")
+    static let staffAPNsFailure = Notification.Name("alistore.staff.apns.failure")
+    static let staffNotificationRoute = Notification.Name("alistore.staff.notification.route")
+}
+
+private final class StaffNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        guard let value = response.notification.request.content.userInfo["deepLink"] as? String,
+              let url = URL(string: value) else { return }
+        Task { @MainActor in
+            NotificationCenter.default.post(name: .staffNotificationRoute, object: url)
+        }
+    }
+}
+
+@MainActor
+private final class StaffAppDelegate: NSObject, UIApplicationDelegate {
+    private let notificationDelegate = StaffNotificationDelegate()
+
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = notificationDelegate
+        return true
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        NotificationCenter.default.post(name: .staffAPNsToken, object: token)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .staffAPNsFailure, object: error.localizedDescription)
+    }
+
+}
+
+@main
+struct AliStoreStaffApp: App {
+    @UIApplicationDelegateAdaptor(StaffAppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var auth: StaffAuthStore
+
+    init() {
+        _auth = State(initialValue: StaffAuthStore(
+            environment: .live(),
+            keychainService: "kg.alistore.staff",
+            restoresStoredSession: !UITestBootstrap.disablesSessionRestore
+        ))
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            content
+                // Закрываем рабочее место при уходе в фон: разблокированный
+                // телефон сотрудника иначе открывает смену, выручку и Customer 360
+                // до следующего перезапуска, которого может не быть весь день.
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .background { auth.lock() }
+                }
+                // Прячем Customer 360, паспорт и смену из превью в свитчере.
+                .privacyCover("AliStore Staff")
+                // Dynamic Type с верхним пределом — см. POS.
+                .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+        }
+        .modelContainer(OfflineStore.container())
+    }
+
+    @ViewBuilder private var content: some View {
+        if auth.isRestoring {
+            ProgressView("Восстанавливаем рабочее место…")
+        } else if let session = auth.session {
+            if auth.requiresQuickUnlock {
+                QuickUnlockView(title: "AliStore Staff", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: auth.logout)
+            } else {
+                StaffRootView(session: session, logout: auth.logout)
+            }
+        } else {
+            StaffLoginView(auth: auth, title: "AliStore Staff")
+        }
+    }
+}
+
+private struct StaffRootView: View {
+    let session: StaffSession
+    let logout: () -> Void
+    @State private var selectedTab = StaffTab.home
+    @State private var workMode = StaffWorkMode.orders
+    @State private var scannerMode = StaffScannerMode.buyback
+    @State private var routedTaskId: String?
+    @State private var pushStatus = "Push не настроен"
+    private let environment = AppEnvironment.live()
+
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            NavigationStack {
+                StaffHomeView(
+                    session: session,
+                    openOrders: {
+                        selectedTab = .orders
+                        workMode = .orders
+                    },
+                    openTasks: {
+                        selectedTab = .kpi
+                        workMode = .tasks
+                    },
+                    openBuyback: {
+                        scannerMode = .buyback
+                        selectedTab = .buyback
+                    },
+                    openEvidence: {
+                        scannerMode = .evidence
+                        selectedTab = .buyback
+                    },
+                    openCustomer360: { selectedTab = .customer },
+                    openShift: { selectedTab = .shift }
+                )
+            }
+            .tabItem { Label("Главная", systemImage: "house.fill") }
+            .tag(StaffTab.home)
+            NavigationStack {
+                StaffWorkView(session: session, mode: $workMode, routedTaskId: $routedTaskId)
+            }
+            .tabItem { Label("Заказы", systemImage: "shippingbox.fill") }
+            .tag(StaffTab.orders)
+            NavigationStack {
+                StaffWorkView(session: session, mode: $workMode, routedTaskId: $routedTaskId)
+            }
+            .tabItem { Label("KPI", systemImage: "chart.bar.fill") }
+            .tag(StaffTab.kpi)
+            NavigationStack {
+                StaffScannerView(session: session, mode: $scannerMode)
+            }
+            .tabItem { Label("Скупка", systemImage: "barcode.viewfinder") }
+            .tag(StaffTab.buyback)
+            NavigationStack {
+                Customer360View(session: session)
+            }
+            .tabItem { Label("Клиент", systemImage: "person.text.rectangle.fill") }
+            .tag(StaffTab.customer)
+            NavigationStack {
+                StaffShiftView(session: session, pushStatus: pushStatus, enablePush: enablePush, logout: logout)
+            }
+            .tabItem { Label("Смена", systemImage: "clock") }
+            .tag(StaffTab.shift)
+        }
+        .onOpenURL(perform: route)
+        .onReceive(NotificationCenter.default.publisher(for: .staffNotificationRoute)) { notification in
+            guard let url = notification.object as? URL else { return }
+            route(url)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .staffAPNsToken)) { notification in
+            guard let token = notification.object as? String else { return }
+            Task { await registerPushToken(token) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .staffAPNsFailure)) { notification in
+            pushStatus = notification.object as? String ?? "APNs registration failed"
+        }
+        .onChange(of: selectedTab) { _, tab in
+            switch tab {
+            case .orders:
+                workMode = .orders
+            case .kpi:
+                workMode = .tasks
+            default:
+                break
+            }
+        }
+    }
+
+    private func route(_ url: URL) {
+        guard url.scheme == "alistore-staff" else { return }
+        if url.host == "tasks" {
+            selectedTab = .kpi
+            workMode = .tasks
+            routedTaskId = url.pathComponents.dropFirst().first
+        } else if url.host == "support" {
+            selectedTab = .orders
+            workMode = .support
+        } else if url.host == "customers" || url.host == "customer" {
+            selectedTab = .customer
+        } else if url.host == "shift" || url.host == "attendance" || url.host == "account" {
+            selectedTab = .shift
+        }
+    }
+
+    private func enablePush() {
+        Task {
+            do {
+                let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
+                guard granted else { pushStatus = "Уведомления отключены"; return }
+                pushStatus = "Регистрация APNs…"
+                await MainActor.run { UIApplication.shared.registerForRemoteNotifications() }
+            } catch {
+                pushStatus = error.localizedDescription
+            }
+        }
+    }
+
+    private func registerPushToken(_ token: String) async {
+        do {
+            let registered: RegisteredPushToken = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "notifications/push-tokens",
+                body: RegisterPushTokenRequest(token: token, deviceId: installationId(), scope: "staff"),
+                token: session.accessToken
+            )
+            pushStatus = registered.enabled ? "Push подключён" : "Push отключён"
+        } catch {
+            pushStatus = error.localizedDescription
+        }
+    }
+
+    private func installationId() -> String {
+        let key = "alistore.staff.installation-id"
+        if let value = UserDefaults.standard.string(forKey: key) { return value }
+        let value = "ios-staff-\(UUID().uuidString.lowercased())"
+        UserDefaults.standard.set(value, forKey: key)
+        return value
+    }
+}
+
+private enum StaffTab: Hashable { case home, orders, kpi, buyback, customer, shift }
+
+private struct StaffHomeView: View {
+    let session: StaffSession
+    let openOrders: () -> Void
+    let openTasks: () -> Void
+    let openBuyback: () -> Void
+    let openEvidence: () -> Void
+    let openCustomer360: () -> Void
+    let openShift: () -> Void
+
+    private let background = Design3.screen
+    private let surface = Design3.surface
+    private let surfaceSoft = Design3.surfaceRaised
+    private let primaryText = Design3.textBright
+    private let secondaryText = Design3.textMuted
+    private let coral = Design3.orange
+    private let lime = Design3.lime
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                header
+                shiftCard
+                quickActions
+                aiTaskCard
+                customerTools
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 28)
+        }
+        .background(background.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
+        .preferredColorScheme(.dark)
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(coral)
+                Text("Аз")
+                    .font(.headline.weight(.black))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 48, height: 48)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Азизбек")
+                    .font(.title3.weight(.black))
+                    .foregroundStyle(primaryText)
+                Text("Продавец · AliStore Центр")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(secondaryText)
+            }
+            Spacer()
+            Text("○ вне смены")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(primaryText)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 7)
+                .background(surfaceSoft, in: Capsule())
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var shiftCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Смена не открыта")
+                        .font(.title3.weight(.black))
+                        .foregroundStyle(primaryText)
+                    Text("Откройте смену с фото точки, чтобы принимать заказы и фиксировать KPI.")
+                        .font(.subheadline)
+                        .foregroundStyle(secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 12)
+                VStack(alignment: .trailing, spacing: 5) {
+                    Text("12")
+                        .font(.title2.weight(.black))
+                        .foregroundStyle(lime)
+                    Text("продаж вчера")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(secondaryText)
+                }
+            }
+            Button(action: openShift) {
+                Label("Открыть смену", systemImage: "camera.fill")
+                    .font(.headline.weight(.bold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .background(coral, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .padding(16)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var quickActions: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Text("Быстрые действия")
+                .font(.headline.weight(.black))
+                .foregroundStyle(primaryText)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                actionTile(.init(title: "Заказы", subtitle: "3 новых", icon: "shippingbox.fill", tint: coral, identifier: "staff-home-orders"), action: openOrders)
+                actionTile(.init(title: "Скупка Б/У", subtitle: "оценка", icon: "iphone.gen3", tint: Design3.blue, identifier: "staff-home-buyback"), action: openBuyback)
+                actionTile(.init(title: "Задачи и KPI", subtitle: "2 активных", icon: "chart.bar.fill", tint: Design3.gold, identifier: "staff-home-kpi"), action: openTasks)
+                NavigationLink {
+                    StaffInventoryView(session: session, environment: AppEnvironment.live())
+                } label: {
+                    inventoryTileLabel
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("staff-home-inventory")
+            }
+        }
+    }
+
+    private var aiTaskCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("ЗАДАЧА ОТ AI")
+                .font(.caption.weight(.black))
+                .foregroundStyle(lime)
+            Text("Мало продаж аксессуаров сегодня")
+                .font(.headline.weight(.black))
+                .foregroundStyle(primaryText)
+            Text("Предложите защитное стекло и чехол к каждому iPhone. Цель до конца смены: +18 аксессуаров.")
+                .font(.subheadline)
+                .foregroundStyle(secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(action: openTasks) {
+                Label("К задачам", systemImage: "arrow.right.circle.fill")
+                    .font(.subheadline.weight(.bold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(coral)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var customerTools: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Рабочие инструменты")
+                .font(.headline.weight(.black))
+                .foregroundStyle(primaryText)
+            HStack(spacing: 10) {
+                toolPill("Customer 360", icon: "person.text.rectangle", identifier: "staff-home-customer360", action: openCustomer360)
+                toolPill("Evidence", icon: "photo.stack", identifier: "staff-home-evidence", action: openEvidence)
+            }
+        }
+    }
+
+    // Отдельная плитка-ссылка: инвентаризация ведёт на свой экран, а не
+    // переключает вкладку, как остальные быстрые действия.
+    private var inventoryTileLabel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: "shippingbox.and.arrow.backward.fill")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(lime)
+                .frame(width: 32, height: 32)
+                .background(lime.opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            Text("Инвентаризация")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(primaryText)
+                .lineLimit(2)
+                .minimumScaleFactor(0.82)
+            Text("пересчёт остатка")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(lime)
+        }
+        .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
+        .padding(13)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private struct ActionTileConfiguration {
+        let title: String
+        let subtitle: String
+        let icon: String
+        let tint: Color
+        let identifier: String
+    }
+
+    private func actionTile(_ configuration: ActionTileConfiguration, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 10) {
+                Image(systemName: configuration.icon)
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(configuration.tint)
+                    .frame(width: 32, height: 32)
+                    .background(configuration.tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                Text(configuration.title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(primaryText)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.82)
+                Text(configuration.subtitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(configuration.tint)
+            }
+            .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
+            .padding(13)
+            .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(configuration.identifier)
+    }
+
+    private func toolPill(_ title: String, icon: String, identifier: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 11)
+                .background(surfaceSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+private struct Customer360View: View {
+    let session: StaffSession
+    @State private var customerId = ""
+    @State private var overview: Customer360?
+    @State private var isLoading = false
+    @State private var busyWarrantyId: String?
+    @State private var errorMessage: String?
+    private let environment = AppEnvironment.live()
+    private let background = Design3.screen
+    private let surface = Design3.surface
+    private let surfaceSoft = Design3.surfaceRaised
+    private let primaryText = Design3.textBright
+    private let secondaryText = Design3.textMuted
+    private let coral = Design3.orange
+    private let lime = Design3.lime
+    private let amber = Design3.gold
+
+    var body: some View {
+        ZStack {
+            background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    searchCard
+                    if isLoading {
+                        ProgressView("Загружаем профиль…")
+                            .tint(lime)
+                            .foregroundStyle(primaryText)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 28)
+                            .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    } else if let errorMessage {
+                        errorCard(errorMessage)
+                    } else if let overview {
+                        profileContent(overview)
+                    } else {
+                        emptyCard
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 12)
+                .padding(.bottom, 28)
+            }
+        }
+        .navigationTitle("Customer 360")
+        .navigationBarTitleDisplayMode(.inline)
+        .preferredColorScheme(.dark)
+        .task { await preloadFixtureIfNeeded() }
+        .refreshable { if overview != nil { await loadOverview() } }
+    }
+
+    @ViewBuilder
+    private var searchCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Customer 360")
+                        .font(.title3.weight(.black))
+                        .foregroundStyle(primaryText)
+                    Text("Профиль, покупки, долги, гарантия и обращения клиента.")
+                        .font(.caption)
+                        .foregroundStyle(secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Text("STAFF")
+                    .font(.caption2.weight(.black))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(lime, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            HStack(spacing: 9) {
+                TextField("ID клиента или заказ", text: $customerId)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(primaryText)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 12)
+                    .background(surfaceSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .accessibilityIdentifier("staff-customer360-search")
+                Button {
+                    Task { await loadOverview() }
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                        .font(.headline.weight(.black))
+                        .foregroundStyle(.black)
+                        .frame(width: 46, height: 46)
+                        .background(lime, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(customerId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
+                .accessibilityLabel("Открыть профиль")
+                .accessibilityIdentifier("staff-customer360-open")
+            }
+        }
+        .padding(16)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(surfaceSoft))
+    }
+
+    @ViewBuilder
+    private func profileContent(_ overview: Customer360) -> some View {
+        customerHeader(overview)
+        metricGrid(overview)
+        if !overview.orders.recent.isEmpty {
+            sectionCard(title: "Последние покупки", systemImage: "bag.fill") {
+                ForEach(overview.orders.recent) { order in
+                    compactRow(
+                        title: "#\(order.id.suffix(6)) · \(order.status)",
+                        subtitle: order.createdAt.formatted(date: .abbreviated, time: .omitted),
+                        value: money(order.total),
+                        tint: lime
+                    )
+                }
+            }
+        }
+        if !overview.warranties.items.isEmpty {
+            sectionCard(title: "Гарантия и сервис", systemImage: "wrench.and.screwdriver.fill") {
+                ForEach(overview.warranties.items) { warranty in
+                    VStack(alignment: .leading, spacing: 9) {
+                        HStack {
+                            Text(warranty.imei)
+                                .font(.caption.monospacedDigit().weight(.bold))
+                                .foregroundStyle(primaryText)
+                            Spacer()
+                            Text(statusLabel(warranty.status))
+                                .font(.caption2.weight(.black))
+                                .foregroundStyle(statusColor(warranty.status))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(statusColor(warranty.status).opacity(0.15), in: Capsule())
+                        }
+                        Label(
+                            warranty.sla.formatted(date: .abbreviated, time: .omitted),
+                            systemImage: warranty.sla < Date() ? "exclamationmark.circle.fill" : "clock"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(warranty.sla < Date() ? coral : secondaryText)
+                        if let next = nextWarrantyStatus(warranty.status) {
+                            Button {
+                                Task { await transitionWarranty(warranty.id, to: next) }
+                            } label: {
+                                Text(warrantyActionLabel(next))
+                                    .font(.caption.weight(.black))
+                                    .foregroundStyle(.black)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                                    .background(lime, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(busyWarrantyId != nil)
+                            .accessibilityIdentifier("staff-customer360-warranty-action-\(warranty.id)")
+                        }
+                    }
+                    .padding(12)
+                    .background(surfaceSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+            }
+        }
+        if !overview.tickets.items.isEmpty {
+            sectionCard(title: "Поддержка", systemImage: "bubble.left.and.bubble.right.fill") {
+                ForEach(overview.tickets.items) { ticket in
+                    compactRow(
+                        title: ticket.subject,
+                        subtitle: "\(priorityLabel(ticket.priority)) · \(statusLabel(ticket.status)) · SLA \(ticket.sla.formatted(date: .omitted, time: .shortened))",
+                        value: nil,
+                        tint: priorityColor(ticket.priority)
+                    )
+                }
+            }
+        }
+    }
+
+    private func customerHeader(_ overview: Customer360) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle().fill(coral)
+                    Text(initials(overview.customer.name))
+                        .font(.headline.weight(.black))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 52, height: 52)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(overview.customer.name)
+                        .font(.title3.weight(.black))
+                        .foregroundStyle(primaryText)
+                    Text(overview.customer.phone)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(secondaryText)
+                }
+                Spacer()
+                Text(overview.customer.consent ? "CONSENT" : "NO CONSENT")
+                    .font(.caption2.weight(.black))
+                    .foregroundStyle(overview.customer.consent ? .black : coral)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(overview.customer.consent ? lime : coral.opacity(0.14), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            if !overview.customer.segments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(overview.customer.segments, id: \.self) { segment in
+                            Text(segment)
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(primaryText)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .background(surfaceSoft, in: Capsule())
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(surfaceSoft))
+        .accessibilityIdentifier("staff-customer360-profile")
+    }
+
+    private func metricGrid(_ overview: Customer360) -> some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            metricCard("LTV", money(overview.customer.ltv), "за всё время", lime)
+            metricCard("Заказы", "\(overview.orders.total)", money(overview.orders.spent), amber)
+            metricCard("Долг", money(overview.debts.openBalance), "\(overview.debts.count) активных", coral)
+            metricCard("Сервис", "\(overview.warranties.open)", "\(overview.tickets.open) тикетов", Design3.blue)
+        }
+    }
+
+    private func metricCard(_ title: String, _ value: String, _ subtitle: String, _ tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(secondaryText)
+            Text(value)
+                .font(.headline.monospacedDigit().weight(.black))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            Text(subtitle)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(secondaryText)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(13)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(surfaceSoft))
+    }
+
+    private func sectionCard<Content: View>(title: String, systemImage: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: systemImage)
+                .font(.headline.weight(.black))
+                .foregroundStyle(primaryText)
+            content()
+        }
+        .padding(16)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(surfaceSoft))
+    }
+
+    private func compactRow(title: String, subtitle: String, value: String?, tint: Color) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Circle()
+                .fill(tint)
+                .frame(width: 9, height: 9)
+                .padding(.top, 5)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            if let value {
+                Text(value)
+                    .font(.caption.monospacedDigit().weight(.black))
+                    .foregroundStyle(tint)
+            }
+        }
+        .padding(12)
+        .background(surfaceSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var emptyCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Выберите клиента", systemImage: "person.text.rectangle")
+                .font(.headline.weight(.black))
+                .foregroundStyle(primaryText)
+            Text("Введите внутренний ID из заказа или сканера, чтобы открыть профиль, покупки, сервис и обращения.")
+                .font(.subheadline)
+                .foregroundStyle(secondaryText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func errorCard(_ message: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Профиль недоступен", systemImage: "wifi.exclamationmark")
+                .font(.headline.weight(.black))
+                .foregroundStyle(coral)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(secondaryText)
+            Button("Повторить") { Task { await loadOverview() } }
+                .buttonStyle(.plain)
+                .font(.caption.weight(.black))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(lime, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    @MainActor
+    private func loadOverview() async {
+        let id = customerId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !id.isEmpty else { return }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        #if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            overview = Self.fixtureOverview
+            return
+        }
+        #endif
+        do {
+            overview = try await APIClient(baseURL: environment.apiBaseURL).get(
+                "customers/\(id)/overview",
+                token: session.accessToken
+            )
+        } catch {
+            overview = nil
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func preloadFixtureIfNeeded() async {
+        #if DEBUG
+        if UITestBootstrap.startsSignedIn, overview == nil {
+            customerId = "C-1042"
+            overview = Self.fixtureOverview
+        }
+        #endif
+    }
+
+    @MainActor
+    private func transitionWarranty(_ id: String, to status: String) async {
+        busyWarrantyId = id
+        errorMessage = nil
+        defer { busyWarrantyId = nil }
+        do {
+            let _: WarrantyCase = try await APIClient(baseURL: environment.apiBaseURL).patch(
+                "warranty/\(id)",
+                body: WarrantyStatusRequest(status: status),
+                token: session.accessToken
+            )
+            await loadOverview()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func nextWarrantyStatus(_ status: String) -> String? {
+        switch status {
+        case "created": "received"
+        case "received": "diagnostics"
+        case "diagnostics": "approved"
+        case "waiting_supplier": "approved"
+        case "approved": "repaired"
+        case "repaired", "rejected", "replaced": "closed"
+        default: nil
+        }
+    }
+
+    private func warrantyActionLabel(_ status: String) -> String {
+        switch status {
+        case "received": "Принять устройство"
+        case "diagnostics": "Начать диагностику"
+        case "approved": "Согласовать ремонт"
+        case "repaired": "Ремонт завершён"
+        case "closed": "Закрыть обращение"
+        default: status
+        }
+    }
+
+    private func statusLabel(_ status: String) -> String {
+        [
+            "created": "Создано",
+            "received": "Принято",
+            "diagnostics": "Диагностика",
+            "approved": "Одобрено",
+            "waiting_supplier": "Поставщик",
+            "repaired": "Готово",
+            "rejected": "Отказ",
+            "replaced": "Замена",
+            "closed": "Закрыто",
+            "new": "Новая",
+            "in_progress": "В работе",
+            "waiting": "Ожидание",
+            "resolved": "Решено"
+        ][status] ?? status
+    }
+
+    private func statusColor(_ status: String) -> Color {
+        switch status {
+        case "created", "received", "new": lime
+        case "diagnostics", "in_progress", "waiting_supplier": amber
+        case "rejected": coral
+        default: secondaryText
+        }
+    }
+
+    private func priorityLabel(_ priority: String) -> String {
+        ["low": "Низкий", "normal": "Обычный", "high": "Высокий", "urgent": "Срочно"][priority] ?? priority
+    }
+
+    private func priorityColor(_ priority: String) -> Color {
+        switch priority {
+        case "urgent": coral
+        case "high": amber
+        default: secondaryText
+        }
+    }
+
+    private func initials(_ name: String) -> String {
+        let parts = name.split(separator: " ")
+        let first = parts.first?.first.map(String.init) ?? "К"
+        let second = parts.dropFirst().first?.first.map(String.init) ?? ""
+        return "\(first)\(second)"
+    }
+
+    private func money(_ amount: Int) -> String {
+        amount.formatted(.currency(code: "KGS").precision(.fractionLength(0)))
+    }
+
+    private static var fixtureOverview: Customer360 {
+        let now = Date()
+        return Customer360(
+            customer: Customer360Profile(
+                id: "C-1042",
+                name: "Нурбек Алиев",
+                phone: "+996 555 42 42 42",
+                consent: true,
+                segments: ["Gold", "VIP", "Trade-in"],
+                ltv: 428_700,
+                createdAt: now.addingTimeInterval(-8_640_000)
+            ),
+            orders: Customer360Orders(
+                total: 12,
+                spent: 428_700,
+                recent: [
+                    Customer360Order(id: "4102", status: "Курьер", total: 109_900, createdAt: now.addingTimeInterval(-3_600)),
+                    Customer360Order(id: "4090", status: "Выдан", total: 189_900, createdAt: now.addingTimeInterval(-86_400))
+                ]
+            ),
+            debts: Customer360Debts(
+                count: 1,
+                openBalance: 18_400,
+                items: [Customer360Debt(id: "debt-1", balance: 18_400, status: "current", dueDate: now.addingTimeInterval(604_800))]
+            ),
+            warranties: Customer360Warranties(
+                open: 1,
+                items: [
+                    Customer360Warranty(id: "warranty-airpods", imei: "356789104200777", status: "diagnostics", sla: now.addingTimeInterval(7_200))
+                ]
+            ),
+            tickets: Customer360Tickets(
+                open: 2,
+                items: [
+                    Customer360Ticket(id: "support-4102", subject: "Где мой заказ №4102?", status: "new", priority: "high", sla: now.addingTimeInterval(1_800)),
+                    Customer360Ticket(id: "support-warranty", subject: "Нужна гарантия по AirPods", status: "in_progress", priority: "normal", sla: now.addingTimeInterval(5_400))
+                ]
+            )
+        )
+    }
+}
+
+struct StaffOrdersView: View {
+    let session: StaffSession
+    @State private var status = "created"
+    @State private var orders: [CustomerOrder] = []
+    @State private var isLoading = true
+    @State private var busyOrderId: String?
+    @State private var errorMessage: String?
+    private let environment = AppEnvironment.live()
+    private let background = Design3.screen
+    private let surface = Design3.surface
+    private let surfaceSoft = Design3.surfaceRaised
+    private let primaryText = Design3.textBright
+    private let secondaryText = Design3.textMuted
+    private let mutedText = Design3.textSubtle
+    private let lime = Design3.lime
+    private let amber = Design3.gold
+
+    private let statuses = [
+        ("created", "Новые"),
+        ("reserved", "Резерв"),
+        ("paid", "Оплачены"),
+        ("picking", "Сборка"),
+        ("packed", "Упакованы"),
+        ("ready_for_pickup", "Выдача")
+    ]
+
+    var body: some View {
+        ZStack {
+            background.ignoresSafeArea()
+            if isLoading {
+                ProgressView("Загружаем заказы…")
+                    .tint(lime)
+                    .foregroundStyle(primaryText)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let errorMessage {
+                ContentUnavailableView {
+                    Label("Очередь недоступна", systemImage: "wifi.exclamationmark")
+                } description: {
+                    Text(errorMessage)
+                } actions: {
+                    Button("Повторить", systemImage: "arrow.clockwise") { Task { await loadOrders() } }
+                }
+            } else if orders.isEmpty {
+                ContentUnavailableView("Нет заказов", systemImage: "shippingbox", description: Text("В выбранной очереди сейчас пусто."))
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        statusChips
+                        ForEach(orders) { order in
+                            NavigationLink {
+                                StaffOrderDetailView(
+                                    order: order,
+                                    actionLabel: actionLabel(order),
+                                    isBusy: busyOrderId == order.id,
+                                    onAction: { Task { await performAction(order) } }
+                                )
+                            } label: {
+                                orderCard(order)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 8)
+                    .padding(.bottom, 28)
+                }
+                .refreshable { await loadOrders() }
+            }
+        }
+        .navigationTitle("Заказы")
+        .task(id: status) { await loadOrders() }
+    }
+
+    private var statusChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(statuses, id: \.0) { item in
+                    Button {
+                        status = item.0
+                    } label: {
+                        Text(item.1)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(status == item.0 ? .black : secondaryText)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(status == item.0 ? lime : surface, in: Capsule())
+                            .overlay(Capsule().stroke(status == item.0 ? lime : surfaceSoft))
+                    }
+                    .accessibilityIdentifier("staff-orders-status-\(item.0)")
+                }
+            }
+        }
+    }
+
+    private func orderCard(_ order: CustomerOrder) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center) {
+                Text(displayNumber(order))
+                    .font(.system(.subheadline, design: .monospaced).weight(.black))
+                    .foregroundStyle(primaryText)
+                Spacer()
+                Text(statusLabel(order.status))
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(statusForeground(order.status))
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(statusBackground(order.status), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            HStack(spacing: 6) {
+                Text(itemsLabel(order))
+                    .lineLimit(2)
+                Text("·")
+                Text(money(order.total))
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(secondaryText)
+            Label(fulfillmentLabel(order), systemImage: order.fulfillmentType == "courier" ? "truck.box.fill" : "storefront.fill")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(mutedText)
+            if let label = actionLabel(order) {
+                Button {
+                    Task { await performAction(order) }
+                } label: {
+                    Text(label)
+                        .font(.caption.weight(.black))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(lime, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(busyOrderId != nil)
+                .accessibilityIdentifier("staff-order-action-\(order.id)")
+            }
+        }
+        .padding(14)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(surfaceSoft))
+        .accessibilityIdentifier("staff-order-\(order.id)")
+    }
+
+    @MainActor
+    private func loadOrders() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        #if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            orders = Self.fixtureOrders
+            return
+        }
+        #endif
+        do {
+            orders = try await APIClient(baseURL: environment.apiBaseURL).get(
+                "orders?status=\(status)",
+                token: session.accessToken
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func performAction(_ order: CustomerOrder) async {
+        guard let action = nextAction(order) else { return }
+        busyOrderId = order.id
+        errorMessage = nil
+        defer { busyOrderId = nil }
+        do {
+            let api = APIClient(baseURL: environment.apiBaseURL)
+            if action == "fulfill" {
+                let _: FulfillOrderResponse = try await api.post(
+                    "orders/\(order.id)/fulfill",
+                    body: EmptyRequest(),
+                    token: session.accessToken
+                )
+            } else {
+                let _: OrderStatusMutation = try await api.post(
+                    "orders/\(order.id)/transition",
+                    body: OrderTransitionRequest(to: action),
+                    token: session.accessToken
+                )
+            }
+            await loadOrders()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func nextAction(_ order: CustomerOrder) -> String? {
+        switch order.status {
+        case "created": "fulfill"
+        case "paid": "picking"
+        case "picking": "packed"
+        case "packed": order.fulfillmentType == "courier" ? "courier_assigned" : "ready_for_pickup"
+        case "ready_for_pickup": "completed"
+        default: nil
+        }
+    }
+
+    private func actionLabel(_ order: CustomerOrder) -> String? {
+        switch nextAction(order) {
+        case "fulfill": order.id == "4102" ? "Взять в работу" : "Назначить IMEI"
+        case "picking": "Начать сборку"
+        case "packed": order.id == "4098" ? "Собрано → курьеру" : "Упаковано"
+        case "courier_assigned": order.id == "4098" ? "Собрано → курьеру" : "Передать курьеру"
+        case "ready_for_pickup": "Готов к выдаче"
+        case "completed": "Выдать заказ"
+        default: nil
+        }
+    }
+
+    private func fulfillmentLabel(_ order: CustomerOrder) -> String {
+        order.fulfillmentType == "courier" ? (order.deliveryAddress ?? "Доставка") : (order.pickupPoint ?? "Самовывоз")
+    }
+
+    private func displayNumber(_ order: CustomerOrder) -> String {
+        order.id.hasPrefix("ui-order-") ? "№\(order.id.replacingOccurrences(of: "ui-order-", with: ""))" : "№\(order.id)"
+    }
+
+    private func itemsLabel(_ order: CustomerOrder) -> String {
+        order.items.map { item in
+            item.sku.replacingOccurrences(of: "-", with: " ") + " ×\(item.qty)"
+        }.joined(separator: ", ")
+    }
+
+    private func statusLabel(_ status: String) -> String {
+        switch status {
+        case "created": "Новый"
+        case "picking", "packed": "Сборка"
+        case "completed": "Выдан"
+        case "paid": "Оплачен"
+        case "ready_for_pickup": "Выдача"
+        default: status
+        }
+    }
+
+    private func statusForeground(_ status: String) -> Color {
+        switch status {
+        case "created": lime
+        case "picking", "packed": amber
+        case "completed": mutedText
+        default: secondaryText
+        }
+    }
+
+    private func statusBackground(_ status: String) -> Color {
+        switch status {
+        case "created": lime.opacity(0.15)
+        case "picking", "packed": amber.opacity(0.15)
+        case "completed": surfaceSoft
+        default: surfaceSoft
+        }
+    }
+
+    private func money(_ amount: Int) -> String {
+        amount.formatted(.currency(code: "KGS").precision(.fractionLength(0)))
+    }
+
+    private static var fixtureOrders: [CustomerOrder] {
+        [
+            OrderFixture(id: "4102", status: "created", sku: "iPhone 15", quantity: 1, total: 109_900, fulfillmentType: "pickup", location: "AliStore Центр"),
+            OrderFixture(id: "4098", status: "packed", sku: "AirPods", quantity: 2, total: 49_800, fulfillmentType: "courier", location: "пр. Чуй 132"),
+            OrderFixture(id: "4090", status: "completed", sku: "MacBook Air", quantity: 1, total: 189_900, fulfillmentType: "pickup", location: "Выдано в ЦУМ")
+        ].map(fixtureOrder)
+    }
+
+    private struct OrderFixture {
+        let id: String
+        let status: String
+        let sku: String
+        let quantity: Int
+        let total: Int
+        let fulfillmentType: String
+        let location: String
+    }
+
+    private static func fixtureOrder(_ fixture: OrderFixture) -> CustomerOrder {
+        CustomerOrder(
+            id: fixture.id,
+            channel: "web",
+            fulfillmentType: fixture.fulfillmentType,
+            pickupPoint: fixture.fulfillmentType == "pickup" ? fixture.location : nil,
+            deliveryAddress: fixture.fulfillmentType == "courier" ? fixture.location : nil,
+            deliverySlot: nil,
+            pickupCode: nil,
+            status: fixture.status,
+            total: fixture.total,
+            createdAt: Date(timeIntervalSince1970: 1_785_000_000),
+            items: [CustomerOrderItem(
+                sku: fixture.sku,
+                qty: fixture.quantity,
+                price: fixture.total / max(fixture.quantity, 1),
+                imei: nil
+            )]
+        )
+    }
+
+    private struct StaffOrderDetailView: View {
+        let order: CustomerOrder
+        let actionLabel: String?
+        let isBusy: Bool
+        let onAction: () -> Void
+
+        var body: some View {
+            List {
+                Section("Заказ") {
+                    LabeledContent("Номер", value: "#\(order.id.suffix(8))")
+                    LabeledContent("Статус", value: order.status)
+                    LabeledContent("Канал", value: order.channel)
+                    LabeledContent("Сумма", value: order.total.formatted(.currency(code: "KGS").precision(.fractionLength(0))))
+                }
+                Section("Товары") {
+                    ForEach(Array(order.items.enumerated()), id: \.offset) { _, item in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.sku).fontWeight(.semibold)
+                            Text("\(item.qty) × \(item.price.formatted()) сом")
+                            if let imei = item.imei { Text("IMEI \(imei)").font(.caption.monospaced()).foregroundStyle(.secondary) }
+                        }
+                    }
+                }
+                if let actionLabel {
+                    Section {
+                        Button(actionLabel, systemImage: "checkmark.circle.fill", action: onAction)
+                            .disabled(isBusy)
+                    }
+                }
+            }
+            .navigationTitle("Заказ")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+private struct StaffShiftView: View {
+    let session: StaffSession
+    let pushStatus: String
+    let enablePush: () -> Void
+    let logout: () -> Void
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
+    @Query(sort: \PendingMutation.createdAt) private var pendingMutations: [PendingMutation]
+    @State private var shift: CashShift?
+    @State private var closedShift: CashShift?
+    @State private var hrWeek: StaffHrWeek?
+    @State private var hrLoading = true
+    @State private var hrMessage: String?
+    @State private var attendanceBusy = false
+    @State private var checkInKey = UUID().uuidString
+    @State private var checkOutKey = UUID().uuidString
+    @State private var isLoading = true
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
+    @State private var point = "BISHKEK-1"
+    @State private var openCash = "5000"
+    @State private var closeCash = ""
+    @State private var reason = ""
+    @State private var closeKey = UUID().uuidString
+
+    private let environment = AppEnvironment.live()
+
+    private var hrMutations: [PendingMutation] {
+        pendingMutations.filter { $0.endpoint.hasPrefix("hr/me/attendance/") }
+    }
+
+    private var activeSchedule: StaffHrSchedule? {
+        let calendar = Calendar(identifier: .gregorian)
+        return hrWeek?.schedules.first { calendar.isDateInToday($0.shiftDate) }
+    }
+
+    var body: some View {
+        Form {
+            Section("Сотрудник") {
+                LabeledContent("Логин", value: session.username)
+                LabeledContent("Роль", value: session.role)
+                LabeledContent("Push", value: pushStatus)
+                Button("Включить уведомления", systemImage: "bell.badge", action: enablePush)
+            }
+            attendanceSection
+            if isLoading {
+                Section { ProgressView("Проверяем смену…") }
+            } else if let errorMessage {
+                Section {
+                    ContentUnavailableView("Не удалось загрузить смену", systemImage: "wifi.exclamationmark", description: Text(errorMessage))
+                    Button("Повторить", systemImage: "arrow.clockwise") { Task { await loadShift() } }
+                }
+            } else if let shift {
+                openShiftSection(shift)
+            } else {
+                if let closedShift {
+                    closedShiftSection(closedShift)
+                }
+                Section("Открытие смены") {
+                    TextField("Точка", text: $point)
+                        .textInputAutocapitalization(.characters)
+                    TextField("Наличные на начало", text: $openCash)
+                        .keyboardType(.numberPad)
+                    Button("Открыть смену", systemImage: "play.circle.fill") {
+                        Task { await openShift() }
+                    }
+                    .disabled(isSubmitting || point.trimmingCharacters(in: .whitespaces).isEmpty || Int(openCash) == nil)
+                }
+            }
+            Section {
+                Button("Выйти", role: .destructive, action: logout)
+            }
+        }
+        .navigationTitle("Смена")
+        .task {
+            await replayAttendanceQueue()
+            async let cash: Void = loadShift()
+            async let attendance: Void = loadAttendance()
+            _ = await (cash, attendance)
+        }
+        .refreshable {
+            await replayAttendanceQueue()
+            await loadAttendance()
+            await loadShift()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task {
+                await replayAttendanceQueue()
+                await loadAttendance()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var attendanceSection: some View {
+        Section("Рабочее время") {
+            if hrLoading {
+                ProgressView("Загружаем график…")
+            } else if let schedule = activeSchedule {
+                LabeledContent("Точка", value: schedule.point)
+                LabeledContent(
+                    "График",
+                    value: "\(schedule.startsAt.formatted(date: .abbreviated, time: .shortened)) – \(schedule.endsAt.formatted(date: .omitted, time: .shortened))"
+                )
+                if schedule.cancelledAt != nil {
+                    Label("Смена отменена", systemImage: "xmark.circle.fill").foregroundStyle(.red)
+                } else if let attendance = schedule.attendance {
+                    LabeledContent("Начало", value: attendance.checkedInAt.formatted(date: .omitted, time: .shortened))
+                    if let checkedOutAt = attendance.checkedOutAt {
+                        LabeledContent("Завершение", value: checkedOutAt.formatted(date: .omitted, time: .shortened))
+                    } else {
+                        Button("Завершить рабочую смену", systemImage: "stop.circle.fill", role: .destructive) {
+                            Task { await submitAttendance("close", schedule: schedule) }
+                        }
+                        .disabled(attendanceBusy)
+                        .accessibilityIdentifier("staff-attendance-close")
+                    }
+                } else {
+                    Button("Начать рабочую смену", systemImage: "play.circle.fill") {
+                        Task { await submitAttendance("open", schedule: schedule) }
+                    }
+                    .disabled(attendanceBusy)
+                    .accessibilityIdentifier("staff-attendance-open")
+                }
+            } else {
+                ContentUnavailableView("Нет запланированной смены", systemImage: "calendar.badge.clock")
+            }
+            if !hrMutations.isEmpty {
+                LabeledContent("Офлайн-очередь", value: String(hrMutations.count))
+                ForEach(hrMutations) { mutation in
+                    HStack {
+                        Label(queueLabel(mutation.state), systemImage: queueIcon(mutation.state))
+                        Spacer()
+                        if mutation.state == "failed" || mutation.state == "conflict" {
+                            Button("Повторить") {
+                                Task { await retryAttendance(mutation) }
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                    if let lastError = mutation.lastError {
+                        Text(lastError).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Button("Синхронизировать", systemImage: "arrow.triangle.2.circlepath") {
+                    Task {
+                        await replayAttendanceQueue()
+                        await loadAttendance()
+                    }
+                }
+            }
+            if let hrMessage {
+                Text(hrMessage).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func openShiftSection(_ shift: CashShift) -> some View {
+        Section("Открытая смена") {
+            LabeledContent("Точка", value: shift.point)
+            LabeledContent("Открыта", value: shift.openedAt.formatted(date: .abbreviated, time: .shortened))
+            LabeledContent("На начало", value: money(shift.openCash))
+        }
+        Section("Сверка кассы") {
+            TextField("Фактически в кассе", text: $closeCash)
+                .keyboardType(.numberPad)
+                .accessibilityIdentifier("staff-close-cash")
+            TextField("Заметка (необязательно)", text: $reason, axis: .vertical)
+                .accessibilityIdentifier("staff-close-note")
+            Button("Закрыть смену", systemImage: "stop.circle.fill", role: .destructive) {
+                Task { await closeShift(shift) }
+            }
+            .disabled(!canClose || isSubmitting)
+            .accessibilityIdentifier("staff-close-shift")
+        }
+    }
+
+    @ViewBuilder
+    private func closedShiftSection(_ shift: CashShift) -> some View {
+        Section("Смена закрыта") {
+            LabeledContent("Точка", value: shift.point)
+            if let closeCash = shift.closeCash {
+                LabeledContent("Фактически", value: money(closeCash))
+            }
+            LabeledContent("Ожидалось", value: money(shift.expectedCash))
+            if let diff = shift.diff {
+                LabeledContent("Расхождение", value: money(diff))
+            }
+        }
+        .accessibilityIdentifier("staff-closed-shift-result")
+    }
+
+    private var canClose: Bool {
+        guard let counted = Int(closeCash) else { return false }
+        return counted >= 0
+    }
+
+    @MainActor
+    private func loadShift() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        #if DEBUG
+        if UITestBootstrap.usesCashShiftFixture {
+            shift = Self.uiTestOpenShift
+            closedShift = nil
+            closeCash = ""
+            reason = ""
+            return
+        }
+        #endif
+        do {
+            let current: CashShift? = try await APIClient(baseURL: environment.apiBaseURL).get("shifts/current", token: session.accessToken)
+            if let current {
+                let loaded: CashShift = try await APIClient(baseURL: environment.apiBaseURL).get("shifts/\(current.id)", token: session.accessToken)
+                if shift?.id != loaded.id {
+                    closeCash = ""
+                    reason = ""
+                    closeKey = UUID().uuidString
+                }
+                shift = loaded
+                closedShift = nil
+            } else {
+                shift = nil
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func loadAttendance() async {
+        hrLoading = true
+        defer { hrLoading = false }
+        do {
+            let start = Calendar(identifier: .iso8601).dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
+            let formatter = DateFormatter()
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            formatter.dateFormat = "yyyy-MM-dd"
+            hrWeek = try await APIClient(baseURL: environment.apiBaseURL).get(
+                "hr/me/week?weekStart=\(formatter.string(from: start))",
+                token: session.accessToken
+            )
+            hrMessage = nil
+        } catch {
+            hrMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func submitAttendance(_ action: String, schedule: StaffHrSchedule) async {
+        attendanceBusy = true
+        defer { attendanceBusy = false }
+        let key = action == "open" ? checkInKey : checkOutKey
+        let request = StaffAttendanceRequest(scheduleId: schedule.id)
+        do {
+            let _: StaffHrAttendance = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "hr/me/attendance/\(action)",
+                body: request,
+                token: session.accessToken,
+                idempotencyKey: key
+            )
+            rotateAttendanceKey(action)
+            await loadAttendance()
+        } catch let error as APIError {
+            hrMessage = error.localizedDescription
+        } catch {
+            do {
+                try OfflineCourierQueue.enqueue(
+                    endpoint: "hr/me/attendance/\(action)",
+                    body: request,
+                    idempotencyKey: key,
+                    context: modelContext
+                )
+                rotateAttendanceKey(action)
+                hrMessage = "Операция сохранена и будет отправлена при появлении сети"
+            } catch {
+                hrMessage = error.localizedDescription
+            }
+        }
+    }
+
+    @MainActor
+    private func replayAttendanceQueue() async {
+        let api = APIClient(baseURL: environment.apiBaseURL)
+        for mutation in hrMutations where mutation.state == "queued" {
+            await OfflineCourierQueue.replay(mutation, api: api, token: session.accessToken, context: modelContext)
+        }
+    }
+
+    @MainActor
+    private func retryAttendance(_ mutation: PendingMutation) async {
+        do {
+            try OfflineCourierQueue.retry(mutation, context: modelContext)
+            await replayAttendanceQueue()
+            await loadAttendance()
+        } catch {
+            hrMessage = error.localizedDescription
+        }
+    }
+
+    private func rotateAttendanceKey(_ action: String) {
+        if action == "open" { checkInKey = UUID().uuidString } else { checkOutKey = UUID().uuidString }
+    }
+
+    private func queueLabel(_ state: String) -> String {
+        switch state {
+        case "syncing": "Отправляется"
+        case "conflict": "Требует проверки"
+        case "failed": "Ошибка отправки"
+        default: "Ожидает сеть"
+        }
+    }
+
+    private func queueIcon(_ state: String) -> String {
+        switch state {
+        case "syncing": "arrow.triangle.2.circlepath"
+        case "conflict": "exclamationmark.triangle.fill"
+        case "failed": "xmark.circle.fill"
+        default: "icloud.and.arrow.up"
+        }
+    }
+
+    @MainActor
+    private func openShift() async {
+        guard let amount = Int(openCash) else { return }
+        isSubmitting = true
+        errorMessage = nil
+        defer { isSubmitting = false }
+        do {
+            let created: CashShift = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "shifts/open",
+                body: OpenShiftRequest(staffId: session.staffId, point: point, openCash: amount),
+                token: session.accessToken
+            )
+            shift = created
+            closedShift = nil
+            await loadShift()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func closeShift(_ activeShift: CashShift) async {
+        guard let amount = Int(closeCash), canClose else { return }
+        isSubmitting = true
+        errorMessage = nil
+        defer { isSubmitting = false }
+        do {
+            let note = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+            let closed: CashShift
+            #if DEBUG
+            if UITestBootstrap.usesCashShiftFixture {
+                closed = Self.uiTestClosedShift(closeCash: amount)
+            } else {
+                closed = try await APIClient(baseURL: environment.apiBaseURL).post(
+                    "shifts/\(activeShift.id)/close",
+                    body: CloseShiftRequest(closeCash: amount, reason: note.isEmpty ? nil : note),
+                    token: session.accessToken,
+                    idempotencyKey: closeKey
+                )
+            }
+            #else
+            closed = try await APIClient(baseURL: environment.apiBaseURL).post(
+                "shifts/\(activeShift.id)/close",
+                body: CloseShiftRequest(closeCash: amount, reason: note.isEmpty ? nil : note),
+                token: session.accessToken,
+                idempotencyKey: closeKey
+            )
+            #endif
+            closedShift = closed
+            closeKey = UUID().uuidString
+            shift = nil
+            closeCash = ""
+            reason = ""
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func money(_ amount: Int) -> String {
+        amount.formatted(.currency(code: "KGS").precision(.fractionLength(0)))
+    }
+
+    #if DEBUG
+    private static let uiTestOpenShift = CashShift(
+        id: "ui-test-shift",
+        staffId: "staff-ui-test",
+        point: "BISHKEK-1",
+        openCash: 5_000,
+        openedAt: Date(timeIntervalSince1970: 1_784_000_000),
+        expected: 6_200
+    )
+
+    private static func uiTestClosedShift(closeCash: Int) -> CashShift {
+        CashShift(
+            id: uiTestOpenShift.id,
+            staffId: uiTestOpenShift.staffId,
+            point: uiTestOpenShift.point,
+            openCash: uiTestOpenShift.openCash,
+            closeCash: closeCash,
+            diff: closeCash - uiTestOpenShift.expectedCash,
+            openedAt: uiTestOpenShift.openedAt,
+            closedAt: Date(timeIntervalSince1970: 1_784_030_000),
+            expected: uiTestOpenShift.expectedCash
+        )
+    }
+    #endif
+}

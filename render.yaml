@@ -1,0 +1,347 @@
+services:
+  - type: web
+    name: alistore-api-prod
+    runtime: docker
+    region: frankfurt
+    plan: standard
+    dockerfilePath: ./docker/api.Dockerfile
+    dockerContext: .
+    autoDeployTrigger: off
+    renderSubdomainPolicy: allowed
+    # /live возвращал { status: 'ok' } без проверки БД, поэтому Render объявлял
+    # деплой успешным поверх недоступной базы, а каждый запрос каталога отдавал
+    # 500. /ready дёргает db.pingCheck — деплой не переключит трафик на мёртвую
+    # базу.
+    healthCheckPath: /api/health/ready
+    preDeployCommand: npm run db:deploy -w @alistore/api
+    envVars:
+      - fromGroup: alistore-prod-common
+      - key: PROCESS_ROLE
+        value: api
+      # Expand/switch auth rollout: leave false while the previous API revision
+      # drains after the additive enum migration, then enable explicitly.
+      - key: AUTH_RECOVERY_OTP_ENABLED
+        value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: alistore-postgres-prod
+          property: connectionPoolString
+      - key: DIRECT_DATABASE_URL
+        fromDatabase:
+          name: alistore-postgres-prod
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: alistore-redis-prod
+          type: keyvalue
+          property: connectionString
+      - key: MEILI_API_KEY
+        fromService:
+          name: alistore-meilisearch-prod
+          type: pserv
+          envVarKey: MEILI_MASTER_KEY
+      - key: S3_ENDPOINT
+        sync: false
+      - key: MINIO_ROOT_USER
+        sync: false
+      - key: MINIO_ROOT_PASSWORD
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+
+  - type: web
+    name: alistore-web-prod
+    runtime: docker
+    region: frankfurt
+    plan: standard
+    dockerfilePath: ./docker/web.Dockerfile
+    dockerContext: .
+    autoDeployTrigger: off
+    renderSubdomainPolicy: allowed
+    healthCheckPath: /healthz
+    envVars:
+      - key: ALLOWED_HOSTS
+        value: ali.kg,www.ali.kg,admin.ali.kg
+      # Без этой переменной сборка витрины не знает адреса API. В коде есть
+      # аварийный вывод адреса из origin (apps/web/lib/api/http.ts), но он —
+      # страховка от забытой переменной, а не способ её не задавать: адрес
+      # должен быть объявлен там же, где объявлен сам сервис.
+      # Значение совпадает с CORS_ORIGINS и ALLOWED_HOSTS сервиса API ниже.
+      - key: NEXT_PUBLIC_API_BASE
+        value: https://api.ali.kg/api
+      # Демо-режим штамповал каждый заказ витрины как isDemo: выбранные зона и
+      # интервал доставки писались в базу как null (orders.service.ts), слот не
+      # бронировался, а order_confirmed гасилось условием `!order.isDemo`.
+      # Покупатель выбирал «14:00–16:00» и не получал ни брони, ни письма.
+      - key: PUBLIC_DEMO_MODE
+        value: "false"
+      - key: NEXT_PUBLIC_DEMO_MODE
+        value: "false"
+      # This public gate is baked into the Next client build. Keep it false
+      # until deterministic API grace is enabled on every API instance.
+      - key: NEXT_PUBLIC_AUTH_REFRESH_ROTATION_GRACE_ENABLED
+        value: "false"
+      - key: SENTRY_DSN
+        fromService: { name: alistore-api-prod, type: web, envVarKey: SENTRY_DSN }
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        fromService: { name: alistore-api-prod, type: web, envVarKey: SENTRY_DSN }
+      - key: SENTRY_ENVIRONMENT
+        value: production
+      - key: NEXT_PUBLIC_SENTRY_ENVIRONMENT
+        value: production
+
+  - type: worker
+    name: alistore-worker-prod
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    dockerfilePath: ./docker/api.Dockerfile
+    dockerContext: .
+    dockerCommand: npm run start:worker -w @alistore/api
+    autoDeployTrigger: off
+    envVars:
+      - fromGroup: alistore-prod-common
+      - key: PROCESS_ROLE
+        value: worker
+      # Провайдерских возвратов при оплате наличными не существует физически:
+      # деньги приходят курьеру или на кассу, возврат идёт через домен refunds.
+      # При PAYMENT_PROVIDER=none preflight считает включённый релей unsafe.
+      - key: REFUND_RELAY_ENABLED
+        value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: alistore-postgres-prod
+          property: connectionPoolString
+      - key: REDIS_URL
+        fromService:
+          name: alistore-redis-prod
+          type: keyvalue
+          property: connectionString
+      - key: MEILI_API_KEY
+        fromService:
+          name: alistore-meilisearch-prod
+          type: pserv
+          envVarKey: MEILI_MASTER_KEY
+      - key: S3_ENDPOINT
+        fromService: { name: alistore-api-prod, type: web, envVarKey: S3_ENDPOINT }
+      - key: MINIO_ROOT_USER
+        fromService: { name: alistore-api-prod, type: web, envVarKey: MINIO_ROOT_USER }
+      - key: MINIO_ROOT_PASSWORD
+        fromService: { name: alistore-api-prod, type: web, envVarKey: MINIO_ROOT_PASSWORD }
+      - key: SENTRY_DSN
+        fromService: { name: alistore-api-prod, type: web, envVarKey: SENTRY_DSN }
+
+  - type: cron
+    name: alistore-backup-prod
+    runtime: docker
+    region: frankfurt
+    schedule: "0 3 * * *"
+    dockerfilePath: ./docker/api.Dockerfile
+    dockerContext: .
+    dockerCommand: node apps/api/dist/ops/backup-to-s3.js
+    envVars:
+      - fromGroup: alistore-prod-common
+      - key: DATABASE_URL
+        fromDatabase:
+          name: alistore-postgres-prod
+          property: connectionString
+      - key: S3_ENDPOINT
+        fromService: { name: alistore-api-prod, type: web, envVarKey: S3_ENDPOINT }
+      - key: MINIO_ROOT_USER
+        fromService: { name: alistore-api-prod, type: web, envVarKey: MINIO_ROOT_USER }
+      - key: MINIO_ROOT_PASSWORD
+        fromService: { name: alistore-api-prod, type: web, envVarKey: MINIO_ROOT_PASSWORD }
+
+  - type: pserv
+    name: alistore-meilisearch-prod
+    runtime: image
+    region: frankfurt
+    plan: starter
+    image:
+      url: getmeili/meilisearch:v1.37
+    disk:
+      name: meili-data
+      mountPath: /meili_data
+      sizeGB: 10
+    envVars:
+      - key: MEILI_ENV
+        value: production
+      - key: MEILI_NO_ANALYTICS
+        value: "true"
+      - key: MEILI_MASTER_KEY
+        generateValue: true
+
+  - type: keyvalue
+    name: alistore-redis-prod
+    region: frankfurt
+    plan: starter
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+    persistenceMode: journal-snapshot
+
+databases:
+  - name: alistore-postgres-prod
+    region: frankfurt
+    plan: basic-1gb
+    databaseName: alistore_prod
+    user: alistore_app
+    postgresMajorVersion: "16"
+    connectionPool: pgbouncer
+    ipAllowList: []
+    storageAutoscalingEnabled: true
+
+envVarGroups:
+  - name: alistore-prod-common
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      # Mixed-version rollout gate. Keep false until every legacy API instance
+      # is drained, then enable together with the dedicated secret below.
+      - key: AUTH_REFRESH_ROTATION_GRACE_ENABLED
+        value: "false"
+      - key: AUTH_REFRESH_DERIVATION_SECRET
+        sync: false
+      # Keep disabled until email OTP delivery moves to a durable encrypted job.
+      - key: AUTH_EMAIL_LOGIN_ENABLED
+        value: "false"
+      # Канал критических алертов. Без этих двух значений alerter.service держит
+      # алерты в массиве в памяти процесса (delivered: false) — рестарт их
+      # стирает, и о 5xx, смерти relay и падении refund-релея не узнаёт никто.
+      # Владелец задаёт токен и chatId бота в дашборде Render (sync: false —
+      # секрет не в блюпринте).
+      - key: ALERT_TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: ALERT_TELEGRAM_CHAT_ID
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://ali.kg,https://www.ali.kg,https://admin.ali.kg
+      - key: ALLOWED_HOSTS
+        value: api.ali.kg
+      - key: PUBLIC_DEMO_MODE
+        value: "false"
+      - key: AUTH_OTP_DEV_ECHO
+        value: "false"
+      - key: API_DOCS_ENABLED
+        value: "false"
+      # Запуск за наличные при получении: онлайн-шлюза нет по решению
+      # владельца. `sandbox` здесь означал, что реальный покупатель на реальном
+      # домене получает счёт со страницей «Списание средств не производится» и
+      # кнопкой подтверждения, которая 404-ит (PAYMENTS_SANDBOX_CONFIRM_ENABLED
+      # не задан). `none` — честный 503 online_payments_unavailable.
+      - key: PAYMENT_PROVIDER
+        value: none
+      - key: PAYMENT_PROVIDER_CERTIFIED
+        value: "false"
+      - key: PAYMENTS_SANDBOX_CONFIRM_ENABLED
+        value: "false"
+      # `silent` селектор не знает: otp-sender-selector.ts принимает `noop` и
+      # `production`. Вызов стоит в useFactory провайдера OTP_SENDER, поэтому
+      # неизвестное значение роняло контейнер Nest до первого запроса — снаружи
+      # это выглядело как 502 без объяснения. Покрыто тестом, который читает
+      # этот файл: apps/api/test/otp-sender-selector.spec.ts
+      - key: SMS_PROVIDER
+        value: disabled
+      - key: SMS_PROVIDER_CERTIFIED
+        value: "false"
+      # Мост через Android-телефон. Чтобы включить: SMS_PROVIDER=android_gateway
+      # и задать эти четыре секрета в дашборде Render (sync: false — значения не
+      # в блюпринте, вводит владелец). Passphrase обязана совпадать с заданной на
+      # устройстве: код входа уходит в публичное облако зашифрованным, и без
+      # совпадения телефон его не расшифрует. Покрыто otp-sender-selector.spec.ts
+      # и production-preflight.spec.ts.
+      - key: SMS_GATEWAY_URL
+        sync: false
+      - key: SMS_GATEWAY_USERNAME
+        sync: false
+      - key: SMS_GATEWAY_PASSWORD
+        sync: false
+      - key: SMS_GATEWAY_ENCRYPTION_PASSPHRASE
+        sync: false
+      # Ниже — слоты входов, которых в блюпринте не было вовсе. Пустой слот
+      # ничего не включает: `GET /api/auth/methods` просто продолжит отвечать,
+      # что канал мёртв, и витрина не нарисует кнопку. Но заполнить их теперь
+      # можно в дашборде Render, без правки репозитория и пересборки образа —
+      # раньше половина этих переменных читалась кодом, не будучи объявленной
+      # нигде, а витрина решала судьбу кнопок по флагам, вшитым в бандл Next.
+      #
+      # Sign in with Apple. APPLE_CLIENT_ID принимает СПИСОК аудиторий: Services
+      # ID сайта и bundle id нативного приложения — с одним значением половина
+      # входов отвалится с «audience is invalid». APPLE_WEB_CLIENT_ID обязателен
+      # для кнопки на сайте: угадать по виду строки, где Services ID, а где
+      # bundle id, нельзя, и вывода из APPLE_CLIENT_ID нет намеренно.
+      - key: APPLE_CLIENT_ID
+        sync: false
+      - key: APPLE_WEB_CLIENT_ID
+        sync: false
+      # Вход через Telegram. Это НЕ ALERT_TELEGRAM_BOT_TOKEN выше: тот канал
+      # дежурного, этим проверяется подпись initData.
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      # Имя бота для Login Widget в обычном браузере (атрибут
+      # data-telegram-login). Без него вход через Telegram остаётся доступен
+      # только внутри Mini App, где initData подписывает сам Telegram.
+      - key: TELEGRAM_BOT_USERNAME
+        sync: false
+      # Транспорт email-кода. Без SMTP_HOST в production отправитель уходит в
+      # заглушку и вход по почте отвечает email_transport_unavailable. Домен в
+      # SMTP_FROM обязан совпадать с верифицированным у провайдера, иначе письмо
+      # отклоняется на его стороне.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      # Первый владелец ERP. Маршрут /staff-auth/bootstrap в production отдаёт
+      # 404, пока здесь не стоит "true", а другого способа завести стартовую
+      # учётку нет — сида сотрудников в репозитории не существует. Включать на
+      # время первого входа и возвращать в "false".
+      - key: STAFF_BOOTSTRAP_ENABLED
+        value: "false"
+      - key: POS_HARDWARE_CERTIFIED
+        value: "false"
+      - key: JOB_BACKEND
+        value: bullmq
+      - key: RESERVATION_SWEEP_ENABLED
+        value: "true"
+      - key: SERVICE_SLA_SWEEP_ENABLED
+        value: "true"
+      # Напоминания о долгах не включались ни разу: без этого флага
+      # debts.scheduler молча не стартует, а preflight про него не спрашивал.
+      # Рассрочки — деньги магазина, о просрочке которых иначе никто не узнает.
+      - key: DEBT_REMINDERS_ENABLED
+        value: "true"
+      - key: OUTBOX_RELAY_ENABLED
+        value: "true"
+      # Без явного значения выбиралась лог-заглушка: она резолвится успешно,
+      # сообщение помечается sent, дашборд показывает pending: 0 / failed: 0 —
+      # и ни один клиент ничего не получает. `realtime` честен: сотрудники
+      # получают события в интерфейсе, клиенты — строки в своей ленте
+      # (CustomerNotification создаётся независимо от транспорта). SMS/e-mail
+      # появятся здесь, когда владелец подключит провайдера.
+      - key: NOTIFICATION_TRANSPORT
+        value: realtime
+      - key: REFUND_RELAY_ENABLED
+        value: "false"
+      - key: MEILI_HOST
+        value: http://alistore-meilisearch-prod:7700
+      - key: MEILI_PRODUCTS_INDEX
+        value: products
+      - key: MEDIA_STORAGE
+        value: s3
+      - key: S3_REGION
+        value: auto
+      - key: EVIDENCE_SIGNED_URL_TTL_SECONDS
+        value: "300"
+      - key: S3_PUBLIC_BASE
+        value: https://media.ali.kg
+      - key: MINIO_BUCKET
+        value: alistore-media-prod
+      - key: S3_BACKUP_BUCKET
+        value: alistore-backups-prod

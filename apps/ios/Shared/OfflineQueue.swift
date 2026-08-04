@@ -1,0 +1,517 @@
+import Foundation
+import SwiftData
+
+@Model
+public final class PendingMutation {
+    @Attribute(.unique) public var id: UUID
+    public var endpoint: String
+    public var method: String
+    public var body: Data
+    public var idempotencyKey: String
+    public var attempts: Int
+    public var state: String = "queued"
+    public var lastError: String?
+    public var createdAt: Date
+    public var updatedAt: Date
+    /// Кто поставил операцию в очередь. Реплей шёл токеном того, кто вошёл в
+    /// приложение сейчас, — то есть продажу одного кассира леджер записывал на
+    /// следующего. Необязательное: у записей, созданных до этого поля, владельца
+    /// нет, и терять их нельзя.
+    public var owner: String?
+
+    public init(
+        endpoint: String,
+        method: String,
+        body: Data,
+        idempotencyKey: String = UUID().uuidString,
+        owner: String? = nil
+    ) {
+        self.id = UUID()
+        self.endpoint = endpoint
+        self.method = method
+        self.body = body
+        self.idempotencyKey = idempotencyKey
+        self.attempts = 0
+        self.state = "queued"
+        self.lastError = nil
+        self.createdAt = Date()
+        self.updatedAt = Date()
+        self.owner = owner
+    }
+}
+
+public enum OfflineOrderQueue {
+    /// Заказы, которые нужно переотправить. Включает `syncing` НАМЕРЕННО: `replay`
+    /// пишет `state = "syncing"` на диск ДО сетевого запроса, и если приложение
+    /// убили посреди отправки (фон, force-quit, разряд — ровно та плохая связь, из-за
+    /// которой заказ и попал в офлайн), запись навсегда застревала в `syncing` —
+    /// авто-повтор её пропускал, ручной был выключен, заказ терялся молча. То же
+    /// уже чинили в POS-очереди (`replayable`, `testSaleStuckInSyncingIsRetried`);
+    /// здесь фикс не применили. `idempotencyKey` защищает от дубля, если заказ на
+    /// самом деле ушёл.
+    public static func replayable(_ all: [PendingMutation]) -> [PendingMutation] {
+        all.filter { mutation in
+            guard mutation.endpoint == "orders/mine" else { return false }
+            return mutation.state == "queued" || mutation.state == "failed" || mutation.state == "syncing"
+        }
+    }
+
+    @MainActor
+    public static func enqueue(
+        _ request: CreateOrderRequest,
+        idempotencyKey: String,
+        context: ModelContext
+    ) throws {
+        // Канон — как в кассе и у курьера: сравнивать сырое кодирование
+        // бессмысленно, порядок ключей не гарантирован.
+        let body = OfflineQueueCoding.canonical(try JSONEncoder().encode(request))
+        let descriptor = FetchDescriptor<PendingMutation>(
+            predicate: #Predicate { $0.idempotencyKey == idempotencyKey }
+        )
+        // Та же развилка, что в двух других очередях: точный повтор идемпотентен,
+        // а другое тело под тем же ключом — потеря заказа, о которой покупатель
+        // обязан узнать. Здесь этой проверки не было, и это была единственная
+        // очередь, где переиспользованный ключ молча давал два заказа.
+        if let existing = try context.fetch(descriptor).first {
+            guard existing.body == body else { throw OfflineQueueError.keyReused }
+            return
+        }
+        context.insert(PendingMutation(
+            endpoint: "orders/mine",
+            method: "POST",
+            body: body,
+            idempotencyKey: idempotencyKey
+        ))
+        try context.save()
+    }
+
+    @MainActor
+    public static func replay(
+        _ mutation: PendingMutation,
+        api: APIClient,
+        token: String,
+        context: ModelContext
+    ) async {
+        mutation.state = "syncing"
+        mutation.attempts += 1
+        mutation.updatedAt = Date()
+        try? context.save()
+        do {
+            let request = try JSONDecoder().decode(CreateOrderRequest.self, from: mutation.body)
+            if request.fulfillmentType == "pickup" && request.storePointId == nil {
+                mutation.state = "conflict"
+                mutation.lastError = "Выберите актуальную точку самовывоза и создайте заказ повторно"
+                mutation.updatedAt = Date()
+                try? context.save()
+                return
+            }
+            let _: CustomerOrder = try await api.post(
+                mutation.endpoint,
+                body: request,
+                token: token,
+                idempotencyKey: mutation.idempotencyKey
+            )
+            context.delete(mutation)
+            try context.save()
+        } catch let error as APIError {
+            if case let .rejected(status, message) = error {
+                mutation.state = status == 409 || status == 422 ? "conflict" : "failed"
+                mutation.lastError = message
+            } else {
+                mutation.state = "failed"
+                mutation.lastError = error.localizedDescription
+            }
+            mutation.updatedAt = Date()
+            try? context.save()
+        } catch {
+            mutation.state = "queued"
+            mutation.lastError = error.localizedDescription
+            mutation.updatedAt = Date()
+            try? context.save()
+        }
+    }
+}
+
+public enum OfflineCourierQueue {
+    @MainActor
+    public static func enqueue<Body: Encodable>(
+        endpoint: String,
+        body: Body,
+        idempotencyKey: String,
+        context: ModelContext,
+        owner: String? = nil
+    ) throws {
+        let encoded = try OfflineQueueCoding.encode(body)
+        try enqueueEncoded(endpoint: endpoint, body: encoded, idempotencyKey: idempotencyKey, context: context, owner: owner)
+    }
+
+    @MainActor
+    public static func enqueueEncoded(
+        endpoint: String,
+        body rawBody: Data,
+        idempotencyKey: String,
+        context: ModelContext,
+        owner: String? = nil
+    ) throws {
+        // Тело могло прийти от произвольного кодировщика — приводим к канону,
+        // иначе сравнение с уже сохранённым бессмысленно.
+        let body = OfflineQueueCoding.canonical(rawBody)
+        let descriptor = FetchDescriptor<PendingMutation>(
+            predicate: #Predicate { $0.idempotencyKey == idempotencyKey }
+        )
+        // Та же развилка, что и в кассе: повтор — идемпотентен, подмена тела под
+        // тем же ключом — потеря операции, о которой курьер обязан узнать.
+        if let existing = try context.fetch(descriptor).first {
+            guard existing.body == body else { throw OfflineQueueError.keyReused }
+            return
+        }
+        context.insert(PendingMutation(
+            endpoint: endpoint,
+            method: "POST",
+            body: body,
+            idempotencyKey: idempotencyKey,
+            owner: owner
+        ))
+        try context.save()
+    }
+
+    /// Мутации, которые волен видеть и переотправлять текущий курьер: свои и legacy
+    /// без владельца. Сервер и так отклоняет чужую команду 403 (`assertAssignedCourier`),
+    /// поэтому денег это не теряет — но без фильтра после пересменки B видел бы очередь A,
+    /// упирался в 403 и ронял чужую команду в `failed`, а собранный A COD висел бы
+    /// невидимым для сверки. Тот же паттерн, что `OfflinePOSQueue.owned`.
+    public static func owned(_ all: [PendingMutation], by owner: String?) -> [PendingMutation] {
+        all.filter { mutation in
+            guard let mutationOwner = mutation.owner else { return true }
+            return mutationOwner == owner
+        }
+    }
+
+    /// Есть ли по этому заказу команда, которая ещё не применилась.
+    ///
+    /// Нужно, чтобы карточка доставки предупредила ДО отправки второй: сервер
+    /// разруливает статус заказа через CAS, поэтому первая (возможно устаревшая)
+    /// сумма выигрывает, а поздняя правильная ловит конфликт и пропадает с глаз
+    /// курьера. Сверяем по сегментам пути, а не подстрокой: `order-1` не должен
+    /// совпасть с `order-10`.
+    public static func hasPendingCommand(forOrder orderId: String, in mutations: [PendingMutation]) -> Bool {
+        mutations.contains { mutation in
+            guard unappliedStates.contains(mutation.state) else { return false }
+            return mutation.endpoint.split(separator: "/").contains { $0 == orderId }
+        }
+    }
+
+    private static let unappliedStates: Set<String> = ["queued", "syncing", "failed", "conflict"]
+
+    @MainActor
+    public static func replay(
+        _ mutation: PendingMutation,
+        api: APIClient,
+        token: String,
+        context: ModelContext
+    ) async {
+        mutation.state = "syncing"
+        mutation.attempts += 1
+        mutation.updatedAt = Date()
+        try? context.save()
+        do {
+            let _: IgnoredMutationResponse = try await api.postEncoded(
+                mutation.endpoint,
+                body: mutation.body,
+                token: token,
+                idempotencyKey: mutation.idempotencyKey
+            )
+            context.delete(mutation)
+            try context.save()
+        } catch let error as APIError {
+            if case let .rejected(status, message) = error {
+                mutation.state = status == 409 || status == 422 ? "conflict" : "failed"
+                mutation.lastError = message
+            } else {
+                mutation.state = "failed"
+                mutation.lastError = error.localizedDescription
+            }
+            mutation.updatedAt = Date()
+            try? context.save()
+        } catch {
+            mutation.state = "queued"
+            mutation.lastError = error.localizedDescription
+            mutation.updatedAt = Date()
+            try? context.save()
+        }
+    }
+
+    @MainActor
+    public static func retry(_ mutation: PendingMutation, context: ModelContext) throws {
+        mutation.state = "queued"
+        mutation.lastError = nil
+        mutation.updatedAt = Date()
+        try context.save()
+    }
+}
+
+/**
+ Каноническое кодирование тел очереди.
+
+ `JSONEncoder` **не гарантирует порядок ключей**: замерено, что два кодирования
+ одного и того же `POSSaleRequest` в одном процессе дают разный JSON. Поэтому
+ сравнивать тела побайтово можно только после приведения к канону — иначе повтор
+ той же продажи выглядит как другая операция.
+
+ Сортировка ключей не меняет смысла для сервера, а тело становится сравнимым и
+ стабильным между запусками.
+ */
+public enum OfflineQueueCoding {
+    public static func encode<Body: Encodable>(_ body: Body) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return try encoder.encode(body)
+    }
+
+    /// Приводит уже закодированное тело к тому же канону. Если это не JSON —
+    /// возвращает как есть: терять операцию из-за формата нельзя.
+    public static func canonical(_ body: Data) -> Data {
+        guard let object = try? JSONSerialization.jsonObject(with: body),
+              let sorted = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+        else { return body }
+        return sorted
+    }
+}
+
+/// Ошибки офлайн-очереди, которые обязан увидеть человек.
+public enum OfflineQueueError: LocalizedError, Equatable {
+    /// Под этим ключом уже лежит другая операция — принимать нельзя, потому что
+    /// одна из двух была бы потеряна без следа.
+    case keyReused
+
+    public var errorDescription: String? {
+        switch self {
+        case .keyReused:
+            return "Под этим номером продажи уже сохранена другая операция. Начните новую продажу."
+        }
+    }
+}
+
+public enum OfflinePOSQueue {
+    private static let approvalPrefix = "approval:"
+
+    @MainActor
+    public static func enqueue(
+        _ request: POSSaleRequest,
+        context: ModelContext,
+        owner: String? = nil
+    ) throws {
+        let body = try OfflineQueueCoding.encode(request)
+        let descriptor = FetchDescriptor<PendingMutation>(
+            predicate: #Predicate { $0.idempotencyKey == request.clientSaleId }
+        )
+        // Совпадение ключа — это два разных случая, и раньше оба молча
+        // проглатывались. Тот же запрос — идемпотентный повтор. Другой запрос
+        // под тем же ключом — следующий покупатель, продажа которого исчезала
+        // бы целиком, при том что касса писала «сохранено».
+        if let existing = try context.fetch(descriptor).first {
+            guard existing.body == body else { throw OfflineQueueError.keyReused }
+            return
+        }
+        context.insert(PendingMutation(
+            endpoint: "pos/sale",
+            method: "POST",
+            body: body,
+            idempotencyKey: request.clientSaleId,
+            owner: owner
+        ))
+        try context.save()
+    }
+
+    /// Продажи, которые может отправить именно этот кассир.
+    ///
+    /// Реплей шёл токеном того, кто вошёл сейчас: продажа, отложенная одним
+    /// кассиром, уходила на сервер от имени следующего — и леджер записывал
+    /// выручку и ответственность не на того человека. Чужие записи остаются
+    /// в очереди и ждут своего владельца, а не отправляются под чужим именем.
+    ///
+    /// `syncing` включается намеренно: приложение могли убить посреди отправки,
+    /// и такая запись раньше не переигрывалась никогда. Повторная отправка
+    /// безопасна — у неё тот же ключ идемпотентности, сервер отсечёт дубль.
+    public static func replayable(_ all: [PendingMutation], owner: String?) -> [PendingMutation] {
+        all.filter { mutation in
+            guard mutation.endpoint == "pos/sale" else { return false }
+            guard mutation.state == "queued" || mutation.state == "syncing" else { return false }
+            // Записи без владельца созданы до появления поля — их отправляет тот,
+            // кто есть: иначе они не уйдут никогда.
+            guard let mutationOwner = mutation.owner else { return true }
+            return mutationOwner == owner
+        }
+    }
+
+    /// Мутации, которые текущий кассир волен видеть и вручную переотправлять:
+    /// свои и legacy-записи без владельца. В отличие от `replayable(_:owner:)`
+    /// НЕ сужает по состоянию — ручная вкладка «Офлайн» чинит и `failed`, и
+    /// `conflict`, и «по одобрению», но только СВОИ. Иначе после пересменки
+    /// кассир B видел бы очередь кассира A и мог отправить его продажу под своим
+    /// токеном: сервер берёт staffId из токена звонящего, и выручка легла бы на B.
+    public static func owned(_ all: [PendingMutation], by owner: String?) -> [PendingMutation] {
+        all.filter { mutation in
+            guard let mutationOwner = mutation.owner else { return true }
+            return mutationOwner == owner
+        }
+    }
+
+    @MainActor
+    public static func replay(
+        _ mutation: PendingMutation,
+        api: APIClient,
+        token: String,
+        context: ModelContext
+    ) async {
+        mutation.state = "syncing"
+        mutation.attempts += 1
+        mutation.updatedAt = Date()
+        try? context.save()
+        do {
+            let result: POSSaleResult = try await api.postEncoded(
+                mutation.endpoint,
+                body: mutation.body,
+                token: token,
+                idempotencyKey: mutation.idempotencyKey
+            )
+            switch result {
+            case .completed:
+                context.delete(mutation)
+            case let .approvalRequired(approvalId, reason):
+                mutation.state = "conflict"
+                mutation.lastError = "\(approvalPrefix)\(approvalId)|\(reason)"
+                mutation.updatedAt = Date()
+            }
+            try context.save()
+        } catch let error as APIError {
+            if case let .rejected(status, message) = error {
+                mutation.state = status == 409 || status == 422 ? "conflict" : "failed"
+                mutation.lastError = message
+            } else {
+                mutation.state = "failed"
+                mutation.lastError = error.localizedDescription
+            }
+            mutation.updatedAt = Date()
+            try? context.save()
+        } catch {
+            mutation.state = "queued"
+            mutation.lastError = error.localizedDescription
+            mutation.updatedAt = Date()
+            try? context.save()
+        }
+    }
+
+    @MainActor
+    public static func retry(_ mutation: PendingMutation, context: ModelContext) throws {
+        mutation.state = "queued"
+        mutation.lastError = nil
+        mutation.updatedAt = Date()
+        try context.save()
+    }
+
+    @MainActor
+    public static func attachApproval(_ mutation: PendingMutation, context: ModelContext) throws {
+        guard let approvalId = approvalId(from: mutation.lastError) else { return }
+        let request = try JSONDecoder().decode(POSSaleRequest.self, from: mutation.body)
+        mutation.body = try OfflineQueueCoding.encode(request.approved(with: approvalId))
+        mutation.state = "queued"
+        mutation.lastError = nil
+        mutation.updatedAt = Date()
+        try context.save()
+    }
+
+    public static func approvalId(from error: String?) -> String? {
+        guard let error, error.hasPrefix(approvalPrefix) else { return nil }
+        return error.dropFirst(approvalPrefix.count).split(separator: "|", maxSplits: 1).first.map(String.init)
+    }
+}
+
+private struct IgnoredMutationResponse: Decodable, Sendable {
+    init(from decoder: Decoder) throws {}
+}
+
+/// Первая версия офлайн-схемы. `PendingMutation` намеренно остаётся top-level
+/// классом, а не вкладывается сюда: имя сущности SwiftData берёт из имени класса,
+/// и вложение переименовало бы её — существующие очереди стали бы невидимыми.
+/// Текущая (и пока единственная) версия схемы. Указывает на живой
+/// `PendingMutation` — со всеми его полями, включая опциональный `owner`.
+///
+/// Почему одна версия, а не V1+V2 со стадией: `owner` — опциональное поле, и
+/// SwiftData добавляет такую колонку сам, автоматической lightweight-миграцией.
+/// Две `VersionedSchema`, обе ссылающиеся на один живой класс, дают ОДИНАКОВУЮ
+/// контрольную сумму — SwiftData падает на старте с `Duplicate version checksums
+/// detected` у каждого, у кого уже есть store. Именно это и произошло: срез с
+/// добавлением `owner` ввёл вторую версию поверх той же модели и ронял запуск.
+public enum OfflineSchemaV1: VersionedSchema {
+    public static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
+    public static var models: [any PersistentModel.Type] { [PendingMutation.self] }
+}
+
+/// План миграций с одной версией и без стадий. Ценность не в текущем содержимом,
+/// а в каркасе: следующее НЕтривиальное изменение модели (переименование поля,
+/// смена типа) добавит сюда новую `VersionedSchema` со своим снимком модели и
+/// стадию — и не будет молча ломать запуск. Для добавления опционального поля
+/// новая версия не нужна и вредна (дубль контрольной суммы).
+public enum OfflineMigrationPlan: SchemaMigrationPlan {
+    public static var schemas: [any VersionedSchema.Type] { [OfflineSchemaV1.self] }
+    public static var stages: [MigrationStage] { [] }
+}
+
+@MainActor
+public enum OfflineStore {
+    /// Результат открытия хранилища. Деградация обязана быть видимой: очередь
+    /// в памяти выглядит рабочей ровно до перезапуска, после которого продажи
+    /// исчезают без следа.
+    public struct Opened {
+        public let container: ModelContainer
+        /// Очередь живёт только в оперативной памяти — офлайн-приём принимать нельзя.
+        public let isEphemeral: Bool
+        /// Причина отказа, пригодная для показа человеку.
+        public let failure: String?
+    }
+
+    /// Состояние последнего открытия — чтобы экраны могли отказать в офлайн-приёме
+    /// и сказать об этом кассиру, а не принимать продажи в никуда.
+    public private(set) static var isEphemeral = false
+    public private(set) static var failure: String?
+
+    /// - Parameter url: путь к store. `nil` — расположение по умолчанию;
+    ///   продовый путь своё имя не задаёт, иначе сменился бы файл базы.
+    public static func open(url: URL? = nil) -> Opened {
+        let schema = Schema(versionedSchema: OfflineSchemaV1.self)
+        do {
+            let configuration = url.map { ModelConfiguration(schema: schema, url: $0) }
+                ?? ModelConfiguration(schema: schema)
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: OfflineMigrationPlan.self,
+                configurations: configuration
+            )
+            return finish(Opened(container: container, isEphemeral: false, failure: nil))
+        } catch {
+            // Файл базы не удаляем ни при каких обстоятельствах: он может быть
+            // единственным следом непроведённых продаж, и его ещё можно достать
+            // руками. Приложение при этом обязано открыться — касса работает
+            // в онлайне, а офлайн-приём выключается явно.
+            let reason = "Офлайн-очередь недоступна: \(error.localizedDescription)"
+            if let memory = try? ModelContainer(
+                for: schema,
+                configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            ) {
+                return finish(Opened(container: memory, isEphemeral: true, failure: reason))
+            }
+            // Контейнер в памяти не создаётся только при поломке самой схемы —
+            // это дефект сборки, а не состояние устройства.
+            preconditionFailure("Не удалось создать даже временное офлайн-хранилище: \(error)")
+        }
+    }
+
+    public static func container() -> ModelContainer { open().container }
+
+    private static func finish(_ opened: Opened) -> Opened {
+        isEphemeral = opened.isEphemeral
+        failure = opened.failure
+        return opened
+    }
+}

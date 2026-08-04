@@ -1,0 +1,191 @@
+import { Body, Controller, ForbiddenException, Get, Header, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { AuthService } from './auth.service';
+import {
+  AppleSocialLoginDto,
+  CompleteSocialEnrollmentDto,
+  RefreshDto,
+  RequestEmailOtpDto,
+  RequestOtpDto,
+  TelegramSocialLoginDto,
+  VerifyOtpDto,
+  VerifyEmailOtpDto,
+} from './auth.dto';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { CurrentUser } from './current-user.decorator';
+import { AuthPrincipal } from './jwt.strategy';
+import {
+  clearWebSessionCookies,
+  isWebSessionRequest,
+  readWebCookie,
+  setWebSessionCookies,
+  WEB_REFRESH_COOKIE,
+  webAuthResponse,
+} from './web-session';
+
+@Controller('auth')
+@UseGuards(ThrottlerGuard)
+export class AuthController {
+  constructor(private readonly auth: AuthService) {}
+
+  /**
+   * Какие входы живы в этом процессе. Публичный: содержит только флаги и
+   * публичный Apple client id, который всё равно уходит в браузерный SDK.
+   *
+   * Существует, потому что клиент не может знать ответ сам: бандл витрины
+   * собран заранее, а канал включается переменной в дашборде хостинга уже
+   * после сборки.
+   */
+  @Get('methods')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  /**
+   * `no-store` обязателен, а не гигиеничен: между витриной и API стоит CDN, и
+   * закешированный ответ пережил бы включение канала владельцем — тот задал бы
+   * переменную в дашборде, а экран входа продолжал бы говорить «входов нет»
+   * ровно до истечения чужого кеша.
+   */
+  @Header('Cache-Control', 'no-store')
+  methods() {
+    return this.auth.describeAuthMethods();
+  }
+
+  /** Request a login OTP. Tight limit — anti SMS-bomb / cost abuse. */
+  @Post('otp/request')
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  requestOtp(@Body() dto: RequestOtpDto) {
+    return this.auth.requestOtp(dto.phone, 'login');
+  }
+
+  /** Verify the OTP → access + refresh tokens. Capped to slow brute-forcing. */
+  @Post('otp/verify')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async verifyOtp(@Body() dto: VerifyOtpDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const tokens = await this.auth.verifyOtp(dto.phone, dto.code, dto.challengeId);
+    if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
+    return webAuthResponse(request, tokens);
+  }
+
+  /** Request an account recovery OTP. Same SMS channel, separate product intent. */
+  @Post('recovery/request')
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  requestRecovery(@Body() dto: RequestOtpDto) {
+    return this.auth.requestRecoveryOtp(dto.phone);
+  }
+
+  /** Verify recovery OTP, revoke old refresh sessions, issue fresh tokens. */
+  @Post('recovery/verify')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async verifyRecovery(@Body() dto: VerifyOtpDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const tokens = await this.auth.verifyRecoveryOtp(dto.phone, dto.code, dto.challengeId);
+    if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
+    return webAuthResponse(request, tokens);
+  }
+
+  @Post('email/request')
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  requestEmailOtp(@Body() dto: RequestEmailOtpDto) {
+    return this.auth.requestEmailOtp(dto.email);
+  }
+
+  @Post('email/verify')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async verifyEmailOtp(@Body() dto: VerifyEmailOtpDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const tokens = await this.auth.verifyEmailOtp(dto.email, dto.code, dto.challengeId);
+    if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
+    return webAuthResponse(request, tokens);
+  }
+
+  @Post('email/attach/request')
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  requestEmailAttach(@CurrentUser() user: AuthPrincipal, @Body() dto: RequestEmailOtpDto) {
+    if (user.typ !== 'customer') throw new ForbiddenException('Требуется customer JWT');
+    return this.auth.requestEmailAttach(user.customerId, dto.email);
+  }
+
+  @Post('email/attach/confirm')
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  confirmEmailAttach(@CurrentUser() user: AuthPrincipal, @Body() dto: VerifyEmailOtpDto) {
+    if (user.typ !== 'customer') throw new ForbiddenException('Требуется customer JWT');
+    return this.auth.confirmEmailAttach(user.customerId, dto.email, dto.code, dto.challengeId);
+  }
+
+  /** Telegram Mini App/Login Widget auth → access + refresh tokens. */
+  @Post('social/telegram')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async telegramSocialLogin(@Body() dto: TelegramSocialLoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const tokens = await this.auth.loginWithTelegram(dto);
+    if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
+    return webAuthResponse(request, tokens);
+  }
+
+  /** Sign in with Apple identity token → access + refresh tokens. */
+  @Post('social/apple')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async appleSocialLogin(@Body() dto: AppleSocialLoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const tokens = await this.auth.loginWithApple(dto);
+    if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
+    return webAuthResponse(request, tokens);
+  }
+
+  @Post('v2/social/telegram')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async telegramSocialLoginV2(@Body() dto: TelegramSocialLoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const result = await this.auth.loginWithTelegramV2(dto);
+    if (result.status === 'authenticated' && isWebSessionRequest(request)) {
+      setWebSessionCookies(response, result, process.env.NODE_ENV === 'production');
+      return webAuthResponse(request, result);
+    }
+    return result;
+  }
+
+  @Post('v2/social/apple')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async appleSocialLoginV2(@Body() dto: AppleSocialLoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const result = await this.auth.loginWithAppleV2(dto);
+    if (result.status === 'authenticated' && isWebSessionRequest(request)) {
+      setWebSessionCookies(response, result, process.env.NODE_ENV === 'production');
+      return webAuthResponse(request, result);
+    }
+    return result;
+  }
+
+  @Post('v2/social/enrollment/complete')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async completeSocialEnrollment(@Body() dto: CompleteSocialEnrollmentDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const result = await this.auth.completeSocialEnrollment(dto);
+    if (isWebSessionRequest(request)) {
+      setWebSessionCookies(response, result, process.env.NODE_ENV === 'production');
+      return webAuthResponse(request, result);
+    }
+    return result;
+  }
+
+  /** Rotate the refresh token → a fresh access + refresh pair. */
+  @Post('refresh')
+  async refresh(@Body() dto: RefreshDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const refreshToken = dto.refreshToken?.trim() || readWebCookie(request, WEB_REFRESH_COOKIE);
+    if (!refreshToken) return this.auth.refresh('');
+    const tokens = await this.auth.refresh(refreshToken);
+    if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
+    return webAuthResponse(request, tokens);
+  }
+
+  /** Revoke a refresh token (logout). */
+  @Post('logout')
+  @HttpCode(204)
+  async logout(@Body() dto: RefreshDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const refreshToken = dto.refreshToken?.trim() || readWebCookie(request, WEB_REFRESH_COOKIE);
+    if (refreshToken) await this.auth.logout(refreshToken);
+    if (isWebSessionRequest(request)) clearWebSessionCookies(response, process.env.NODE_ENV === 'production');
+  }
+
+  /** The current authenticated principal (guarded — proves the JWT pipeline). */
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  me(@CurrentUser() user: AuthPrincipal) {
+    return user;
+  }
+}

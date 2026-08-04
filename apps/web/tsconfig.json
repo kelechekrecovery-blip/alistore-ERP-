@@ -1,0 +1,85 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    ".next-e2e/types/**/*.ts",
+    ".next-e2e/dev/types/**/*.ts",
+    ".next-e2e-3200/types/**/*.ts",
+    ".next-e2e-3200/dev/types/**/*.ts",
+    ".next-e2e-3204/types/**/*.ts",
+    ".next-e2e-3204/dev/types/**/*.ts",
+    ".next-e2e-3220/types/**/*.ts",
+    ".next-e2e-3220/dev/types/**/*.ts",
+    ".next-e2e-3221/types/**/*.ts",
+    ".next-e2e-3221/dev/types/**/*.ts",
+    ".next-e2e-3205/types/**/*.ts",
+    ".next-e2e-3205/dev/types/**/*.ts",
+    ".next-e2e-3206/types/**/*.ts",
+    ".next-e2e-3206/dev/types/**/*.ts",
+    ".next-e2e-3222/types/**/*.ts",
+    ".next-e2e-3222/dev/types/**/*.ts",
+    ".next-e2e-3223/types/**/*.ts",
+    ".next-e2e-3223/dev/types/**/*.ts",
+    ".next-e2e-3210/types/**/*.ts",
+    ".next-e2e-3210/dev/types/**/*.ts",
+    "build-output/types/**/*.ts",
+    "build-output/dev/types/**/*.ts",
+    ".next-e2e-3230/types/**/*.ts",
+    ".next-e2e-3230/dev/types/**/*.ts",
+    ".next-showcase/types/**/*.ts",
+    ".next-showcase/dev/types/**/*.ts",
+    ".next-e2e-3240/types/**/*.ts",
+    ".next-e2e-3240/dev/types/**/*.ts",
+    ".next-e2e-3250/types/**/*.ts",
+    ".next-e2e-3250/dev/types/**/*.ts",
+    ".next-e2e-3260/types/**/*.ts",
+    ".next-e2e-3260/dev/types/**/*.ts",
+    ".next-e2e-3243/types/**/*.ts",
+    ".next-e2e-3243/dev/types/**/*.ts",
+    ".next-e2e-3360/types/**/*.ts",
+    ".next-e2e-3360/dev/types/**/*.ts",
+    ".next-e2e-3310/types/**/*.ts",
+    ".next-e2e-3310/dev/types/**/*.ts",
+    ".next-e2e-3320/types/**/*.ts",
+    ".next-e2e-3320/dev/types/**/*.ts",
+    ".next-e2e-3330/types/**/*.ts",
+    ".next-e2e-3330/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next-e2e-*",
+    "build-output"
+  ]
+}

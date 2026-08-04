@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #0B0A08; }
+a { color: #FF7A4D; text-decoration: none; } a:hover { color: #FF9A6E; }
+::selection { background: #FF5B2E; color: #fff; }
+@keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(24px,-20px) scale(1.1);}}
+</style>
+</helmet>
+
+<div style="position: relative; overflow: hidden; min-height: 100vh; background: radial-gradient(circle at 82% 6%, rgba(255,91,46,0.16), transparent 42%), radial-gradient(circle at 12% 92%, rgba(127,176,236,0.13), transparent 44%), radial-gradient(circle at 16% 4%, #2B221B 0%, #14100C 46%, #0B0A08 100%); font-family: 'Golos Text', sans-serif; color: #E5DCD3; padding: 30px 34px 56px;">
+  <div style="position: absolute; inset: 0; z-index: 0; overflow: hidden;">
+    <div style="position: absolute; top: -150px; left: -110px; width: 460px; height: 460px; border-radius: 50%; background: radial-gradient(circle, rgba(255,91,46,0.4), transparent 68%); filter: blur(26px); animation: floatBlob 16s ease-in-out infinite;"></div>
+    <div style="position: absolute; bottom: -180px; right: -90px; width: 520px; height: 520px; border-radius: 50%; background: radial-gradient(circle, rgba(127,176,236,0.3), transparent 68%); filter: blur(30px); animation: floatBlob 20s ease-in-out infinite reverse;"></div>
+  </div>
+
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.14); color: #fff; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+
+  <div style="position: relative; z-index: 1; max-width: 1180px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 13px; margin-bottom: 18px;">
+      <div style="width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 21px; box-shadow: 0 6px 18px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4);">A</div>
+      <div style="flex: 1;"><div style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff; line-height: 1;">Банковская сверка · 17 июля</div><div style="font-size: 13px; color: #8A7F76; margin-top: 5px;">Выписка банка против Payment Ledger. P0 — деньги системы = деньги банка.</div></div>
+      <span style="background: {{ headBg }}; color: {{ headFg }}; border-radius: 9px; padding: 6px 14px; font-size: 13px; font-weight: 600;">{{ headStatus }}</span>
+    </div>
+
+    <!-- KPI -->
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 16px;">
+      <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+        <div style="padding: 15px; border-radius: 15px; background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 10px 28px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.16);"><div style="font-size: 11px; color: #A79C92;">{{ k.label }}</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 20px; color: {{ k.color }}; margin-top: 6px; white-space: nowrap;">{{ k.value }}</div></div>
+      </sc-for>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1.7fr 1fr; gap: 16px; align-items: start;">
+      <!-- reconciliation list -->
+      <div style="border-radius: 18px; overflow: hidden; background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+        <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,0.09); font-size: 11px; color: #8A7F76;"><span>Транзакция</span><span style="text-align:right;">Система</span><span style="text-align:right;">Банк</span><span style="text-align:center;">Статус</span></div>
+        <sc-for list="{{ txns }}" as="t" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;">
+            <div><div style="font-size: 13px; color: #fff;">{{ t.name }}</div><div style="font-family: 'JetBrains Mono'; font-size: 11px; color: #8A7F76;">{{ t.ref }}</div></div>
+            <span style="text-align: right; font-family: 'JetBrains Mono'; font-size: 12.5px; color: #D8CFC6;">{{ t.sys }}</span>
+            <span style="text-align: right; font-family: 'JetBrains Mono'; font-size: 12.5px; color: {{ t.bankColor }};">{{ t.bank }}</span>
+            <span style="text-align: center;"><span onClick="{{ t.act }}" style="background: {{ t.bg }}; color: {{ t.fg }}; border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: {{ t.cursor }};">{{ t.status }}</span></span>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- right: issues + close -->
+      <div>
+        <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16); margin-bottom: 14px;">
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 12px;">Расхождения ({{ issueCount }})</div>
+          <sc-for list="{{ issues }}" as="i" hint-placeholder-count="3">
+            <div style="display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px; border-radius: 11px; margin-bottom: 8px; background: {{ i.bg }}; border: 1px solid {{ i.bd }};"><span style="font-size: 15px;">{{ i.icon }}</span><div style="flex: 1;"><div style="font-size: 12.5px; color: #fff; font-weight: 600;">{{ i.title }}</div><div style="font-size: 11px; color: #A79C92; margin-top: 2px; line-height: 1.4;">{{ i.text }}</div></div></div>
+          </sc-for>
+          <sc-if value="{{ allMatched }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: rgba(78,209,122,0.1); border: 1px solid rgba(78,209,122,0.28); font-size: 13px; color: #7EE6A0;">✓ Всё сведено — система = банк.</div>
+          </sc-if>
+        </div>
+
+        <div onClick="{{ doClose }}" style="background: {{ btnBg }}; color: {{ btnFg }}; border: 1px solid {{ btnBd }}; border-radius: 13px; padding: 15px; text-align: center; font-weight: 700; font-size: 14.5px; cursor: pointer; box-shadow: {{ btnSh }}; margin-bottom: 8px;">{{ btnLabel }}</div>
+        <div style="font-size: 11px; color: #6E645C; line-height: 1.45; margin-bottom: 14px;">{{ btnNote }}</div>
+
+        <div style="padding: 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);">
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 14px; color: #fff; margin-bottom: 12px;">🕓 Аудит сверки</div>
+          <sc-for list="{{ audit }}" as="a" hint-placeholder-count="3">
+            <div style="display: flex; gap: 11px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05);"><span style="font-family: 'JetBrains Mono'; font-size: 11px; color: #6E645C; width: 42px; flex-shrink: 0;">{{ a.time }}</span><div style="flex: 1;"><div style="font-size: 12.5px; color: #E5DCD3;">{{ a.text }}</div><div style="font-size: 11px; color: #8A7F76;">{{ a.who }}</div></div></div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1220,&quot;height&quot;:760}}">
+class Component extends DCLogic {
+  state = { resolved: {}, closed: false };
+  renderVals(){
+    const s=this.state;
+    // txns: matched, dup webhook, fee diff, missing in bank
+    const def=[
+      {name:"Оплата заказа #4102",ref:"PAY-4102 · QR",sys:"156 000",bank:"156 000",kind:"match"},
+      {name:"Оплата заказа #4118",ref:"PAY-4118 · карта",sys:"109 900",bank:"109 900",kind:"match"},
+      {name:"Оплата заказа #4120",ref:"PAY-4120 · карта",sys:"24 900",bank:"24 610",kind:"fee"},
+      {name:"Webhook-дубль #4102",ref:"PAY-4102b · QR",sys:"—",bank:"156 000",kind:"dup"},
+      {name:"Возврат RET-0451",ref:"REF-0451 · карта",sys:"−34 900",bank:"—",kind:"missing"}
+    ];
+    const txns=def.map((d,i)=>{
+      const done=s.resolved[i];
+      let status,bg,fg,cursor="default",act=()=>{};
+      if(d.kind==="match"||done){status="сведено";bg="rgba(78,209,122,0.14)";fg="#7EE6A0";}
+      else if(d.kind==="fee"){status="комиссия ?";bg="rgba(229,178,60,0.16)";fg="#E5B23C";cursor="pointer";act=()=>this.setState({resolved:{...s.resolved,[i]:1}});}
+      else if(d.kind==="dup"){status="дубль";bg="rgba(255,138,122,0.15)";fg="#FF8A7A";cursor="pointer";act=()=>this.setState({resolved:{...s.resolved,[i]:1}});}
+      else {status="нет в банке";bg="rgba(255,138,122,0.15)";fg="#FF8A7A";cursor="pointer";act=()=>this.setState({resolved:{...s.resolved,[i]:1}});}
+      return {name:d.name,ref:d.ref,sys:d.sys,bank:d.bank,
+        bankColor: (d.sys!==d.bank && !done && d.kind!=="match")?"#E5B23C":"#D8CFC6",
+        status,bg,fg,cursor,act};
+    });
+    const unresolved=def.filter((d,i)=>d.kind!=="match" && !s.resolved[i]);
+    const issueCount=unresolved.length;
+    const allMatched=issueCount===0;
+
+    const issues=[];
+    if(!s.resolved[2]) issues.push({icon:"🏦",title:"Комиссия эквайера 290 сом",text:"PAY-4120: банк зачислил меньше на сумму комиссии. Отнести на расходы «эквайринг».",bg:"rgba(229,178,60,0.1)",bd:"rgba(229,178,60,0.28)"});
+    if(!s.resolved[3]) issues.push({icon:"🔁",title:"Дубль webhook",text:"PAY-4102 пришёл дважды — второй игнорировать, деньги в банке одни.",bg:"rgba(255,138,122,0.1)",bd:"rgba(255,138,122,0.28)"});
+    if(!s.resolved[4]) issues.push({icon:"⏳",title:"Возврат ещё не в банке",text:"REF-0451 проведён в системе, банк отразит 1–3 дня. Пометить «в пути».",bg:"rgba(255,138,122,0.1)",bd:"rgba(255,138,122,0.28)"});
+
+    const kpis=[
+      {label:"Приход по системе",value:"290 800",color:"#fff"},
+      {label:"Приход по банку",value:"312 610",color:"#fff"},
+      {label:"Расхождений",value:issueCount+" шт",color:issueCount?"#E5B23C":"#7EE6A0"},
+      {label:"Статус дня",value:s.closed?"Закрыт":(allMatched?"Готов":"В работе"),color:s.closed?"#7EE6A0":allMatched?"#7FB0EC":"#E5B23C"}
+    ];
+    const st = s.closed?["День закрыт","rgba(78,209,122,0.15)","#7EE6A0"] : allMatched?["Сведено","rgba(127,176,236,0.15)","#7FB0EC"] : ["Есть расхождения","rgba(229,178,60,0.16)","#E5B23C"];
+
+    const audit=[
+      {time:"18:40",text:"Загружена выписка банка (5 операций)",who:"Нурбек · владелец"},
+      {time:"18:42",text:"Авто-сопоставление: 2 сведено, 3 расхождения",who:"система"},
+      ...(allMatched && !Object.keys(s.resolved).length ? [] : Object.keys(s.resolved).length ? [{time:"18:45",text:Object.keys(s.resolved).length+" расхожд. разобрано вручную",who:"Нурбек · владелец"}] : []),
+      ...(s.closed ? [{time:"18:50",text:"Период закрыт, замок установлен",who:"Нурбек · владелец"}] : [])
+    ];
+
+    return {
+      kpis, txns, issues, issueCount, allMatched,
+      headStatus:st[0], headBg:st[1], headFg:st[2],
+      doClose: ()=>{ if(allMatched) this.setState({closed:true}); },
+      btnLabel: s.closed ? "✓ День закрыт — период на замке" : allMatched ? "Закрыть день (замок периода)" : "Сначала разберите расхождения",
+      btnBg: s.closed ? "rgba(78,209,122,0.14)" : allMatched ? "linear-gradient(135deg,#8FD40F,#6FA80C)" : "rgba(255,255,255,0.05)",
+      btnFg: s.closed ? "#7EE6A0" : allMatched ? "#14110E" : "#8A7F76",
+      btnBd: s.closed ? "rgba(78,209,122,0.3)" : allMatched ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+      btnSh: allMatched && !s.closed ? "0 6px 18px rgba(143,212,15,0.3)" : "none",
+      btnNote: s.closed ? "Изменения задним числом запрещены. Отчёт P&L зафиксирован, в Event Ledger — событие закрытия." : allMatched ? "Все операции сведены. Закрытие поставит замок — правки задним числом невозможны." : "Клик по красному/жёлтому статусу разбирает расхождение. Закрыть можно только когда всё сведено.",
+      audit
+    };
+  }
+}
+</script>
+</body>
+</html>

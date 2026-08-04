@@ -1,0 +1,386 @@
+import { AccountingAccountType, PaymentMethod, Prisma } from '@prisma/client';
+import { ConflictError, ValidationError } from '../common/errors';
+import { cumulativeTaxDelta, outputTaxMetadata } from './sales-tax';
+
+export const FUNDING_ACCOUNT_CODES = ['1000', '1010', '1020'] as const;
+
+const EXPENSE_ACCOUNT_BY_CATEGORY: Record<string, string> = {
+  payroll: '6100',
+  rent: '6200',
+  logistics: '6300',
+  marketing: '6400',
+  utilities: '6500',
+  procurement: '6600',
+  other: '6900',
+};
+
+export type AccountingJournalLineInput = {
+  accountCode: string;
+  debit?: number;
+  credit?: number;
+  memo?: string | null;
+};
+
+export type AccountingJournalEntryInput = {
+  idempotencyKey: string;
+  sourceType: string;
+  sourceRef: string;
+  description: string;
+  point?: string | null;
+  currency?: string;
+  documentAmount?: number | null;
+  exchangeRateMicros?: number;
+  baseAmount?: number | null;
+  taxCode?: string;
+  taxRateBps?: number;
+  taxAmount?: number;
+  occurredAt: Date;
+  createdBy: string;
+  lines: AccountingJournalLineInput[];
+};
+
+export function expenseAccountCode(category: string) {
+  return EXPENSE_ACCOUNT_BY_CATEGORY[category] ?? EXPENSE_ACCOUNT_BY_CATEGORY.other;
+}
+
+export function paymentAccountCode(method: PaymentMethod) {
+  if (method === 'cash') return '1000';
+  if (method === 'gift_card') return '2300';
+  return '1020';
+}
+
+export async function postPaymentEntryOnTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    payment: {
+      id: string;
+      amount: number;
+      method: PaymentMethod;
+      orderId: string | null;
+      serviceWorkOrderId: string | null;
+      createdAt: Date;
+    };
+    idempotencyKey: string;
+    point?: string | null;
+    actor: string;
+    receivedBy?: string | null;
+    tax?: {
+      taxCode: string;
+      taxRateBps: number;
+      taxAmount: number;
+    };
+  },
+) {
+  if (input.payment.amount === 0) {
+    throw new ValidationError('accounting_payment_zero', 'Нулевой платёж нельзя провести');
+  }
+  const amount = Math.abs(input.payment.amount);
+  const accountCode = paymentAccountCode(input.payment.method);
+  const revenueCode = input.payment.serviceWorkOrderId ? '4100' : '4000';
+  const isRefund = input.payment.amount < 0;
+  const taxAmount = input.tax?.taxAmount ?? 0;
+  if (!Number.isSafeInteger(taxAmount) || taxAmount < 0 || taxAmount > amount) {
+    throw new ValidationError('accounting_payment_tax_invalid', 'Налог платежа превышает сумму движения');
+  }
+  const revenueAmount = amount - taxAmount;
+  const lines: AccountingJournalLineInput[] = isRefund
+    ? [
+      ...(revenueAmount > 0 ? [{ accountCode: revenueCode, debit: revenueAmount, memo: 'Уменьшение выручки без налога' }] : []),
+      ...(taxAmount > 0 ? [{ accountCode: '2200', debit: taxAmount, memo: 'Уменьшение исходящего НДС' }] : []),
+      { accountCode, credit: amount, memo: 'Выбытие денежных средств' },
+    ]
+    : [
+      { accountCode, debit: amount, memo: 'Поступление денежных средств' },
+      ...(revenueAmount > 0 ? [{ accountCode: revenueCode, credit: revenueAmount, memo: 'Признание выручки без налога' }] : []),
+      ...(taxAmount > 0 ? [{ accountCode: '2200', credit: taxAmount, memo: 'Начисление исходящего НДС' }] : []),
+    ];
+  const entry = await postAccountingEntryOnTx(tx, {
+    idempotencyKey: `accounting:${input.idempotencyKey}`,
+    sourceType: isRefund ? 'payment.refund' : 'payment.receipt',
+    sourceRef: input.payment.id,
+    description: `${isRefund ? 'Возврат' : 'Получение'} платежа ${input.payment.id}`,
+    point: input.point,
+    documentAmount: amount,
+    baseAmount: amount,
+    taxCode: input.tax?.taxCode ?? 'none',
+    taxRateBps: input.tax?.taxRateBps ?? 0,
+    taxAmount,
+    occurredAt: input.payment.createdAt,
+    createdBy: input.actor,
+    lines,
+  });
+  await tx.payment.update({
+    where: { id: input.payment.id },
+    data: {
+      accountCode,
+      accountingEntryId: entry.id,
+      idempotencyKey: input.idempotencyKey,
+      point: input.point?.trim() || null,
+      receivedBy: input.receivedBy ?? input.actor,
+    },
+  });
+  return entry;
+}
+
+/**
+ * Refund of a customer prepayment. The deposit was posted to liability 2400,
+ * so returning it must release that liability rather than reverse revenue/tax.
+ */
+export async function postCustomerPrepaymentRefundOnTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    payment: {
+      id: string;
+      amount: number;
+      method: PaymentMethod;
+      createdAt: Date;
+    };
+    idempotencyKey: string;
+    point?: string | null;
+    actor: string;
+    receivedBy?: string | null;
+  },
+) {
+  if (input.payment.amount >= 0) {
+    throw new ValidationError(
+      'customer_prepayment_refund_sign_invalid',
+      'Возврат предоплаты должен быть отрицательным платежом',
+    );
+  }
+  const amount = Math.abs(input.payment.amount);
+  const accountCode = paymentAccountCode(input.payment.method);
+  const entry = await postAccountingEntryOnTx(tx, {
+    idempotencyKey: `accounting:${input.idempotencyKey}`,
+    sourceType: 'customer_prepayment.refund',
+    sourceRef: input.payment.id,
+    description: `Возврат предоплаты ${input.payment.id}`,
+    point: input.point,
+    documentAmount: amount,
+    baseAmount: amount,
+    taxCode: 'none',
+    taxRateBps: 0,
+    taxAmount: 0,
+    occurredAt: input.payment.createdAt,
+    createdBy: input.actor,
+    lines: [
+      { accountCode: '2400', debit: amount, memo: 'Погашение обязательства по предоплате' },
+      { accountCode, credit: amount, memo: 'Возврат денежных средств покупателю' },
+    ],
+  });
+  await tx.payment.update({
+    where: { id: input.payment.id },
+    data: {
+      accountCode,
+      accountingEntryId: entry.id,
+      idempotencyKey: input.idempotencyKey,
+      point: input.point?.trim() || null,
+      receivedBy: input.receivedBy ?? input.actor,
+    },
+  });
+  return entry;
+}
+
+export async function postOrderReceivableOnTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    idempotencyKey: string;
+    sourceType: string;
+    sourceRef: string;
+    description: string;
+    order: {
+      id: string;
+      total: number;
+      taxAmount: number;
+      storePointCode?: string | null;
+      items: Array<{ taxCode: string; taxRateBps: number; taxAmount: number }>;
+    };
+    processedBefore: number;
+    amount: number;
+    occurredAt: Date;
+    actor: string;
+  },
+) {
+  if (!Number.isSafeInteger(input.amount) || input.amount <= 0) {
+    throw new ValidationError('accounting_receivable_amount_invalid', 'Сумма дебиторской задолженности должна быть положительной');
+  }
+  const taxAmount = cumulativeTaxDelta(
+    input.order.taxAmount,
+    input.order.total,
+    input.processedBefore,
+    input.amount,
+  );
+  const revenueAmount = input.amount - taxAmount;
+  const taxMetadata = outputTaxMetadata(input.order.items);
+  const entry = await postAccountingEntryOnTx(tx, {
+    idempotencyKey: input.idempotencyKey,
+    sourceType: input.sourceType,
+    sourceRef: input.sourceRef,
+    description: input.description,
+    point: input.order.storePointCode,
+    documentAmount: input.amount,
+    baseAmount: input.amount,
+    taxCode: taxMetadata.taxCode,
+    taxRateBps: taxMetadata.taxRateBps,
+    taxAmount,
+    occurredAt: input.occurredAt,
+    createdBy: input.actor,
+    lines: [
+      { accountCode: '1100', debit: input.amount, memo: 'Возникновение дебиторской задолженности покупателя' },
+      ...(revenueAmount > 0 ? [{ accountCode: '4000', credit: revenueAmount, memo: 'Признание выручки без налога' }] : []),
+      ...(taxAmount > 0 ? [{ accountCode: '2200', credit: taxAmount, memo: 'Начисление исходящего НДС' }] : []),
+    ],
+  });
+  return entry;
+}
+
+export async function postAccountingEntryOnTx(tx: Prisma.TransactionClient, input: AccountingJournalEntryInput) {
+  const normalized = normalizeEntry(input);
+  const existing = await tx.accountingJournalEntry.findUnique({
+    where: { idempotencyKey: input.idempotencyKey },
+    include: { lines: { orderBy: { accountCode: 'asc' } } },
+  });
+  if (existing) return replayEntry(existing, normalized);
+
+  const sourceEntry = await tx.accountingJournalEntry.findUnique({
+    where: { sourceType_sourceRef: { sourceType: normalized.sourceType, sourceRef: normalized.sourceRef } },
+    select: { id: true },
+  });
+  if (sourceEntry) {
+    throw new ConflictError('accounting_source_already_posted', 'Для этого первичного документа проводка уже создана');
+  }
+
+  const period = accountingPeriodKey(normalized.occurredAt);
+  const accountingPeriod = await tx.accountingPeriod.upsert({
+    where: { period },
+    create: { period },
+    update: {},
+    select: { status: true },
+  });
+  if (accountingPeriod.status === 'hard_closed') {
+    throw new ConflictError('accounting_period_hard_closed', `Бухгалтерский период ${period} закрыт для новых проводок`);
+  }
+  if (accountingPeriod.status === 'soft_closed' && !['tax.settlement', 'accounting.reversal'].includes(normalized.sourceType)) {
+    throw new ConflictError('accounting_period_soft_closed', `Бухгалтерский период ${period} закрыт для обычных проводок`);
+  }
+  if (accountingPeriod.status === 'soft_closed' && normalized.sourceType === 'accounting.reversal') {
+    const taxSettlement = await tx.accountingTaxSettlement.findUnique({
+      where: { period_point: { period, point: '' } },
+      select: { id: true },
+    });
+    if (taxSettlement) {
+      throw new ConflictError('accounting_period_tax_settled', `Период ${period} уже имеет налоговую сверку; сторно требует отдельной корректировки периода`);
+    }
+  }
+
+  const accountCodes = [...new Set(normalized.lines.map((line) => line.accountCode))];
+  const accounts = await tx.accountingAccount.findMany({
+    where: { code: { in: accountCodes }, active: true },
+    select: { code: true },
+  });
+  if (accounts.length !== accountCodes.length) {
+    const found = new Set(accounts.map((account) => account.code));
+    throw new ValidationError('accounting_account_invalid', `Счёт ${accountCodes.find((code) => !found.has(code))} не найден или отключён`);
+  }
+
+  const entry = await tx.accountingJournalEntry.create({
+    data: {
+      idempotencyKey: normalized.idempotencyKey,
+      sourceType: normalized.sourceType,
+      sourceRef: normalized.sourceRef,
+      description: normalized.description,
+      point: normalized.point,
+      currency: normalized.currency,
+      documentAmount: normalized.documentAmount,
+      exchangeRateMicros: normalized.exchangeRateMicros,
+      baseAmount: normalized.baseAmount,
+      taxCode: normalized.taxCode,
+      taxRateBps: normalized.taxRateBps,
+      taxAmount: normalized.taxAmount,
+      occurredAt: normalized.occurredAt,
+      createdBy: normalized.createdBy,
+      lines: { create: normalized.lines },
+    },
+    include: { lines: { orderBy: { accountCode: 'asc' } } },
+  });
+  return { ...entry, idempotent: false };
+}
+
+export function accountingPeriodKey(date: Date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+export function normalBalance(type: AccountingAccountType, debit: number, credit: number) {
+  return type === 'asset' || type === 'expense' ? debit - credit : credit - debit;
+}
+
+function normalizeEntry(input: AccountingJournalEntryInput) {
+  const lines = input.lines.map((line) => ({
+    accountCode: line.accountCode.trim(),
+    debit: line.debit ?? 0,
+    credit: line.credit ?? 0,
+    memo: line.memo?.trim() || null,
+  }));
+  if (lines.length < 2) throw new ValidationError('accounting_lines_required', 'Проводка должна содержать минимум две строки');
+  for (const line of lines) {
+    if (!line.accountCode || !Number.isSafeInteger(line.debit) || !Number.isSafeInteger(line.credit) || line.debit < 0 || line.credit < 0 || (line.debit > 0) === (line.credit > 0)) {
+      throw new ValidationError('accounting_line_invalid', 'В каждой строке должен быть указан ровно один положительный дебет или кредит');
+    }
+  }
+  const debit = lines.reduce((sum, line) => sum + line.debit, 0);
+  const credit = lines.reduce((sum, line) => sum + line.credit, 0);
+  if (debit <= 0 || debit !== credit) throw new ValidationError('accounting_entry_unbalanced', 'Дебет и кредит проводки должны совпадать');
+  const currency = (input.currency ?? 'KGS').trim().toUpperCase();
+  const exchangeRateMicros = input.exchangeRateMicros ?? 1_000_000;
+  const documentAmount = input.documentAmount ?? null;
+  const baseAmount = input.baseAmount ?? null;
+  const taxCode = input.taxCode?.trim() || 'none';
+  const taxRateBps = input.taxRateBps ?? 0;
+  const taxAmount = input.taxAmount ?? 0;
+  if (!/^[A-Z]{3}$/.test(currency)) throw new ValidationError('accounting_currency_invalid', 'Код валюты должен состоять из трёх заглавных букв');
+  if (!Number.isSafeInteger(exchangeRateMicros) || exchangeRateMicros <= 0) throw new ValidationError('accounting_exchange_rate_invalid', 'Курс проводки должен быть положительным целым числом');
+  if ((documentAmount !== null && (!Number.isSafeInteger(documentAmount) || documentAmount <= 0)) || (baseAmount !== null && (!Number.isSafeInteger(baseAmount) || baseAmount <= 0))) {
+    throw new ValidationError('accounting_amount_snapshot_invalid', 'Снимок суммы проводки должен быть положительным целым числом');
+  }
+  if (!Number.isSafeInteger(taxRateBps) || taxRateBps < 0 || taxRateBps > 10_000 || !Number.isSafeInteger(taxAmount) || taxAmount < 0) {
+    throw new ValidationError('accounting_tax_snapshot_invalid', 'Налоговый снимок проводки некорректен');
+  }
+  return {
+    ...input,
+    sourceType: input.sourceType.trim(),
+    sourceRef: input.sourceRef.trim(),
+    description: input.description.trim(),
+    point: input.point?.trim() || null,
+    currency,
+    documentAmount,
+    exchangeRateMicros,
+    baseAmount,
+    taxCode,
+    taxRateBps,
+    taxAmount,
+    lines: lines.sort((left, right) => left.accountCode.localeCompare(right.accountCode)),
+  };
+}
+
+function replayEntry(
+  existing: Awaited<ReturnType<Prisma.TransactionClient['accountingJournalEntry']['findUniqueOrThrow']>> & { lines: Array<{ accountCode: string; debit: number; credit: number; memo: string | null }> },
+  input: ReturnType<typeof normalizeEntry>,
+) {
+  const existingLines = existing.lines.map((line) => ({ accountCode: line.accountCode, debit: line.debit, credit: line.credit, memo: line.memo }));
+  const same = existing.sourceType === input.sourceType
+    && existing.sourceRef === input.sourceRef
+    && existing.description === input.description
+    && existing.point === input.point
+    && existing.currency === input.currency
+    && existing.documentAmount === input.documentAmount
+    && existing.exchangeRateMicros === input.exchangeRateMicros
+    && existing.baseAmount === input.baseAmount
+    && existing.taxCode === input.taxCode
+    && existing.taxRateBps === input.taxRateBps
+    && existing.taxAmount === input.taxAmount
+    && existing.occurredAt.getTime() === input.occurredAt.getTime()
+    && JSON.stringify(existingLines) === JSON.stringify(input.lines);
+  if (!same) throw new ConflictError('accounting_idempotency_conflict', 'Idempotency key уже использован для другой проводки');
+  return { ...existing, idempotent: true };
+}

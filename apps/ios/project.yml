@@ -1,0 +1,318 @@
+name: AliStoreNative
+options:
+  bundleIdPrefix: kg.alistore
+  deploymentTarget:
+    iOS: "17.0"
+  # Язык разработки — русский. Без него все четыре Info.plist резолвили
+  # `CFBundleDevelopmentRegion = $(DEVELOPMENT_LANGUAGE)` в пусто и приложения
+  # объявлялись англоязычными: система форматировала даты и числа по английским
+  # правилам даже на русском устройстве.
+  developmentLanguage: ru
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    # Номер сборки для App Store Connect. 4 уже загружена по всем четырём bundle id
+    # и привязана к версии 1.0.0 — следующая заливка обязана быть 5, иначе ASC
+    # отклонит бинарь как дубликат.
+    CURRENT_PROJECT_VERSION: 5
+    MARKETING_VERSION: 1.0.0
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    # Отдельно от developmentLanguage: build-переменная, на которую ссылается
+    # `CFBundleDevelopmentRegion` в четырёх Info.plist.
+    DEVELOPMENT_LANGUAGE: ru
+targets:
+  AliStoreCore:
+    type: framework
+    platform: iOS
+    sources: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.core
+        GENERATE_INFOPLIST_FILE: YES
+  AliStoreClient:
+    type: application
+    platform: iOS
+    sources: [Client, Branding]
+    dependencies:
+      - target: AliStoreCore
+    info:
+      path: Client/Info.plist
+      properties:
+        CFBundleDisplayName: AliStore
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: false
+        "UISupportedInterfaceOrientations~ipad":
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        API_BASE_URL: $(API_BASE_URL)
+        PAYMENT_RETURN_URL: $(PAYMENT_RETURN_URL)
+        CFBundleURLTypes:
+          - CFBundleURLName: kg.alistore.client
+            CFBundleURLSchemes: [alistore]
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSFaceIDUsageDescription: Быстрый и защищённый вход в AliStore
+        UIAppFonts:
+          - Manrope-Regular.ttf
+          - Manrope-Medium.ttf
+          - Manrope-SemiBold.ttf
+          - Manrope-Bold.ttf
+          - Manrope-ExtraBold.ttf
+          - GolosText-Regular.ttf
+          - GolosText-Medium.ttf
+          - GolosText-SemiBold.ttf
+          - GolosText-Bold.ttf
+          - JetBrainsMono-Regular.ttf
+          - JetBrainsMono-Medium.ttf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.client
+        PRODUCT_NAME: AliStore
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_ENTITLEMENTS: Client/Client.entitlements
+        PAYMENT_RETURN_URL: alistore://payment-return
+        API_BASE_URL: http://127.0.0.1:4000/api
+        APS_ENVIRONMENT: development
+      configs:
+        Release:
+          API_BASE_URL: $(ALISTORE_API_BASE_URL)
+          APS_ENVIRONMENT: production
+          CODE_SIGN_IDENTITY: Apple Distribution
+          CODE_SIGN_STYLE: Manual
+          PAYMENT_RETURN_URL: https://ali.kg/payment-return
+          PROVISIONING_PROFILE_SPECIFIER: AliStore Client App Store
+  AliStoreStaff:
+    type: application
+    platform: iOS
+    sources: [Staff, Branding]
+    dependencies:
+      - target: AliStoreCore
+    info:
+      path: Staff/Info.plist
+      properties:
+        CFBundleDisplayName: AliStore Staff
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: false
+        "UISupportedInterfaceOrientations~ipad":
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        API_BASE_URL: $(API_BASE_URL)
+        NSCameraUsageDescription: Сканирование IMEI и фото для подтверждения операций
+        NSPhotoLibraryUsageDescription: Выбор фото для Evidence Vault
+        NSFaceIDUsageDescription: Быстрый и защищённый вход в рабочее приложение
+        CFBundleURLTypes:
+          - CFBundleURLName: kg.alistore.staff
+            CFBundleURLSchemes: [alistore-staff]
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.staff
+        PRODUCT_NAME: AliStoreStaff
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Только iPhone: рабочее место сотрудника живёт на телефоне, а на iPad
+        # это был растянутый интерфейс — лишний класс скриншотов и риск отказа
+        # по Guideline 4.0. Клиентское приложение остаётся iPhone+iPad.
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_ENTITLEMENTS: Staff/Staff.entitlements
+        API_BASE_URL: http://127.0.0.1:4000/api
+        APS_ENVIRONMENT: development
+      configs:
+        Release:
+          API_BASE_URL: $(ALISTORE_API_BASE_URL)
+          APS_ENVIRONMENT: production
+          CODE_SIGN_IDENTITY: Apple Distribution
+          CODE_SIGN_STYLE: Manual
+          PROVISIONING_PROFILE_SPECIFIER: AliStore Staff App Store
+  AliStoreCourier:
+    type: application
+    platform: iOS
+    sources: [Courier, Branding]
+    dependencies:
+      - target: AliStoreCore
+    info:
+      path: Courier/Info.plist
+      properties:
+        CFBundleDisplayName: AliStore Courier
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: false
+        "UISupportedInterfaceOrientations~ipad":
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        API_BASE_URL: $(API_BASE_URL)
+        NSCameraUsageDescription: Фото подтверждения доставки для Evidence Vault
+        NSPhotoLibraryUsageDescription: Выбор фото подтверждения доставки
+        NSFaceIDUsageDescription: Быстрый и защищённый вход в приложение курьера
+        CFBundleURLTypes:
+          - CFBundleURLName: kg.alistore.courier
+            CFBundleURLSchemes: [alistore-courier]
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.courier
+        PRODUCT_NAME: AliStoreCourier
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Только iPhone: инструмент курьера в руках, не на планшете.
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_ENTITLEMENTS: Courier/Courier.entitlements
+        API_BASE_URL: http://127.0.0.1:4000/api
+        APS_ENVIRONMENT: development
+      configs:
+        Release:
+          API_BASE_URL: $(ALISTORE_API_BASE_URL)
+          APS_ENVIRONMENT: production
+          CODE_SIGN_IDENTITY: Apple Distribution
+          CODE_SIGN_STYLE: Manual
+          PROVISIONING_PROFILE_SPECIFIER: AliStore Courier App Store
+  AliStorePOS:
+    type: application
+    platform: iOS
+    sources: [POS, Branding]
+    dependencies:
+      - target: AliStoreCore
+    info:
+      path: POS/Info.plist
+      properties:
+        CFBundleDisplayName: AliStore POS
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: false
+        "UISupportedInterfaceOrientations~ipad":
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        API_BASE_URL: $(API_BASE_URL)
+        NSCameraUsageDescription: Сканирование штрихкодов и IMEI на кассе
+        NSPhotoLibraryUsageDescription: Выбор фото состояния устройства для согласования обмена
+        NSFaceIDUsageDescription: Быстрый и защищённый вход в кассу
+        CFBundleURLTypes:
+          - CFBundleURLName: kg.alistore.pos
+            CFBundleURLSchemes: [alistore-pos]
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.pos
+        PRODUCT_NAME: AliStorePOS
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Только iPhone: касса работает на телефоне кассира.
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_ENTITLEMENTS: POS/POS.entitlements
+        API_BASE_URL: http://127.0.0.1:4000/api
+        APS_ENVIRONMENT: development
+      configs:
+        Release:
+          API_BASE_URL: $(ALISTORE_API_BASE_URL)
+          APS_ENVIRONMENT: production
+          CODE_SIGN_IDENTITY: Apple Distribution
+          CODE_SIGN_STYLE: Manual
+          PROVISIONING_PROFILE_SPECIFIER: AliStore POS App Store
+  AliStoreCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: Tests
+    dependencies:
+      - target: AliStoreCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.core.tests
+        GENERATE_INFOPLIST_FILE: YES
+  AliStoreClientUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: UITests/Client
+    dependencies:
+      - target: AliStoreClient
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.client.ui-tests
+        GENERATE_INFOPLIST_FILE: YES
+  AliStoreStaffUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: UITests/Staff
+    dependencies:
+      - target: AliStoreStaff
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.staff.ui-tests
+        GENERATE_INFOPLIST_FILE: YES
+  AliStoreCourierUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: UITests/Courier
+    dependencies:
+      - target: AliStoreCourier
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.courier.ui-tests
+        GENERATE_INFOPLIST_FILE: YES
+  AliStorePOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: UITests/POS
+    dependencies:
+      - target: AliStorePOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kg.alistore.pos.ui-tests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  AliStoreClient:
+    build:
+      targets:
+        AliStoreClient: all
+    run:
+      config: Debug
+    test:
+      targets:
+        - AliStoreCoreTests
+  AliStoreStaff:
+    build:
+      targets:
+        AliStoreStaff: all
+    run:
+      config: Debug
+  AliStoreCourier:
+    build:
+      targets:
+        AliStoreCourier: all
+    run:
+      config: Debug
+  AliStorePOS:
+    build:
+      targets:
+        AliStorePOS: all
+    run:
+      config: Debug
+  AliStoreUITests:
+    build:
+      targets:
+        AliStoreClient: all
+        AliStoreStaff: all
+        AliStoreCourier: all
+        AliStorePOS: all
+    test:
+      targets:
+        - AliStoreClientUITests
+        - AliStoreStaffUITests
+        - AliStoreCourierUITests
+        - AliStorePOSUITests

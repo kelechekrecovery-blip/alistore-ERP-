@@ -2,6 +2,7 @@ import {
   ALLOWED_TRANSITIONS,
   assertTransition,
   canTransition,
+  deriveOrderStatusFromLineFulfillment,
 } from '../src/orders/order-state-machine';
 import { ValidationError } from '../src/common/errors';
 
@@ -9,6 +10,10 @@ describe('order state machine (pure)', () => {
   it('allows the POS/web core path created → reserved → paid', () => {
     expect(canTransition('created', 'reserved')).toBe(true);
     expect(canTransition('reserved', 'paid')).toBe(true);
+  });
+
+  it('exposes reserved → picking only for the contextual COD guard', () => {
+    expect(canTransition('reserved', 'picking')).toBe(true);
   });
 
   it('forbids skipping reservation: created → paid', () => {
@@ -32,5 +37,14 @@ describe('order state machine (pure)', () => {
     expect(canTransition('refunded', 'paid')).toBe(false);
     expect(canTransition('cancelled', 'created')).toBe(false);
     expect(canTransition('exchanged', 'reserved')).toBe(false);
+  });
+
+  it('derives the backward-compatible aggregate status from line fulfillment truth', () => {
+    expect(deriveOrderStatusFromLineFulfillment(['ready', 'in_transit']))
+      .toBe('confirmed');
+    expect(deriveOrderStatusFromLineFulfillment(['ready', 'handed_over']))
+      .toBe('ready_for_pickup');
+    expect(deriveOrderStatusFromLineFulfillment(['handed_over', 'customer_cancelled']))
+      .toBe('completed');
   });
 });

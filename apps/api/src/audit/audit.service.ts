@@ -32,6 +32,11 @@ export class AuditService {
     work: (
       tx: Prisma.TransactionClient,
     ) => Promise<{ result: T; events: AuditInput[] }>,
+    // Пакетным операциям (свип напоминаний по долгам) дефолтных 5 секунд
+    // Prisma не хватает, и транзакция откатывается целиком — не частично, а
+    // вся работа разом. Разовые мутации опции не передают и ведут себя как
+    // раньше.
+    options?: { timeout?: number; maxWait?: number },
   ): Promise<T> {
     return this.prisma.$transaction(async (tx) => {
       const { result, events } = await work(tx);
@@ -46,7 +51,7 @@ export class AuditService {
         });
       }
       return result;
-    });
+    }, options);
   }
 
   /** Read the ledger (append-only, read-only surface). */

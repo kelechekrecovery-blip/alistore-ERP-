@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0E0C0A; } ::selection { background: #C6FF3D; color: #14110E; }</style>
+</helmet>
+
+<div style="background: #0E0C0A; font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 60px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: #221E19; color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+  <div style="max-width: 1000px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: #FF5B2E; display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">Операционка точки</span>
+    </div>
+    <div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+        <div onClick="{{ t.pick }}" style="background: {{ t.bg }}; color: {{ t.fg }}; border: 1px solid {{ t.border }}; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;">{{ t.label }}</div>
+      </sc-for>
+    </div>
+
+    <!-- OPEN/CLOSE POINT -->
+    <sc-if value="{{ isPoint }}" hint-placeholder-val="{{ true }}">
+      <div style="max-width: 560px; background: #16130F; border: 1px solid #2E2822; border-radius: 16px; padding: 22px;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 16px; color: #fff; margin-bottom: 4px;">Открытие магазина · Центр</div>
+        <div style="font-size: 13px; color: #8A7F76; margin-bottom: 18px;">Не смена кассы, а точка целиком: свет, сигнализация, готовность зала.</div>
+        <sc-for list="{{ openList }}" as="c" hint-placeholder-count="5">
+          <div onClick="{{ c.toggle }}" style="display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #1A1611; cursor: pointer;"><span style="width: 22px; height: 22px; border-radius: 7px; border: 2px solid {{ c.on ? '#C6FF3D' : '#3A342E' }}; background: {{ c.on ? '#C6FF3D' : 'transparent' }}; color: #14110E; display: flex; align-items: center; justify-content: center; font-size: 12px;">{{ c.mark }}</span><span style="font-size: 14px; color: #D8CFC6;">{{ c.label }}</span></div>
+        </sc-for>
+        <div onClick="{{ openPoint }}" style="background: {{ openBg }}; color: {{ openFg }}; border-radius: 12px; padding: 14px; text-align: center; font-weight: 700; font-size: 15px; cursor: pointer; margin-top: 18px;">{{ openLabel }}</div>
+        <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Открытие точки фиксирует, кто и во сколько открыл, фото зала → Evidence Vault. Закрытие — обратный чек-лист + сигнализация.</div>
+      </div>
+    </sc-if>
+
+    <!-- DEFECTS -->
+    <sc-if value="{{ isDefect }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid #2E2822; font-size: 11px; color: #8A7F76;"><span>Товар</span><span>Дефект</span><span>Фото</span><span>Решение</span></div>
+        <sc-for list="{{ defects }}" as="d" hint-placeholder-count="3">
+          <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid #1A1611; align-items: center;"><span style="font-size: 13px; color: #fff;">{{ d.name }}</span><span style="font-size: 12px; color: #A79C92;">{{ d.defect }}</span><span style="font-size: 12px; color: #7FB0EC;">📷 {{ d.photos }}</span><span><span style="background: {{ d.bg }}; color: {{ d.fg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ d.action }}</span></span></div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Учёт брака с обязательным фото. Списание/возврат поставщику/уценка → approval. Событие в Event Ledger + Evidence Vault.</div>
+    </sc-if>
+
+    <!-- CLIENT RESERVE -->
+    <sc-if value="{{ isReserve }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid #2E2822; font-size: 11px; color: #8A7F76;"><span>Товар</span><span>Клиент</span><span>До</span><span>Статус</span></div>
+        <sc-for list="{{ reserves }}" as="r" hint-placeholder-count="3">
+          <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid #1A1611; align-items: center;"><span style="font-size: 13px; color: #fff;">{{ r.name }}</span><span style="font-size: 12px; color: #A79C92;">{{ r.client }}</span><span style="font-size: 12px; color: {{ r.tillColor }};">{{ r.till }}</span><span><span style="background: {{ r.bg }}; color: {{ r.fg }}; border-radius: 6px; padding: 3px 9px; font-size: 11px;">{{ r.status }}</span></span></div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Резерв без оплаты («придержите до вечера»): товар снят с витрины на срок, авто-снятие по истечении → возврат в продажу + уведомление.</div>
+    </sc-if>
+
+    <!-- WAITLIST -->
+    <sc-if value="{{ isWait }}" hint-placeholder-val="{{ false }}">
+      <div style="background: #16130F; border: 1px solid #2E2822; border-radius: 16px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr; padding: 12px 18px; border-bottom: 1px solid #2E2822; font-size: 11px; color: #8A7F76;"><span>Товар (нет в наличии)</span><span>Ждут</span><span></span></div>
+        <sc-for list="{{ waitlist }}" as="w" hint-placeholder-count="3">
+          <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr; padding: 13px 18px; border-bottom: 1px solid #1A1611; align-items: center;"><span style="font-size: 13px; color: #fff;">{{ w.name }}</span><span style="font-family: 'JetBrains Mono'; font-size: 13px; color: #E5B23C;">{{ w.count }} чел</span><span><span style="background: {{ w.bg }}; color: {{ w.fg }}; border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer;">{{ w.action }}</span></span></div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Лист ожидания «сообщить о поступлении». Приход товара (PO) → авто push/SMS всем в очереди по приоритету записи.</div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tab: "point", open: {0:true,1:true,2:false,3:true,4:false}, opened: false };
+  renderVals() {
+    const t = this.state.tab;
+    const tabDef = [["point","Открытие/закрытие"],["defect","Учёт брака"],["reserve","Резерв клиента"],["wait","Лист ожидания"]];
+    const tabs = tabDef.map(x => ({ label: x[1], pick: () => this.setState({ tab: x[0] }),
+      bg: t === x[0] ? "#FF5B2E" : "#16130F", fg: t === x[0] ? "#fff" : "#A79C92", border: t === x[0] ? "#FF5B2E" : "#2E2822" }));
+    const olDef = ["Снять сигнализацию","Включить свет и технику","Проверить витрину и ценники","Открыть кассы (смены)","Фото зала на открытии"];
+    const openList = olDef.map((c,i)=>({ label:c, on:!!this.state.open[i], mark:this.state.open[i]?"✓":"",
+      toggle:()=>{ const o={...this.state.open}; o[i]=!o[i]; this.setState({open:o}); } }));
+    const allOpen = olDef.every((c,i)=>this.state.open[i]);
+    const df = (st,ok) => ({ action:st, bg: ok?"rgba(198,255,61,0.12)":"rgba(229,178,60,0.15)", fg: ok?"#C6FF3D":"#E5B23C" });
+    const defects = [
+      { name:"iPhone 14 (возврат)", defect:"Царапина экрана", photos:"3", ...df("Уценка",true) },
+      { name:"AirPods Pro", defect:"Не заряжается", photos:"2", ...df("Поставщику",false) },
+      { name:"Чехол ×4", defect:"Брак партии", photos:"1", ...df("Списание",false) }
+    ];
+    const rv = (st,ok) => ({ status:st, bg: ok?"rgba(198,255,61,0.12)":"rgba(255,138,122,0.15)", fg: ok?"#C6FF3D":"#FF8A7A" });
+    const reserves = [
+      { name:"iPhone 15 Синий 256", client:"Нурбек", till:"сегодня 20:00", tillColor:"#E5B23C", ...rv("Активен",true) },
+      { name:"MacBook Air M2", client:"Айбек", till:"завтра 14:00", tillColor:"#8A7F76", ...rv("Активен",true) },
+      { name:"Apple Watch S9", client:"Мээрим", till:"истёк 2 ч назад", tillColor:"#FF8A7A", ...rv("Снят",false) }
+    ];
+    const waitlist = [
+      { name:"iPhone 15 Pro 256", count:"12", action:"Уведомить", bg:"#C6FF3D", fg:"#14110E" },
+      { name:"PlayStation 5", count:"7", action:"Уведомить", bg:"#C6FF3D", fg:"#14110E" },
+      { name:"AirPods Max", count:"3", action:"Ждём PO", bg:"#221E19", fg:"#A79C92" }
+    ];
+    return { tabs, isPoint:t==="point", isDefect:t==="defect", isReserve:t==="reserve", isWait:t==="wait",
+      openList, defects, reserves, waitlist,
+      openLabel: this.state.opened?"✓ Магазин открыт":(allOpen?"Открыть магазин":"Заполните чек-лист"),
+      openBg: allOpen?"#C6FF3D":"#3A342E", openFg: allOpen?"#14110E":"#6E645C",
+      openPoint:()=>{ if(allOpen) this.setState({opened:true}); } };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "gate": "ios-app-ui",
+  "command": "npm run ios:ui",
+  "exitCode": 0,
+  "packageCommandSha256": "9cb5830b79556ccf525c7bfed32859aa70e6e78755df56cd92fc721838588ba6",
+  "sourceTreeSha256": "1200ac5446a49d3eecc41394beb81edbcb048dc7ca406497ebb0ea76f3f4b5d3",
+  "sourceCommit": "c1c487f72d921595a05081306493e5b1b2148338",
+  "executionEnvironment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v25.9.0",
+    "toolchain": "Xcode 26.6\nBuild version 17F113"
+  },
+  "executionEnvironmentSha256": "ec1677f4b60ea5f8906135bfbcb9b0653bdf6b8cde5c766e7fa330c1364fe462",
+  "completedAt": "2026-07-16T09:23:07.127Z"
+}

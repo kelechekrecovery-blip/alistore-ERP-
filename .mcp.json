@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "xcodebuild": {
+      "command": "npx",
+      "args": ["-y", "xcodebuildmcp@2.6.2", "mcp"],
+      "env": {
+        "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+        "XCODEBUILDMCP_ENABLED_WORKFLOWS": "project-discovery,simulator,simulator-management,ui-automation,coverage,utilities"
+      }
+    },
+    "apple-doc": {
+      "command": "npx",
+      "args": ["-y", "apple-doc-mcp@1.0.3"]
+    },
+    "serena": {
+      "command": "serena",
+      "args": ["start-mcp-server", "--context=codex", "--project-from-cwd"]
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@1.6.0", "--isolated=true", "--headless=true"]
+    }
+  }
+}

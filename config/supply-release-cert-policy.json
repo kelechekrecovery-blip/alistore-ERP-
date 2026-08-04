@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "issuerPublicKeyPath": "supply-release-cert-issuer.pem",
+  "issuerFingerprint": "sha256:6656eacac266b505458cc745d9bbc7846e41353eedfb4f798d3f0e2d81a1170b",
+  "targetEnvironment": "production",
+  "maxAgeSeconds": 604800,
+  "expectedScopes": {
+    "payment_gateway": "production:supply-payment-gateway",
+    "refund_webhook": "production:supply-refund-webhook",
+    "smtp": "production:supply-email-notifications",
+    "sms": "production:supply-sms-notifications",
+    "fcm": "production:supply-android-push",
+    "apns": "production:supply-ios-push",
+    "object_storage": "production:supply-evidence-storage",
+    "fiscal_ofd": "production:supply-fiscal-ofd",
+    "monitoring": "production:supply-monitoring-alerts",
+    "pos_hardware": "production:supply-pos-hardware"
+  }
+}

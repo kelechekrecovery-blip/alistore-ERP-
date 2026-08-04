@@ -22,10 +22,17 @@ enum Role {
   senior_seller
   cashier
   warehouse
+  service
+  technician
   courier
   marketer
   admin
   owner
+  // Retired 2026-07-20 by owner decision: the role had no UI, no tests and no
+  // per-point data isolation, so `store_operations:read` exposed the whole
+  // network. All grants are removed and it is no longer offered when creating an
+  // account. The enum value stays because Postgres cannot drop one in place —
+  // dropping it needs a type recreation, and no row has ever used it.
   franchise
 }
 
@@ -59,6 +66,7 @@ enum PaymentMethod {
   bakai_pos
   obank
   installment
+  gift_card
 }
 
 enum PaymentStatus {
@@ -67,15 +75,195 @@ enum PaymentStatus {
   reconciled
   disputed
   refunded
+  voided
+}
+
+enum RefundStatus {
+  requested
+  approved
+  processing
+  partially_succeeded
+  succeeded
+  failed
+  rejected
+}
+
+enum RefundPurpose {
+  return_sale
+  customer_prepayment
+}
+
+enum RefundAllocationStatus {
+  queued
+  processing
+  provider_pending
+  succeeded
+  failed
+}
+
+enum GiftCardTransactionType {
+  redemption
+  refund
+}
+
+enum FinanceSettlementStatus {
+  balanced
+  disputed
+  closed
+}
+
+enum FinanceSettlementLineStatus {
+  matched
+  disputed
+  reconciled
+}
+
+enum FinanceSettlementSourceType {
+  provider_payment
+  pos_shift
+  courier_cod
+  refund
+}
+
+enum CashIncassationStatus {
+  deposited
+  reconciled
+  disputed
 }
 
 enum UnitStatus {
   in_stock
   reserved
+  quarantined
+  returned_supplier
   sold
   returned
   in_repair
+  loaner_available
+  loaner_issued
   written_off
+}
+
+enum InventoryQuarantineStatus {
+  pending_diagnosis
+  diagnosed
+  disposed
+}
+
+enum InventoryQuarantineDiagnosis {
+  resellable
+  repair
+  write_off
+}
+
+enum InventoryQuarantineDisposition {
+  restock
+  repair
+  write_off
+}
+
+enum LoanerLoanStatus {
+  prepared
+  issued
+  overdue
+  returned
+  disputed
+  cancelled
+}
+
+enum StockTrackingMode {
+  serialized
+  quantity
+}
+
+// Политика поставки товара. own_stock — наш склад, продаём из остатков.
+// to_order — под заказ: остатка нет, товар закупается у поставщика под
+// конкретный заказ, покупателю показывается срок supplyLeadDays.
+// Инвариант: to_order НЕ участвует в резервировании и списании стока.
+enum SupplyMode {
+  own_stock
+  to_order
+}
+
+enum SupplyQuarantineStatus {
+  pending
+  resolved
+}
+
+enum SupplyQuarantineDisposition {
+  return_to_supplier
+  convert_to_own_stock
+}
+
+// Слайс 3 плана SUPPLY-TO-ORDER: жизненный цикл поставки одной строки заказа
+// от подтверждения у поставщика до выдачи покупателю. `cancelled` достижим из
+// любого нетерминального состояния — сорванная поставка не редкий путь.
+enum OrderLineSupplyStatus {
+  awaiting_deposit
+  awaiting_supplier
+  procurement_draft
+  ordered
+  in_transit
+  received
+  quality_check
+  ready
+  handed_over
+  supplier_rejected
+  late
+  customer_cancelled
+  quarantined
+  cancelled
+}
+
+enum OrderLineFulfillmentStatus {
+  pending_payment
+  reserved
+  ready
+  awaiting_deposit
+  procurement_draft
+  supplier_ordered
+  in_transit
+  received
+  quality_check
+  handed_over
+  reservation_expired
+  supplier_rejected
+  late
+  customer_cancelled
+  quarantined
+  cancelled
+}
+
+enum OrderReceivableKind {
+  supply_deposit
+  stock_sale
+  supply_balance
+  delivery
+}
+
+enum OrderReceivableStatus {
+  open
+  partially_settled
+  settled
+  cancelled
+}
+
+enum ConsignmentStatus {
+  active
+  sold
+  settled
+  withdrawn
+}
+
+enum ConsignmentPayoutStatus {
+  created
+  paid
+  cancelled
+}
+
+enum ConsignmentAdjustmentStatus {
+  open
+  settled
 }
 
 enum Grade {
@@ -106,10 +294,22 @@ enum WarrantyStatus {
   diagnostics
   waiting_supplier
   approved
+  repairing
   rejected
   repaired
   replaced
   closed
+}
+
+enum ServiceCaseType {
+  warranty
+  paid
+}
+
+enum ServicePartStatus {
+  reserved
+  consumed
+  released
 }
 
 enum TicketStatus {
@@ -120,130 +320,1456 @@ enum TicketStatus {
   closed
 }
 
+enum RmaStatus {
+  created
+  shipped
+  accepted
+  repaired
+  replaced
+  refunded
+  rejected
+  closed
+}
+
+enum DebtStatus {
+  open
+  settled
+  written_off
+}
+
+enum GiftCardStatus {
+  active
+  redeemed
+  cancelled
+  expired
+}
+
+enum B2BQuoteStatus {
+  requested
+  reviewing
+  quoted
+  accepted
+  rejected
+}
+
+enum ProtectionStatus {
+  requested
+  reviewing
+  offered
+  active
+  rejected
+  cancelled
+}
+
+enum PurchaseOrderStatus {
+  draft
+  sent
+  receiving
+  received
+  cancelled
+}
+
+enum OrderCancellationStatus {
+  requested
+  awaiting_owner
+  approved
+  refund_queued
+  refund_processing
+  refunded
+  rejected
+  refund_failed
+  cancelled
+}
+
+enum OrderCancellationPolicy {
+  automatic_full
+  owner_resolution
+}
+
+enum OrderCancellationFaultParty {
+  customer
+  supplier
+  alistore
+  unknown
+}
+
+enum OrderCancellationResolutionAction {
+  approve_full
+  approve_partial
+  reject
+}
+
+enum SupplierInvoiceStatus {
+  draft
+  approved
+  partially_paid
+  paid
+  cancelled
+}
+
+enum SupplierCreditNoteStatus {
+  draft
+  approved
+  applied
+  cancelled
+}
+
+enum SupplierAdvanceStatus {
+  open
+  partially_applied
+  applied
+  cancelled
+}
+
+enum SupplierStatementStatus {
+  imported
+  reconciled
+  disputed
+}
+
+enum SupplierStatementLineStatus {
+  unmatched
+  matched
+  disputed
+}
+
+enum BankStatementStatus {
+  imported
+  reconciled
+  disputed
+}
+
+enum BankStatementLineStatus {
+  unmatched
+  matched
+  disputed
+}
+
+enum ExpenseStatus {
+  submitted
+  approved
+  rejected
+  paid
+}
+
+enum ExpenseTaxMode {
+  none
+  included
+  excluded
+}
+
+enum AccountingPeriodStatus {
+  open
+  soft_closed
+  hard_closed
+}
+
+enum AccountingAccountType {
+  asset
+  liability
+  equity
+  revenue
+  expense
+}
+
+enum HrAbsenceType {
+  annual_leave
+  sick_leave
+  unpaid_leave
+  other
+}
+
+enum HrAbsenceStatus {
+  requested
+  approved
+  rejected
+  cancelled
+}
+
+enum HrPayrollStatus {
+  posted
+  paid
+}
+
+enum FixedAssetStatus {
+  active
+  fully_depreciated
+  disposed
+}
+
+enum AccountableAdvanceStatus {
+  open
+  partially_settled
+  settled
+}
+
+enum PromotionStatus {
+  draft
+  active
+  paused
+}
+
+enum PromotionDiscountType {
+  fixed
+  percent
+}
+
+enum StorefrontBlockType {
+  hero
+  promo
+  info
+  collection
+}
+
+enum StorefrontBlockStatus {
+  draft
+  published
+  scheduled
+  archived
+}
+
+enum StoreChecklistType {
+  opening
+  closing
+}
+
+enum StoreChecklistStatus {
+  open
+  completed
+}
+
+enum StoreIncidentSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum StoreIncidentStatus {
+  open
+  investigating
+  resolved
+}
+
+enum StorefrontBlockDevice {
+  all
+  desktop
+  mobile
+}
+
+enum CampaignFunnelStage {
+  click
+  visit
+  checkout
+  conversion
+}
+
+enum CampaignLifecycleStatus {
+  draft
+  review
+  approved
+  active
+  paused
+  completed
+}
+
+enum CampaignCreativeType {
+  text
+  image
+  video
+}
+
 // ---------- CORE ----------
 model Customer {
-  id        String          @id @default(cuid())
-  phone     String          @unique // PII — маскировать младшим ролям
-  name      String
-  consent   Boolean         @default(false) // маркетинг только при true
-  segments  String[]
-  ltv       Int             @default(0)
-  orders    Order[]
-  tickets   SupportTicket[]
-  tradeIns  TradeInDevice[]
-  createdAt DateTime        @default(now())
+  id                      String                  @id @default(cuid())
+  phone                   String                  @unique // PII — маскировать младшим ролям
+  // Второй канал входа в тот же аккаунт, а не вторая личность: телефон остаётся
+  // первичным идентификатором (доставка и COD без него не работают). Хранится
+  // нормализованным в нижнем регистре, поэтому @unique ловит и Ivan@… и ivan@….
+  email                   String?                 @unique // PII — маскировать младшим ролям
+  emailVerifiedAt         DateTime? // set when the OTP attach flow confirms ownership
+  name                    String
+  consent                 Boolean                 @default(false) // маркетинг только при true
+  segments                String[]
+  ltv                     Int                     @default(0)
+  identities              CustomerIdentity[]
+  pushTokens              PushToken[]
+  addresses               CustomerAddress[]
+  preferences             CustomerPreferences?
+  loyaltyEntries          LoyaltyEntry[]
+  coupons                 CustomerCoupon[]
+  promotionRedemptions    PromotionRedemption[]
+  campaignRecipients      CampaignRecipient[]
+  notifications           CustomerNotification[]
+  telegramAgentIdentities TelegramAgentIdentity[]
+  orders                  Order[]
+  tradeIns                TradeInDevice[]
+  createdAt               DateTime                @default(now())
+  // SupportTicket ссылается на customerId строкой (как WarrantyCase/DebtPlan) —
+  // без @relation, чтобы очистка в тестах не каскадила через FK.
+}
+
+model CustomerAddress {
+  id             String   @id @default(cuid())
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  title          String
+  text           String
+  comment        String?
+  isPrimary      Boolean  @default(false)
+  idempotencyKey String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([customerId, isPrimary])
+}
+
+model CustomerPreferences {
+  customerId String   @id
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  push       Boolean  @default(true)
+  whatsapp   Boolean  @default(true)
+  service    Boolean  @default(true)
+  promos     Boolean  @default(false)
+  updatedAt  DateTime @updatedAt
+}
+
+// Durable customer-owned inbox projected from the transactional outbox.
+model CustomerNotification {
+  id          String    @id @default(cuid())
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  template    String
+  title       String
+  detail      String
+  symbol      String    @default("bell.fill")
+  route       String    @default("account")
+  referenceId String?
+  createdAt   DateTime  @default(now())
+  readAt      DateTime?
+
+  @@index([customerId, createdAt])
+  @@index([customerId, readAt])
+}
+
+model LoyaltyEntry {
+  id         String    @id @default(cuid())
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  kind       String    @default("adjustment") // earn | redeem | refund_restore | refund_clawback | adjustment
+  label      String
+  amount     Int
+  sourceRef  String?   @unique
+  orderId    String?
+  paymentId  String?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([customerId, createdAt])
+  @@index([orderId])
+  @@index([paymentId])
+}
+
+model CustomerCoupon {
+  id         String    @id @default(cuid())
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  title      String
+  code       String
+  valueLabel String
+  expiresAt  DateTime?
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+
+  @@unique([customerId, code])
+  @@index([customerId, active])
+}
+
+model CustomerIdentity {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  provider    String
+  subject     String
+  email       String?
+  displayName String?
+  avatarUrl   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([provider, subject])
+  @@index([customerId])
+}
+
+// Short-lived, one-time bridge between a verified social-provider assertion
+// and phone ownership. Neither the provider credential nor the opaque
+// enrollment token is stored: only non-reversible SHA-256 fingerprints.
+model SocialEnrollment {
+  id            String   @id @default(cuid())
+  tokenHash     String   @unique
+  assertionHash String   @unique
+  provider      String
+  subject       String
+  email         String?
+  displayName   String?
+  avatarUrl     String?
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([provider, subject])
+  @@index([expiresAt])
+}
+
+// Durable global budget for the deliberately narrow App Store / Play review
+// credential. The row is keyed by canonical phone so attempts cannot be reset
+// by changing IP, process, or API instance.
+model ReviewLoginGuard {
+  phone         String    @id
+  attempts      Int       @default(0)
+  successes     Int       @default(0)
+  lockedUntil   DateTime?
+  disabledAt    DateTime?
+  lastAttemptAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([lockedUntil])
+}
+
+model PushToken {
+  id         String     @id @default(cuid())
+  token      String     @unique
+  platform   String
+  deviceId   String
+  appScope   String     @default("anonymous") // anonymous | customer | staff
+  customerId String?
+  customer   Customer?  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  staffId    String?
+  staff      StaffUser? @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  enabled    Boolean    @default(true)
+  lastSeenAt DateTime   @default(now())
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([customerId, enabled])
+  @@index([staffId, enabled])
+  @@index([platform])
 }
 
 model Product {
-  id        String              @id @default(cuid())
-  sku       String              @unique
-  name      String
-  price     Int
-  cost      Int
-  category  String
-  attrs     Json
-  archived  Boolean             @default(false) // soft-delete: НЕ удалять физически
-  units     DeviceUnit[]
-  movements InventoryMovement[]
+  id                          String                       @id @default(cuid())
+  sku                         String                       @unique
+  barcode                     String?                      @unique
+  variantGroup                String?
+  name                        String
+  price                       Int
+  cost                        Int
+  category                    String
+  taxCode                     String                       @default("vat_standard")
+  taxRateBps                  Int                          @default(1200)
+  trackingMode                StockTrackingMode            @default(serialized)
+  supplyMode                  SupplyMode                   @default(own_stock)
+  supplyLeadDays              Int? // обязателен при supplyMode=to_order, 1..180 (CHECK в миграции)
+  supplierId                  String? // внутренние данные: НЕ проецировать в публичный каталог
+  supplier                    Supplier?                    @relation(fields: [supplierId], references: [id])
+  supplierOffers              SupplierOffer[]
+  attrs                       Json
+  archived                    Boolean                      @default(false) // soft-delete: НЕ удалять физически
+  updatedAt                   DateTime                     @default(now()) @updatedAt
+  units                       DeviceUnit[]
+  movements                   InventoryMovement[]
+  balances                    InventoryBalance[]
+  quantityAllocations         OrderQuantityAllocation[]
+  supplyQuantityAllocations   SupplyQuantityAllocation[]
+  purchaseOrderItems          PurchaseOrderItem[]
+  bundleComponents            ProductBundleComponent[]     @relation("BundleProduct")
+  includedInBundles           ProductBundleComponent[]     @relation("BundleComponentProduct")
+  bundleAllocations           OrderBundleAllocation[]
+  consignmentItems            ConsignmentItem[]
+  quantityConsignmentLots     QuantityConsignmentLot[]
+  serviceParts                ServicePart[]
+  valuationLayers             InventoryValuationLayer[]
+  valuationIssues             InventoryValuationIssue[]
+  valuationReversals          InventoryValuationReversal[]
+  landedCostAllocations       LandedCostAllocation[]
+  exchangeReplacementRequests ExchangeRequest[]            @relation("ExchangeReplacementProduct")
+  orderItems                  OrderItem[]
+  supplyQuarantineResolutions SupplyQuarantineResolution[]
 
   @@index([category])
+  @@index([variantGroup])
   @@index([archived])
+  @@index([updatedAt])
+  @@index([supplyMode])
+  @@index([supplierId])
+}
+
+model InventoryBalance {
+  id                      String                    @id @default(cuid())
+  product                 Product                   @relation(fields: [productId], references: [id])
+  productId               String
+  location                String
+  onHand                  Int                       @default(0)
+  reserved                Int                       @default(0)
+  inventoryValue          Int                       @default(0) // value of on-hand stock at receipt cost
+  updatedAt               DateTime                  @default(now()) @updatedAt
+  allocations             OrderQuantityAllocation[]
+  quantityConsignmentLots QuantityConsignmentLot[]
+  serviceParts            ServicePart[]
+  valuationLayers         InventoryValuationLayer[]
+
+  @@unique([productId, location])
+  @@index([location])
+  @@index([updatedAt])
+}
+
+model ProductBundleComponent {
+  id                 String  @id @default(cuid())
+  bundleProduct      Product @relation("BundleProduct", fields: [bundleProductId], references: [id])
+  bundleProductId    String
+  componentProduct   Product @relation("BundleComponentProduct", fields: [componentProductId], references: [id])
+  componentProductId String
+  qty                Int
+
+  @@unique([bundleProductId, componentProductId])
+  @@index([componentProductId])
+}
+
+model ProductReview {
+  id               String    @id @default(cuid())
+  productId        String
+  sku              String
+  customerId       String
+  customerName     String
+  orderId          String
+  rating           Int
+  text             String?
+  status           String    @default("pending")
+  moderatedBy      String?
+  moderatedAt      DateTime?
+  moderationReason String?
+  createdAt        DateTime  @default(now())
+
+  @@unique([productId, customerId, orderId])
+  @@index([productId])
+  @@index([status, createdAt])
+  @@index([customerId])
+  @@index([orderId])
 }
 
 model DeviceUnit {
-  id        String     @id @default(cuid())
-  imei      String     @unique // один IMEI нельзя продать дважды
-  product   Product    @relation(fields: [productId], references: [id])
-  productId String
-  status    UnitStatus @default(in_stock)
-  grade     Grade?
-  location  String
-  orderId   String?
+  id                           String                      @id @default(cuid())
+  imei                         String                      @unique // один IMEI нельзя продать дважды
+  product                      Product                     @relation(fields: [productId], references: [id])
+  productId                    String
+  status                       UnitStatus                  @default(in_stock)
+  grade                        Grade?
+  location                     String
+  acquisitionCost              Int?
+  orderId                      String?
+  updatedAt                    DateTime                    @default(now()) @updatedAt
+  consignmentItem              ConsignmentItem?
+  serviceReplacement           ServiceWorkOrder?           @relation("ServiceReplacementUnit")
+  loanerProfile                LoanerDevice?
+  valuationIssues              InventoryValuationIssue[]
+  quarantineCases              InventoryQuarantineCase[]
+  exchangeReturnRequests       ExchangeRequest[]           @relation("ExchangeReturnedUnit")
+  exchangeReplacementRequests  ExchangeRequest[]           @relation("ExchangeReplacementUnit")
+  landedCostAllocations        LandedCostAllocation[]
+  supplyQuarantineResolution   SupplyQuarantineResolution? @relation(fields: [supplyQuarantineResolutionId], references: [id], onDelete: Restrict)
+  supplyQuarantineResolutionId String?
   // повтор IMEI в trade-in + продаже → risk-флаг (проверка на сервере)
 
   @@index([productId])
   @@index([status])
   @@index([orderId])
+  @@index([supplyQuarantineResolutionId])
+  @@index([updatedAt])
+}
+
+model InventoryQuarantineCase {
+  id                    String                          @id @default(cuid())
+  unit                  DeviceUnit                      @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  unitId                String
+  return                Return                          @relation(fields: [returnId], references: [id], onDelete: Restrict)
+  returnId              String
+  sourceType            String
+  reason                String
+  unitCost              Int
+  status                InventoryQuarantineStatus       @default(pending_diagnosis)
+  diagnosis             InventoryQuarantineDiagnosis?
+  disposition           InventoryQuarantineDisposition?
+  notes                 String?
+  createdBy             String
+  diagnosedBy           String?
+  disposedBy            String?
+  diagnosedAt           DateTime?
+  disposedAt            DateTime?
+  dispositionApproval   Approval?                       @relation(fields: [dispositionApprovalId], references: [id], onDelete: Restrict)
+  dispositionApprovalId String?                         @unique
+  repairWorkOrder       ServiceWorkOrder?               @relation(fields: [repairWorkOrderId], references: [id], onDelete: Restrict)
+  repairWorkOrderId     String?                         @unique
+  createdAt             DateTime                        @default(now())
+  updatedAt             DateTime                        @updatedAt
+
+  @@unique([sourceType, returnId, unitId])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([unitId, status])
+  @@index([returnId])
+}
+
+model StorePoint {
+  id                          String                       @id @default(cuid())
+  code                        String                       @unique
+  name                        String
+  address                     String
+  inventoryLocation           String                       @unique
+  hours                       String
+  pickupInstructions          String?
+  active                      Boolean                      @default(true)
+  sortOrder                   Int                          @default(100)
+  createdBy                   String
+  idempotencyKey              String                       @unique
+  orders                      Order[]
+  commands                    StorePointCommand[]
+  staff                       StaffUser[]
+  supplyQuarantineResolutions SupplyQuarantineResolution[]
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+
+  @@index([active, sortOrder])
+}
+
+model StorePointCommand {
+  idempotencyKey String     @id
+  storePoint     StorePoint @relation(fields: [storePointId], references: [id], onDelete: Cascade)
+  storePointId   String
+  fingerprint    String
+  response       Json
+  createdAt      DateTime   @default(now())
+
+  @@index([storePointId, createdAt])
+}
+
+model StoreOperationChecklist {
+  id             String                        @id @default(cuid())
+  point          String
+  businessDate   DateTime                      @db.Date
+  type           StoreChecklistType
+  status         StoreChecklistStatus          @default(open)
+  startedBy      String
+  completedBy    String?
+  completedAt    DateTime?
+  idempotencyKey String                        @unique
+  items          StoreOperationChecklistItem[]
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+
+  @@unique([point, businessDate, type])
+  @@index([point, businessDate, status])
+}
+
+model StoreOperationChecklistItem {
+  id          String                  @id @default(cuid())
+  checklist   StoreOperationChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  checklistId String
+  code        String
+  label       String
+  required    Boolean                 @default(true)
+  checked     Boolean                 @default(false)
+  checkedBy   String?
+  checkedAt   DateTime?
+  note        String?
+
+  @@unique([checklistId, code])
+  @@index([checklistId, checked])
+}
+
+model StoreIncident {
+  id             String                @id @default(cuid())
+  point          String
+  businessDate   DateTime              @db.Date
+  category       String
+  severity       StoreIncidentSeverity
+  status         StoreIncidentStatus   @default(open)
+  title          String
+  description    String
+  resolution     String?
+  createdBy      String
+  resolvedBy     String?
+  resolvedAt     DateTime?
+  idempotencyKey String                @unique
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([point, businessDate, status])
+  @@index([severity, status])
+}
+
+model StoreOperationCommand {
+  idempotencyKey String   @id
+  resourceType   String
+  resourceId     String
+  fingerprint    String
+  response       Json
+  createdAt      DateTime @default(now())
+
+  @@index([resourceType, resourceId, createdAt])
+}
+
+model PromotionCode {
+  id                 String                @id @default(cuid())
+  code               String                @unique
+  name               String
+  description        String?
+  status             PromotionStatus       @default(draft)
+  discountType       PromotionDiscountType
+  discountValue      Int
+  maxDiscount        Int?
+  minimumSubtotal    Int                   @default(0)
+  eligibleProductIds String[]
+  eligibleCategories String[]
+  startsAt           DateTime?
+  endsAt             DateTime?
+  totalLimit         Int?
+  perCustomerLimit   Int?
+  createdBy          String
+  updatedBy          String
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  redemptions        PromotionRedemption[]
+
+  @@index([status, startsAt, endsAt])
+  @@index([createdAt])
+}
+
+model PromotionRedemption {
+  id             String        @id @default(cuid())
+  promotion      PromotionCode @relation(fields: [promotionId], references: [id], onDelete: Restrict)
+  promotionId    String
+  customer       Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customerId     String
+  order          Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId        String        @unique
+  discountAmount Int
+  createdAt      DateTime      @default(now())
+
+  @@index([promotionId, createdAt])
+  @@index([promotionId, customerId, createdAt])
+}
+
+model StorefrontBlock {
+  id          String                @id @default(cuid())
+  type        StorefrontBlockType
+  status      StorefrontBlockStatus @default(draft)
+  device      StorefrontBlockDevice @default(all)
+  position    Int
+  title       String
+  eyebrow     String?
+  body        String?
+  ctaLabel    String?
+  ctaHref     String?
+  imageUrl    String?
+  tone        String                @default("dark")
+  productIds  String[]
+  startsAt    DateTime?
+  endsAt      DateTime?
+  publishedAt DateTime?
+  createdBy   String
+  updatedBy   String
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([status, device, position])
+  @@index([type, startsAt, endsAt])
 }
 
 model Order {
-  id         String      @id @default(cuid())
-  customer   Customer    @relation(fields: [customerId], references: [id])
-  customerId String
-  status     OrderStatus @default(draft)
-  channel    String // web | app | pos | telegram
-  total      Int
-  items      OrderItem[]
-  payments   Payment[]
-  createdAt  DateTime    @default(now())
+  id                       String                          @id @default(cuid())
+  idempotencyKey           String?                         @unique
+  isDemo                   Boolean                         @default(false)
+  customer                 Customer                        @relation(fields: [customerId], references: [id])
+  customerId               String
+  status                   OrderStatus                     @default(draft)
+  channel                  String // web | app | mobile | pos | telegram
+  fulfillmentType          String                          @default("pickup") // pickup | courier | express | store
+  paymentMode              String                          @default("prepaid") // prepaid | cod
+  paymentModeExplicit      Boolean                         @default(false)
+  idempotencyRequestHash   String?
+  storePointId             String?
+  storePoint               StorePoint?                     @relation(fields: [storePointId], references: [id], onDelete: Restrict)
+  storePointCode           String?
+  storePointName           String?
+  storePointAddress        String?
+  posShiftId               String?
+  posShift                 CashShift?                      @relation(fields: [posShiftId], references: [id], onDelete: Restrict)
+  pickupPoint              String?
+  pickupAddress            String?
+  fulfillmentLocation      String?
+  deliveryAddress          String?
+  deliverySlot             String?
+  deliveryZoneId           String?
+  deliveryZone             DeliveryZone?                   @relation(fields: [deliveryZoneId], references: [id])
+  deliverySlotId           String?
+  logisticsSlot            DeliverySlot?                   @relation(fields: [deliverySlotId], references: [id])
+  courierId                String?
+  courier                  StaffUser?                      @relation("OrderCourier", fields: [courierId], references: [id])
+  courierRunId             String?
+  courierRun               CourierRun?                     @relation(fields: [courierRunId], references: [id])
+  pickupCode               String?
+  subtotal                 Int                             @default(0)
+  deliveryFee              Int                             @default(0)
+  promoCode                String?
+  promoDiscount            Int                             @default(0)
+  promotionRedemption      PromotionRedemption?
+  loyaltyRedeemed          Int                             @default(0)
+  loyaltyEarned            Int                             @default(0)
+  taxBaseAmount            Int                             @default(0)
+  taxAmount                Int                             @default(0)
+  total                    Int
+  piiConsentAt             DateTime? // согласие с офертой и обработкой ПДн на витрине
+  items                    OrderItem[]
+  receivables              OrderReceivable[]
+  purchaseOrders           PurchaseOrder[]                 @relation("CustomerOrderPurchaseOrders")
+  bundleAllocations        OrderBundleAllocation[]
+  quantityAllocations      OrderQuantityAllocation[]
+  consignmentSales         ConsignmentItem[]               @relation("ConsignmentSaleOrder")
+  quantityConsignmentSales QuantityConsignmentAllocation[] @relation("QuantityConsignmentSaleOrder")
+  payments                 Payment[]
+  refunds                  Refund[]
+  cancellationRequests     OrderCancellation[]
+  attribution              OrderAttribution?
+  returns                  Return[]
+  exchangeSourceRequests   ExchangeRequest[]               @relation("ExchangeOriginalOrder")
+  exchangeOutputRequest    ExchangeRequest?                @relation("ExchangeOutputOrder")
+  createdAt                DateTime                        @default(now())
   // переходы статусов — только через сервис state-machine + запись AuditEvent
+
+  @@index([customerId])
+  @@index([isDemo, createdAt])
+  @@index([status])
+  @@index([fulfillmentType, status])
+  @@index([storePointId, status])
+  @@index([posShiftId])
+  @@index([pickupPoint, status])
+  @@index([courierId, status])
+  @@index([courierRunId])
+  @@index([deliveryZoneId, status])
+  @@index([deliverySlotId, status])
+}
+
+model DeliveryZone {
+  id             String         @id @default(cuid())
+  code           String         @unique
+  name           String
+  fee            Int
+  etaMinMinutes  Int
+  etaMaxMinutes  Int
+  active         Boolean        @default(true)
+  createdBy      String
+  idempotencyKey String         @unique
+  slots          DeliverySlot[]
+  orders         Order[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model DeliverySlot {
+  id             String       @id @default(cuid())
+  zone           DeliveryZone @relation(fields: [zoneId], references: [id])
+  zoneId         String
+  startsAt       DateTime
+  endsAt         DateTime
+  capacity       Int
+  active         Boolean      @default(true)
+  createdBy      String
+  idempotencyKey String       @unique
+  orders         Order[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([zoneId, startsAt, endsAt])
+  @@index([startsAt, active])
+}
+
+model ConsignmentItem {
+  id               String             @id @default(cuid())
+  idempotencyKey   String             @unique
+  unit             DeviceUnit         @relation(fields: [unitId], references: [id])
+  unitId           String             @unique
+  product          Product            @relation(fields: [productId], references: [id])
+  productId        String
+  ownerName        String
+  ownerContact     String?
+  commissionBps    Int
+  status           ConsignmentStatus  @default(active)
+  saleOrder        Order?             @relation("ConsignmentSaleOrder", fields: [saleOrderId], references: [id])
+  saleOrderId      String?
+  salePrice        Int?
+  commissionAmount Int?
+  ownerAmount      Int?
+  soldAt           DateTime?
+  payout           ConsignmentPayout? @relation(fields: [payoutId], references: [id])
+  payoutId         String?
+  createdBy        String
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([status, createdAt])
+  @@index([ownerName, ownerContact])
+  @@index([saleOrderId])
+  @@index([payoutId])
+}
+
+model ConsignmentPayout {
+  id                  String                          @id @default(cuid())
+  idempotencyKey      String                          @unique
+  ownerName           String
+  ownerContact        String?
+  grossAmount         Int
+  commissionAmount    Int
+  ownerAmount         Int
+  status              ConsignmentPayoutStatus         @default(created)
+  paymentKey          String?                         @unique
+  paymentMethod       PaymentMethod                   @default(cash)
+  createdBy           String
+  paidBy              String?
+  paidAt              DateTime?
+  createdAt           DateTime                        @default(now())
+  updatedAt           DateTime                        @updatedAt
+  items               ConsignmentItem[]
+  quantityAllocations QuantityConsignmentAllocation[]
+
+  @@index([status, createdAt])
+  @@index([ownerName, ownerContact])
+}
+
+model QuantityConsignmentLot {
+  id             String                          @id @default(cuid())
+  idempotencyKey String                          @unique
+  product        Product                         @relation(fields: [productId], references: [id])
+  productId      String
+  balance        InventoryBalance                @relation(fields: [balanceId], references: [id])
+  balanceId      String
+  location       String
+  ownerName      String
+  ownerContact   String?
+  commissionBps  Int
+  receivedQty    Int
+  availableQty   Int
+  reservedQty    Int                             @default(0)
+  createdBy      String
+  createdAt      DateTime                        @default(now())
+  updatedAt      DateTime                        @updatedAt
+  allocations    QuantityConsignmentAllocation[]
+
+  @@index([productId, location, createdAt])
+  @@index([balanceId, availableQty])
+  @@index([ownerName, ownerContact])
+}
+
+model QuantityConsignmentAllocation {
+  id                        String                  @id @default(cuid())
+  lot                       QuantityConsignmentLot  @relation(fields: [lotId], references: [id])
+  lotId                     String
+  orderQuantityAllocation   OrderQuantityAllocation @relation(fields: [orderQuantityAllocationId], references: [id])
+  orderQuantityAllocationId String
+  saleOrder                 Order?                  @relation("QuantityConsignmentSaleOrder", fields: [saleOrderId], references: [id])
+  saleOrderId               String?
+  qty                       Int
+  returnedQty               Int                     @default(0)
+  status                    ConsignmentStatus       @default(active)
+  salePrice                 Int?
+  commissionAmount          Int?
+  ownerAmount               Int?
+  returnedSaleAmount        Int                     @default(0)
+  returnedCommissionAmount  Int                     @default(0)
+  returnedOwnerAmount       Int                     @default(0)
+  soldAt                    DateTime?
+  returnedAt                DateTime?
+  payout                    ConsignmentPayout?      @relation(fields: [payoutId], references: [id])
+  payoutId                  String?
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+
+  @@unique([orderQuantityAllocationId, lotId])
+  @@index([saleOrderId, status])
+  @@index([payoutId])
+  @@index([lotId, status])
+}
+
+model QuantityConsignmentAdjustment {
+  id           String                      @id @default(cuid())
+  returnId     String
+  allocationId String
+  payoutId     String
+  ownerName    String
+  ownerContact String?
+  amount       Int
+  reason       String
+  status       ConsignmentAdjustmentStatus @default(open)
+  createdBy    String
+  settledBy    String?
+  settledAt    DateTime?
+  createdAt    DateTime                    @default(now())
+
+  @@unique([returnId, allocationId])
+  @@index([status, createdAt])
+  @@index([payoutId])
+  @@index([ownerName, ownerContact])
+}
+
+model ConsignmentAdjustment {
+  id           String                      @id @default(cuid())
+  returnId     String
+  itemId       String
+  payoutId     String
+  ownerName    String
+  ownerContact String?
+  amount       Int
+  reason       String
+  status       ConsignmentAdjustmentStatus @default(open)
+  createdBy    String
+  settledBy    String?
+  settledAt    DateTime?
+  createdAt    DateTime                    @default(now())
+
+  @@unique([returnId, itemId])
+  @@index([status, createdAt])
+  @@index([payoutId])
+  @@index([ownerName, ownerContact])
+}
+
+model OrderQuantityAllocation {
+  id                     String                          @id @default(cuid())
+  order                  Order                           @relation(fields: [orderId], references: [id])
+  orderId                String
+  orderItemId            String
+  product                Product                         @relation(fields: [productId], references: [id])
+  productId              String
+  balance                InventoryBalance                @relation(fields: [balanceId], references: [id])
+  balanceId              String
+  sku                    String
+  location               String
+  qty                    Int
+  active                 Boolean                         @default(true)
+  consumedAt             DateTime?
+  returnedQty            Int                             @default(0)
+  createdAt              DateTime                        @default(now())
+  reservation            Reservation?
+  consignmentAllocations QuantityConsignmentAllocation[]
+
+  @@index([orderId, active])
+  @@index([productId])
+  @@index([balanceId])
+}
+
+model OrderBundleAllocation {
+  id                 String    @id @default(cuid())
+  order              Order     @relation(fields: [orderId], references: [id])
+  orderId            String
+  orderItemId        String
+  bundleSku          String
+  componentProduct   Product   @relation(fields: [componentProductId], references: [id])
+  componentProductId String
+  componentSku       String
+  location           String
+  imei               String
+  active             Boolean   @default(true)
+  releasedAt         DateTime?
+  consumedAt         DateTime?
+  createdAt          DateTime  @default(now())
+
+  @@index([orderId])
+  @@index([orderId, active])
+  @@index([orderItemId])
+  @@index([componentProductId])
+  @@index([imei])
+}
+
+model OrderItem {
+  id                     String                     @id @default(cuid())
+  order                  Order                      @relation(fields: [orderId], references: [id])
+  orderId                String
+  product                Product?                   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId              String?
+  lineNumber             Int                        @default(0)
+  sku                    String
+  qty                    Int
+  price                  Int
+  unitCost               Int                        @default(0)
+  discountAmount         Int                        @default(0)
+  taxCode                String                     @default("vat_standard")
+  taxRateBps             Int                        @default(1200)
+  taxBaseAmount          Int                        @default(0)
+  taxAmount              Int                        @default(0)
+  supplyModeSnapshot     SupplyMode                 @default(own_stock)
+  supplierIdSnapshot     String?
+  supplyLeadDaysSnapshot Int?
+  promisedDate           DateTime?                  @db.Date
+  fulfillmentStatus      OrderLineFulfillmentStatus @default(pending_payment)
+  readyAt                DateTime?
+  handedOverAt           DateTime?
+  imei                   String?
+  inventorySnapshot      Json?
+  returnItems            ReturnItem[]
+  orderLineSupply        OrderLineSupply?
+  receivables            OrderReceivable[]
+
+  @@index([orderId])
+  @@index([orderId, lineNumber])
+  @@index([productId])
+  @@index([fulfillmentStatus])
+}
+
+model OrderCancellation {
+  id                        String                             @id @default(cuid())
+  order                     Order                              @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderId                   String
+  customerIdSnapshot        String
+  status                    OrderCancellationStatus            @default(requested)
+  policySnapshot            OrderCancellationPolicy
+  purchaseOrderSentSnapshot Boolean
+  depositPaidSnapshot       Int
+  requestedRefundAmount     Int
+  approvedRefundAmount      Int?
+  supplierExpenseAmount     Int                                @default(0)
+  faultParty                OrderCancellationFaultParty?
+  customerReason            String
+  ownerReason               String?
+  evidence                  Json?
+  resolutionAction          OrderCancellationResolutionAction?
+  resolutionIdempotencyKey  String?                            @unique
+  resolutionRequestHash     String?
+  idempotencyKey            String                             @unique
+  requestHash               String
+  requestedBy               String
+  resolvedBy                String?
+  refundId                  String?                            @unique
+  refund                    Refund?                            @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  createdAt                 DateTime                           @default(now())
+  resolvedAt                DateTime?
+  completedAt               DateTime?
+  updatedAt                 DateTime                           @updatedAt
+
+  @@index([orderId, status])
+  @@index([status, createdAt])
+}
+
+model Payment {
+  id                    String                        @id @default(cuid())
+  order                 Order?                        @relation(fields: [orderId], references: [id])
+  orderId               String?
+  serviceWorkOrder      ServiceWorkOrder?             @relation(fields: [serviceWorkOrderId], references: [id], onDelete: Restrict)
+  serviceWorkOrderId    String?
+  originalPayment       Payment?                      @relation("PaymentRefunds", fields: [originalPaymentId], references: [id], onDelete: Restrict)
+  originalPaymentId     String?
+  refunds               Payment[]                     @relation("PaymentRefunds")
+  refundAllocations     RefundAllocation[]            @relation("RefundOriginalPayment")
+  refundExecution       RefundAllocation?             @relation("RefundExecutionPayment")
+  giftCard              GiftCard?                     @relation(fields: [giftCardId], references: [id], onDelete: Restrict)
+  giftCardId            String?
+  giftCardTransaction   GiftCardTransaction?
+  receivableAllocations PaymentReceivableAllocation[]
+  amount                Int // отрицательное = возврат
+  method                PaymentMethod
+  status                PaymentStatus                 @default(pending)
+  shift                 CashShift?                    @relation(fields: [shiftId], references: [id])
+  shiftId               String?
+  account               AccountingAccount?            @relation(fields: [accountCode], references: [code], onDelete: Restrict)
+  accountCode           String?
+  accountingEntry       AccountingJournalEntry?       @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId     String?                       @unique
+  idempotencyKey        String?                       @unique
+  receivedBy            String?
+  point                 String?
+  txnId                 String?                       @unique // идемпотентность webhook (dedup)
+  createdAt             DateTime                      @default(now())
+
+  @@index([orderId])
+  @@index([serviceWorkOrderId])
+  @@index([originalPaymentId])
+  @@index([giftCardId])
+  @@index([shiftId])
+  @@index([accountCode, createdAt])
+  @@index([point, createdAt])
+  @@index([status, createdAt]) // dashboards/KPI/payroll filter by status + date window
+}
+
+model OrderReceivable {
+  id            String                        @id @default(cuid())
+  order         Order                         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderId       String
+  orderItem     OrderItem?                    @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  orderItemId   String?
+  kind          OrderReceivableKind
+  amount        Int
+  settledAmount Int                           @default(0)
+  status        OrderReceivableStatus         @default(open)
+  dueAt         DateTime?
+  createdAt     DateTime                      @default(now())
+  updatedAt     DateTime                      @updatedAt
+  allocations   PaymentReceivableAllocation[]
+
+  @@index([orderId, status])
+  @@index([orderItemId, kind])
+}
+
+model PaymentReceivableAllocation {
+  id           String          @id @default(cuid())
+  payment      Payment         @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  paymentId    String
+  receivable   OrderReceivable @relation(fields: [receivableId], references: [id], onDelete: Restrict)
+  receivableId String
+  amount       Int
+  createdAt    DateTime        @default(now())
+
+  @@unique([paymentId, receivableId])
+  @@index([receivableId, createdAt])
+}
+
+model OnlinePaymentIntentCommand {
+  id             String        @id @default(cuid())
+  idempotencyKey String        @unique
+  customerId     String
+  orderId        String
+  method         PaymentMethod
+  amount         Int
+  returnUrl      String?
+  response       Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([customerId, createdAt])
+  @@index([orderId])
+}
+
+model GiftCard {
+  id             String                @id @default(cuid())
+  code           String                @unique
+  // Выпуск карты — это выпуск денег, поэтому повтор запроса обязан вернуть ту
+  // же карту, а не вторую. Проверки по `code` для этого недостаточно: когда код
+  // не передан, сервер генерирует новый на каждый вызов, и реплей проходил её
+  // насквозь. Nullable — исторические карты ключа не имеют.
+  idempotencyKey String?               @unique
+  initialBalance Int
+  balance        Int
+  currency       String                @default("KGS")
+  status         GiftCardStatus        @default(active)
+  customerId     String?
+  issuedBy       String
+  note           String?
+  expiresAt      DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  payments       Payment[]
+  transactions   GiftCardTransaction[]
 
   @@index([customerId])
   @@index([status])
 }
 
-model OrderItem {
-  id      String  @id @default(cuid())
-  order   Order   @relation(fields: [orderId], references: [id])
-  orderId String
-  sku     String
-  qty     Int
-  price   Int
-  imei    String?
-
-  @@index([orderId])
-}
-
-model Payment {
-  id        String        @id @default(cuid())
-  order     Order?        @relation(fields: [orderId], references: [id])
-  orderId   String?
-  amount    Int // отрицательное = возврат
-  method    PaymentMethod
-  status    PaymentStatus @default(pending)
-  shift     CashShift?    @relation(fields: [shiftId], references: [id])
-  shiftId   String?
-  txnId     String?       @unique // идемпотентность webhook (dedup)
-  createdAt DateTime      @default(now())
-
-  @@index([orderId])
-  @@index([shiftId])
-}
-
 model CashShift {
-  id        String    @id @default(cuid())
-  staffId   String
-  point     String
-  openCash  Int
-  closeCash Int?
-  diff      Int? // расхождение → approval + Risk
-  openedAt  DateTime  @default(now())
-  closedAt  DateTime?
-  payments  Payment[]
+  id                  String               @id @default(cuid())
+  staffId             String
+  point               String
+  openCash            Int
+  closeCash           Int?
+  closeReason         String?
+  openIdempotencyKey  String?              @unique
+  closeIdempotencyKey String?              @unique
+  diff                Int? // расхождение → approval + Risk
+  openedAt            DateTime             @default(now())
+  closedAt            DateTime?
+  payments            Payment[]
+  refundAllocations   RefundAllocation[]
+  incassations        CashIncassation[]
+  drawerMovements     CashDrawerMovement[]
+  exchangeRequests    ExchangeRequest[]
+  posOrders           Order[]
+
+  @@index([staffId, closedAt]) // currentOpen() lookup on every POS sale
+  @@index([diff, closedAt]) // Risk Center: closed shifts with a discrepancy
+}
+
+model CashIncassation {
+  id                String                  @id @default(cuid())
+  idempotencyKey    String                  @unique
+  shift             CashShift               @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  shiftId           String
+  point             String
+  amount            Int
+  destinationCode   String                  @default("1010")
+  reference         String?
+  status            CashIncassationStatus   @default(deposited)
+  depositedBy       String
+  depositedAt       DateTime                @default(now())
+  reconciledAt      DateTime?
+  accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId String?                 @unique
+
+  @@index([shiftId, depositedAt])
+  @@index([point, depositedAt])
+  @@index([status, depositedAt])
+}
+
+/// Наличные, вошедшие в ящик или вышедшие из него не через `Payment`.
+///
+/// Ожидаемый остаток смены считался как `openCash + Σ Payment(cash)`, поэтому
+/// пять каналов двигали реальные деньги мимо сверки: сдача COD курьером, выпуск
+/// подарочной карты, выплата комитенту, выкуп trade-in и залог подменного фонда.
+/// Смена с продажей карт на 50 000 и выплатой комитенту 90 000 давала недостачу
+/// 40 000 на пустом месте, и объяснить её кассиру было нечем.
+///
+/// Форма повторяет `CashIncassation`: ключ идемпотентности, точка и ссылка на
+/// проводку. Отдельный `Payment` для этих движений создавать нельзя — он удвоил
+/// бы выручку (`salesGross = Payment + cod.receivable`).
+model CashDrawerMovement {
+  id                String                  @id @default(cuid())
+  idempotencyKey    String                  @unique
+  /// Cascade, а не Restrict: движение не существует без своей смены, а в
+  /// проде смены не удаляются вовсе (леджер append-only). Restrict здесь
+  /// давал только хрупкую уборку в тестах.
+  shift             CashShift               @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  shiftId           String
+  point             String
+  amount            Int // > 0 — приход в ящик, < 0 — расход из ящика
+  kind              String // cod_handover | giftcard_issue | consignment_payout | tradein_buyback | loaner_deposit
+  sourceType        String?
+  sourceRef         String?
+  reason            String?
+  createdBy         String
+  createdAt         DateTime                @default(now())
+  /// Ссылка информационная: авторитетная запись — сама проводка. SetNull,
+  /// чтобы удаление проводки не требовало знать о движениях.
+  accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: SetNull)
+  accountingEntryId String?                 @unique
+
+  @@index([shiftId, createdAt])
+  @@index([point, createdAt])
+}
+
+model CashShiftHandover {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  fromShiftId    String   @unique
+  toShiftId      String   @unique
+  fromStaffId    String
+  toStaffId      String
+  point          String
+  expectedCash   Int
+  countedCash    Int
+  diff           Int
+  reason         String?
+  createdBy      String
+  createdAt      DateTime @default(now())
+
+  @@index([point, createdAt])
+  @@index([toStaffId, createdAt])
 }
 
 model InventoryMovement {
-  id        String   @id @default(cuid())
-  product   Product  @relation(fields: [productId], references: [id])
-  productId String
-  qty       Int
-  type      String // received | moved | write_off | adjust | count
-  from      String?
-  to        String?
-  reason    String?
-  createdAt DateTime @default(now())
+  id                         String                      @id @default(cuid())
+  idempotencyKey             String?                     @unique
+  product                    Product                     @relation(fields: [productId], references: [id])
+  productId                  String
+  qty                        Int
+  type                       String // received | moved | write_off | adjust | count
+  from                       String?
+  to                         String?
+  reason                     String?
+  unitCost                   Int?
+  totalValue                 Int?
+  valuationQty               Int?
+  createdAt                  DateTime                    @default(now())
+  servicePart                ServicePart?
+  supplyQuarantineResolution SupplyQuarantineResolution?
   // write_off / adjust → owner approval + evidence
 
   @@index([productId])
   @@index([type])
 }
 
+// Immutable cost provenance. Product.cost is only the current catalog default;
+// these rows are the accounting source for stock value and COGS.
+model InventoryValuationLayer {
+  id                String                    @id @default(cuid())
+  product           Product                   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId         String
+  balance           InventoryBalance          @relation(fields: [balanceId], references: [id], onDelete: Cascade)
+  balanceId         String
+  location          String
+  sourceType        String
+  sourceRef         String
+  unitCost          Int
+  quantityReceived  Int
+  quantityRemaining Int
+  createdAt         DateTime                  @default(now())
+  issues            InventoryValuationIssue[]
+
+  @@unique([sourceType, sourceRef])
+  @@index([productId, location, createdAt])
+  @@index([balanceId, quantityRemaining, createdAt])
+}
+
+model InventoryValuationIssue {
+  id                       String                       @id @default(cuid())
+  product                  Product                      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId                String
+  layer                    InventoryValuationLayer?     @relation(fields: [layerId], references: [id], onDelete: Cascade)
+  layerId                  String?
+  unit                     DeviceUnit?                  @relation(fields: [imei], references: [imei], onDelete: Cascade)
+  imei                     String?
+  orderId                  String?
+  sourceType               String
+  sourceRef                String
+  location                 String
+  quantity                 Int
+  reversedQty              Int                          @default(0)
+  unitCost                 Int
+  totalCost                Int
+  createdAt                DateTime                     @default(now())
+  reversals                InventoryValuationReversal[]
+  supplyQuantityAllocation SupplyQuantityAllocation?
+
+  @@unique([sourceType, sourceRef])
+  @@index([productId, createdAt])
+  @@index([productId, location, createdAt])
+  @@index([orderId])
+  @@index([imei])
+}
+
+model InventoryValuationReversal {
+  id         String                  @id @default(cuid())
+  issue      InventoryValuationIssue @relation(fields: [issueId], references: [id], onDelete: Restrict)
+  issueId    String
+  product    Product                 @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId  String
+  return     Return                  @relation(fields: [returnId], references: [id], onDelete: Restrict)
+  returnId   String
+  sourceType String
+  sourceRef  String
+  location   String
+  quantity   Int
+  unitCost   Int
+  totalCost  Int
+  createdAt  DateTime                @default(now())
+
+  @@unique([sourceType, sourceRef])
+  @@index([issueId, createdAt])
+  @@index([productId, location, createdAt])
+  @@index([returnId])
+}
+
 model Reservation {
-  id        String   @id @default(cuid())
-  orderId   String
-  imei      String?
-  expiresAt DateTime // зависший резерв → Risk
-  active    Boolean  @default(true)
+  id                   String                   @id @default(cuid())
+  orderId              String
+  imei                 String?
+  quantityAllocationId String?                  @unique
+  quantityAllocation   OrderQuantityAllocation? @relation(fields: [quantityAllocationId], references: [id])
+  expiresAt            DateTime // зависший резерв → Risk
+  active               Boolean                  @default(true)
 
   @@index([orderId])
   @@index([imei])
@@ -251,27 +1777,1212 @@ model Reservation {
 }
 
 model Return {
-  id        String       @id @default(cuid())
-  orderId   String
-  reason    String
-  status    ReturnStatus @default(requested)
-  refundId  String? // refund → approval, тем же способом
-  createdAt DateTime     @default(now())
+  id                 String                       @id @default(cuid())
+  order              Order                        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId            String
+  reason             String
+  status             ReturnStatus                 @default(requested)
+  refundId           String? // refund → approval, тем же способом
+  refundAmount       Int                          @default(0)
+  isFullOrder        Boolean                      @default(true)
+  idempotencyKey     String?                      @unique
+  restockLocation    String?
+  restockedAt        DateTime?
+  createdAt          DateTime                     @default(now())
+  items              ReturnItem[]
+  refund             Refund?
+  quarantineCases    InventoryQuarantineCase[]
+  valuationReversals InventoryValuationReversal[]
+  exchangeRequest    ExchangeRequest?
 
   @@index([orderId])
   @@index([status])
 }
 
+model ReturnItem {
+  id           String       @id @default(cuid())
+  return       Return       @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  returnId     String
+  orderItem    OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  orderItemId  String
+  qty          Int
+  refundAmount Int
+  createdAt    DateTime     @default(now())
+  refundLines  RefundLine[]
+
+  @@unique([returnId, orderItemId])
+  @@index([orderItemId])
+}
+
+model Refund {
+  id             String             @id @default(cuid())
+  purpose        RefundPurpose      @default(return_sale)
+  return         Return?            @relation(fields: [returnId], references: [id], onDelete: Restrict)
+  returnId       String?            @unique
+  cancellation   OrderCancellation?
+  order          Order              @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderId        String
+  approval       Approval?          @relation(fields: [approvalId], references: [id], onDelete: Restrict)
+  approvalId     String?            @unique
+  idempotencyKey String             @unique
+  requestHash    String
+  amount         Int
+  status         RefundStatus       @default(requested)
+  reason         String
+  requester      String
+  approver       String?
+  approvedAt     DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  allocations    RefundAllocation[]
+  lines          RefundLine[]
+
+  @@index([orderId, createdAt])
+  @@index([status, updatedAt])
+}
+
+model RefundAllocation {
+  id                  String                  @id @default(cuid())
+  refund              Refund                  @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  refundId            String
+  originalPayment     Payment                 @relation("RefundOriginalPayment", fields: [originalPaymentId], references: [id], onDelete: Restrict)
+  originalPaymentId   String
+  refundPayment       Payment?                @relation("RefundExecutionPayment", fields: [refundPaymentId], references: [id], onDelete: Restrict)
+  refundPaymentId     String?                 @unique
+  shift               CashShift?              @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  shiftId             String?
+  accountingEntry     AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId   String?                 @unique
+  amount              Int
+  ordinal             Int
+  methodSnapshot      PaymentMethod
+  status              RefundAllocationStatus  @default(queued)
+  providerRefundId    String?                 @unique
+  attempts            Int                     @default(0)
+  lastError           String?
+  lockedAt            DateTime?
+  nextAttemptAt       DateTime?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  giftCardTransaction GiftCardTransaction?
+
+  @@unique([refundId, originalPaymentId])
+  @@unique([refundId, ordinal])
+  @@index([originalPaymentId])
+  @@index([shiftId])
+  @@index([status, nextAttemptAt])
+  @@index([status, lockedAt])
+}
+
+model RefundLine {
+  id            String     @id @default(cuid())
+  refund        Refund     @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  refundId      String
+  returnItem    ReturnItem @relation(fields: [returnItemId], references: [id], onDelete: Restrict)
+  returnItemId  String
+  qty           Int
+  grossAmount   Int
+  taxBaseAmount Int
+  taxAmount     Int
+  revenueAmount Int
+  taxCode       String
+  taxRateBps    Int
+  createdAt     DateTime   @default(now())
+
+  @@unique([refundId, returnItemId])
+  @@index([returnItemId])
+}
+
+model GiftCardTransaction {
+  id                 String                  @id @default(cuid())
+  giftCard           GiftCard                @relation(fields: [giftCardId], references: [id], onDelete: Restrict)
+  giftCardId         String
+  payment            Payment?                @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  paymentId          String?                 @unique
+  refundAllocation   RefundAllocation?       @relation(fields: [refundAllocationId], references: [id], onDelete: Restrict)
+  refundAllocationId String?                 @unique
+  type               GiftCardTransactionType
+  amount             Int
+  balanceAfter       Int
+  sourceRef          String                  @unique
+  actor              String
+  createdAt          DateTime                @default(now())
+
+  @@index([giftCardId, createdAt])
+}
+
 model WarrantyCase {
-  id         String         @id @default(cuid())
-  imei       String
-  customerId String
-  problem    String
-  status     WarrantyStatus @default(created)
-  sla        DateTime
-  assignee   String?
+  id             String            @id @default(cuid())
+  imei           String
+  customerId     String
+  problem        String
+  status         WarrantyStatus    @default(created)
+  serviceType    ServiceCaseType   @default(warranty)
+  deviceName     String?
+  sla            DateTime
+  slaEscalatedAt DateTime?
+  assignee       String?
+  workOrder      ServiceWorkOrder?
 
   @@index([imei])
+  @@index([status])
+  @@index([status, sla])
+  @@index([serviceType, status])
+}
+
+model ServiceWorkOrder {
+  id                  String                    @id @default(cuid())
+  warrantyCase        WarrantyCase              @relation(fields: [warrantyCaseId], references: [id], onDelete: Cascade)
+  warrantyCaseId      String                    @unique
+  technicianId        String?
+  diagnosticSummary   String?
+  diagnosticFee       Int                       @default(0)
+  estimateAmount      Int?
+  estimatePreparedAt  DateTime?
+  estimateApprovedAt  DateTime?
+  estimateApprovedBy  String?
+  repairStartedAt     DateTime?
+  repairCompletedAt   DateTime?
+  repairClosedAt      DateTime?
+  repairWarrantyUntil DateTime?
+  completionSummary   String?
+  replacementUnit     DeviceUnit?               @relation("ServiceReplacementUnit", fields: [replacementImei], references: [imei], onDelete: Restrict)
+  replacementImei     String?                   @unique
+  createdBy           String
+  point               String
+  taxCode             String                    @default("vat_standard")
+  taxRateBps          Int                       @default(1200)
+  taxBaseAmount       Int                       @default(0)
+  taxAmount           Int                       @default(0)
+  payments            Payment[]
+  parts               ServicePart[]
+  commands            ServiceWorkOrderCommand[]
+  loanerLoans         LoanerLoan[]
+  quarantineCase      InventoryQuarantineCase?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  @@index([technicianId, createdAt])
+  @@index([point, createdAt])
+  @@index([estimateApprovedAt, createdAt])
+}
+
+model LoanerDevice {
+  id                         String       @id @default(cuid())
+  unit                       DeviceUnit   @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  unitId                     String       @unique
+  active                     Boolean      @default(true)
+  condition                  String
+  registeredBy               String
+  registrationIdempotencyKey String       @unique
+  loans                      LoanerLoan[]
+  createdAt                  DateTime     @default(now())
+  updatedAt                  DateTime     @updatedAt
+
+  @@index([active, createdAt])
+}
+
+model LoanerLoan {
+  id                 String           @id @default(cuid())
+  device             LoanerDevice     @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  deviceId           String
+  workOrder          ServiceWorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Restrict)
+  workOrderId        String
+  customerId         String
+  status             LoanerLoanStatus @default(prepared)
+  issueCondition     String
+  returnCondition    String?
+  damageNote         String?
+  depositAmount      Int              @default(0)
+  agreementRef       String?
+  dueAt              DateTime
+  preparedBy         String
+  preparedAt         DateTime         @default(now())
+  issuedBy           String?
+  issuedAt           DateTime?
+  returnedBy         String?
+  returnedAt         DateTime?
+  overdueEscalatedAt DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([deviceId, status])
+  @@index([workOrderId, status])
+  @@index([customerId, createdAt])
+  @@index([status, dueAt])
+}
+
+model ServicePart {
+  id          String             @id @default(cuid())
+  workOrder   ServiceWorkOrder   @relation(fields: [workOrderId], references: [id], onDelete: Restrict)
+  workOrderId String
+  product     Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId   String
+  balance     InventoryBalance   @relation(fields: [balanceId], references: [id], onDelete: Restrict)
+  balanceId   String
+  location    String
+  qty         Int
+  status      ServicePartStatus  @default(reserved)
+  reservedBy  String
+  reservedAt  DateTime           @default(now())
+  consumedBy  String?
+  consumedAt  DateTime?
+  releasedBy  String?
+  releasedAt  DateTime?
+  movement    InventoryMovement? @relation(fields: [movementId], references: [id], onDelete: Restrict)
+  movementId  String?            @unique
+
+  @@index([workOrderId, status])
+  @@index([balanceId, status])
+  @@index([productId, status])
+}
+
+model ServiceWorkOrderCommand {
+  id             String           @id @default(cuid())
+  idempotencyKey String           @unique
+  workOrder      ServiceWorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  workOrderId    String
+  action         String
+  request        Json
+  response       Json
+  createdAt      DateTime         @default(now())
+
+  @@index([workOrderId, createdAt])
+}
+
+model WarrantyOpenCommand {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  customerId     String
+  imei           String
+  problem        String
+  warrantyCaseId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([customerId, createdAt])
+  @@index([imei])
+}
+
+// Слайс 4 плана SUPPLY-TO-ORDER: прайс-лист поставщика — файл/строки поступают
+// от партнёра без API (WhatsApp), поэтому импорт всегда двухшаговый:
+// preview (stage, ничего в Product не пишет) → apply (явное решение сотрудника).
+// rows хранит уже классифицированные строки, посчитанные один раз на этапе
+// stage — apply читает их как есть, а не парсит файл заново, иначе preview и
+// apply могли бы разойтись.
+model SupplierPriceImportBatch {
+  id          String                          @id @default(cuid())
+  supplier    Supplier                        @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId  String
+  mapping     Json
+  rows        Json
+  summary     Json
+  createdBy   String
+  createdAt   DateTime                        @default(now())
+  application SupplierPriceImportApplication?
+
+  @@index([supplierId])
+  @@index([createdAt])
+}
+
+// Одна строка на батч — применить дважды нельзя даже гонкой: второй apply
+// упирается в @@unique([batchId]), а не в проверку «если уже применено»
+// в коде до записи.
+model SupplierPriceImportApplication {
+  id        String                   @id @default(cuid())
+  batch     SupplierPriceImportBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  batchId   String                   @unique
+  appliedBy String
+  appliedAt DateTime                 @default(now())
+  summary   Json
+
+  @@index([appliedAt])
+}
+
+// Поставщик техники. Scorecard считается из связанных RMA.
+model Supplier {
+  id                 String                     @id @default(cuid())
+  name               String                     @unique
+  contact            String?
+  rmas               SupplierRma[]
+  purchaseOrders     PurchaseOrder[]
+  invoices           SupplierInvoice[]
+  creditNotes        SupplierCreditNote[]
+  advances           SupplierAdvance[]
+  statements         SupplierStatement[]
+  landedCosts        LandedCost[]
+  expenses           Expense[]
+  products           Product[]
+  offers             SupplierOffer[]
+  priceImportBatches SupplierPriceImportBatch[]
+  createdAt          DateTime                   @default(now())
+}
+
+model SupplierOffer {
+  id           String            @id @default(cuid())
+  product      Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId    String
+  supplier     Supplier          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId   String
+  supplierSku  String?
+  unitCost     Int
+  availableQty Int
+  leadDays     Int
+  currency     String            @default("KGS")
+  checkedAt    DateTime
+  validUntil   DateTime
+  active       Boolean           @default(true)
+  updatedBy    String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  supplies     OrderLineSupply[]
+
+  @@index([productId, active])
+  @@index([supplierId, active])
+  @@index([validUntil, active])
+}
+
+model Expense {
+  id                 String                  @id @default(cuid())
+  idempotencyKey     String                  @unique
+  category           String
+  description        String
+  amount             Int
+  documentAmount     Int
+  currency           String                  @default("KGS")
+  exchangeRateMicros Int                     @default(1000000)
+  exchangeRate       AccountingCurrencyRate? @relation(fields: [exchangeRateId], references: [id], onDelete: Restrict)
+  exchangeRateId     String?
+  taxMode            ExpenseTaxMode          @default(none)
+  taxCode            String                  @default("none")
+  taxRateBps         Int                     @default(0)
+  taxBaseAmount      Int
+  taxAmount          Int                     @default(0)
+  point              String?
+  supplier           Supplier?               @relation(fields: [supplierId], references: [id])
+  supplierId         String?
+  status             ExpenseStatus           @default(submitted)
+  requestedBy        String
+  approvedBy         String?
+  rejectedBy         String?
+  rejectionNote      String?
+  paidBy             String?
+  paymentKey         String?                 @unique
+  paymentAccountCode String?
+  paymentReference   String?
+  incurredAt         DateTime                @default(now())
+  approvedAt         DateTime?
+  rejectedAt         DateTime?
+  paidAt             DateTime?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  @@index([status, createdAt])
+  @@index([category, incurredAt])
+  @@index([supplierId])
+  @@index([currency, incurredAt])
+  @@index([exchangeRateId])
+}
+
+model AccountingCurrencyRate {
+  id             String    @id @default(cuid())
+  idempotencyKey String    @unique
+  currency       String
+  baseCurrency   String    @default("KGS")
+  rateMicros     Int
+  effectiveAt    DateTime
+  source         String
+  createdBy      String
+  createdAt      DateTime  @default(now())
+  expenses       Expense[]
+
+  @@unique([currency, baseCurrency, effectiveAt])
+  @@index([currency, baseCurrency, effectiveAt])
+}
+
+// Balanced accounting ledger. AuditEvent explains what happened; these rows
+// prove where value moved and that every posted entry balances.
+model AccountingAccount {
+  code                String                         @id
+  name                String
+  type                AccountingAccountType
+  system              Boolean                        @default(true)
+  active              Boolean                        @default(true)
+  lines               AccountingJournalLine[]
+  openingBalanceLines AccountingOpeningBalanceLine[]
+  bankStatements      BankStatement[]
+  payments            Payment[]
+  createdAt           DateTime                       @default(now())
+
+  @@index([type, active])
+}
+
+model AccountingJournalEntry {
+  id                              String                            @id @default(cuid())
+  idempotencyKey                  String                            @unique
+  sourceType                      String
+  sourceRef                       String
+  description                     String
+  point                           String?
+  currency                        String                            @default("KGS")
+  documentAmount                  Int?
+  exchangeRateMicros              Int                               @default(1000000)
+  baseAmount                      Int?
+  taxCode                         String                            @default("none")
+  taxRateBps                      Int                               @default(0)
+  taxAmount                       Int                               @default(0)
+  occurredAt                      DateTime
+  postedAt                        DateTime                          @default(now())
+  createdBy                       String
+  lines                           AccountingJournalLine[]
+  payment                         Payment?
+  refundAllocation                RefundAllocation?
+  purchaseReceipt                 PurchaseReceipt?
+  supplierInvoice                 SupplierInvoice?
+  supplierCreditNote              SupplierCreditNote?
+  supplierInvoicePayment          SupplierInvoicePayment?
+  supplierAdvance                 SupplierAdvance?
+  supplierAdvanceAllocation       SupplierInvoiceAdvanceAllocation?
+  supplierStatementLine           SupplierStatementLine?
+  landedCost                      LandedCost?
+  openingBalance                  AccountingOpeningBalance?
+  hrPayrollAccrual                HrPayrollRun?                     @relation("HrPayrollAccrual")
+  hrPayrollPayout                 HrPayrollRun?                     @relation("HrPayrollPayout")
+  fixedAssetAcquisition           FixedAsset?                       @relation("FixedAssetAcquisition")
+  fixedAssetDepreciation          FixedAssetDepreciation?           @relation("FixedAssetDepreciation")
+  accountableAdvanceIssue         AccountableAdvance?               @relation("AccountableAdvanceIssue")
+  accountableAdvanceSettlement    AccountableAdvanceSettlement?     @relation("AccountableAdvanceSettlement")
+  accountableAdvanceReturn        AccountableAdvanceReturn?         @relation("AccountableAdvanceReturn")
+  accountableAdvanceReimbursement AccountableAdvanceReimbursement?  @relation("AccountableAdvanceReimbursement")
+  bankStatementLine               BankStatementLine?
+  cashIncassation                 CashIncassation?
+  cashDrawerMovement              CashDrawerMovement?
+  taxSettlement                   AccountingTaxSettlement?
+  debtPlan                        DebtPlan?
+  reversalOfId                    String?                           @unique
+  reversalOf                      AccountingJournalEntry?           @relation("AccountingReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversal                        AccountingJournalEntry?           @relation("AccountingReversal")
+
+  @@unique([sourceType, sourceRef])
+  @@index([occurredAt, point])
+  @@index([sourceType, occurredAt])
+}
+
+model AccountingOpeningBalance {
+  id                String                         @id @default(cuid())
+  period            String                         @unique
+  documentNumber    String                         @unique
+  idempotencyKey    String                         @unique
+  description       String
+  createdBy         String
+  accountingEntryId String                         @unique
+  accountingEntry   AccountingJournalEntry         @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  lines             AccountingOpeningBalanceLine[]
+  createdAt         DateTime                       @default(now())
+
+  @@index([createdAt])
+}
+
+model AccountingOpeningBalanceLine {
+  id               String                   @id @default(cuid())
+  openingBalance   AccountingOpeningBalance @relation(fields: [openingBalanceId], references: [id], onDelete: Restrict)
+  openingBalanceId String
+  account          AccountingAccount        @relation(fields: [accountCode], references: [code], onDelete: Restrict)
+  accountCode      String
+  debit            Int                      @default(0)
+  credit           Int                      @default(0)
+  memo             String?
+
+  @@unique([openingBalanceId, accountCode])
+  @@index([accountCode, openingBalanceId])
+}
+
+model FixedAsset {
+  id                           String                   @id @default(cuid())
+  assetNumber                  String                   @unique
+  name                         String
+  category                     String
+  serialNumber                 String?
+  acquisitionCost              Int
+  accumulatedDepreciation      Int                      @default(0)
+  usefulLifeMonths             Int
+  acquiredAt                   DateTime
+  inServiceAt                  DateTime
+  fundingAccountCode           String
+  externalRef                  String?
+  status                       FixedAssetStatus         @default(active)
+  idempotencyKey               String                   @unique
+  createdBy                    String
+  acquisitionAccountingEntryId String                   @unique
+  acquisitionAccountingEntry   AccountingJournalEntry   @relation("FixedAssetAcquisition", fields: [acquisitionAccountingEntryId], references: [id], onDelete: Restrict)
+  depreciationEntries          FixedAssetDepreciation[]
+  createdAt                    DateTime                 @default(now())
+  updatedAt                    DateTime                 @updatedAt
+
+  @@index([status, inServiceAt])
+  @@index([category, createdAt])
+}
+
+model FixedAssetDepreciation {
+  id                 String                 @id @default(cuid())
+  fixedAsset         FixedAsset             @relation(fields: [fixedAssetId], references: [id], onDelete: Restrict)
+  fixedAssetId       String
+  period             String
+  amount             Int
+  openingAccumulated Int
+  closingAccumulated Int
+  idempotencyKey     String                 @unique
+  accountingEntryId  String                 @unique
+  accountingEntry    AccountingJournalEntry @relation("FixedAssetDepreciation", fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  postedBy           String
+  postedAt           DateTime               @default(now())
+
+  @@unique([fixedAssetId, period])
+  @@index([period, postedAt])
+}
+
+model AccountableAdvance {
+  id                 String                            @id @default(cuid())
+  staff              StaffUser                         @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  staffId            String
+  idempotencyKey     String                            @unique
+  purpose            String
+  point              String
+  amount             Int
+  settledAmount      Int                               @default(0)
+  returnedAmount     Int                               @default(0)
+  reimbursedAmount   Int                               @default(0)
+  status             AccountableAdvanceStatus          @default(open)
+  fundingAccountCode String
+  paymentReference   String
+  issuedBy           String
+  issuedAt           DateTime                          @default(now())
+  dueAt              DateTime?
+  accountingEntryId  String                            @unique
+  accountingEntry    AccountingJournalEntry            @relation("AccountableAdvanceIssue", fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  settlements        AccountableAdvanceSettlement[]
+  returns            AccountableAdvanceReturn[]
+  reimbursements     AccountableAdvanceReimbursement[]
+  createdAt          DateTime                          @default(now())
+  updatedAt          DateTime                          @updatedAt
+
+  @@index([staffId, status, createdAt])
+  @@index([point, status, dueAt])
+}
+
+model AccountableAdvanceSettlement {
+  id                 String                 @id @default(cuid())
+  advance            AccountableAdvance     @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  advanceId          String
+  idempotencyKey     String                 @unique
+  amount             Int
+  expenseAccountCode String
+  description        String
+  settledBy          String
+  settledAt          DateTime               @default(now())
+  accountingEntryId  String                 @unique
+  accountingEntry    AccountingJournalEntry @relation("AccountableAdvanceSettlement", fields: [accountingEntryId], references: [id], onDelete: Restrict)
+
+  @@index([advanceId, settledAt])
+}
+
+model AccountableAdvanceReturn {
+  id                 String                 @id @default(cuid())
+  advance            AccountableAdvance     @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  advanceId          String
+  idempotencyKey     String                 @unique
+  amount             Int
+  fundingAccountCode String
+  paymentReference   String
+  returnedBy         String
+  returnedAt         DateTime               @default(now())
+  accountingEntryId  String                 @unique
+  accountingEntry    AccountingJournalEntry @relation("AccountableAdvanceReturn", fields: [accountingEntryId], references: [id], onDelete: Restrict)
+
+  @@index([advanceId, returnedAt])
+}
+
+model AccountableAdvanceReimbursement {
+  id                 String                 @id @default(cuid())
+  advance            AccountableAdvance     @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  advanceId          String
+  idempotencyKey     String                 @unique
+  amount             Int
+  fundingAccountCode String
+  paymentReference   String
+  reimbursedBy       String
+  reimbursedAt       DateTime               @default(now())
+  accountingEntryId  String                 @unique
+  accountingEntry    AccountingJournalEntry @relation("AccountableAdvanceReimbursement", fields: [accountingEntryId], references: [id], onDelete: Restrict)
+
+  @@index([advanceId, reimbursedAt])
+}
+
+model AccountingPeriod {
+  id                      String                 @id @default(cuid())
+  period                  String                 @unique
+  status                  AccountingPeriodStatus @default(open)
+  lastCloseIdempotencyKey String?                @unique
+  closedBy                String?
+  closedAt                DateTime?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+
+  @@index([status, period])
+}
+
+model AccountingTaxSettlement {
+  id                String                  @id @default(cuid())
+  period            String
+  point             String                  @default("")
+  idempotencyKey    String                  @unique
+  outputTax         Int
+  inputTax          Int
+  offsetAmount      Int
+  payableAmount     Int
+  recoverableAmount Int
+  accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId String?                 @unique
+  createdBy         String
+  createdAt         DateTime                @default(now())
+
+  @@unique([period, point])
+  @@index([period, createdAt])
+}
+
+model AccountingJournalLine {
+  id          String                 @id @default(cuid())
+  entry       AccountingJournalEntry @relation(fields: [entryId], references: [id], onDelete: Restrict)
+  entryId     String
+  account     AccountingAccount      @relation(fields: [accountCode], references: [code], onDelete: Restrict)
+  accountCode String
+  debit       Int                    @default(0)
+  credit      Int                    @default(0)
+  memo        String?
+
+  @@index([entryId])
+  @@index([accountCode, entryId])
+}
+
+model FinanceBudget {
+  id        String   @id @default(cuid())
+  period    String
+  category  String
+  point     String   @default("")
+  amount    Int
+  version   Int      @default(1)
+  createdBy String
+  updatedBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([period, category, point])
+  @@index([period, point])
+}
+
+model FinanceBudgetCommand {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  period         String
+  category       String
+  point          String
+  amount         Int
+  budgetId       String
+  response       Json
+  createdAt      DateTime @default(now())
+
+  @@index([period, point, createdAt])
+  @@index([budgetId])
+}
+
+model FinanceSettlementRun {
+  id              String                  @id @default(cuid())
+  periodStart     DateTime
+  periodEnd       DateTime
+  point           String                  @default("")
+  status          FinanceSettlementStatus @default(balanced)
+  expectedTotal   Int
+  actualTotal     Int
+  adjustmentTotal Int                     @default(0)
+  variance        Int
+  note            String?
+  createdBy       String
+  closedBy        String?
+  closedAt        DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  lines           FinanceSettlementLine[]
+
+  @@index([status, createdAt])
+  @@index([periodStart, periodEnd, point])
+}
+
+model FinanceSettlementLine {
+  id               String                      @id @default(cuid())
+  run              FinanceSettlementRun        @relation(fields: [runId], references: [id], onDelete: Restrict)
+  runId            String
+  sourceType       FinanceSettlementSourceType
+  sourceRef        String
+  label            String
+  expectedAmount   Int
+  actualAmount     Int
+  adjustmentAmount Int                         @default(0)
+  variance         Int
+  status           FinanceSettlementLineStatus @default(matched)
+  reason           String?
+  resolutionReason String?
+  resolvedBy       String?
+  resolvedAt       DateTime?
+  reconciledAt     DateTime?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  @@unique([sourceType, sourceRef])
+  @@index([runId, status])
+}
+
+model FinanceSettlementCommand {
+  idempotencyKey String   @id
+  action         String
+  runId          String?
+  input          Json
+  response       Json
+  createdBy      String
+  createdAt      DateTime @default(now())
+
+  @@index([runId, createdAt])
+}
+
+model PurchaseOrder {
+  id             String              @id @default(cuid())
+  number         String              @unique
+  idempotencyKey String?             @unique
+  supplier       Supplier            @relation(fields: [supplierId], references: [id])
+  supplierId     String
+  sourceOrder    Order?              @relation("CustomerOrderPurchaseOrders", fields: [sourceOrderId], references: [id], onDelete: Restrict)
+  sourceOrderId  String?
+  sourceKey      String?             @unique
+  sourceVersion  Int                 @default(1)
+  status         PurchaseOrderStatus @default(draft)
+  location       String
+  note           String?
+  createdBy      String
+  sentAt         DateTime?
+  receivedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  items          PurchaseOrderItem[]
+  receipts       PurchaseReceipt[]
+  invoices       SupplierInvoice[]
+  landedCosts    LandedCost[]
+
+  @@index([supplierId, createdAt])
+  @@index([status, createdAt])
+  @@index([sourceOrderId, supplierId, status])
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrderId String
+  product         Product       @relation(fields: [productId], references: [id])
+  productId       String
+  orderedQty      Int
+  receivedQty     Int           @default(0)
+  unitCost        Int
+
+  orderLineSupply OrderLineSupply?
+
+  @@unique([purchaseOrderId, productId])
+  @@index([productId])
+}
+
+// Слайс 3 плана SUPPLY-TO-ORDER: связка «строка клиентского заказа» ↔
+// «строка заказа поставщику». Прямой FK Order → PurchaseOrder был бы неверен —
+// один PO поставщику агрегирует строки нескольких клиентских заказов, поэтому
+// связь идёт через отдельную запись на КАЖДУЮ строку заказа (orderItemId
+// уникален: одна запись поставки на строку). purchaseOrderItemId остаётся
+// NULL, пока PO поставщику не размещён — на awaiting_supplier его физически
+// не существует.
+model OrderLineSupply {
+  id                   String                      @id @default(cuid())
+  orderItem            OrderItem                   @relation(fields: [orderItemId], references: [id])
+  orderItemId          String                      @unique
+  purchaseOrderItem    PurchaseOrderItem?          @relation(fields: [purchaseOrderItemId], references: [id])
+  purchaseOrderItemId  String?                     @unique
+  supplierOffer        SupplierOffer?              @relation(fields: [supplierOfferId], references: [id], onDelete: Restrict)
+  supplierOfferId      String?
+  status               OrderLineSupplyStatus       @default(awaiting_supplier)
+  orderedQty           Int                         @default(1)
+  receivedQty          Int                         @default(0)
+  expectedAt           DateTime?
+  actor                String
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  quarantineResolution SupplyQuarantineResolution?
+  quantityAllocations  SupplyQuantityAllocation[]
+
+  @@index([status])
+  @@index([supplierOfferId, status])
+}
+
+// Количественный товар, принятый под конкретную клиентскую строку. Это
+// отдельный субрегистр: запись не увеличивает свободный InventoryBalance и
+// может быть списана только через связанную OrderLineSupply.
+model SupplyQuantityAllocation {
+  id                String                   @id @default(cuid())
+  orderLineSupply   OrderLineSupply          @relation(fields: [orderLineSupplyId], references: [id], onDelete: Restrict)
+  orderLineSupplyId String
+  purchaseReceipt   PurchaseReceipt          @relation(fields: [purchaseReceiptId], references: [id], onDelete: Restrict)
+  purchaseReceiptId String
+  product           Product                  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId         String
+  location          String
+  qty               Int
+  returnedQty       Int                      @default(0)
+  unitCost          Int
+  active            Boolean                  @default(true)
+  consumedAt        DateTime?
+  valuationIssue    InventoryValuationIssue? @relation(fields: [valuationIssueId], references: [id], onDelete: Restrict)
+  valuationIssueId  String?                  @unique
+  createdAt         DateTime                 @default(now())
+
+  @@unique([purchaseReceiptId, orderLineSupplyId])
+  @@index([orderLineSupplyId, active])
+  @@index([productId, active])
+}
+
+model SupplyQuarantineResolution {
+  id                        String                       @id @default(cuid())
+  orderLineSupply           OrderLineSupply              @relation(fields: [orderLineSupplyId], references: [id], onDelete: Restrict)
+  orderLineSupplyId         String                       @unique
+  product                   Product                      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId                 String
+  storePoint                StorePoint                   @relation(fields: [storePointId], references: [id], onDelete: Restrict)
+  storePointId              String
+  inventoryLocationSnapshot String
+  trackingModeSnapshot      StockTrackingMode
+  quarantinedQty            Int
+  unitCostSnapshot          Int
+  imeis                     Json?
+  status                    SupplyQuarantineStatus       @default(pending)
+  disposition               SupplyQuarantineDisposition?
+  proposalReason            String
+  proposalEvidence          Json
+  proposedBy                String
+  proposalIdempotencyKey    String                       @unique
+  proposalHash              String
+  resolutionReason          String?
+  resolutionEvidence        Json?
+  resolvedBy                String?
+  resolutionIdempotencyKey  String?                      @unique
+  resolutionHash            String?
+  inventoryMovement         InventoryMovement?           @relation(fields: [inventoryMovementId], references: [id], onDelete: Restrict)
+  inventoryMovementId       String?                      @unique
+  units                     DeviceUnit[]
+  createdAt                 DateTime                     @default(now())
+  resolvedAt                DateTime?
+
+  @@index([status, createdAt])
+  @@index([storePointId, status])
+  @@index([productId, status])
+}
+
+model PurchaseReceipt {
+  id                  String                     @id @default(cuid())
+  purchaseOrder       PurchaseOrder              @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrderId     String
+  idempotencyKey      String
+  actor               String
+  payload             Json
+  accountingEntryId   String?                    @unique
+  accountingEntry     AccountingJournalEntry?    @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  quantityAllocations SupplyQuantityAllocation[]
+  createdAt           DateTime                   @default(now())
+
+  @@unique([purchaseOrderId, idempotencyKey])
+  @@index([purchaseOrderId, createdAt])
+}
+
+model SupplierInvoice {
+  id                  String                             @id @default(cuid())
+  supplier            Supplier                           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId          String
+  purchaseOrder       PurchaseOrder                      @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  purchaseOrderId     String
+  invoiceNumber       String
+  idempotencyKey      String                             @unique
+  amount              Int
+  matchedReceiptValue Int
+  dueDate             DateTime?
+  status              SupplierInvoiceStatus              @default(draft)
+  approvedBy          String?
+  approvedAt          DateTime?
+  paymentKey          String?                            @unique
+  paymentAccountCode  String?
+  paymentReference    String?
+  paidBy              String?
+  paidAt              DateTime?
+  accountingEntryId   String?                            @unique
+  accountingEntry     AccountingJournalEntry?            @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  payments            SupplierInvoicePayment[]
+  advanceAllocations  SupplierInvoiceAdvanceAllocation[]
+  creditNotes         SupplierCreditNote[]
+  createdBy           String
+  createdAt           DateTime                           @default(now())
+  updatedAt           DateTime                           @updatedAt
+
+  @@unique([supplierId, invoiceNumber])
+  @@index([status, dueDate])
+  @@index([supplierId, createdAt])
+  @@index([purchaseOrderId])
+}
+
+model SupplierInvoicePayment {
+  id                 String                 @id @default(cuid())
+  invoice            SupplierInvoice        @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  invoiceId          String
+  idempotencyKey     String                 @unique
+  paymentKey         String                 @unique
+  amount             Int
+  paymentAccountCode String
+  paymentReference   String
+  paidBy             String
+  paidAt             DateTime               @default(now())
+  accountingEntryId  String                 @unique
+  accountingEntry    AccountingJournalEntry @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  createdAt          DateTime               @default(now())
+
+  @@index([invoiceId, paidAt])
+  @@index([paymentAccountCode, paidAt])
+}
+
+model SupplierAdvance {
+  id                 String                             @id @default(cuid())
+  supplier           Supplier                           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId         String
+  idempotencyKey     String                             @unique
+  paymentKey         String                             @unique
+  amount             Int
+  appliedAmount      Int                                @default(0)
+  status             SupplierAdvanceStatus              @default(open)
+  paymentAccountCode String
+  paymentReference   String
+  paidBy             String
+  paidAt             DateTime                           @default(now())
+  accountingEntryId  String                             @unique
+  accountingEntry    AccountingJournalEntry             @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  allocations        SupplierInvoiceAdvanceAllocation[]
+  createdAt          DateTime                           @default(now())
+  updatedAt          DateTime                           @updatedAt
+
+  @@index([supplierId, status, createdAt])
+  @@index([status, paidAt])
+}
+
+model SupplierInvoiceAdvanceAllocation {
+  id                String                 @id @default(cuid())
+  advance           SupplierAdvance        @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  advanceId         String
+  invoice           SupplierInvoice        @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  invoiceId         String
+  idempotencyKey    String                 @unique
+  amount            Int
+  accountingEntryId String                 @unique
+  accountingEntry   AccountingJournalEntry @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  appliedBy         String
+  appliedAt         DateTime               @default(now())
+
+  @@index([advanceId, appliedAt])
+  @@index([invoiceId, appliedAt])
+}
+
+model SupplierStatement {
+  id              String                  @id @default(cuid())
+  supplier        Supplier                @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId      String
+  statementNumber String                  @unique
+  idempotencyKey  String                  @unique
+  periodStart     DateTime
+  periodEnd       DateTime
+  openingBalance  Int
+  closingBalance  Int
+  status          SupplierStatementStatus @default(imported)
+  createdBy       String
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  lines           SupplierStatementLine[]
+
+  @@index([supplierId, periodStart, periodEnd])
+  @@index([status, createdAt])
+}
+
+model SupplierStatementLine {
+  id                String                      @id @default(cuid())
+  statement         SupplierStatement           @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  statementId       String
+  externalId        String
+  occurredAt        DateTime
+  amount            Int
+  reference         String?
+  status            SupplierStatementLineStatus @default(unmatched)
+  reconciliationKey String?                     @unique
+  matchedEntryId    String?                     @unique
+  matchedEntry      AccountingJournalEntry?     @relation(fields: [matchedEntryId], references: [id], onDelete: Restrict)
+  matchedBy         String?
+  matchedAt         DateTime?
+  createdAt         DateTime                    @default(now())
+
+  @@unique([statementId, externalId])
+  @@index([statementId, status])
+  @@index([occurredAt, amount])
+}
+
+// Additional acquisition costs are capitalized into the received serialized
+// units and the inventory asset account in one immutable document.
+model LandedCost {
+  id                String                 @id @default(cuid())
+  purchaseOrder     PurchaseOrder          @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  purchaseOrderId   String
+  supplier          Supplier               @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId        String
+  idempotencyKey    String                 @unique
+  documentNumber    String                 @unique
+  amount            Int
+  creditAccountCode String
+  description       String
+  appliedBy         String
+  appliedAt         DateTime               @default(now())
+  accountingEntryId String                 @unique
+  accountingEntry   AccountingJournalEntry @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  allocations       LandedCostAllocation[]
+  createdAt         DateTime               @default(now())
+
+  @@index([purchaseOrderId, createdAt])
+  @@index([supplierId, createdAt])
+}
+
+model LandedCostAllocation {
+  id              String     @id @default(cuid())
+  landedCost      LandedCost @relation(fields: [landedCostId], references: [id], onDelete: Restrict)
+  landedCostId    String
+  unit            DeviceUnit @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  unitId          String
+  imei            String
+  product         Product    @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId       String
+  baseCost        Int
+  allocatedAmount Int
+  resultingCost   Int
+  createdAt       DateTime   @default(now())
+
+  @@unique([landedCostId, unitId])
+  @@index([unitId, createdAt])
+  @@index([productId, createdAt])
+}
+
+model SupplierCreditNote {
+  id                String                   @id @default(cuid())
+  supplier          Supplier                 @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierId        String
+  invoice           SupplierInvoice          @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  invoiceId         String
+  noteNumber        String
+  idempotencyKey    String                   @unique
+  amount            Int
+  reason            String
+  status            SupplierCreditNoteStatus @default(draft)
+  approvedBy        String?
+  approvedAt        DateTime?
+  appliedBy         String?
+  appliedAt         DateTime?
+  accountingEntryId String?                  @unique
+  accountingEntry   AccountingJournalEntry?  @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  createdBy         String
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@unique([supplierId, noteNumber])
+  @@index([invoiceId, status])
+  @@index([supplierId, createdAt])
+}
+
+model BankStatement {
+  id              String              @id @default(cuid())
+  account         AccountingAccount   @relation(fields: [accountCode], references: [code], onDelete: Restrict)
+  accountCode     String
+  statementNumber String              @unique
+  idempotencyKey  String              @unique
+  periodStart     DateTime
+  periodEnd       DateTime
+  openingBalance  Int
+  closingBalance  Int
+  status          BankStatementStatus @default(imported)
+  createdBy       String
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  lines           BankStatementLine[]
+
+  @@index([accountCode, periodStart, periodEnd])
+  @@index([status, createdAt])
+}
+
+model BankStatementLine {
+  id                String                  @id @default(cuid())
+  statement         BankStatement           @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  statementId       String
+  externalId        String
+  occurredAt        DateTime
+  amount            Int
+  reference         String?
+  status            BankStatementLineStatus @default(unmatched)
+  reconciliationKey String?                 @unique
+  matchedEntryId    String?                 @unique
+  matchedEntry      AccountingJournalEntry? @relation(fields: [matchedEntryId], references: [id], onDelete: Restrict)
+  matchedBy         String?
+  matchedAt         DateTime?
+  createdAt         DateTime                @default(now())
+
+  @@unique([statementId, externalId])
+  @@index([statementId, status])
+  @@index([occurredAt, amount])
+}
+
+// Возврат брака поставщику (RMA). Машина статусов + SLA; просрочка → Risk Center.
+model SupplierRma {
+  id         String    @id @default(cuid())
+  supplier   Supplier  @relation(fields: [supplierId], references: [id])
+  supplierId String
+  imei       String
+  defect     String
+  status     RmaStatus @default(created)
+  sla        DateTime
+  resolution String? // repaired | replaced | refunded | rejected — итог для scorecard
+  createdAt  DateTime  @default(now())
+
+  @@index([supplierId])
+  @@index([imei])
+  @@index([status])
+}
+
+// Продажа в долг / рассрочка. Долг сверх лимита — через approval (action=debt).
+// balance гасится платежами; просрочка (open + dueDate<now) → Risk Center.
+model DebtPlan {
+  id                String                  @id @default(cuid())
+  orderId           String                  @unique
+  customerId        String
+  principal         Int // исходная сумма долга
+  balance           Int // остаток к погашению
+  installments      Int                     @default(1) // число платежей (рассрочка)
+  dueDate           DateTime
+  status            DebtStatus              @default(open)
+  idempotencyKey    String?                 @unique
+  accountingEntry   AccountingJournalEntry? @relation(fields: [accountingEntryId], references: [id], onDelete: Restrict)
+  accountingEntryId String?                 @unique
+  createdAt         DateTime                @default(now())
+
+  @@index([customerId])
   @@index([status])
 }
 
@@ -284,33 +2995,107 @@ model TradeInDevice {
   price          Int
   contractId     String?
   sellerPassport String // защищённое поле + anti-fraud
+  imei           String? // anti-fraud: тот же IMEI в скупке И в продаже → risk-флаг
+  idempotencyKey String?  @unique
 
   @@index([customerId])
+  @@index([imei])
 }
 
 model CourierRun {
-  id         String   @id @default(cuid())
-  courierId  String
-  codTotal   Int // COD не сдан >24ч → Risk
-  handedOver Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  id                       String    @id @default(cuid())
+  courierId                String
+  codTotal                 Int // COD не сдан >24ч → Risk
+  handedOver               Boolean   @default(false)
+  collectedTotal           Int       @default(0)
+  assignmentIdempotencyKey String?   @unique
+  handoverIdempotencyKey   String?   @unique
+  handoverAmount           Int?
+  handoverReason           String?
+  handedOverAt             DateTime?
+  orders                   Order[]
+  createdAt                DateTime  @default(now())
 
   @@index([courierId])
   @@index([handedOver])
 }
 
+model CourierCommand {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  courierId      String
+  orderId        String
+  action         String
+  payload        Json
+  response       Json?
+  createdAt      DateTime @default(now())
+
+  @@index([courierId, createdAt])
+  @@index([orderId, createdAt])
+}
+
 model Approval {
-  id        String         @id @default(cuid())
-  action    String // discount | refund | write_off | price | debt | delete | stock_adjust | pii
-  requester String
-  approver  String?
-  status    ApprovalStatus @default(requested)
-  reason    String
-  evidence  Json? // обязательно для high-risk
-  createdAt DateTime       @default(now())
+  id                    String                   @id @default(cuid())
+  action                String // discount | refund | write_off | quarantine_write_off | price | debt | delete | stock_adjust | pii
+  requester             String
+  approver              String?
+  idempotencyKey        String?                  @unique
+  sourceRef             String?                  @unique
+  status                ApprovalStatus           @default(requested)
+  reason                String
+  evidence              Json? // обязательно для high-risk
+  createdAt             DateTime                 @default(now())
+  // Одноразовость одобрения. Действия из ACTION_EXECUTORS исполняются атомарно
+  // в момент решения; у `discount` исполнителя нет — продажа списывает его
+  // позже, и без этой отметки одно одобрение можно было проиграть на сколько
+  // угодно продаж. POS-продажа проставляет consumedAt атомарным updateMany.
+  consumedAt            DateTime?
+  refund                Refund?
+  quarantineDisposition InventoryQuarantineCase?
+  exchangeRequest       ExchangeRequest?
 
   @@index([status])
   @@index([action])
+}
+
+model ExchangeRequest {
+  id                String        @id @default(cuid())
+  idempotencyKey    String        @unique
+  approvalId        String        @unique
+  approval          Approval      @relation(fields: [approvalId], references: [id], onDelete: Restrict)
+  status            String        @default("requested")
+  requester         String
+  originalOrder     Order         @relation("ExchangeOriginalOrder", fields: [originalOrderId], references: [id], onDelete: Restrict)
+  originalOrderId   String
+  oldUnit           DeviceUnit    @relation("ExchangeReturnedUnit", fields: [oldImei], references: [imei], onDelete: Restrict)
+  oldImei           String
+  newProduct        Product       @relation("ExchangeReplacementProduct", fields: [newProductId], references: [id], onDelete: Restrict)
+  newProductId      String
+  newUnit           DeviceUnit    @relation("ExchangeReplacementUnit", fields: [newUnitId], references: [id], onDelete: Restrict)
+  newUnitId         String
+  newImei           String
+  creditAmount      Int
+  surchargeAmount   Int
+  method            PaymentMethod
+  shift             CashShift?    @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  shiftId           String?
+  externalReference String?
+  exchangeOrder     Order?        @relation("ExchangeOutputOrder", fields: [exchangeOrderId], references: [id], onDelete: Restrict)
+  exchangeOrderId   String?       @unique
+  return            Return?       @relation(fields: [returnId], references: [id], onDelete: Restrict)
+  returnId          String?       @unique
+  expiresAt         DateTime
+  executedAt        DateTime?
+  rejectedAt        DateTime?
+  expiredAt         DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([status, createdAt])
+  @@index([originalOrderId])
+  @@index([oldImei])
+  @@index([newImei])
+  @@index([newUnitId])
 }
 
 // Неизменяемо. Только append. Никаких update/delete. Источник правды.
@@ -324,28 +3109,715 @@ model AuditEvent {
 
   @@index([type])
   @@index([actor])
-  @@index([refs])
+  // Кокпит ERP открывает ленту событий без фильтра: `orderBy ts desc, take 50`
+  // по пустому where — то есть полный проход append-only таблицы с сортировкой
+  // при каждом открытии. Индекс по ts превращает это в чтение 50 строк.
+  @@index([ts])
+  // Та же лента с фильтром по типу (`where.type` + сортировка по ts).
+  @@index([type, ts])
+  @@index([refs], type: Gin) // array-containment (has/hasEvery) needs GIN, not B-tree
+}
+
+// A successful multipart upload is replayable by its caller's idempotency key.
+// The stored asset is returned on retry and the EvidenceAttached ledger event
+// is emitted exactly once.
+model EvidenceUpload {
+  id               String    @id @default(cuid())
+  idempotencyKey   String    @unique
+  actor            String
+  entityType       String
+  entityId         String
+  label            String?
+  fingerprint      String
+  asset            Json
+  isPii            Boolean   @default(false)
+  retentionUntil   DateTime?
+  purgeRequestedAt DateTime?
+  purgeAttempts    Int       @default(0)
+  nextPurgeAt      DateTime?
+  purgedAt         DateTime?
+  purgeReason      String?
+  createdAt        DateTime  @default(now())
+
+  @@index([entityType, entityId])
+  @@index([isPii, purgedAt, retentionUntil, nextPurgeAt])
 }
 
 model Campaign {
-  id      String @id @default(cuid())
-  segment String
-  channel String
-  budget  Int
-  orders  Int    @default(0)
-  revenue Int    @default(0)
+  id                String                     @id @default(cuid())
+  name              String                     @default("Campaign")
+  trackingCode      String                     @unique
+  status            CampaignLifecycleStatus    @default(draft)
+  source            String                     @default("alistore")
+  medium            String
+  promotionCode     String?
+  segment           String
+  channel           String
+  budget            Int
+  creativeType      CampaignCreativeType       @default(text)
+  creativeHeadline  String
+  creativeBody      String?
+  creativeAssetUrl  String?
+  creativeCtaLabel  String?
+  destinationUrl    String                     @default("/")
+  template          String                     @default("campaign_offer")
+  approvalId        String?                    @unique
+  rejectionReason   String?
+  createdBy         String
+  updatedBy         String
+  approvedBy        String?
+  reviewedAt        DateTime?
+  approvedAt        DateTime?
+  activatedAt       DateTime?
+  pausedAt          DateTime?
+  completedAt       DateTime?
+  orders            Int                        @default(0)
+  revenue           Int                        @default(0)
+  grossProfit       Int                        @default(0)
+  recipients        CampaignRecipient[]
+  attributions      OrderAttribution[]
+  funnelEvents      CampaignFunnelEvent[]
+  refundAdjustments CampaignRefundAdjustment[]
+  spendEntries      CampaignSpendEntry[]
+  outboxMessages    OutboxMessage[]
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
   // аудитория фильтруется по Customer.consent
+
+  @@index([status, createdAt])
+  @@index([channel, createdAt])
+  @@index([promotionCode])
+}
+
+model CampaignRecipient {
+  id            String   @id @default(cuid())
+  campaign      Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId    String
+  consentAtSend Boolean
+  createdAt     DateTime @default(now())
+
+  @@unique([campaignId, customerId])
+  @@index([customerId, createdAt])
+}
+
+model OrderAttribution {
+  id                String                     @id @default(cuid())
+  order             Order                      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId           String                     @unique
+  campaign          Campaign?                  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignId        String?
+  journeyHash       String?
+  firstSource       String
+  firstMedium       String?
+  firstCampaign     String?
+  firstContent      String?
+  firstTerm         String?
+  firstLanding      String?
+  lastSource        String
+  lastMedium        String?
+  lastCampaign      String?
+  lastContent       String?
+  lastTerm          String?
+  lastLanding       String?
+  capturedAt        DateTime
+  convertedAt       DateTime?
+  revenue           Int                        @default(0)
+  grossProfit       Int                        @default(0)
+  refundedRevenue   Int                        @default(0)
+  refundedCost      Int                        @default(0)
+  refundAdjustments CampaignRefundAdjustment[]
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  @@index([campaignId, convertedAt])
+  @@index([lastSource, lastMedium])
+}
+
+model CampaignFunnelEvent {
+  id          String              @id @default(cuid())
+  campaign    Campaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId  String
+  sessionHash String
+  stage       CampaignFunnelStage
+  orderId     String?
+  createdAt   DateTime            @default(now())
+
+  @@unique([campaignId, sessionHash, stage])
+  @@index([campaignId, stage, createdAt])
+  @@index([orderId])
+}
+
+model CampaignRefundAdjustment {
+  id              String           @id @default(cuid())
+  campaign        Campaign         @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  campaignId      String
+  attribution     OrderAttribution @relation(fields: [attributionId], references: [id], onDelete: Cascade)
+  attributionId   String
+  refundPaymentId String           @unique
+  returnId        String?
+  revenue         Int
+  restoredCost    Int
+  createdAt       DateTime         @default(now())
+
+  @@index([campaignId, createdAt])
+  @@index([attributionId, createdAt])
+}
+
+model CampaignSpendEntry {
+  id             String   @id @default(cuid())
+  campaign       Campaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  campaignId     String
+  idempotencyKey String   @unique
+  provider       String
+  externalRef    String
+  amount         Int
+  occurredAt     DateTime
+  actor          String
+  createdAt      DateTime @default(now())
+
+  @@unique([provider, externalRef])
+  @@index([campaignId, occurredAt])
+}
+
+model StorefrontContentRevision {
+  id                 String    @id @default(cuid())
+  version            Int       @unique
+  status             String    @default("draft")
+  heroEyebrow        String
+  heroTitle          String
+  heroBody           String
+  heroCtaLabel       String
+  heroCtaHref        String
+  heroImageUrl       String?
+  financingText      String?
+  aboutTitle         String
+  aboutBody          String
+  deliveryTitle      String
+  deliveryBody       String
+  contactPhone       String?
+  supportHours       String?
+  benefits           Json
+  featuredTitle      String    @default("Подборка AliStore")
+  featuredProductIds String[]  @default([])
+  createdBy          String
+  publishedBy        String?
+  scheduledBy        String?
+  createdAt          DateTime  @default(now())
+  publishedAt        DateTime?
+  startsAt           DateTime?
+  endsAt             DateTime?
+
+  @@index([status, publishedAt])
+  @@index([status, startsAt, endsAt])
 }
 
 model SupportTicket {
-  id         String       @id @default(cuid())
-  customer   Customer     @relation(fields: [customerId], references: [id])
-  customerId String
-  channel    String // web | app | whatsapp | telegram | call | store
-  priority   String
-  sla        DateTime
-  status     TicketStatus @default(new)
+  id             String       @id @default(cuid())
+  revision       Int          @default(0)
+  customerId     String // ссылка строкой, без @relation (см. Customer)
+  channel        String // web | app | whatsapp | telegram | call | store
+  subject        String
+  body           String?
+  priority       String // normal | high | urgent (эскалация повышает уровень)
+  sla            DateTime
+  status         TicketStatus @default(new)
+  assignee       String?
+  idempotencyKey String?      @unique
+  createdAt      DateTime     @default(now())
 
   @@index([customerId])
   @@index([status])
+}
+
+// Telegram AI agent identity. A Telegram account is linked either to one
+// customer or to one active staff account; the database CHECK enforces XOR.
+model TelegramAgentIdentity {
+  id             String                 @id @default(cuid())
+  telegramUserId String                 @unique
+  chatId         String
+  kind           String // customer | staff
+  customerId     String?                @unique
+  customer       Customer?              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  staffId        String?                @unique
+  staff          StaffUser?             @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  displayName    String?
+  active         Boolean                @default(true)
+  lastSeenAt     DateTime               @default(now())
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  messages       TelegramAgentMessage[]
+
+  @@index([customerId, active])
+  @@index([staffId, active])
+  @@index([chatId, active])
+}
+
+// One-time staff pairing secret. Only its SHA-256 hash is persisted.
+model TelegramAgentPairing {
+  id        String    @id @default(cuid())
+  codeHash  String    @unique
+  staffId   String
+  staff     StaffUser @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([staffId, expiresAt])
+  @@index([expiresAt, usedAt])
+}
+
+// Durable, idempotent webhook inbox and response trace. Secrets, provider keys
+// and tool payloads are never stored here.
+model TelegramAgentMessage {
+  id             String                 @id @default(cuid())
+  externalKey    String                 @unique
+  identityId     String?
+  identity       TelegramAgentIdentity? @relation(fields: [identityId], references: [id], onDelete: SetNull)
+  telegramUserId String
+  chatId         String
+  direction      String // inbound | outbound
+  text           String
+  intent         String?
+  status         String                 @default("received") // received | processing | answered | failed
+  attempts       Int                    @default(0)
+  leaseUntil     DateTime?
+  responseText   String?
+  createdAt      DateTime               @default(now())
+  expiresAt      DateTime
+
+  @@index([identityId, createdAt])
+  @@index([telegramUserId, createdAt])
+  @@index([status, createdAt])
+  @@index([expiresAt])
+}
+
+// Business buyer profile is customer-owned but intentionally stores customerId
+// without a foreign key, matching SupportTicket/WarrantyCase test isolation.
+model BusinessBuyerProfile {
+  id             String   @id @default(cuid())
+  customerId     String   @unique
+  companyName    String
+  taxId          String
+  contactName    String
+  email          String?
+  billingAddress String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([companyName])
+}
+
+model B2BQuote {
+  id              String         @id @default(cuid())
+  customerId      String
+  status          B2BQuoteStatus @default(requested)
+  paymentIntent   String         @default("invoice") // invoice | bank_transfer
+  fulfillmentType String         @default("delivery") // delivery | pickup
+  deliveryAddress String?
+  pickupPoint     String?
+  comment         String?
+  staffNote       String?
+  listTotal       Int
+  quotedTotal     Int?
+  validUntil      DateTime?
+  items           B2BQuoteItem[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([customerId, createdAt])
+  @@index([status, createdAt])
+}
+
+model B2BQuoteItem {
+  id          String   @id @default(cuid())
+  quote       B2BQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quoteId     String
+  sku         String
+  name        String
+  qty         Int
+  listPrice   Int
+  targetPrice Int?
+
+  @@index([quoteId])
+  @@index([sku])
+}
+
+model DeviceProtectionPolicy {
+  id             String           @id @default(cuid())
+  customerId     String
+  orderId        String
+  imei           String
+  productName    String
+  planType       String // accidental_damage | extended_warranty | full_protection
+  status         ProtectionStatus @default(requested)
+  deviceValue    Int
+  premium        Int?
+  coverageMonths Int
+  staffNote      String?
+  startsAt       DateTime?
+  endsAt         DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([customerId, createdAt])
+  @@index([status, createdAt])
+  @@index([imei])
+}
+
+// ---------- AUTH ----------
+enum OtpPurpose {
+  login
+  recovery
+  email_attach
+}
+
+enum OtpChannel {
+  sms
+  email
+}
+
+// One-time login code (phone+OTP). Code stored hashed; short-lived; attempt-capped.
+model OtpChallenge {
+  id         String     @id @default(cuid())
+  // Ровно одно из двух заполнено — какое именно, говорит `channel`. Телефон стал
+  // необязательным вместе с появлением email-канала; исторические строки при
+  // миграции получили channel = sms и сохранили свой phone.
+  phone      String?
+  email      String?
+  channel    OtpChannel @default(sms)
+  codeHash   String
+  purpose    OtpPurpose @default(login)
+  attempts   Int        @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime   @default(now())
+
+  @@index([phone])
+  @@index([email])
+}
+
+// Rotating refresh token, stored as a sha-256 hash and single-use (revoked on
+// refresh). customerId is a plain indexed string to avoid coupling the Customer
+// model that other modules edit concurrently.
+model RefreshToken {
+  id         String    @id @default(cuid())
+  customerId String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  // Set only for normal rotation. A brief replay grace lets concurrent browser
+  // tabs exchange the same old HttpOnly cookie without storing plaintext.
+  rotatedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([customerId])
+}
+
+// ---------- OUTBOX ----------
+enum OutboxStatus {
+  pending
+  sent
+  failed
+  cancelled
+}
+
+// Transactional outbox for guaranteed-delivery side-effects (notifications,
+// webhook follow-ups). Producers write a message in the SAME transaction as the
+// business change (invariant #10); a pg-boss relay delivers it with retries.
+model OutboxMessage {
+  id            String       @id @default(cuid())
+  campaign      Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignId    String?
+  channel       String // sms | email | push | telegram | webhook
+  recipient     String
+  template      String
+  payload       Json
+  status        OutboxStatus @default(pending)
+  attempts      Int          @default(0)
+  lastError     String?
+  nextAttemptAt DateTime?    @default(now())
+  createdAt     DateTime     @default(now())
+  sentAt        DateTime?
+
+  @@index([status])
+  @@index([status, nextAttemptAt])
+  @@index([campaignId, status])
+}
+
+// Liveness signal written by worker relays/schedulers after each pass. The
+// protected operations status endpoint flags a worker as stale when its
+// heartbeat is older than the freshness window.
+model WorkerHeartbeat {
+  id         String   @id
+  lastSeenAt DateTime @updatedAt
+  meta       Json?
+}
+
+// Durable compensation queue for media objects that were uploaded before a
+// later database validation failed. Deletion is idempotent and retried until
+// the object store accepts it.
+model MediaCleanupTask {
+  id               String    @id @default(cuid())
+  objectKey        String    @unique
+  attempts         Int       @default(0)
+  deletePasses     Int       @default(0)
+  lastError        String?
+  nextAttemptAt    DateTime  @default(now())
+  uploadLeaseUntil DateTime
+  claimedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([completedAt, nextAttemptAt, uploadLeaseUntil, claimedAt])
+}
+
+// ---------- ANALYTICS ----------
+// First-party storefront funnel. Deliberately separate from AuditEvent: the
+// ledger is the money/stock/status spine (Invariant #10) that reports read as
+// truth, and high-volume marketing telemetry must not bloat it. Still the owner's
+// data — a private table, not an external tracker.
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  type       String
+  sessionId  String
+  customerId String?
+  productId  String?
+  source     String? // last-touch attribution (utm_source), for campaign ROI breakdown
+  payload    Json     @default("{}")
+  ts         DateTime @default(now())
+
+  @@index([type, ts])
+  @@index([productId])
+  @@index([source, ts])
+}
+
+// ---------- STAFF AUTH ----------
+// Staff login carries a role in the JWT so dangerous actions are authorized on
+// the server (Role Permission Matrix), not trusted from the request body.
+model StaffUser {
+  id                      String                  @id @default(cuid())
+  username                String                  @unique
+  passwordHash            String
+  role                    Role
+  // Store point the account works at. References StorePoint.inventoryLocation
+  // (@unique), the value `point` has always carried — a typo can no longer detach
+  // an employee from every point-scoped report.
+  point                   String
+  storePoint              StorePoint              @relation(fields: [point], references: [inventoryLocation], onDelete: Restrict, onUpdate: Cascade)
+  active                  Boolean                 @default(true)
+  totpSecret              String?
+  totpEnabled             Boolean                 @default(false)
+  totpLastToken           String? // last used TOTP code — single-use guard (anti-replay)
+  pushTokens              PushToken[]
+  telegramAgentIdentities TelegramAgentIdentity[]
+  telegramAgentPairings   TelegramAgentPairing[]
+  assignedTasks           StaffTask[]             @relation("StaffTaskAssignee")
+  createdTasks            StaffTask[]             @relation("StaffTaskCreator")
+  courierOrders           Order[]                 @relation("OrderCourier")
+  hrSchedules             HrSchedule[]
+  hrAttendances           HrAttendance[]
+  hrAbsences              HrAbsence[]
+  hrPayrollLines          HrPayrollLine[]
+  accountableAdvances     AccountableAdvance[]
+  createdAt               DateTime                @default(now())
+
+  @@index([role])
+  @@index([point])
+}
+
+model HrSchedule {
+  id             String        @id @default(cuid())
+  staff          StaffUser     @relation(fields: [staffId], references: [id])
+  staffId        String
+  point          String
+  shiftDate      DateTime      @db.Date
+  startsAt       DateTime
+  endsAt         DateTime
+  createdBy      String
+  idempotencyKey String        @unique
+  attendance     HrAttendance?
+  cancelledAt    DateTime?
+  cancelledBy    String?
+  cancelReason   String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([staffId, shiftDate])
+  @@index([point, shiftDate])
+}
+
+model HrScheduleCommand {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  scheduleId     String
+  action         String
+  request        Json
+  response       Json
+  createdAt      DateTime @default(now())
+
+  @@index([scheduleId, createdAt])
+}
+
+model HrAttendance {
+  id           String     @id @default(cuid())
+  schedule     HrSchedule @relation(fields: [scheduleId], references: [id])
+  scheduleId   String     @unique
+  staff        StaffUser  @relation(fields: [staffId], references: [id])
+  staffId      String
+  point        String
+  checkedInAt  DateTime
+  checkedOutAt DateTime?
+  checkInKey   String     @unique
+  checkOutKey  String?    @unique
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([staffId, checkedInAt])
+  @@index([point, checkedInAt])
+}
+
+model HrAbsence {
+  id             String          @id @default(cuid())
+  staff          StaffUser       @relation(fields: [staffId], references: [id])
+  staffId        String
+  type           HrAbsenceType
+  startsOn       DateTime        @db.Date
+  endsOn         DateTime        @db.Date
+  reason         String?
+  status         HrAbsenceStatus @default(requested)
+  createdBy      String
+  decidedBy      String?
+  decidedAt      DateTime?
+  decisionNote   String?
+  idempotencyKey String          @unique
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([staffId, startsOn, endsOn])
+  @@index([status, startsOn])
+}
+
+model HrPayrollRun {
+  id                       String                  @id @default(cuid())
+  period                   String
+  point                    String
+  status                   HrPayrollStatus         @default(posted)
+  baseAmount               Int
+  commissionBps            Int
+  latePenaltyPerMinute     Int
+  overtimePayPerMinute     Int
+  totalBase                Int
+  totalCommission          Int
+  totalAdjustments         Int
+  totalPayout              Int
+  createdBy                String
+  paidBy                   String?
+  paidAt                   DateTime?
+  externalRef              String?
+  accrualAccountingEntryId String?                 @unique
+  accrualAccountingEntry   AccountingJournalEntry? @relation("HrPayrollAccrual", fields: [accrualAccountingEntryId], references: [id], onDelete: Restrict)
+  payoutAccountingEntryId  String?                 @unique
+  payoutAccountingEntry    AccountingJournalEntry? @relation("HrPayrollPayout", fields: [payoutAccountingEntryId], references: [id], onDelete: Restrict)
+  lines                    HrPayrollLine[]
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
+
+  @@unique([period, point])
+  @@index([status, createdAt])
+}
+
+model HrPayrollLine {
+  id                String       @id @default(cuid())
+  run               HrPayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId             String
+  staff             StaffUser    @relation(fields: [staffId], references: [id])
+  staffId           String
+  username          String
+  plannedShifts     Int
+  completedShifts   Int
+  paidAbsenceShifts Int
+  workedMinutes     Int
+  lateMinutes       Int
+  overtimeMinutes   Int
+  revenue           Int
+  sales             Int
+  baseEarned        Int
+  commission        Int
+  lateDeduction     Int
+  overtimePay       Int
+  total             Int
+  createdAt         DateTime     @default(now())
+
+  @@unique([runId, staffId])
+  @@index([staffId, createdAt])
+}
+
+model HrPayrollCommand {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  action         String
+  runId          String?
+  request        Json
+  response       Json
+  createdAt      DateTime @default(now())
+
+  @@index([runId, createdAt])
+}
+
+enum StaffTaskStatus {
+  open
+  in_progress
+  completed
+  cancelled
+}
+
+enum StaffTaskPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+model StaffTask {
+  id          String            @id @default(cuid())
+  title       String
+  description String?
+  status      StaffTaskStatus   @default(open)
+  priority    StaffTaskPriority @default(normal)
+  assigneeId  String
+  assignee    StaffUser         @relation("StaffTaskAssignee", fields: [assigneeId], references: [id])
+  createdById String
+  createdBy   StaffUser         @relation("StaffTaskCreator", fields: [createdById], references: [id])
+  dueAt       DateTime?
+  relatedType String?
+  relatedId   String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  completedAt DateTime?
+
+  @@index([assigneeId, status])
+  @@index([dueAt])
+}
+
+/// Owner-editable business parameters.
+///
+/// Commercial rules — discount ceilings, payroll base and commission, warranty
+/// term, buyback spread, loyalty rate, risk thresholds — lived as `as const`
+/// literals in TypeScript, so changing an employee's pay or loosening a discount
+/// for a clearance week meant a code change, a review and a deploy. Roughly 70%
+/// of the rule set was unreachable to the person who owns the business.
+///
+/// Values are stored as text and parsed by the reader, so one table serves
+/// numbers, flags and strings without a migration per parameter. Every write
+/// lands in the Event Ledger (`settings.changed`) with the previous value.
+model Setting {
+  key       String   @id
+  value     String
+  updatedBy String
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
 }

@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Конкурс — демо сервисов · alistore</title>
+<style>
+  :root {
+    --paper: #F2F4F5; --surface: #FBFCFC; --sunk: #E7EBED;
+    --ink: #131A1F; --ink-soft: #4A5860; --ink-faint: #78888F;
+    --rule: #D2DADE; --accent: #1B5170; --accent-soft: #E2ECF2;
+    --warn: #8A5B0E; --warn-bg: #FBF0DC; --warn-rule: #E2C384;
+    --good: #256A4E; --good-bg: #E3F1E9;
+    --bad: #94382B; --bad-bg: #F8E6E2;
+    --seg-1: #1B4E6B; --seg-2: #2E7898; --seg-3: #3F9BA6; --seg-4: #58B08C; --seg-5: #A6B8BD;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --xs: 0.75rem; --sm: 0.85rem; --base: 0.95rem; --lg: 1.15rem; --xl: 1.5rem; --xxl: 2.1rem;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0E1418; --surface: #161E23; --sunk: #1E282E;
+      --ink: #E4EBEE; --ink-soft: #A5B4BB; --ink-faint: #74868E;
+      --rule: #2B383F; --accent: #7FC0E0; --accent-soft: #1B2C36;
+      --warn: #E0B267; --warn-bg: #2A2212; --warn-rule: #6B5320;
+      --good: #6BC49B; --good-bg: #14251D;
+      --bad: #E08A78; --bad-bg: #2A1714;
+      --seg-1: #2E6E92; --seg-2: #4193B4; --seg-3: #52B3BE; --seg-4: #6CC7A2; --seg-5: #5E7178;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--sans); font-size: var(--base); line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 68rem; margin-inline: auto; padding: 0 1.5rem 5rem; }
+
+  .band {
+    position: sticky; top: 0; z-index: 20;
+    margin-inline: -1.5rem; padding: 0.6rem 1.5rem;
+    background: var(--warn-bg); color: var(--warn);
+    border-bottom: 1px solid var(--warn-rule);
+    font-family: var(--mono); font-size: var(--xs); letter-spacing: 0.03em;
+  }
+  .band b { text-transform: uppercase; }
+
+  header { padding: 2rem 0 1.25rem; }
+  .eyebrow { font-family: var(--mono); font-size: var(--xs); letter-spacing: 0.14em;
+             text-transform: uppercase; color: var(--ink-faint); margin: 0 0 0.5rem; }
+  h1 { font-family: var(--mono); font-size: var(--xxl); font-weight: 600;
+       letter-spacing: -0.02em; margin: 0 0 0.6rem; line-height: 1.1; }
+  .lede { max-width: 60ch; color: var(--ink-soft); margin: 0; }
+
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--rule); margin: 1.75rem 0 2rem; }
+  .tab {
+    appearance: none; background: none; border: none; border-bottom: 2px solid transparent;
+    padding: 0.7rem 1.1rem; font-family: var(--mono); font-size: var(--sm);
+    color: var(--ink-faint); cursor: pointer; margin-bottom: -1px;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  .panel { display: none; flex-direction: column; gap: 2rem; }
+  .panel.is-active { display: flex; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 2px;
+    padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;
+  }
+  .card > h2 { font-family: var(--mono); font-size: var(--lg); font-weight: 600; margin: 0;
+               display: flex; align-items: baseline; gap: 0.7rem; }
+  .card > h2::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+  .step { font-family: var(--mono); font-size: var(--xs); color: var(--ink-faint);
+          border: 1px solid var(--rule); border-radius: 2px; padding: 0.05rem 0.4rem; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.9rem; }
+  label { display: flex; flex-direction: column; gap: 0.3rem;
+          font-family: var(--mono); font-size: var(--xs); color: var(--ink-faint);
+          text-transform: uppercase; letter-spacing: 0.06em; }
+  input, textarea, select {
+    font-family: var(--mono); font-size: var(--sm); color: var(--ink);
+    background: var(--paper); border: 1px solid var(--rule); border-radius: 2px;
+    padding: 0.45rem 0.55rem; width: 100%; text-transform: none; letter-spacing: 0;
+  }
+  input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px;
+  }
+  textarea { resize: vertical; line-height: 1.45; min-height: 8rem; }
+
+  button {
+    appearance: none; font-family: var(--mono); font-size: var(--sm); cursor: pointer;
+    background: var(--accent); color: var(--surface); border: 1px solid var(--accent);
+    border-radius: 2px; padding: 0.5rem 1rem; transition: opacity 120ms ease;
+  }
+  button:hover { opacity: 0.85; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost { background: none; color: var(--accent); }
+  button.danger { background: none; color: var(--bad); border-color: var(--bad); }
+  .row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+           gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 2px; }
+  .stat { background: var(--surface); padding: 0.7rem 0.85rem; }
+  .stat dt { font-family: var(--mono); font-size: var(--xs); letter-spacing: 0.07em;
+             text-transform: uppercase; color: var(--ink-faint); }
+  .stat dd { margin: 0; font-family: var(--mono); font-size: var(--xl); font-weight: 600;
+             font-variant-numeric: tabular-nums; }
+  .stat.good dd { color: var(--good); }
+  .stat.bad dd { color: var(--bad); }
+
+  .hash { font-family: var(--mono); font-size: var(--xs); word-break: break-all;
+          color: var(--accent); background: var(--accent-soft);
+          padding: 0.4rem 0.55rem; border-radius: 2px; display: block; }
+  .hash-label { font-family: var(--mono); font-size: var(--xs); letter-spacing: 0.08em;
+                text-transform: uppercase; color: var(--ink-faint); display: block; margin-bottom: 0.25rem; }
+
+  .entry { border: 1px solid var(--rule); border-radius: 2px; padding: 0.8rem 0.9rem;
+           display: flex; flex-direction: column; gap: 0.55rem; background: var(--surface); }
+  .entry + .entry { margin-top: 0.55rem; }
+  .entry-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem 0.8rem; }
+  .rank { font-family: var(--mono); font-weight: 600; color: var(--ink-faint); min-width: 1.5rem; }
+  .handle { font-family: var(--mono); font-weight: 600; }
+  .score { margin-left: auto; font-family: var(--mono); font-weight: 600;
+           font-variant-numeric: tabular-nums; font-size: var(--lg); }
+  .quote { margin: 0; color: var(--ink-soft); font-size: var(--sm); line-height: 1.5;
+           padding-left: 0.7rem; border-left: 2px solid var(--rule); }
+  .bar { display: flex; height: 0.6rem; background: var(--sunk); border-radius: 1px; overflow: hidden; }
+  .bar div { height: 100%; }
+
+  table { width: 100%; border-collapse: collapse; font-size: var(--sm); }
+  th { text-align: left; font-family: var(--mono); font-size: var(--xs); font-weight: 600;
+       text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-faint);
+       padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--rule); }
+  td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--rule); }
+  tr:last-child td { border-bottom: none; }
+  .scroll { overflow-x: auto; }
+  code.reason { font-family: var(--mono); font-size: var(--xs); color: var(--bad);
+                background: var(--bad-bg); padding: 0.1rem 0.35rem; border-radius: 2px; }
+  .mono { font-family: var(--mono); }
+  .num { font-variant-numeric: tabular-nums; text-align: right; }
+
+  .flash { border-radius: 2px; padding: 0.75rem 0.9rem; font-size: var(--sm);
+           border: 1px solid; display: flex; flex-direction: column; gap: 0.3rem; }
+  .flash.ok { background: var(--good-bg); border-color: var(--good); color: var(--good); }
+  .flash.err { background: var(--bad-bg); border-color: var(--bad); color: var(--bad); }
+  .flash .mono { font-size: var(--xs); word-break: break-word; }
+  .note { color: var(--ink-soft); font-size: var(--sm); margin: 0; max-width: 62ch; }
+  .hidden { display: none !important; }
+  fieldset { border: 1px dashed var(--rule); border-radius: 2px; padding: 0.9rem; margin: 0;
+             display: flex; flex-direction: column; gap: 0.8rem; }
+  legend { font-family: var(--mono); font-size: var(--xs); text-transform: uppercase;
+           letter-spacing: 0.08em; color: var(--ink-faint); padding: 0 0.4rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="band">
+    <b>Демо</b> · вымышленные аккаунты и комментарии. Это не итоги конкурса @alistore_kg.
+  </div>
+
+  <header>
+    <p class="eyebrow">alistore-erp · scripts/contest-*</p>
+    <h1>Конкурс: два сервиса</h1>
+    <p class="lede">
+      Живой прогон настоящего кода — страница дёргает те же модули, что и CLI.
+      Слева правите данные, справа сразу видите результат.
+    </p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-judge" aria-selected="true" aria-controls="panel-judge">Судейство</button>
+    <button class="tab" role="tab" id="tab-raffle" aria-selected="false" aria-controls="panel-raffle">Розыгрыш</button>
+  </div>
+
+  <!-- ------------------------------------------------------------ JUDGE -->
+  <section class="panel is-active" id="panel-judge" role="tabpanel" aria-labelledby="tab-judge">
+
+    <div class="card">
+      <h2>Входные данные</h2>
+      <p class="note">
+        Конкурс объявлен как «эң жакшы комментарий» — судейский, а не случайный.
+        Сервис ранжирует, решение принимает человек, но только из шорт-листа.
+      </p>
+      <div class="controls">
+        <label>Старт конкурса<input id="j-started" value="2026-07-21T00:00:00+06:00"></label>
+        <label>Исключить<input id="j-excluded" value="alistore_kg"></label>
+        <label>Макс. комментов на юзера<input id="j-maxper" type="number" min="1" value="3"></label>
+        <label>Размер шорт-листа<input id="j-shortlist" type="number" min="1" value="8"></label>
+      </div>
+      <label>Комментарии (JSON)<textarea id="j-comments" spellcheck="false" rows="8"></textarea></label>
+      <div class="row">
+        <button id="j-run">Провести судейство</button>
+        <button class="ghost" id="j-reset">Вернуть демо-данные</button>
+      </div>
+      <div id="j-error" class="flash err hidden"></div>
+    </div>
+
+    <div class="card hidden" id="j-results">
+      <h2>Результат</h2>
+      <dl class="stats" id="j-stats"></dl>
+      <div>
+        <span class="hash-label">Критерии · SHA-256</span>
+        <code class="hash" id="j-fp-criteria"></code>
+      </div>
+      <div>
+        <span class="hash-label">Комментарии · SHA-256</span>
+        <code class="hash" id="j-fp-input"></code>
+      </div>
+      <p class="note">
+        Эти два хеша публикуются <strong>до</strong> итогов. Поправьте любой
+        комментарий выше и прогоните заново — второй хеш изменится.
+      </p>
+      <div id="j-shortlist"></div>
+      <div class="scroll"><table id="j-rejected"></table></div>
+    </div>
+
+    <div class="card hidden" id="j-decide">
+      <h2>Решение <span class="step">человек, не алгоритм</span></h2>
+      <p class="note">
+        Победителем можно назвать любого из шорт-листа — это объявленная
+        дискреция. Аккаунт вне шорт-листа сервис отклонит.
+      </p>
+      <div class="controls">
+        <label>Победитель<select id="d-winner"></select></label>
+        <label>Кто решил<input id="d-by" value="Владелец @alistore_kg"></label>
+      </div>
+      <label>Обоснование (публикуется, минимум 20 символов)
+        <textarea id="d-why" rows="3" spellcheck="false">Эң таасирдүү окуя, чын жүрөктөн жазылган комментарий.</textarea>
+      </label>
+      <div class="row">
+        <button id="d-run">Зафиксировать</button>
+        <button class="danger" id="d-cheat">Попробовать назначить бота</button>
+      </div>
+      <div id="d-flash" class="flash hidden"></div>
+      <div class="scroll hidden" id="d-awards"></div>
+    </div>
+  </section>
+
+  <!-- ----------------------------------------------------------- RAFFLE -->
+  <section class="panel" id="panel-raffle" role="tabpanel" aria-labelledby="tab-raffle">
+
+    <div class="card">
+      <h2>Шаг 1 — обязательство <span class="step">до дедлайна</span></h2>
+      <p class="note">
+        Генерируем секретный сид и публикуем только его хеш. После дедлайна сид
+        раскрывается, и любой проверит, что он тот самый.
+      </p>
+      <div class="row"><button id="r-commit">Сгенерировать и закоммитить сид</button></div>
+      <div id="r-commit-out" class="hidden">
+        <span class="hash-label">Обязательство · публикуйте в посте</span>
+        <code class="hash" id="r-commitment"></code>
+      </div>
+    </div>
+
+    <div class="card hidden" id="r-draw-card">
+      <h2>Шаг 2 — розыгрыш <span class="step">после дедлайна</span></h2>
+      <p class="note">
+        Маяк — публичное значение, которого <em>не существовало</em> в момент
+        коммита. Без него можно было бы перебирать сиды, пока не выпадет нужный
+        человек, и коммитить уже победивший. Поэтому поле обязательное.
+      </p>
+      <div class="controls">
+        <label>Публичный маяк<input id="r-beacon" value="00000000000000000001f3a9c4e7b2d5a8f1c6e903b7d24e5a8c1f0b3d6e9a2c5"></label>
+        <label>Сколько мест<input id="r-winners" type="number" min="1" value="5"></label>
+        <label>Старт конкурса<input id="r-started" value="2026-07-21T00:00:00+06:00"></label>
+        <label>Исключить<input id="r-excluded" value="alistore_kg"></label>
+      </div>
+      <div class="row"><button id="r-draw">Провести розыгрыш</button></div>
+      <div id="r-error" class="flash err hidden"></div>
+    </div>
+
+    <div class="card hidden" id="r-results">
+      <h2>Результат</h2>
+      <dl class="stats" id="r-stats"></dl>
+      <div><span class="hash-label">Сид · раскрыт после дедлайна</span><code class="hash" id="r-seed"></code></div>
+      <div><span class="hash-label">Хеш списка участников</span><code class="hash" id="r-entries-hash"></code></div>
+      <div class="scroll"><table id="r-winners-table"></table></div>
+    </div>
+
+    <div class="card hidden" id="r-verify-card">
+      <h2>Шаг 3 — проверка <span class="step">это делает участник</span></h2>
+      <p class="note">
+        Пересчёт с нуля из опубликованных чисел. Кнопка справа подменяет первое
+        место — так выглядит попытка подтасовки со стороны участника.
+      </p>
+      <fieldset>
+        <legend>Заявленные победители</legend>
+        <input id="r-claimed" spellcheck="false">
+      </fieldset>
+      <div class="row">
+        <button id="r-verify">Проверить</button>
+        <button class="danger" id="r-tamper">Подменить первое место</button>
+      </div>
+      <div id="r-verify-flash" class="flash hidden"></div>
+    </div>
+  </section>
+</div>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+  return data;
+}
+
+function show(el, on = true) { el.classList.toggle('hidden', !on); }
+function flash(el, kind, lines) {
+  el.className = `flash ${kind}`;
+  el.innerHTML = lines.map((l, i) => i === 0 ? `<strong>${l}</strong>` : `<span class="mono">${l}</span>`).join('');
+  show(el, true);
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const listOf = (v) => v.split(',').map((s) => s.trim()).filter(Boolean);
+
+/* --------------------------------------------------------------- tabs */
+for (const tab of document.querySelectorAll('.tab')) {
+  tab.addEventListener('click', () => {
+    for (const t of document.querySelectorAll('.tab')) {
+      const on = t === tab;
+      t.setAttribute('aria-selected', String(on));
+      $(t.getAttribute('aria-controls')).classList.toggle('is-active', on);
+    }
+  });
+}
+
+/* -------------------------------------------------------------- sample */
+let SAMPLE = [];
+let WEIGHTS = {};
+const SEG = ['--seg-1', '--seg-2', '--seg-3', '--seg-4', '--seg-5'];
+
+const boot = await api('/api/sample');
+SAMPLE = boot.comments;
+WEIGHTS = boot.criteria.weights;
+$('j-comments').value = JSON.stringify(SAMPLE, null, 1);
+
+/* -------------------------------------------------------------- judge */
+let judgeResult = null;
+
+function readComments() {
+  try {
+    const parsed = JSON.parse($('j-comments').value);
+    if (!Array.isArray(parsed)) throw new Error('Ожидается массив комментариев.');
+    return parsed;
+  } catch (error) {
+    throw new Error(`JSON не разобрался: ${error.message}`);
+  }
+}
+
+function renderStats(el, pairs) {
+  el.innerHTML = pairs.map(([label, value, tone = '']) =>
+    `<div class="stat ${tone}"><dt>${label}</dt><dd>${value}</dd></div>`).join('');
+}
+
+function renderShortlist(shortlist) {
+  $('j-shortlist').innerHTML = shortlist.map((c) => {
+    const bars = Object.keys(WEIGHTS).map((key, i) =>
+      `<div style="width:${(c.breakdown[key] * WEIGHTS[key]).toFixed(2)}%;background:var(${SEG[i]})"></div>`).join('');
+    return `<article class="entry">
+      <div class="entry-head">
+        <span class="rank">${c.rank}</span>
+        <span class="handle">@${esc(c.username)}</span>
+        <span class="score">${c.total.toFixed(2)}</span>
+      </div>
+      <p class="quote">${esc(c.text)}</p>
+      <div class="bar" role="img" aria-label="Балл ${c.total.toFixed(2)} из 100">${bars}</div>
+    </article>`;
+  }).join('');
+}
+
+function renderRejected(rejected) {
+  $('j-rejected').innerHTML = `
+    <thead><tr><th>Аккаунт</th><th>Комментарий</th><th>Причина</th></tr></thead>
+    <tbody>${rejected.map((r) => `<tr>
+      <td class="mono">@${esc(r.username)}</td>
+      <td>${esc(r.text).slice(0, 70)}</td>
+      <td><code class="reason">${r.reason}</code></td>
+    </tr>`).join('')}</tbody>`;
+}
+
+$('j-run').addEventListener('click', async () => {
+  show($('j-error'), false);
+  try {
+    judgeResult = await api('/api/judge', {
+      comments: readComments(),
+      startedAt: $('j-started').value,
+      excluded: listOf($('j-excluded').value),
+      maxPerUser: $('j-maxper').value,
+      shortlistSize: $('j-shortlist').value,
+    });
+
+    const s = judgeResult.stats;
+    renderStats($('j-stats'), [
+      ['Всего', s.total], ['Допущено', s.eligible, 'good'],
+      ['Отклонено', s.disqualified, 'bad'], ['Шорт-лист', s.shortlisted],
+    ]);
+    $('j-fp-criteria').textContent = judgeResult.fingerprint.criteria;
+    $('j-fp-input').textContent = judgeResult.fingerprint.input;
+    renderShortlist(judgeResult.shortlist);
+    renderRejected(judgeResult.disqualified);
+
+    $('d-winner').innerHTML = judgeResult.shortlist
+      .map((c) => `<option value="${esc(c.username)}">${c.rank}. @${esc(c.username)} — ${c.total.toFixed(2)}</option>`).join('');
+
+    show($('j-results')); show($('j-decide'));
+    show($('d-flash'), false); show($('d-awards'), false);
+  } catch (error) {
+    flash($('j-error'), 'err', ['Не получилось', error.message]);
+  }
+});
+
+$('j-reset').addEventListener('click', () => { $('j-comments').value = JSON.stringify(SAMPLE, null, 1); });
+
+async function decide(username) {
+  show($('d-awards'), false);
+  try {
+    const out = await api('/api/judge', {
+      comments: readComments(),
+      startedAt: $('j-started').value,
+      excluded: listOf($('j-excluded').value),
+      maxPerUser: $('j-maxper').value,
+      shortlistSize: $('j-shortlist').value,
+      winner: username,
+      justification: $('d-why').value,
+      decidedBy: $('d-by').value,
+      prizes: [
+        { prize: 'iPhone 15 Pro', count: 1 },
+        { prize: 'Чехол PITAKA', count: 2 },
+        { prize: 'Скидка 10%', count: 20 },
+      ],
+    });
+
+    flash($('d-flash'), 'ok', [
+      `Зафиксировано: @${out.decision.username} (место ${out.decision.rank}, балл ${out.decision.total.toFixed(2)})`,
+      `Решил: ${out.decision.decidedBy}`,
+    ]);
+    $('d-awards').innerHTML = `<table>
+      <thead><tr><th>Приз</th><th>Аккаунт</th><th class="num">Место</th></tr></thead>
+      <tbody>${out.awards.map((a) => `<tr><td>${esc(a.prize)}</td>
+        <td class="mono">@${esc(a.username)}</td><td class="num mono">${a.rank}</td></tr>`).join('')}</tbody></table>`;
+    show($('d-awards'));
+  } catch (error) {
+    flash($('d-flash'), 'err', ['Отклонено', error.message]);
+  }
+}
+
+$('d-run').addEventListener('click', () => decide($('d-winner').value));
+$('d-cheat').addEventListener('click', () => decide('bot_farm_01'));
+
+/* ------------------------------------------------------------- raffle */
+let commitment = null, seed = null, drawn = null;
+
+$('r-commit').addEventListener('click', async () => {
+  const out = await api('/api/raffle/commit', {});
+  seed = out.seed; commitment = out.commitment;
+  $('r-commitment').textContent = commitment;
+  show($('r-commit-out')); show($('r-draw-card'));
+});
+
+$('r-draw').addEventListener('click', async () => {
+  show($('r-error'), false);
+  try {
+    drawn = await api('/api/raffle/draw', {
+      comments: SAMPLE,
+      seed, commitment,
+      beacon: $('r-beacon').value,
+      winners: $('r-winners').value,
+      startedAt: $('r-started').value,
+      excluded: listOf($('r-excluded').value),
+    });
+
+    renderStats($('r-stats'), [
+      ['Участников', drawn.stats.entrants],
+      ['Билетов', drawn.stats.tickets],
+      ['Мест', drawn.stats.places],
+      ['Отсеяно', drawn.rejected.length, 'bad'],
+    ]);
+    $('r-seed').textContent = drawn.seed;
+    $('r-entries-hash').textContent = drawn.entriesHash;
+
+    const prizes = ['iPhone 15 Pro', 'Чехол PITAKA', 'Чехол PITAKA', 'Скидка 10%', 'Скидка 10%'];
+    $('r-winners-table').innerHTML = `<thead><tr><th class="num">#</th><th>Аккаунт</th><th>Приз</th></tr></thead>
+      <tbody>${drawn.winners.map((w) => `<tr><td class="num mono">${w.rank}</td>
+        <td class="mono">@${esc(w.username)}</td><td>${esc(prizes[w.rank - 1] ?? '—')}</td></tr>`).join('')}</tbody>`;
+
+    $('r-claimed').value = drawn.winners.map((w) => w.username).join(',');
+    show($('r-results')); show($('r-verify-card')); show($('r-verify-flash'), false);
+  } catch (error) {
+    flash($('r-error'), 'err', ['Розыгрыш не проведён', error.message]);
+  }
+});
+
+$('r-tamper').addEventListener('click', () => {
+  const claimed = listOf($('r-claimed').value);
+  const outsider = drawn.entries.map((e) => e.username)
+    .find((name) => !claimed.includes(name)) ?? 'someone_else';
+  $('r-claimed').value = [outsider, ...claimed.slice(1)].join(',');
+  $('r-verify').click();
+});
+
+$('r-verify').addEventListener('click', async () => {
+  const check = await api('/api/raffle/verify', {
+    entries: drawn.entries,
+    seed: drawn.seed,
+    beacon: $('r-beacon').value,
+    commitment: drawn.commitment,
+    entriesHash: drawn.entriesHash,
+    claimedWinners: listOf($('r-claimed').value),
+  });
+
+  if (check.ok) {
+    flash($('r-verify-flash'), 'ok', [
+      'OK — розыгрыш воспроизводится в точности',
+      check.recomputed.map((n, i) => `${i + 1}. @${n}`).join('   '),
+    ]);
+  } else {
+    flash($('r-verify-flash'), 'err', ['FAILED — результат не сходится', ...check.failures]);
+  }
+});
+</script>
+</body>
+</html>

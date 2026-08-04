@@ -1,0 +1,431 @@
+import { Injectable, Optional } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { AuditInput, AuditService } from '../audit/audit.service';
+import { EventType } from '../audit/event-types';
+import { PrismaService } from '../prisma/prisma.service';
+import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
+import { OutboxService } from '../outbox/outbox.service';
+import { enqueueConsentedCustomerNotice, enqueueStaffNotice } from '../outbox/customer-notifications';
+import { canApprove, Role } from '../rbac/permissions';
+import { ACTION_EXECUTORS, ACTION_REJECTION_EXECUTORS } from './action-executors';
+import { ExchangesService } from '../exchanges/exchanges.service';
+import { StaffAuthService } from '../staff-auth/staff-auth.service';
+
+/** A dangerous action captured for approval (Approval Rules Matrix). */
+export interface ApprovalRequest {
+  action: string; // refund | discount | write_off | quarantine_write_off | price | debt | stock_adjust | delete | pii
+  requester: string;
+  reason: string;
+  payload?: Record<string, unknown>;
+  evidence?: Record<string, unknown>;
+  /**
+   * Optional replay key. Approval-gated actions are not applied on request, so a
+   * duplicate does not move stock by itself — it parks a SECOND approval for one
+   * physical event, and an approver who confirms both applies it twice. With a
+   * key, the repeat replays the first approval instead.
+   */
+  idempotencyKey?: string;
+}
+
+/**
+ * Материальные действия, которые инициатор не решает сам.
+ *
+ * Список вынесен в константу намеренно: пока он был литералом внутри условия,
+ * два действия оказались вне правила незаметно. Добавляя новое опасное
+ * действие, добавьте его сюда — либо осознанно объясните, почему нет.
+ */
+export const FOUR_EYES_ACTIONS: readonly string[] = [
+  'campaign_budget',
+  'storefront_publish',
+  'refund',
+  'quarantine_write_off',
+  'exchange',
+  'manual_adjustment',
+  'discount',
+  'price',
+  'debt',
+  'delete',
+  // Списание и корректировка остатка одобряет только owner — и он же вправе их
+  // запросить (`p, owner, inventory, movement`). Без этих двух строк владелец в
+  // одиночку списывал любое количество товара и правил остаток в обе стороны, а
+  // исполнители честно двигали баланс, слои и GL — операция выглядела идеально
+  // чистой. Действие здесь вычисляемое (`ACTION_BY_TYPE[dto.type]`), поэтому
+  // проверка по литералам в исходниках их не видела.
+  'write_off',
+  'stock_adjust',
+  // Согласовать себе доступ к персональным данным — значит не иметь контроля
+  // вовсе.
+  'pii',
+];
+
+/**
+ * Действия, которые инициатор решает сам — сознательное исключение.
+ *
+ * Список намеренно пуст: сегодня каждое действие, уходящее в approvals.request,
+ * материально. Он существует, чтобы будущее исключение потребовало строки кода
+ * и объяснения рядом с ней, а не молчаливого отсутствия в списке выше.
+ */
+export const SINGLE_APPROVER_ACTIONS: readonly string[] = [];
+
+export interface DecideInput {
+  status: 'approved' | 'rejected';
+  approver: string;
+  approverRole: Role;
+  reason?: string;
+}
+
+function canonicalJson(value: unknown): string {
+  const normalize = (candidate: unknown): unknown => {
+    if (Array.isArray(candidate)) {
+      return candidate.map((item) => item === undefined ? null : normalize(item));
+    }
+    if (candidate && typeof candidate === 'object') {
+      return Object.fromEntries(
+        Object.entries(candidate as Record<string, unknown>)
+          .filter(([, item]) => item !== undefined)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, item]) => [key, normalize(item)]),
+      );
+    }
+    return candidate ?? null;
+  };
+  return JSON.stringify(normalize(value));
+}
+
+/**
+ * Approval cycle for dangerous actions (start → action → approval → event → final).
+ * A gated action is NOT executed on request — it is parked as an Approval and
+ * returns an approvalId (HTTP 202). On approve, the parked action is executed here,
+ * in the same transaction as the approval.approved event, so money/stock/status and
+ * the ledger move together (invariant #10). The Approval row is append-only in
+ * spirit: it only moves requested → approved/rejected once.
+ */
+@Injectable()
+export class ApprovalsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    @Optional() private readonly exchanges?: ExchangesService,
+    @Optional() private readonly staffAuth?: StaffAuthService,
+    @Optional() private readonly outbox?: OutboxService,
+  ) {}
+
+  get(id: string) {
+    return this.prisma.approval.findUnique({ where: { id }, include: { exchangeRequest: true } });
+  }
+
+  list(status?: string) {
+    return this.prisma.approval.findMany({
+      where: status ? { status: status as never } : undefined,
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { exchangeRequest: true },
+    });
+  }
+
+  /** Park a dangerous action for approval; returns the approvalId (caller → 202). */
+  async request(req: ApprovalRequest): Promise<{ approvalId: string; status: 'requested' }> {
+    return this.audit.transaction((tx) => this.requestOnTx(tx, req));
+  }
+
+  /**
+   * Transactional request primitive for callers that must lock and validate
+   * domain state in the same transaction as the Approval insert.
+   */
+  async requestOnTx(
+    tx: Prisma.TransactionClient,
+    req: ApprovalRequest,
+  ): Promise<{ result: { approvalId: string; status: 'requested' }; events: AuditInput[] }> {
+    const key = req.idempotencyKey?.trim() || undefined;
+    if (key) {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'approval-request:' + key}))::text AS locked`;
+      const replay = await this.replayApprovalOnTx(tx, key, req);
+      if (replay) return replay;
+    }
+    return this.createApprovalOnTx(tx, req, key);
+  }
+
+  /**
+   * A key only replays the action it was minted for.
+   *
+   * `idempotencyKey` is unique across ALL approvals, not per action, so a key
+   * that collides with another action must fail loudly: handing a write-off
+   * back the approvalId of somebody's refund is worse than any error message.
+   *
+   * An approval already decided under this key is likewise not a replay — the
+   * physical event has had its answer, and reporting it as `requested` would
+   * tell the caller something is pending when nothing is.
+   */
+  private async replayApprovalOnTx(
+    tx: Prisma.TransactionClient,
+    key: string,
+    req: ApprovalRequest,
+  ): Promise<{ result: { approvalId: string; status: 'requested' }; events: AuditInput[] } | null> {
+    const existing = await tx.approval.findUnique({ where: { idempotencyKey: key } });
+    if (!existing) return null;
+    const stored = existing.evidence as {
+      payload?: Record<string, unknown> | null;
+      evidence?: Record<string, unknown> | null;
+    } | null;
+    const sameCommand = existing.action === req.action
+      && existing.requester === req.requester
+      && existing.reason === req.reason
+      && canonicalJson(stored?.payload ?? null) === canonicalJson(req.payload ?? null)
+      && canonicalJson(stored?.evidence ?? null) === canonicalJson(req.evidence ?? null);
+    if (!sameCommand) {
+      throw new ConflictError(
+        'idempotency_key_reused',
+        'Этот Idempotency-Key уже занят другим инициатором или командой',
+      );
+    }
+    if (existing.status !== 'requested') {
+      throw new ConflictError(
+        'approval_already_decided',
+        `Эта заявка уже ${existing.status === 'approved' ? 'одобрена' : 'обработана'}. Повторите с новым ключом, если это новая операция.`,
+      );
+    }
+    return {
+      result: { approvalId: existing.id, status: 'requested' as const },
+      events: [],
+    };
+  }
+
+  private async createApprovalOnTx(
+    tx: Prisma.TransactionClient,
+    req: ApprovalRequest,
+    key: string | undefined,
+  ) {
+      const approval = await tx.approval.create({
+        data: {
+          action: req.action,
+          requester: req.requester,
+          reason: req.reason,
+          status: 'requested',
+          idempotencyKey: key,
+          evidence: {
+            payload: req.payload ?? null,
+            evidence: req.evidence ?? null,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      if (this.outbox) {
+        await enqueueStaffNotice(tx, this.outbox, {
+          template: 'approval_requested',
+          title: 'Нужно согласование',
+          body: `${req.action} · ${req.reason}`,
+          payload: { approvalId: approval.id, action: req.action, deepLink: `alistore-admin://approvals/${approval.id}` },
+        });
+      }
+      return {
+        result: { approvalId: approval.id, status: 'requested' as const },
+        events: [
+          {
+            type: EventType.ApprovalRequested,
+            actor: req.requester,
+            payload: { approvalId: approval.id, action: req.action, reason: req.reason },
+            refs: [approval.id],
+          },
+        ],
+      };
+  }
+
+  /** Approve (executes the parked action) or reject an approval. */
+  async decide(id: string, input: DecideInput) {
+    return this.audit.transaction((tx) => this.decideOnTx(tx, id, input));
+  }
+
+  async decideWithStepUp(id: string, input: DecideInput, totpToken?: string) {
+    return this.audit.transaction(async (tx) => {
+      if (!this.staffAuth) throw new ConflictError('staff_auth_missing', 'Step-up executor не подключён');
+      // Global high-risk lock order starts with Approval, then StaffUser rows.
+      // Telegram execution follows the same order, preventing A/B approval
+      // deadlocks when requester and approver identities are reversed.
+      await tx.$queryRaw`SELECT id FROM "Approval" WHERE id = ${id} FOR UPDATE`;
+      await this.staffAuth.verifyStepUpOnTx(tx, input.approver, totpToken);
+      return this.decideOnTx(tx, id, input);
+    });
+  }
+
+  private async decideOnTx(tx: Prisma.TransactionClient, id: string, input: DecideInput) {
+      await tx.$queryRaw`SELECT id FROM "Approval" WHERE id = ${id} FOR UPDATE`;
+      const approval = await tx.approval.findUnique({ where: { id }, include: { exchangeRequest: true } });
+      if (!approval) {
+        throw new ValidationError('approval_not_found', `Approval ${id} не найден`);
+      }
+      if (approval.status !== 'requested') {
+        throw new ConflictError(
+          'approval_already_decided',
+          `Approval ${id} уже ${approval.status}`,
+        );
+      }
+      // Role Permission Matrix: only an authorized role may decide this action.
+      if (!canApprove(approval.action, input.approverRole)) {
+        throw new ForbiddenError(
+          'approver_not_authorized',
+          `Роль ${input.approverRole} не может решать действие «${approval.action}»`,
+        );
+      }
+      // `discount` и `price_change` были вне правила, хотя одобряет их
+      // senior_seller — та же роль, что стоит за кассой и просит скидку.
+      // `discountPct` допускает 100, а продажа с нулевым итогом вообще не
+      // создаёт строку Payment: товар уходил бесплатно по решению одного
+      // человека.
+      if (FOUR_EYES_ACTIONS.includes(approval.action)
+        && approval.requester === input.approver) {
+        throw new ForbiddenError(
+          'four_eye_approval_required',
+          'Инициатор не может согласовать собственное материальное действие',
+        );
+      }
+      if (approval.action === 'exchange') {
+        if (!this.exchanges) throw new ConflictError('exchange_executor_missing', 'Exchange executor не подключён');
+        if (!approval.exchangeRequest) {
+          throw new ConflictError('exchange_request_missing', 'Approval не связан с заявкой обмена');
+        }
+        const expiryEvents: AuditInput[] = [];
+        const expired = await this.exchanges.expireIfPastDeadlineOnTx(
+          tx,
+          approval.exchangeRequest.id,
+          id,
+          new Date(),
+          expiryEvents,
+        );
+        if (expired) {
+          return {
+            result: await tx.approval.findUnique({ where: { id } }),
+            events: expiryEvents,
+          };
+        }
+      }
+
+      const parkedPayload = (approval.evidence as { payload?: Record<string, unknown> } | null)
+        ?.payload;
+      if (
+        input.status === 'approved'
+        && approval.action === 'stock_adjust'
+        && (!parkedPayload || !Object.prototype.hasOwnProperty.call(parkedPayload, 'expectedOnHand'))
+      ) {
+        const rejected = await tx.approval.updateMany({
+          where: { id, status: 'requested' },
+          data: { status: 'rejected', approver: input.approver },
+        });
+        if (rejected.count === 0) {
+          throw new ConflictError(
+            'approval_already_decided',
+            `Approval ${id} уже решён другим аппрувером`,
+          );
+        }
+        return {
+          result: await tx.approval.findUnique({ where: { id } }),
+          events: [
+            {
+              type: EventType.ApprovalRejected,
+              actor: input.approver,
+              payload: {
+                approvalId: id,
+                action: approval.action,
+                outcome: 'legacy_snapshot_required',
+                reason: 'Legacy stock adjustment must be re-requested with a balance snapshot',
+              },
+              refs: [id],
+            },
+          ],
+        };
+      }
+
+      // Atomically claim the decision — two concurrent decides cannot both flip
+      // requested→(approved|rejected). count===0 ⇒ another decider won the race
+      // (prevents a double refund / double price change from one approval).
+      const decidedStatus = input.status === 'rejected' ? 'rejected' : 'approved';
+      const claim = await tx.approval.updateMany({
+        where: { id, status: 'requested' },
+        data: { status: decidedStatus, approver: input.approver },
+      });
+      if (claim.count === 0) {
+        throw new ConflictError(
+          'approval_already_decided',
+          `Approval ${id} уже решён другим аппрувером`,
+        );
+      }
+      const updated = await tx.approval.findUnique({ where: { id } });
+
+      if (input.status === 'rejected') {
+        const events: AuditInput[] = [
+          {
+            type: EventType.ApprovalRejected,
+            actor: input.approver,
+            payload: { approvalId: id, action: approval.action, reason: input.reason ?? null },
+            refs: [id],
+          },
+        ];
+        const payload = (approval.evidence as { payload?: Record<string, unknown> } | null)
+          ?.payload;
+        const reject = ACTION_REJECTION_EXECUTORS[approval.action];
+        if (reject && payload) {
+          await reject(tx, payload, input.approver, id, input.reason ?? null, events);
+        }
+        if (approval.action === 'exchange' && approval.exchangeRequest) {
+          if (!this.exchanges) throw new ConflictError('exchange_executor_missing', 'Exchange executor не подключён');
+          await this.exchanges.rejectApprovedOnTx(
+            tx,
+            approval.exchangeRequest.id,
+            id,
+            input.approver,
+            input.reason ?? null,
+            events,
+          );
+        }
+        return {
+          result: updated,
+          events,
+        };
+      }
+      const events: AuditInput[] = [
+        {
+          type: EventType.ApprovalApproved,
+          actor: input.approver,
+          payload: { approvalId: id, action: approval.action },
+          refs: [id],
+        },
+      ];
+
+      // Execute the parked action via its registered executor.
+      const payload = (approval.evidence as { payload?: Record<string, unknown> } | null)
+        ?.payload;
+      const execute = ACTION_EXECUTORS[approval.action];
+      if (execute && payload) {
+        await execute(tx, payload, input.approver, id, events);
+      }
+      if (approval.action === 'exchange') {
+        if (!this.exchanges) throw new ConflictError('exchange_executor_missing', 'Exchange executor не подключён');
+        if (!approval.exchangeRequest) {
+          throw new ConflictError('exchange_request_missing', 'Approval не связан с заявкой обмена');
+        }
+        const exchange = await this.exchanges.executeApprovedOnTx(
+          tx,
+          approval.exchangeRequest.id,
+          input.approver,
+          id,
+        );
+        events.push(...exchange.events);
+      }
+      // The FIN-003E refund aggregate only flips to approved here; the saga executes
+      // out-of-band — tell the customer the money is on its way.
+      if (this.outbox && approval.action === 'refund' && typeof payload?.refundId === 'string') {
+        const approvedRefund = await tx.refund.findUnique({
+          where: { id: payload.refundId },
+          include: { order: { select: { customerId: true } } },
+        });
+        if (approvedRefund) {
+          await enqueueConsentedCustomerNotice(tx, this.outbox, {
+            customerId: approvedRefund.order.customerId,
+            template: 'refund_approved',
+            payload: { refundId: approvedRefund.id, returnId: approvedRefund.returnId, orderId: approvedRefund.orderId, amount: approvedRefund.amount },
+            transactional: true,
+          });
+        }
+      }
+
+      return { result: updated, events };
+  }
+}

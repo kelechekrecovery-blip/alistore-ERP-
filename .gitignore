@@ -3,18 +3,120 @@ node_modules/
 # build
 dist/
 build/
+.build/
+apps/web/build-output/
+apps/web/build-courier/
+apps/web/tsconfig.tsbuildinfo
 .next/
+.next-*/
 out/
 # env & secrets (never commit)
+# `.env` ловит только файлы с этим точным именем. Ротация JWT_SECRET 21.07.2026
+# оставила рядом `apps/api/.env.bak-20260721` с живым OPENROUTER_API_KEY — и он
+# оказался НЕ покрыт: git показал его как untracked, то есть один `git add -A`
+# отправил бы ключ в историю. Закрываем весь класс, кроме примеров.
 .env
+.env.*
+!.env*.example
+!**/.env*.example
 .env.local
 .env.*.local
+apps/api/.env.production
+apps/web/.env.production
+apps/mobile/.env.production
+apps/ios/.env.production
+apps/mobile/.expo/
+apps/mobile/.expo-shared/
+apps/mobile/AuthKey_*.p8
+apps/mobile/google-service-account*.json
+google-services.json
+GoogleService-Info.plist
+apps/mobile/credentials.json
+apps/mobile/*.keystore
+apps/mobile/*.jks
+# Релизная подпись Android: keystore и пароли живут вне репозитория
+*.keystore
+*.jks
+keystore.properties
+apps/android/local.properties
+apps/ios/**/xcuserdata/
+apps/ios/**/*.xcuserstate
+apps/ios/*.xcarchive/
 # prisma
 apps/api/prisma/*.db
 # logs / os
 *.log
 .DS_Store
 coverage/
+playwright-report/
+test-results/
+playwright-report-prod/
+test-results-prod/
+playwright-web.png
+.playwright-mcp/
+.claude/autonomous/
+.artifacts/
+.wrangler/
+backups/d1/
+backups/postgres-cloudflare/
+apps/api/uploads/
+.serena/cache/
+.serena/memories/
+.serena/project.local.yml
 # editor
 .idea/
 .vscode/
+next-env.d.ts
+
+# --- ruflo (agent meta-harness), added 2026-07-22 ---
+# Runtime/state artifacts — never commit
+.claude-flow/
+.swarm/
+ruvector.db
+skills-lock.json
+.agents/skills/ruflo/
+# Generated Claude Code assets (regenerate with: npx ruflo@latest init)
+.claude/commands/
+.claude/helpers/
+.claude/agents/browser/
+.claude/agents/consensus/
+.claude/agents/core/
+.claude/agents/sparc/
+.claude/agents/swarm/
+.claude/agents/testing/
+.claude/skills/agentdb-advanced/
+.claude/skills/agentdb-learning/
+.claude/skills/agentdb-memory-patterns/
+.claude/skills/agentdb-optimization/
+.claude/skills/agentdb-vector-search/
+.claude/skills/browser/
+.claude/skills/github-code-review/
+.claude/skills/github-multi-repo/
+.claude/skills/github-project-management/
+.claude/skills/github-release-management/
+.claude/skills/github-workflow-automation/
+.claude/skills/hooks-automation/
+.claude/skills/pair-programming/
+.claude/skills/reasoningbank-agentdb/
+.claude/skills/reasoningbank-intelligence/
+.claude/skills/ruflo
+.claude/skills/skill-builder/
+.claude/skills/sparc-methodology/
+.claude/skills/stream-chain/
+.claude/skills/swarm-advanced/
+.claude/skills/swarm-orchestration/
+.claude/skills/v3-cli-modernization/
+.claude/skills/v3-core-implementation/
+.claude/skills/v3-ddd-architecture/
+.claude/skills/v3-integration-deep/
+.claude/skills/v3-mcp-optimization/
+.claude/skills/v3-memory-unification/
+.claude/skills/v3-performance-optimization/
+.claude/skills/v3-security-overhaul/
+.claude/skills/v3-swarm-coordination/
+.claude/skills/verification-quality/
+.claude/.proven-config-version
+.claude/proven-config.json
+
+# Раффл: секретный сид до раскрытия — публикуется только его хеш
+.raffle-seed.json

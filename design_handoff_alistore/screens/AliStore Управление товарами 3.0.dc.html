@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>* { box-sizing: border-box; } body { margin: 0; background: #0B0A08; } ::selection { background: #C6FF3D; color: #14110E; } .sc::-webkit-scrollbar{width:6px;} .sc::-webkit-scrollbar-thumb{background:#2E2822;border-radius:3px;}</style>
+</helmet>
+
+<div style="background: radial-gradient(circle at 82% 10%, rgba(255,91,46,0.15), transparent 42%), radial-gradient(circle at 10% 90%, rgba(127,176,236,0.12), transparent 44%), radial-gradient(circle at 16% 4%, #2B221B 0%, #14100C 46%, #0B0A08 100%); font-family: 'Golos Text', sans-serif; color: #E5DCD3; min-height: 100vh; padding: 28px 32px 60px;">
+  <a href="AliStore Обзор проекта.dc.html" style="position: fixed; top: 16px; right: 16px; z-index: 99; background: rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.14); color: #fff; text-decoration: none; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600;">⌂ Обзор</a>
+  <div style="max-width: 1120px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg,#FF7A4D,#E8410F); box-shadow: 0 6px 18px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 19px;">A</div>
+      <span style="font-family: 'Sora'; font-weight: 800; font-size: 24px; color: #fff;">Управление товарами</span>
+    </div>
+    <div class="sc" style="display: flex; gap: 8px; overflow-x: auto; margin-bottom: 20px; padding-bottom: 4px;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+        <div onClick="{{ t.pick }}" style="flex-shrink: 0; background: {{ t.bg }}; color: {{ t.fg }}; border: 1px solid {{ t.border }}; border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;">{{ t.label }}</div>
+      </sc-for>
+    </div>
+
+    <!-- VARIANTS -->
+    <sc-if value="{{ isVariants }}" hint-placeholder-val="{{ true }}">
+      <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 16px; padding: 20px;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 16px; color: #fff; margin-bottom: 4px;">iPhone 15 — варианты (цвет × память)</div>
+        <div style="font-size: 13px; color: #8A7F76; margin-bottom: 16px;">Одна карточка, матрица SKU. Каждый вариант — свой остаток, цена и штрихкод.</div>
+        <div style="overflow-x: auto;">
+          <div style="display: grid; grid-template-columns: 120px repeat(3, 1fr); gap: 8px; min-width: 480px;">
+            <div style="font-size: 11px; color: #8A7F76; padding: 8px;"></div>
+            <div style="font-size: 12px; color: #D8CFC6; text-align: center; padding: 8px; font-weight: 600;">128 ГБ</div>
+            <div style="font-size: 12px; color: #D8CFC6; text-align: center; padding: 8px; font-weight: 600;">256 ГБ</div>
+            <div style="font-size: 12px; color: #D8CFC6; text-align: center; padding: 8px; font-weight: 600;">512 ГБ</div>
+            <sc-for list="{{ matrix }}" as="row" hint-placeholder-count="3">
+              <div style="font-size: 13px; color: #fff; padding: 10px 8px; display: flex; align-items: center; gap: 8px;"><span style="width: 12px; height: 12px; border-radius: 50%; background: {{ row.dot }};"></span>{{ row.color }}</div>
+              <sc-for list="{{ row.cells }}" as="c" hint-placeholder-count="3">
+                <div style="background: {{ c.bg }}; border: 1px solid #2E2822; border-radius: 10px; padding: 10px; text-align: center;"><div style="font-family: 'JetBrains Mono'; font-size: 13px; color: {{ c.stockColor }};">{{ c.stock }}</div><div style="font-size: 11px; color: #8A7F76;">{{ c.price }}</div></div>
+              </sc-for>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- BUNDLES -->
+    <sc-if value="{{ isBundles }}" hint-placeholder-val="{{ false }}">
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
+        <sc-for list="{{ bundles }}" as="b" hint-placeholder-count="2">
+          <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 16px; padding: 20px;">
+            <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 10px;">{{ b.name }}</div>
+            <sc-for list="{{ b.items }}" as="i" hint-placeholder-count="3">
+              <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);"><span style="color: #A79C92;">{{ i.name }}</span><span style="font-family: 'JetBrains Mono'; color: #8A7F76;">{{ i.price }}</span></div>
+            </sc-for>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;"><div><span style="font-size: 12px; color: #8A7F76; text-decoration: line-through;">{{ b.sum }}</span> <span style="background: rgba(255,138,122,0.15); color: #FF8A7A; border-radius: 5px; padding: 2px 7px; font-size: 11px;">−{{ b.disc }}</span></div><span style="font-family: 'Sora'; font-weight: 800; font-size: 18px; color: #C6FF3D;">{{ b.price }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="font-size: 12px; color: #6E645C; margin-top: 12px;">Комплект = набор SKU со скидкой. При продаже списываются все позиции; возврат/маржа считаются по комплекту.</div>
+    </sc-if>
+
+    <!-- GIFT CARDS -->
+    <sc-if value="{{ isGift }}" hint-placeholder-val="{{ false }}">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div style="background: linear-gradient(135deg,#FF5B2E,#E8410F); border-radius: 18px; padding: 24px; color: #fff;">
+          <div style="display: flex; justify-content: space-between; align-items: start;"><span style="font-family: 'Sora'; font-weight: 800; font-size: 20px;">AliStore</span><span style="font-size: 24px;">🎁</span></div>
+          <div style="font-size: 13px; color: #FFE0D5; margin-top: 20px;">Подарочная карта</div>
+          <div style="font-family: 'Sora'; font-weight: 800; font-size: 34px; margin-top: 4px;">10 000 сом</div>
+          <div style="font-family: 'JetBrains Mono'; font-size: 13px; color: #FFE0D5; margin-top: 12px;">GIFT-8842-••••</div>
+        </div>
+        <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 16px; padding: 20px;">
+          <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 12px;">Как работает</div>
+          <div style="font-size: 13px; color: #A79C92; line-height: 1.7;">· Номиналы 1 000 – 50 000 сом<br>· Покупка на сайте / в магазине<br>· Оплата картой в checkout и на POS<br>· Баланс и история — в аккаунте<br>· Не сгорает, можно частями</div>
+          <div style="display: flex; gap: 8px; margin-top: 14px;"><div style="background: #C6FF3D; color: #14110E; border-radius: 9px; padding: 9px 14px; font-size: 12px; font-weight: 700; cursor: pointer;">Выпустить карту</div><div style="background: #221E19; color: #D8CFC6; border-radius: 9px; padding: 9px 14px; font-size: 12px; cursor: pointer;">Проверить баланс</div></div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- PREORDER -->
+    <sc-if value="{{ isPreorder }}" hint-placeholder-val="{{ false }}">
+      <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 16px; padding: 20px;">
+        <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;"><div style="width: 54px; height: 54px; border-radius: 12px; background: url('assets/p-iphone.png'); background-size: cover; background-position: center;"></div><div><div style="font-family: 'Sora'; font-weight: 700; font-size: 17px; color: #fff;">iPhone 18 Pro (предзаказ)</div><div style="font-size: 13px; color: #8A7F76;">Старт продаж: сентябрь 2026 · депозит 20%</div></div></div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+          <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px;"><div style="font-size: 12px; color: #8A7F76;">Броней</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: #fff;">47</div></div>
+          <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px;"><div style="font-size: 12px; color: #8A7F76;">Депозитов собрано</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: #C6FF3D;">1.08 млн</div></div>
+          <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px;"><div style="font-size: 12px; color: #8A7F76;">Ожидаемая выручка</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 22px; color: #fff;">5.4 млн</div></div>
+        </div>
+        <div style="font-size: 12px; color: #6E645C; line-height: 1.5;">Депозит резервирует место в очереди. При поступлении — уведомление, доплата остатка, конвертация в заказ. Возврат депозита при отмене до прихода.</div>
+      </div>
+    </sc-if>
+
+    <!-- PRICE HISTORY -->
+    <sc-if value="{{ isPrice }}" hint-placeholder-val="{{ false }}">
+      <div style="background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.11); box-shadow: 0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 16px; padding: 20px;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 16px; color: #fff; margin-bottom: 4px;">iPhone 15 128 — история цены</div>
+        <div style="font-size: 13px; color: #8A7F76; margin-bottom: 20px;">Кто менял, когда, почему. Видно клиенту как график «цена за 3 мес».</div>
+        <div style="display: flex; align-items: flex-end; gap: 12px; height: 140px; margin-bottom: 8px;">
+          <sc-for list="{{ priceBars }}" as="b" hint-placeholder-count="6">
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;"><div style="width: 100%; background: linear-gradient(180deg,#FF8A5F,#E8410F); border-radius: 5px 5px 0 0; height: {{ b.h }};"></div><span style="font-size: 10px; color: #8A7F76;">{{ b.m }}</span></div>
+          </sc-for>
+        </div>
+        <div style="border-top: 1px solid #1A1611; margin-top: 16px; padding-top: 14px;">
+          <sc-for list="{{ priceLog }}" as="l" hint-placeholder-count="3">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 13px;"><span style="font-family: 'JetBrains Mono'; color: #8A7F76; width: 70px;">{{ l.date }}</span><span style="font-family: 'JetBrains Mono'; color: {{ l.color }};">{{ l.change }}</span><span style="color: #A79C92; flex: 1;">{{ l.reason }}</span><span style="font-size: 12px; color: #6E645C;">{{ l.who }}</span></div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tab: "variants" };
+  renderVals() {
+    const t = this.state.tab;
+    const tabDef = [["variants","Варианты (матрица)"],["bundles","Комплекты"],["gift","Подарочные карты"],["preorder","Предзаказ"],["price","История цены"]];
+    const tabs = tabDef.map(x => ({ label: x[1], pick: () => this.setState({ tab: x[0] }),
+      bg: t === x[0] ? "#FF5B2E" : "rgba(255,255,255,0.06)", fg: t === x[0] ? "#fff" : "#A79C92", border: t === x[0] ? "#FF5B2E" : "rgba(255,255,255,0.1)" }));
+    const cell = (stock, price) => ({ stock: stock+" шт", price, bg: stock===0?"#1A1611":"#100D0B", stockColor: stock===0?"#FF8A7A":(stock<4?"#E5B23C":"#C6FF3D") });
+    const matrix = [
+      { color:"Чёрный", dot:"#333", cells:[cell(8,"109 900"),cell(3,"124 900"),cell(1,"149 900")] },
+      { color:"Синий", dot:"#4B6", cells:[cell(5,"109 900"),cell(0,"124 900"),cell(2,"149 900")] },
+      { color:"Белый", dot:"#EEE", cells:[cell(6,"109 900"),cell(4,"124 900"),cell(0,"149 900")] }
+    ];
+    const bundles = [
+      { name:"Смартфон + защита", items:[{name:"iPhone 15 128",price:"109 900"},{name:"Чехол",price:"1 900"},{name:"Стекло",price:"1 500"}], sum:"113 300", disc:"5%", price:"107 635" },
+      { name:"Аудио-сет", items:[{name:"AirPods Pro 2",price:"24 900"},{name:"Кейс силикон",price:"1 200"}], sum:"26 100", disc:"8%", price:"24 012" }
+    ];
+    const priceBars = [["апр","70%"],["май","72%"],["июн","85%"],["июл","80%"],["авг","78%"],["сен","65%"]].map(b=>({m:b[0],h:b[1]}));
+    const priceLog = [
+      { date:"01.09", change:"−5 000", color:"#7FD3A0", reason:"Акция «конец лета»", who:"Маркетолог" },
+      { date:"15.06", change:"+8 000", color:"#FF8A7A", reason:"Рост курса USD", who:"Владелец" },
+      { date:"01.04", change:"старт", color:"#8A7F76", reason:"Ввод в продажу", who:"Система" }
+    ];
+    return { tabs, isVariants:t==="variants", isBundles:t==="bundles", isGift:t==="gift", isPreorder:t==="preorder", isPrice:t==="price",
+      matrix, bundles, priceBars, priceLog };
+  }
+}
+</script>
+</body>
+</html>

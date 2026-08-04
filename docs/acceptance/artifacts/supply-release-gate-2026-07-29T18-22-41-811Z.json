@@ -1,0 +1,202 @@
+{
+  "title": "AliStore supply release gate evidence",
+  "overall": "BLOCKED",
+  "startedAt": "2026-07-29T18:22:41.809Z",
+  "endedAt": "2026-07-29T18:22:41.811Z",
+  "durationSeconds": 0,
+  "planOnly": true,
+  "deploymentPerformed": false,
+  "storeReleasePerformed": false,
+  "git": {
+    "head": "f71fd7748e75c41fe6149b8c328fac6b9e5731df",
+    "status": "clean"
+  },
+  "results": [
+    {
+      "id": "supply_feature_flags",
+      "status": "PASS",
+      "detail": "all release-sensitive supply flags are false/unset",
+      "command": null
+    },
+    {
+      "id": "prisma_validate",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm exec -w @alistore/api -- prisma validate"
+    },
+    {
+      "id": "api_full_pass_1",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "node scripts/run-isolated-api-tests.mjs"
+    },
+    {
+      "id": "api_full_pass_2",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "node scripts/run-isolated-api-tests.mjs"
+    },
+    {
+      "id": "web_tests",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run test -w @alistore/web"
+    },
+    {
+      "id": "web_build",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run build -w @alistore/web"
+    },
+    {
+      "id": "playwright_cross_browser",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "playwright test"
+    },
+    {
+      "id": "production_preflight_strict",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run launch:preflight:strict"
+    },
+    {
+      "id": "production_readiness_strict",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "npm run launch:readiness:strict"
+    },
+    {
+      "id": "secret_scan",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "gitleaks dir --redact --no-banner ."
+    },
+    {
+      "id": "dependency_scan",
+      "status": "BLOCKED",
+      "detail": "not executed in --plan mode",
+      "command": "osv-scanner scan source -r ."
+    },
+    {
+      "id": "ios_xcode_prerequisite",
+      "status": "BLOCKED",
+      "detail": "not probed in --plan mode",
+      "command": "xcodebuild -version"
+    },
+    {
+      "id": "ios_swiftlint_prerequisite",
+      "status": "BLOCKED",
+      "detail": "not probed in --plan mode",
+      "command": "swiftlint version"
+    },
+    {
+      "id": "ios_build",
+      "status": "BLOCKED",
+      "detail": "Xcode prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "ios_test",
+      "status": "BLOCKED",
+      "detail": "Xcode prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "ios_ui",
+      "status": "BLOCKED",
+      "detail": "Xcode prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "ios_lint",
+      "status": "BLOCKED",
+      "detail": "swiftlint prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "android_java_prerequisite",
+      "status": "BLOCKED",
+      "detail": "not probed in --plan mode",
+      "command": "/opt/homebrew/opt/openjdk@17/bin/java -version"
+    },
+    {
+      "id": "android_build",
+      "status": "BLOCKED",
+      "detail": "Java 17 prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "android_test_lint",
+      "status": "BLOCKED",
+      "detail": "Java 17 prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "android_ui",
+      "status": "BLOCKED",
+      "detail": "Java 17 prerequisite unavailable",
+      "command": null
+    },
+    {
+      "id": "external_payment_gateway",
+      "status": "BLOCKED",
+      "detail": "PAYMENT_PROVIDER_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_refund_webhook",
+      "status": "BLOCKED",
+      "detail": "REFUND_WEBHOOK_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_smtp",
+      "status": "BLOCKED",
+      "detail": "SMTP_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_sms",
+      "status": "BLOCKED",
+      "detail": "SMS_PROVIDER_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_fcm",
+      "status": "BLOCKED",
+      "detail": "FCM_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_apns",
+      "status": "BLOCKED",
+      "detail": "APNS_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_object_storage",
+      "status": "BLOCKED",
+      "detail": "OBJECT_STORAGE_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_fiscal_ofd",
+      "status": "BLOCKED",
+      "detail": "FISCAL_OFD_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_monitoring",
+      "status": "BLOCKED",
+      "detail": "MONITORING_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    },
+    {
+      "id": "external_pos_hardware",
+      "status": "BLOCKED",
+      "detail": "POS_HARDWARE_CERTIFIED is not explicitly true; capability must remain fail-closed",
+      "command": null
+    }
+  ]
+}

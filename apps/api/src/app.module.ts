@@ -5,15 +5,123 @@ import { AuditModule } from './audit/audit.module';
 import { UnitsModule } from './units/units.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
+import { CatalogModule } from './catalog/catalog.module';
+import { ShiftsModule } from './shifts/shifts.module';
+import { CourierModule } from './courier/courier.module';
+import { ReservationsModule } from './reservations/reservations.module';
+import { CustomersModule } from './customers/customers.module';
+import { AuthModule } from './auth/auth.module';
+import { OutboxModule } from './outbox/outbox.module';
+import { PosModule } from './pos/pos.module';
+import { MediaModule } from './media/media.module';
+import { ReceiptsModule } from './receipts/receipts.module';
+import { ApprovalsModule } from './approvals/approvals.module';
+import { ReturnsModule } from './returns/returns.module';
+import { LabelsModule } from './labels/labels.module';
+import { ProductsModule } from './products/products.module';
+import { InventoryModule } from './inventory/inventory.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { ReportsModule } from './reports/reports.module';
+import { ExchangesModule } from './exchanges/exchanges.module';
+import { WarrantyModule } from './warranty/warranty.module';
+import { SuppliersModule } from './suppliers/suppliers.module';
+import { ImportModule } from './import/import.module';
+import { DebtsModule } from './debts/debts.module';
+import { OwnerAlertsModule } from './owner-alerts/owner-alerts.module';
+import { SupportModule } from './support/support.module';
+import { HealthModule } from './health/health.module';
+import { DocumentsModule } from './documents/documents.module';
+import { ObservabilityModule } from './observability/observability.module';
+import { AuthzModule } from './authz/authz.module';
+import { RealtimeModule } from './realtime/realtime.module';
+import { LocalizationModule } from './localization/localization.module';
+import { StaffAuthModule } from './staff-auth/staff-auth.module';
+import { TradeInsModule } from './tradeins/tradeins.module';
+import { AiModule } from './ai/ai.module';
+import { TelegramAgentModule } from './telegram-agent/telegram-agent.module';
+import { EvidenceModule } from './evidence/evidence.module';
+import { CampaignsModule } from './campaigns/campaigns.module';
+import { GiftcardsModule } from './giftcards/giftcards.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { B2BModule } from './b2b/b2b.module';
+import { ProtectionModule } from './protection/protection.module';
+import { ProcurementModule } from './procurement/procurement.module';
+import { FinanceModule } from './finance/finance.module';
+import { StaffTasksModule } from './staff-tasks/staff-tasks.module';
+import { SettingsModule } from './settings/settings.module';
+import { HrModule } from './hr/hr.module';
+import { LogisticsModule } from './logistics/logistics.module';
+import { ServiceCenterModule } from './service-center/service-center.module';
+import { StorefrontModule } from './storefront/storefront.module';
+import { PromotionsModule } from './promotions/promotions.module';
+import { StorefrontBlocksModule } from './storefront-blocks/storefront-blocks.module';
+import { RefundsModule } from './refunds/refunds.module';
+import { StoreOperationsModule } from './store-operations/store-operations.module';
+import { resolveRuntimeEnvFiles } from './config/runtime-env-files';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: resolveRuntimeEnvFiles(process.env.NODE_ENV),
+    }),
     PrismaModule,
     AuditModule,
+    AnalyticsModule,
     UnitsModule,
     OrdersModule,
     PaymentsModule,
+    CatalogModule,
+    ShiftsModule,
+    CourierModule,
+    ReservationsModule,
+    CustomersModule,
+    AuthModule,
+    OutboxModule,
+    PosModule,
+    MediaModule,
+    ReceiptsModule,
+    ApprovalsModule,
+    ReturnsModule,
+    LabelsModule,
+    ProductsModule,
+    InventoryModule,
+    ReportsModule,
+    ExchangesModule,
+    WarrantyModule,
+    SuppliersModule,
+    ImportModule,
+    DebtsModule,
+    OwnerAlertsModule,
+    SupportModule,
+    HealthModule,
+    DocumentsModule,
+    ObservabilityModule,
+    AuthzModule,
+    RealtimeModule,
+    LocalizationModule,
+    StaffAuthModule,
+    TradeInsModule,
+    EvidenceModule,
+    AiModule,
+    TelegramAgentModule,
+    CampaignsModule,
+    GiftcardsModule,
+    NotificationsModule,
+    B2BModule,
+    ProtectionModule,
+    ProcurementModule,
+    FinanceModule,
+    StaffTasksModule,
+    SettingsModule,
+    HrModule,
+    LogisticsModule,
+    ServiceCenterModule,
+    StorefrontModule,
+    PromotionsModule,
+    StorefrontBlocksModule,
+    RefundsModule,
+    StoreOperationsModule,
   ],
 })
 export class AppModule {}

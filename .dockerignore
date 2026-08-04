@@ -1,0 +1,26 @@
+.git
+.next
+**/.next
+# `**/.next` не покрывает каталоги вида `.next-e2e-3200` и `.next-visual`, а их
+# в рабочем дереве накапливается на десятки гигабайт: контекст сборки раздувался
+# с 30 МБ отслеживаемых файлов до 27 ГБ. На Render это не проявляется (там чистый
+# клон), поэтому заметно только локально — и ровно там, где мы проверяем образ
+# перед деплоем.
+**/.next-*
+**/build
+**/build-output
+**/build-courier
+**/node_modules
+node_modules
+playwright-report
+test-results
+uploads
+*.log
+# Паттерны .dockerignore матчатся по ПОЛНОМУ относительному пути, поэтому `.env*`
+# покрывал только корень репозитория. `COPY . .` затягивал в слой образа
+# apps/api/.env (живой OPENROUTER_API_KEY, DATABASE_URL, JWT_SECRET) и
+# apps/ios/.env.production (ключи App Store Connect). Обнаружено 21.07.2026 на
+# фактически собранном образе, а не по чтению файла.
+**/.env*
+!**/.env.example
+!**/.env.production.example

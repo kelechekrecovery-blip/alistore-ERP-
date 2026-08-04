@@ -1,0 +1,622 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Vendored copies keep production builds deterministic when the build runner has no network. */
+@font-face {
+  font-family: "Golos Text";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("/fonts/75f2fdf2e0b68dfe-s.0fq57cj8krwmf.woff2") format("woff2");
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+
+@font-face {
+  font-family: "Golos Text";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("/fonts/cfdfbee4d6cf0a93-s.p.1jwcpm6w583_v.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: "Golos Text";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("/fonts/634e9805ffc8f226-s.2ocajiqvilzpk.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Golos Text";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("/fonts/b4a06a523f527a0e-s.p.3psl0_mnhzy2y.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Sora";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/fonts/b886574ba42c3409-s.1_wjncogyh-s7.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Sora";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/fonts/c41ca59f1c34ba31-s.p.2y2uoi4t910qy.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/fonts/13bf9871fe164e7f-s.2f7nqdagzwx2-.woff2") format("woff2");
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/fonts/cc545e633e20c56d-s.p.176arc174-8zp.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/fonts/71b036adf157cdcf-s.0bp8oijd_gu96.woff2") format("woff2");
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/fonts/89b21bb081cb7469-s.1fby2rem9ngyr.woff2") format("woff2");
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/fonts/3fe682a82f50d426-s.0vfdmo25voy_0.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/fonts/70bc3e132a0a741e-s.p.3t6q91iet4nsy.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  --font-display: "Sora", Arial, sans-serif;
+  --font-sans: "Golos Text", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+:root {
+  /* Canonical palette — design_handoff_alistore/docs/Native Design System.md §1.
+     Mirrors tailwind.config.ts so non-Tailwind CSS + desktop overrides stay 1:1. */
+  --coral: #ff5b2e;
+  --deep: #e8410f;
+  --ink: #201b17;
+  --ink-dark: #16130f;
+  --night: #0e0c0a;
+  --tint: #ffefe7;
+  --sand: #f7f2ec;
+  --lime: #c6ff3d;
+  --lime-dark: #a8e23a;
+  --lime-ink: #14110e;
+  --success: #2e7d46;
+  --success-soft: #7fd3a0;
+  --warn: #e5b23c;
+  --danger: #c6362c;
+  --danger-soft: #ff8a7a;
+  --info: #7fb0ec;
+  --surface: #1a1611;
+  --surface-2: #221e19;
+  --surface-3: #2e2822;
+  --line: #3a332c;
+  --bright: #d8cfc6;
+  --muted: #a79c92;
+  --subtle: #8a7f76;
+  --faint: #6e645c;
+  --paper: #f5f5f7;
+  --mist: #e5e5e7;
+  --haze: #d2d2d7;
+  --linen: #e7ddd3;
+  --graphite: #1d1d1f;
+  --slate: #8a8a8a;
+  --steel: #4a4a4a;
+  --coal: #0f0f0f;
+  --coral-soft: #ff6b55;
+  --coral-light: #ff8a5f;
+  --coral-tint: #ffb5aa;
+  /* Design 3.0 surfaces from the latest desktop handoff. */
+  --erp-bg: #0b0a08;
+  --erp-glass: rgba(255, 255, 255, 0.055);
+  --erp-glass-strong: rgba(255, 255, 255, 0.085);
+  --erp-glass-border: rgba(255, 255, 255, 0.11);
+  --erp-coral-hi: #ff7a4d;
+  --erp-green: #4ed17a;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background-color: var(--sand);
+    color: var(--ink);
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-feature-settings: 'ss01';
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+    letter-spacing: 0;
+  }
+  ::selection {
+    background: var(--lime);
+    color: var(--lime-ink);
+  }
+}
+
+@layer components {
+  .input {
+    @apply w-full rounded-btn border border-ink/15 bg-white px-4 py-2.5 text-base text-ink outline-none transition placeholder:text-ink/35 focus:border-coral focus:ring-4 focus:ring-coral/15;
+  }
+
+  .erp3-stage {
+    background:
+      radial-gradient(circle at 22% 0%, rgba(255, 91, 46, 0.24), transparent 38%),
+      radial-gradient(circle at 88% 16%, rgba(123, 36, 117, 0.2), transparent 34%),
+      linear-gradient(135deg, #17120e 0%, var(--erp-bg) 48%, #11100e 100%);
+  }
+
+  .erp3-shell {
+    background:
+      radial-gradient(circle at 24% 0%, rgba(255, 91, 46, 0.18), transparent 35%),
+      radial-gradient(circle at 88% 20%, rgba(123, 36, 117, 0.14), transparent 32%),
+      linear-gradient(135deg, #1b1510 0%, #13100d 42%, var(--erp-bg) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 26px;
+    box-shadow: 0 50px 120px rgba(0, 0, 0, 0.62);
+  }
+
+  .erp3-glass {
+    background: linear-gradient(160deg, var(--erp-glass-strong), rgba(255, 255, 255, 0.018));
+    border: 1px solid var(--erp-glass-border);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    backdrop-filter: blur(22px) saturate(180%);
+  }
+
+  .erp3-glass-strong {
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.025));
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+
+  .erp3-coral-action {
+    background: linear-gradient(135deg, var(--erp-coral-hi), var(--deep));
+    color: #14110e !important;
+    box-shadow: 0 6px 18px rgba(255, 91, 46, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  }
+
+  /* Dark storefront copy must remain readable at the small sizes used by the
+     handoff. These opacity utilities were originally tuned for atmosphere,
+     but several fell below WCAG AA against the dark shell. */
+  .text-white\/35 { color: rgba(255, 255, 255, 0.60) !important; }
+  .text-white\/40 { color: rgba(255, 255, 255, 0.60) !important; }
+  .text-white\/45 { color: rgba(255, 255, 255, 0.65) !important; }
+  .text-white\/50 { color: rgba(255, 255, 255, 0.70) !important; }
+  .text-white\/55 { color: rgba(255, 255, 255, 0.75) !important; }
+
+  /* Coral is the brand surface; dark ink is the accessible foreground on it. */
+  .bg-coral.text-white,
+  .checkout-primary,
+  .login-shell .bg-coral {
+    color: #14110e !important;
+  }
+
+  /* Legacy operations pages keep their business markup but inherit the 3.0 glass shell. */
+  .erp3-stage .bg-white,
+  .erp3-stage .bg-white\/50,
+  .erp3-stage .bg-sand\/50,
+  .erp3-stage .bg-sand\/60,
+  .erp3-stage .bg-sand\/70 {
+    background-color: rgba(255, 255, 255, 0.055) !important;
+    background-image: none !important;
+  }
+
+  .erp3-stage .text-ink,
+  .erp3-stage .text-ink\/70,
+  .erp3-stage .text-ink\/65,
+  .erp3-stage .text-ink\/60,
+  .erp3-stage .text-ink\/55,
+  .erp3-stage .text-ink\/50,
+  .erp3-stage .text-ink\/45,
+  .erp3-stage .text-ink\/40 {
+    color: var(--bright) !important;
+  }
+
+  .erp3-stage [class*="border-ink/"] {
+    border-color: var(--erp-glass-border) !important;
+  }
+
+  .erp3-stage .shadow-soft {
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.36) !important;
+  }
+}
+
+@layer utilities {
+  /* subtle warm paper grain for atmosphere */
+  .bg-grain {
+    background-image: radial-gradient(
+      rgba(32, 27, 23, 0.035) 1px,
+      transparent 1px
+    );
+    background-size: 4px 4px;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@keyframes store-enter {
+  0%, 100% { opacity: 1; transform: translate3d(0, 0, 0); }
+  45% { opacity: 1; transform: translate3d(0, -4px, 0); }
+}
+
+@keyframes store-product-enter {
+  0%, 100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+  55% { opacity: 1; transform: translate3d(0, -8px, 0) scale(1.015) rotate(0.4deg); }
+}
+
+@keyframes store-product-float {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-0.5deg); }
+  50% { transform: translate3d(0, -12px, 0) rotate(0.7deg); }
+}
+
+@keyframes store-scroll-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.store-motion-enter {
+  animation: store-enter 680ms cubic-bezier(0.16, 1, 0.3, 1) var(--store-delay, 0s) both;
+}
+
+.store-motion-stagger > * {
+  animation: store-enter 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.store-motion-stagger > :nth-child(1) { animation-delay: 60ms; }
+.store-motion-stagger > :nth-child(2) { animation-delay: 130ms; }
+.store-motion-stagger > :nth-child(3) { animation-delay: 200ms; }
+.store-motion-stagger > :nth-child(4) { animation-delay: 270ms; }
+.store-motion-stagger > :nth-child(5) { animation-delay: 340ms; }
+
+.store-product-float {
+  animation:
+    store-product-enter 820ms cubic-bezier(0.16, 1, 0.3, 1) 140ms both,
+    store-product-float 5.4s ease-in-out 1.1s 2;
+}
+
+.store-card-enter {
+  animation: store-enter 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.store-scroll-progress {
+  transform: scaleX(0);
+}
+
+@supports (animation-timeline: scroll()) {
+  .store-scroll-progress {
+    animation: store-scroll-progress linear both;
+    animation-timeline: scroll(root block);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .store-motion-enter,
+  .store-motion-stagger > *,
+  .store-product-float,
+  .store-card-enter,
+  .store-scroll-progress {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .account-detail-shell {
+    position: static;
+    z-index: auto;
+    display: block;
+    min-height: 100vh;
+    background: #0b0a08;
+    color: #e5dcd3;
+  }
+
+  .account-detail-header,
+  .account-detail-footer {
+    display: block;
+  }
+
+  .account-detail-panel {
+    width: min(1180px, 92vw);
+    max-width: none;
+    min-height: 620px;
+    height: auto;
+    margin-inline: auto;
+    padding-block: 32px 64px;
+    background: transparent;
+    color: #e5dcd3;
+  }
+
+  .account-detail-panel > .overflow-y-auto {
+    overflow: visible;
+    padding-inline: 0;
+  }
+
+  .account-detail-panel .bg-\[\#221E19\],
+  .account-detail-panel .bg-\[\#16130F\] {
+    background: rgba(255,255,255,.04) !important;
+  }
+
+  .account-detail-panel .border-\[\#2E2822\] {
+    border-color: rgba(255,255,255,.1) !important;
+  }
+
+  .account-detail-panel .text-white,
+  .account-detail-panel .text-\[\#D8CFC6\] {
+    color: #e5dcd3 !important;
+  }
+
+  .account-detail-panel .text-\[\#A79C92\],
+  .account-detail-panel .text-\[\#8A7F76\],
+  .account-detail-panel .text-\[\#6E645C\] {
+    color: rgba(255,255,255,.45) !important;
+  }
+
+  .account-detail-panel .bg-lime {
+    background: #ff5b2e !important;
+    color: #fff !important;
+  }
+
+  .account-detail-panel .text-lime {
+    color: #ff7a4d !important;
+  }
+
+  .customer-service-shell {
+    background: #0b0a08;
+    color: #e5dcd3;
+  }
+
+  .customer-service-main {
+    width: min(1180px, 92vw);
+    padding-block: 48px 72px;
+  }
+
+  .customer-service-back {
+    border-color: rgba(255,255,255,.1);
+    background: rgba(255,255,255,.05);
+    color: rgba(255,255,255,.7);
+  }
+
+  .customer-service-title {
+    color: #fff;
+    font-size: 32px;
+  }
+
+  .customer-service-subtitle {
+    color: rgba(255,255,255,.45);
+  }
+
+  .customer-service-content {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+  }
+
+  .customer-service-content .bg-\[\#221E19\],
+  .customer-service-content .bg-\[\#16130F\] {
+    background: rgba(255,255,255,.04) !important;
+  }
+
+  .customer-service-content .border-\[\#2E2822\] {
+    border-color: rgba(255,255,255,.1) !important;
+  }
+
+  .customer-service-content .text-\[\#D8CFC6\],
+  .customer-service-content .text-\[\#A79C92\] {
+    color: #e5dcd3 !important;
+  }
+
+  .customer-service-content .text-\[\#8A7F76\],
+  .customer-service-content .text-\[\#6E645C\] {
+    color: rgba(255,255,255,.45) !important;
+  }
+
+  .customer-service-content .bg-lime {
+    background: #ff5b2e !important;
+    color: #fff !important;
+  }
+
+  .login-shell {
+    background: #0b0a08 !important;
+    color: #fff !important;
+  }
+
+  .login-panel {
+    border-color: rgba(255,255,255,.11) !important;
+    background: rgba(255,255,255,.035) !important;
+    box-shadow: 0 30px 90px -60px rgba(255,91,46,.7) !important;
+  }
+
+  .login-tabs {
+    background: rgba(255,255,255,.06) !important;
+  }
+
+  .login-field {
+    border-color: rgba(255,255,255,.1) !important;
+    background: rgba(255,255,255,.05) !important;
+    color: #fff !important;
+  }
+
+  /* Login is dark+lime on mobile (canon §5 dark accent); flip lime -> brand coral on the light desktop shell. */
+  .login-shell .bg-lime,
+  .login-panel .bg-lime {
+    background: #ff5b2e !important;
+    color: #14110e !important;
+  }
+  .login-shell .text-lime,
+  .login-panel .text-lime {
+    color: #ff5b2e !important;
+  }
+  .login-field:focus {
+    border-color: #ff5b2e !important;
+  }
+
+  .checkout-shell {
+    background: #0b0a08 !important;
+    color: #fff !important;
+  }
+
+  .checkout-panel {
+    border-color: rgba(255,255,255,.1) !important;
+    background: rgba(255,255,255,.04) !important;
+    box-shadow: 0 16px 40px rgba(0,0,0,.3) !important;
+  }
+
+  .checkout-surface,
+  .checkout-nested {
+    border-color: rgba(255,255,255,.1) !important;
+    background: rgba(255,255,255,.04) !important;
+    color: #e5dcd3 !important;
+  }
+
+  .checkout-field {
+    border-color: rgba(255,255,255,.1) !important;
+    background: rgba(255,255,255,.05) !important;
+    color: #fff !important;
+  }
+
+  .checkout-primary {
+    background: #ff5b2e !important;
+    color: #ffffff !important;
+  }
+
+  .checkout-panel .text-white,
+  .checkout-panel .text-\[\#D8CFC6\] {
+    color: #fff !important;
+  }
+
+  .checkout-panel .text-lime {
+    color: #ff5b2e !important;
+  }
+
+  .checkout-panel .border-lime {
+    border-color: #ff5b2e !important;
+  }
+
+  .checkout-panel .bg-lime {
+    background: #ff5b2e !important;
+  }
+
+  /* Token-class equivalents of the hex overrides above. After Phase-2 tokenization
+     the dark mobile classes (.bg-[#221E19] etc.) became token classes, so the desktop
+     light-shell overrides must also target the tokens or the desktop panels render dark. */
+  .account-detail-panel .bg-surface-2,
+  .account-detail-panel .bg-ink-dark,
+  .customer-service-content .bg-surface-2,
+  .customer-service-content .bg-ink-dark {
+    background: rgba(255,255,255,.04) !important;
+  }
+  .account-detail-panel .border-surface-3,
+  .customer-service-content .border-surface-3 {
+    border-color: rgba(255,255,255,.1) !important;
+  }
+  .account-detail-panel .text-bright {
+    color: #fff !important;
+  }
+  .account-detail-panel .text-muted,
+  .account-detail-panel .text-subtle,
+  .account-detail-panel .text-faint {
+    color: rgba(255,255,255,.45) !important;
+  }
+  .customer-service-content .text-bright,
+  .customer-service-content .text-muted {
+    color: rgba(255,255,255,.7) !important;
+  }
+  .customer-service-content .text-subtle,
+  .customer-service-content .text-faint {
+    color: rgba(255,255,255,.45) !important;
+  }
+  .checkout-panel .text-bright {
+    color: #201b17 !important;
+  }
+  .checkout-panel .bg-surface-2,
+  .checkout-panel .bg-ink-dark,
+  .checkout-panel .bg-surface {
+    background: #fff !important;
+  }
+  .checkout-panel .border-surface-3,
+  .checkout-panel .border-line {
+    border-color: #e7ddd3 !important;
+  }
+  .checkout-panel .text-muted,
+  .checkout-panel .text-subtle,
+  .checkout-panel .text-faint {
+    color: #6e645c !important;
+  }
+  /* Warning/error text (coral-tint on the dark mobile field) must be legible on the white
+     desktop panel — flip to danger red. */
+  .checkout-panel .text-coral-tint {
+    color: #c6362c !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .account-detail-shell {
+    background-color: #0e0c0a !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .account-detail-header,
+  .account-detail-footer {
+    display: none;
+  }
+}

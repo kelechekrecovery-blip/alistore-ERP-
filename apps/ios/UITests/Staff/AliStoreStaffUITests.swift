@@ -1,0 +1,274 @@
+import XCTest
+
+@MainActor
+final class AliStoreStaffUITests: XCTestCase {
+    override func setUp() async throws {
+        continueAfterFailure = false
+        terminateOtherAliStoreApps()
+    }
+
+    private func terminateOtherAliStoreApps() {
+        ["kg.alistore.client", "kg.alistore.courier", "kg.alistore.pos"].forEach {
+            XCUIApplication(bundleIdentifier: $0).terminate()
+        }
+    }
+
+    func testLaunchesStaffLogin() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-out"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["AliStore Staff"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.textFields["Логин"].exists)
+        XCTAssertTrue(app.secureTextFields["Пароль"].exists)
+        XCTAssertTrue(app.buttons["Войти в рабочее место"].exists)
+    }
+
+    func testSignedInStaffHomeMatchesPrototypeShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Продавец · AliStore Центр"].exists)
+        XCTAssertTrue(app.staticTexts["Смена не открыта"].exists)
+        XCTAssertTrue(app.buttons["Открыть смену"].exists)
+        XCTAssertTrue(app.staticTexts["Быстрые действия"].exists)
+        XCTAssertTrue(app.buttons["staff-home-orders"].exists)
+        XCTAssertTrue(app.buttons["staff-home-buyback"].exists)
+        XCTAssertTrue(app.buttons["staff-home-kpi"].exists)
+        XCTAssertTrue(app.buttons["staff-home-inventory"].exists)
+        XCTAssertTrue(app.staticTexts["ЗАДАЧА ОТ AI"].exists)
+        XCTAssertTrue(app.tabBars.buttons["Главная"].exists)
+        XCTAssertTrue(app.tabBars.buttons["Заказы"].exists)
+        XCTAssertTrue(app.tabBars.buttons["KPI"].exists)
+        XCTAssertTrue(app.tabBars.buttons["Скупка"].exists)
+    }
+
+    func testSignedInStaffCanUseQuickUnlockShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-quick-unlock"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["AliStore Staff"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["azizbek"].exists)
+        XCTAssertTrue(app.staticTexts["PIN-код"].exists)
+        XCTAssertTrue(app.secureTextFields["6 цифр"].exists)
+        XCTAssertTrue(app.buttons["quick-unlock-pin-submit"].exists)
+        XCTAssertTrue(app.buttons["Настроить PIN"].exists || app.buttons["Изменить PIN"].exists)
+        XCTAssertTrue(app.buttons["Выйти из аккаунта"].exists)
+    }
+
+    func testCashShiftUsesBlindCountAndShowsServerResultAfterClose() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-cash-shift"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        app.buttons["Открыть смену"].tap()
+
+        let amount = app.textFields["staff-close-cash"]
+        let form = app.collectionViews.firstMatch
+        for _ in 0..<3 {
+            if amount.exists { break }
+            form.swipeUp()
+        }
+        XCTAssertTrue(amount.waitForExistence(timeout: 5))
+        XCTAssertEqual(amount.value as? String, "Фактически в кассе")
+        XCTAssertFalse(app.staticTexts["Ожидается"].exists)
+        XCTAssertFalse(app.staticTexts["Ожидалось"].exists)
+        XCTAssertFalse(app.buttons["staff-close-shift"].isEnabled)
+
+        amount.tap()
+        amount.typeText("6100")
+        XCTAssertTrue(app.buttons["staff-close-shift"].isEnabled)
+        app.buttons["staff-close-shift"].tap()
+
+        XCTAssertTrue(app.staticTexts["Смена закрыта"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Ожидалось' AND label CONTAINS '6' AND label CONTAINS '200'")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Расхождение' AND label CONTAINS '100'")).firstMatch.exists)
+    }
+
+    func testInventoryScreenOpensFromHome() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in"]
+        app.launch()
+
+        let tile = app.buttons["staff-home-inventory"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 10))
+        tile.tap()
+
+        // Экран пересчёта: товар, точка, количество и кнопка записи.
+        XCTAssertTrue(app.navigationBars["Инвентаризация"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["staff-inventory-location"].exists)
+        XCTAssertTrue(app.textFields["staff-inventory-counted"].exists)
+        XCTAssertTrue(app.buttons["staff-inventory-submit"].exists)
+        // Без выбранного товара и количества запись недоступна.
+        XCTAssertFalse(app.buttons["staff-inventory-submit"].isEnabled)
+
+        // Переключение в списание открывает поле причины — оно обязательно.
+        app.buttons["Списание"].tap()
+        XCTAssertTrue(app.textFields["staff-inventory-reason"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["staff-inventory-submit"].isEnabled)
+    }
+
+    func testSignedInStaffTasksMatchesPrototypeShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        app.buttons["staff-home-kpi"].tap()
+
+        XCTAssertTrue(app.staticTexts["Задачи и KPI"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["KPI месяца"].exists)
+        XCTAssertTrue(app.staticTexts["92%"].exists)
+        XCTAssertTrue(app.staticTexts["Предлагать аксессуары к телефонам"].exists)
+        XCTAssertTrue(app.staticTexts["Обновить ценники на витрине"].exists)
+        XCTAssertTrue(app.staticTexts["Пройти тест по новым тарифам"].exists)
+        XCTAssertTrue(app.staticTexts["Проверить остатки Apple Watch"].exists)
+    }
+
+    func testSignedInStaffOrdersMatchesPrototypeShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        app.buttons["staff-home-orders"].tap()
+
+        XCTAssertTrue(app.staticTexts["Заказы"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["№4102"].exists)
+        XCTAssertTrue(app.staticTexts["Новый"].exists)
+        XCTAssertTrue(app.staticTexts["iPhone 15 ×1"].exists)
+        XCTAssertTrue(app.buttons["Взять в работу"].exists)
+        XCTAssertTrue(app.staticTexts["№4098"].exists)
+        XCTAssertTrue(app.staticTexts["Сборка"].exists)
+        XCTAssertTrue(app.staticTexts["AirPods ×2"].exists)
+        XCTAssertTrue(app.buttons["Собрано → курьеру"].exists)
+        XCTAssertTrue(app.staticTexts["№4090"].exists)
+        XCTAssertTrue(app.staticTexts["Выдан"].exists)
+        XCTAssertTrue(app.staticTexts["MacBook Air ×1"].exists)
+    }
+
+    func testSignedInStaffBuybackMatchesPrototypeShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        app.buttons["staff-home-buyback"].tap()
+
+        XCTAssertTrue(app.staticTexts["Скупка Б/У"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Проверьте по регламенту. Полный процесс — на экране «Скупка и договор»."].exists)
+        XCTAssertTrue(app.staticTexts["Проверить IMEI по базе краденого"].exists)
+        XCTAssertTrue(app.staticTexts["Осмотреть состояние, присвоить грейд"].exists)
+        XCTAssertTrue(app.staticTexts["Сделать фото (4 ракурса)"].exists)
+        XCTAssertTrue(app.staticTexts["Внести данные клиента и паспорт"].exists)
+        XCTAssertTrue(app.staticTexts["Проверить чек/коробку/комплект"].exists)
+
+        app.buttons["Проверить IMEI по базе краденого"].tap()
+        app.buttons["Осмотреть состояние, присвоить грейд"].tap()
+        app.buttons["Сделать фото (4 ракурса)"].tap()
+
+        XCTAssertTrue(app.buttons["К договору купли-продажи →"].isEnabled)
+    }
+
+    func testSignedInStaffSupportMatchesPrototypeShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        app.buttons["staff-home-orders"].tap()
+        XCTAssertTrue(app.staticTexts["Заказы"].waitForExistence(timeout: 5))
+        app.buttons["Поддержка"].tap()
+
+        XCTAssertTrue(app.staticTexts["Поддержка"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Support inbox"].exists)
+        XCTAssertTrue(app.staticTexts["2"].exists)
+        XCTAssertTrue(app.staticTexts["Где мой заказ №4102?"].exists)
+        XCTAssertTrue(app.staticTexts["Клиент C-1042 · Telegram"].exists)
+        XCTAssertTrue(app.staticTexts["Срочно"].exists == false)
+        XCTAssertTrue(app.buttons["В работу"].exists)
+        XCTAssertTrue(app.buttons["Эскалировать"].exists)
+        XCTAssertTrue(app.staticTexts["Нужна гарантия по AirPods"].exists)
+
+        app.buttons["staff-support-status-in_progress"].tap()
+        XCTAssertTrue(app.staticTexts["VIP клиент просит обмен"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Срочно"].exists)
+        XCTAssertFalse(app.buttons["Эскалировать"].exists)
+    }
+
+    func testSignedInStaffCustomer360MatchesPrototypeShell() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        app.buttons["staff-home-customer360"].tap()
+
+        XCTAssertTrue(app.staticTexts["Customer 360"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["staff-customer360-search"].exists)
+        XCTAssertTrue(app.staticTexts["Нурбек Алиев"].exists)
+        XCTAssertTrue(app.staticTexts["+996 555 42 42 42"].exists)
+        XCTAssertTrue(app.staticTexts["CONSENT"].exists)
+        XCTAssertTrue(app.staticTexts["Gold"].exists)
+        XCTAssertTrue(app.staticTexts["LTV"].exists)
+        XCTAssertTrue(app.staticTexts["за всё время"].exists)
+        XCTAssertTrue(app.staticTexts["Гарантия и сервис"].exists)
+        XCTAssertTrue(app.staticTexts["356789104200777"].exists)
+        XCTAssertTrue(app.staticTexts["Диагностика"].exists)
+        XCTAssertTrue(app.buttons["Согласовать ремонт"].exists)
+        XCTAssertTrue(app.staticTexts["Поддержка"].exists)
+        XCTAssertTrue(app.staticTexts["Где мой заказ №4102?"].exists)
+        XCTAssertTrue(app.staticTexts["Нужна гарантия по AirPods"].exists)
+    }
+
+    func testPublicStoreVisualEvidence() {
+        let home = launchSignedInStaff()
+        capture(home, named: "staff-home")
+
+        let orders = launchSignedInStaff()
+        orders.buttons["staff-home-orders"].tap()
+        XCTAssertTrue(orders.staticTexts["Заказы"].waitForExistence(timeout: 5))
+        capture(orders, named: "staff-orders")
+
+        let kpi = launchSignedInStaff()
+        kpi.buttons["staff-home-kpi"].tap()
+        XCTAssertTrue(kpi.staticTexts["Задачи и KPI"].waitForExistence(timeout: 5))
+        capture(kpi, named: "staff-kpi")
+
+        let buyback = launchSignedInStaff()
+        buyback.buttons["staff-home-buyback"].tap()
+        XCTAssertTrue(buyback.staticTexts["Скупка Б/У"].waitForExistence(timeout: 5))
+        capture(buyback, named: "staff-buyback")
+
+        let support = launchSignedInStaff()
+        support.buttons["staff-home-orders"].tap()
+        XCTAssertTrue(support.staticTexts["Заказы"].waitForExistence(timeout: 5))
+        support.buttons["Поддержка"].tap()
+        XCTAssertTrue(support.staticTexts["Support inbox"].waitForExistence(timeout: 5))
+        capture(support, named: "staff-support")
+
+        let customer = launchSignedInStaff()
+        customer.buttons["staff-home-customer360"].tap()
+        XCTAssertTrue(customer.staticTexts["Customer 360"].waitForExistence(timeout: 5))
+        capture(customer, named: "staff-customer")
+    }
+
+    private func launchSignedInStaff() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-visual-evidence"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        return app
+    }
+
+    private func capture(_ app: XCUIApplication, named name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+}

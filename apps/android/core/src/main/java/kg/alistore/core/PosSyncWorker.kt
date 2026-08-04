@@ -1,0 +1,89 @@
+package kg.alistore.core
+
+import android.content.Context
+import androidx.work.CoroutineWorker
+import androidx.work.WorkerParameters
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+class PosSyncWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
+  override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+    val apiBaseUrl = inputData.getString("apiBaseUrl") ?: return@withContext Result.failure()
+    val tokenStore = SecureTokenStore(applicationContext, "alistore-pos-session")
+    val session = tokenStore.readSessionSnapshot("staff") ?: return@withContext Result.failure()
+    val queue = OfflineQueueDb(applicationContext, POS_QUEUE_DB, session.queueOwner)
+    val client = ApiClient(apiBaseUrl)
+    var retry = false
+    try {
+      queue.recoverStaleSyncing(System.currentTimeMillis() - OFFLINE_CLAIM_TIMEOUT_MS)
+      while (true) {
+        val mutation = queue.claimNext() ?: break
+        try {
+        if (!tokenStore.isCurrent(session)) {
+          queue.markClaimState(mutation, "queued", "Authenticated session changed before replay")
+          return@withContext Result.success()
+        }
+        if (!mutation.hasValidPayloadFingerprint()) {
+          queue.markClaimState(mutation, "quarantined", "Offline command payload fingerprint mismatch")
+          continue
+        }
+        val response = client.sendResponse(mutation, session.accessToken)
+        when (val decision = posReplayDecision(response)) {
+          PosReplayDecision.Sent -> queue.markContinuationSent(mutation)
+          is PosReplayDecision.Conflict -> queue.markClaimState(mutation, "conflict", decision.message)
+          is PosReplayDecision.Failed -> queue.markClaimState(mutation, "failed", decision.message)
+          PosReplayDecision.Retry -> {
+            queue.markClaimState(mutation, "queued", "HTTP ${response.status}")
+            retry = true
+          }
+          }
+        } catch (error: Exception) {
+          if (error is ApiException && (error.status == 401 || error.status == 403)) {
+            queue.markClaimState(mutation, "failed", "HTTP ${error.status}")
+          } else {
+            queue.markClaimState(mutation, "queued", error.message)
+            retry = true
+          }
+        }
+        if (retry) break
+      }
+      if (retry) Result.retry() else Result.success()
+    } finally {
+      queue.close()
+    }
+  }
+}
+
+internal const val POS_QUEUE_DB = "alistore-pos-offline.db"
+
+internal sealed interface PosReplayDecision {
+  data object Sent : PosReplayDecision
+  data class Conflict(val message: String) : PosReplayDecision
+  data class Failed(val message: String) : PosReplayDecision
+  data object Retry : PosReplayDecision
+}
+
+internal fun posReplayDecision(response: RawApiResponse): PosReplayDecision {
+  val status = response.status
+  if (status == 202) {
+    val approvalId = runCatching { org.json.JSONObject(response.body).optString("approvalId") }.getOrNull()
+    return PosReplayDecision.Conflict("approval_required:${approvalId.orEmpty()}")
+  }
+  return when {
+    status in 200..299 -> PosReplayDecision.Sent
+    status == 409 || status == 422 -> PosReplayDecision.Conflict("HTTP $status")
+    status == 401 || status == 403 -> PosReplayDecision.Failed("HTTP $status")
+    else -> PosReplayDecision.Retry
+  }
+}
+
+internal fun approvalIdFromQueueError(error: String?): String? = error
+  ?.takeIf { it.startsWith("approval_required:") }
+  ?.substringAfter(':')
+  ?.takeIf(String::isNotBlank)
+
+internal fun attachPosApproval(body: String, approvalId: String): String =
+  org.json.JSONObject(body).put("approvalId", approvalId).toString()
+
+internal fun posApprovalContinuationKey(originalKey: String, approvalId: String): String =
+  "pos-approval:${payloadFingerprint("CONTINUE", "pos/sale", approvalId, originalKey).take(48)}"

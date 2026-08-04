@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "AliStore Courier",
+    "bundleId": "kg.alistore.courier",
+    "primaryLocale": "ru-KG",
+    "category": "BUSINESS",
+    "contentRights": "DOES_NOT_USE_THIRD_PARTY_CONTENT"
+  },
+  "urls": {
+    "marketing": "https://ali.kg",
+    "support": "https://ali.kg/support",
+    "privacy": "https://ali.kg/privacy"
+  },
+  "review": {
+    "demoAccountRequired": true,
+    "demoAccountReference": "Enter an active limited-purpose courier review account only in the App Store Connect Demo Account fields. Do not commit credentials.",
+    "notes": "AliStore Courier is a limited employee resource for AliStore couriers. It is intended for Unlisted App distribution, has no public registration and is not represented as a public multi-tenant subscription service. Account and assigned-delivery availability must be verified before resubmission.",
+    "appReviewNotes": "Paste this text into App Store Connect > App Review Information > Notes.\n\nDISTRIBUTION AND AUDIENCE\nAliStore Courier is a limited employee resource for AliStore couriers and is intended for Unlisted App distribution. It shows deliveries assigned by AliStore, supports route and handover status, delivery evidence and cash-on-delivery reconciliation. It is not offered as a public multi-tenant subscription service and has no public self-service registration.\n\nDEMO ACCOUNT\nUse the username and matching credential entered in the Demo Account fields. Enter them exactly in the two Russian-labelled fields on the sign-in screen, then tap the sign-in button. The review path has no SMS or one-time-code step. The account must be active and two-factor authentication must be disabled before resubmission. No credential is included in these notes or in repository metadata.\n\nREVIEW DATA\nThe owner must verify successful sign-in and an assigned review delivery immediately before resubmission. These notes do not claim that a route, delivery or cash-on-delivery record has been seeded until that gate passes.\n\nWHAT TO EXPECT\nAccess is role-based and authorized by the AliStore server. Location is used for assigned delivery work while the app is in use. The app does not track users across apps or websites and its privacy manifest declares NSPrivacyTracking=false.\n\nUNLISTED REQUEST\nAn Unlisted App distribution request must be submitted for this app. Please evaluate this submission for that limited employee audience rather than for public App Store discovery.\n\nCONTACT\nSupport: https://ali.kg/support."
+  },
+  "localizations": {
+    "ru-KG": {
+      "name": "AliStore Courier",
+      "subtitle": "Доставка розничного магазина",
+      "promotionalText": "Маршруты, подтверждение доставки и сверка наложенных платежей для доставки розничного магазина.",
+      "description": "AliStore Courier — приложение доставки для розничных магазинов электроники. Курьер магазина видит назначенные доставки и маршрут, фиксирует результат вручения заказа, ведёт операции с наложенными платежами и сверяет завершённый рейс. Доступ ролевой: магазин выдаёт учётные записи своим курьерам.",
+      "keywords": [
+        "доставка",
+        "курьер",
+        "розница",
+        "магазин",
+        "маршрут",
+        "cod"
+      ]
+    }
+  },
+  "screenshots": {
+    "requiredPngCount": 5,
+    "devices": {
+      "iphone": {
+        "source": "apps/ios/build/AliStoreCourierVisual-iphone-attachments",
+        "simulator": "iPhone 17 Pro Max",
+        "outputSlug": "iphone-6-9",
+        "expectedDimensions": {
+          "width": 1320,
+          "height": 2868
+        }
+      }
+    },
+    "requiredStates": [
+      "courier-login",
+      "courier-route",
+      "courier-evidence",
+      "courier-cod",
+      "courier-profile"
+    ]
+  },
+  "privacy": {
+    "tracking": false,
+    "dataSafetyReviewRequired": true,
+    "faceIdPurpose": "Быстрый и защищённый вход курьера в AliStore Courier"
+  }
+}

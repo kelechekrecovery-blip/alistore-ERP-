@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #0B0A08; }
+a { color: #FF7A4D; text-decoration: none; } a:hover { color: #FF9A6E; }
+::selection { background: #FF5B2E; color: #fff; }
+@keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(24px,-20px) scale(1.1);}}
+@keyframes spinSlow{to{transform:rotate(360deg);}}
+@keyframes pulseDot{0%,100%{opacity:1;}50%{opacity:0.35;}}
+</style>
+</helmet>
+
+<div style="position: relative; overflow: hidden; width: 1360px; min-height: 1760px; background: radial-gradient(circle at 15% 4%, #2B221B 0%, #14100C 46%, #0B0A08 100%); font-family: 'Golos Text', sans-serif; color: #E5DCD3; padding: 36px 40px 48px;">
+  <div style="position: absolute; inset: 0; z-index: 0; overflow: hidden;">
+    <div style="position: absolute; top: -150px; left: -110px; width: 470px; height: 470px; border-radius: 50%; background: radial-gradient(circle, rgba(255,91,46,0.5), transparent 68%); filter: blur(24px); animation: floatBlob 16s ease-in-out infinite;"></div>
+    <div style="position: absolute; bottom: -180px; right: -90px; width: 540px; height: 540px; border-radius: 50%; background: radial-gradient(circle, rgba(127,176,236,0.32), transparent 68%); filter: blur(28px); animation: floatBlob 20s ease-in-out infinite reverse;"></div>
+    <div style="position: absolute; top: 44%; left: 44%; width: 460px; height: 460px; border-radius: 50%; background: radial-gradient(circle, rgba(181,122,224,0.16), transparent 66%); filter: blur(30px); animation: floatBlob 18s ease-in-out infinite;"></div>
+  </div>
+
+  <div style="position: relative; z-index: 1;">
+    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 22px;">
+      <div style="width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; align-items: center; justify-content: center; color: #fff; font-family: 'Sora'; font-weight: 800; font-size: 22px; box-shadow: 0 8px 22px rgba(255,91,46,0.45), inset 0 1px 0 rgba(255,255,255,0.4);">A</div>
+      <div style="flex: 1;"><div style="font-family: 'Sora'; font-weight: 800; font-size: 27px; color: #fff; line-height: 1;">Топ-улучшения · маховик экосистемы</div><div style="font-size: 13px; color: #8A7F76; margin-top: 5px;">Приложение раскручивает маховик: каждый оборот удешевляет привлечение и повышает LTV. Данные → интеллект → деньги → снова данные.</div></div>
+      <a href="AliStore Топ улучшения 2.dc.html"><div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; padding: 9px 16px; font-size: 13px; color: #fff;">← Слои</div></a>
+    </div>
+
+    <!-- FLYWHEEL -->
+    <div style="display: grid; grid-template-columns: 470px 1fr; gap: 16px; margin-bottom: 22px;">
+      <div style="position: relative; height: 400px; border-radius: 20px; background: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 12px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.14); overflow: hidden;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 300px; height: 300px; border-radius: 50%; border: 1px dashed rgba(255,255,255,0.12); animation: spinSlow 60s linear infinite;"></div>
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 96px; height: 96px; border-radius: 50%; background: linear-gradient(135deg,#FF7A4D,#E8410F); display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 12px 30px rgba(255,91,46,0.5), inset 0 1px 0 rgba(255,255,255,0.4); z-index: 3;"><span style="font-size: 26px;">⚙️</span><span style="font-family: 'Sora'; font-weight: 800; font-size: 10px; color: #fff; margin-top: 2px;">Маховик</span></div>
+        <sc-for list="{{ wheel }}" as="w" hint-placeholder-count="5">
+          <div style="position: absolute; top: {{ w.top }}; left: {{ w.left }}; transform: translate(-50%,-50%); width: 128px; text-align: center; z-index: 2;">
+            <div style="width: 50px; height: 50px; margin: 0 auto; border-radius: 15px; background: {{ w.bg }}; border: 1px solid {{ w.bd }}; display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 8px 18px rgba(0,0,0,0.34);">{{ w.icon }}</div>
+            <div style="font-size: 11.5px; color: #fff; font-weight: 700; margin-top: 5px;">{{ w.step }}</div>
+            <div style="font-size: 10px; color: #8A7F76; line-height: 1.25;">{{ w.txt }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- money outcomes -->
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff;">Что маховик даёт в деньгах</div>
+        <sc-for list="{{ outcomes }}" as="o" hint-placeholder-count="4">
+          <div style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 15px; background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 22px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.14);">
+            <div style="width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; background: {{ o.iconBg }}; display: flex; align-items: center; justify-content: center; font-size: 19px;">{{ o.icon }}</div>
+            <div style="flex: 1;"><div style="font-size: 13.5px; font-weight: 700; color: #fff;">{{ o.name }}</div><div style="font-size: 11.5px; color: #A79C92; margin-top: 2px;">{{ o.txt }}</div></div>
+            <div style="text-align: right;"><div style="font-family: 'Sora'; font-weight: 800; font-size: 17px; color: {{ o.vFg }};">{{ o.value }}</div><div style="font-size: 10px; color: #8A7F76;">{{ o.metric }}</div></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- DEEP LAYERS -->
+    <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 12px;">Слои глубже — механики, а не лозунги</div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; margin-bottom: 22px;">
+      <sc-for list="{{ deep }}" as="d" hint-placeholder-count="6">
+        <div style="padding: 17px 18px; border-radius: 16px; background: linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid {{ d.border }}; box-shadow: 0 12px 30px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.16);">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;"><div style="width: 36px; height: 36px; border-radius: 11px; background: {{ d.iconBg }}; display: flex; align-items: center; justify-content: center; font-size: 18px;">{{ d.icon }}</div><div style="font-family: 'Sora'; font-weight: 800; font-size: 15px; color: #fff;">{{ d.name }}</div><span style="margin-left: auto; font-family: 'JetBrains Mono'; font-size: 10.5px; color: {{ d.tagFg }};">{{ d.tag }}</span></div>
+          <sc-for list="{{ d.rows }}" as="r" hint-placeholder-count="3">
+            <div style="display: flex; gap: 9px; padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.06);"><span style="color: {{ d.tagFg }}; font-size: 12px; flex-shrink: 0;">▸</span><div style="flex: 1;"><span style="font-size: 12px; color: #fff;">{{ r.h }}</span><span style="font-size: 11.5px; color: #8A7F76;"> — {{ r.d }}</span></div></div>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- MATURITY LADDER -->
+    <div style="font-family: 'Sora'; font-weight: 700; font-size: 15px; color: #fff; margin-bottom: 12px;">Лестница зрелости — куда двигаться по шагам</div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px;">
+      <sc-for list="{{ ladder }}" as="s" hint-placeholder-count="3">
+        <div style="padding: 18px; border-radius: 16px; background: linear-gradient(160deg, {{ s.tint }}, rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid {{ s.border }}; box-shadow: 0 12px 30px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.15);">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;"><span style="font-size: 20px;">{{ s.icon }}</span><span style="font-family: 'Sora'; font-weight: 800; font-size: 16px; color: #fff;">{{ s.name }}</span></div>
+          <div style="font-size: 11px; color: {{ s.phaseFg }}; margin-bottom: 12px;">{{ s.phase }}</div>
+          <sc-for list="{{ s.items }}" as="it" hint-placeholder-count="4"><div style="display: flex; gap: 8px; padding: 5px 0; border-top: 1px solid rgba(255,255,255,0.06);"><span style="color: {{ s.phaseFg }}; font-size: 12px;">✓</span><span style="font-size: 12px; color: #E5DCD3; line-height: 1.35;">{{ it }}</span></div></sc-for>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; margin-top: 18px; padding: 14px 18px; border-radius: 15px; background: linear-gradient(160deg, rgba(255,122,77,0.13), rgba(255,255,255,0.02)); border: 1px solid rgba(255,122,77,0.26);">
+      <span style="font-size: 17px;">🎯</span>
+      <span style="font-size: 12.5px; color: #EDE6DE; line-height: 1.45;"><b style="color:#FF9A6E;">Суть:</b> не набор фич, а самоусиливающийся цикл. Больше касаний → богаче профиль → умнее рекомендации и триггеры → выше конверсия и LTV → больше данных. Приложение, сайт, касса и ERP крутят один маховик через общий Event Ledger.</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1360,&quot;height&quot;:1760}}">
+class Component extends DCLogic {
+  renderVals(){
+    const wheel=[
+      {step:"1 · Касание",txt:"просмотр, покупка, ремонт",icon:"👆",top:"16%",left:"50%",bg:"rgba(127,176,236,0.16)",bd:"rgba(127,176,236,0.4)"},
+      {step:"2 · Данные",txt:"профиль, сегмент, IMEI",icon:"📇",top:"40%",left:"86%",bg:"rgba(198,255,61,0.14)",bd:"rgba(198,255,61,0.35)"},
+      {step:"3 · Интеллект",txt:"AI: реко, прогноз, триггер",icon:"🧠",top:"80%",left:"72%",bg:"rgba(181,122,224,0.16)",bd:"rgba(181,122,224,0.4)"},
+      {step:"4 · Деньги",txt:"конверсия, чек, повтор",icon:"💰",top:"80%",left:"28%",bg:"rgba(255,122,77,0.16)",bd:"rgba(255,122,77,0.4)"},
+      {step:"5 · Возврат",txt:"дешевле привлечь снова",icon:"🔄",top:"40%",left:"14%",bg:"rgba(78,209,122,0.14)",bd:"rgba(78,209,122,0.36)"}
+    ];
+    const outcomes=[
+      {icon:"📉",name:"CAC падает",txt:"реферал + удержание вместо платного трафика",value:"−34%",vFg:"#C6FF3D",metric:"стоимость привлеч.",iconBg:"linear-gradient(135deg,#8FD40F,#6FA80C)"},
+      {icon:"📈",name:"LTV растёт",txt:"trade-in цикл + lifecycle-триггеры",value:"×1.6",vFg:"#C6FF3D",metric:"за 12 мес",iconBg:"linear-gradient(135deg,#FF7A4D,#E8410F)"},
+      {icon:"🛒",name:"Средний чек",txt:"attach + рассрочка + бандлы",value:"+18%",vFg:"#FF9A6E",metric:"на заказ",iconBg:"rgba(255,255,255,0.06)"},
+      {icon:"🔁",name:"Повторные покупки",txt:"персонализация + бонусы-валюта",value:"41%",vFg:"#C6FF3D",metric:"за 90 дней",iconBg:"rgba(255,255,255,0.06)"}
+    ];
+    const deep=[
+      {name:"Данные и профиль",tag:"фундамент",icon:"📇",iconBg:"linear-gradient(135deg,#7FB0EC,#5E8FD0)",tagFg:"#7FB0EC",border:"rgba(127,176,236,0.24)",
+        rows:[{h:"Телефон на каждой продаже",d:"офлайн-чек связывается с профилем"},{h:"Идентити-граф",d:"устройства, адреса, связи (рефералы)"},{h:"Consent-центр",d:"согласия по каналам, GDPR-готовность"}]},
+      {name:"Интеллект и AI",tag:"мозг",icon:"🧠",iconBg:"linear-gradient(135deg,#B57AE0,#8A4FC0)",tagFg:"#B57AE0",border:"rgba(181,122,224,0.26)",
+        rows:[{h:"Реко по истории и похожим",d:"на главной, в карточке, в push"},{h:"Прогноз оттока и «пора менять»",d:"по возрасту устройства и паузе"},{h:"Next-best-action",d:"что предложить клиенту прямо сейчас"}]},
+      {name:"Вовлечение",tag:"возврат",icon:"🔔",iconBg:"linear-gradient(135deg,#FF7A4D,#E8410F)",tagFg:"#FF9A6E",border:"rgba(255,122,77,0.26)",
+        rows:[{h:"Lifecycle-триггеры",d:"корзина, гарантия, батарея, ДР"},{h:"Геймификация",d:"уровни, стрики, прогресс профиля"},{h:"Сегментные волны",d:"AI-директор запускает по событию"}]},
+      {name:"Коммерция",tag:"чек",icon:"🛒",iconBg:"linear-gradient(135deg,#FF7A4D,#E8410F)",tagFg:"#FF9A6E",border:"rgba(255,122,77,0.26)",
+        rows:[{h:"Рассрочка-калькулятор",d:"в карточке, с выбором банка"},{h:"Attach и бандлы",d:"комплект к устройству у кассы и в корзине"},{h:"Trade-in оценка",d:"скидка на новое → цикл апгрейда"}]},
+      {name:"Доверие",tag:"удержание",icon:"🛡️",iconBg:"rgba(255,255,255,0.06)",tagFg:"#C6FF3D",border:"rgba(198,255,61,0.2)",
+        rows:[{h:"Живой статус + карта курьера",d:"из Event Ledger в реальном времени"},{h:"Гарантия-таймер по IMEI",d:"и апселл защиты перед концом"},{h:"Чат с контекстом заказа",d:"поддержка видит IMEI и историю"}]},
+      {name:"Связь систем",tag:"хребет",icon:"🔗",iconBg:"linear-gradient(135deg,#8FD40F,#6FA80C)",tagFg:"#C6FF3D",border:"rgba(198,255,61,0.22)",
+        rows:[{h:"Единая корзина и профиль",d:"сайт ↔ приложение бесшовно"},{h:"Remote-config флаги",d:"вкл/выкл функции из ERP без релиза"},{h:"Открытое API и вебхуки",d:"1С, банки, маркетплейсы, фискал"}]}
+    ];
+    const ladder=[
+      {name:"Crawl",phase:"сейчас · 0–1 мес",icon:"🐣",phaseFg:"#7FB0EC",tint:"rgba(127,176,236,0.1)",border:"rgba(127,176,236,0.24)",
+        items:["Телефон на каждой продаже","Живой остаток и статус","Deep-link из push","Состояния: оффлайн/ошибка/пусто"]},
+      {name:"Walk",phase:"1–3 мес",icon:"🚶",phaseFg:"#E5B23C",tint:"rgba(229,178,60,0.1)",border:"rgba(229,178,60,0.24)",
+        items:["Единая корзина сайт↔приложение","Lifecycle-триггеры WhatsApp","Рассрочка-график + бонусы","Trade-in и рефералы"]},
+      {name:"Run",phase:"3–6 мес",icon:"🏃",phaseFg:"#C6FF3D",tint:"rgba(198,255,61,0.09)",border:"rgba(198,255,61,0.22)",
+        items:["AI-реко и next-best-action","Прогноз оттока и апгрейда","Открытое API (1С, банки, МП)","Автономные сегментные волны"]}
+    ];
+    return { wheel, outcomes, deep, ladder };
+  }
+}
+</script>
+</body>
+</html>

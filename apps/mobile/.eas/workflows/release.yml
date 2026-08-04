@@ -1,0 +1,64 @@
+name: AliStore Native Store Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      submit:
+        type: boolean
+        required: false
+        default: false
+        description: Submit successful builds to TestFlight and Google Play internal track
+  push:
+    tags:
+      - mobile-v*
+    paths:
+      - apps/mobile/**
+      - package.json
+      - package-lock.json
+
+defaults:
+  tools:
+    node: '20'
+
+jobs:
+  build_ios:
+    name: Build iOS App Store binary
+    type: build
+    environment: production
+    params:
+      platform: ios
+      profile: production
+      message: AliStore Native iOS production build
+
+  build_android:
+    name: Build Android Play AAB
+    type: build
+    environment: production
+    params:
+      platform: android
+      profile: production
+      message: AliStore Native Android production build
+
+  submit_ios:
+    name: Submit iOS to TestFlight
+    type: submit
+    needs:
+      - build_ios
+    if: ${{ inputs.submit == true }}
+    environment: production
+    params:
+      profile: production
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      groups:
+        - Internal Testers
+
+  submit_android:
+    name: Submit Android to Play internal
+    type: submit
+    needs:
+      - build_android
+    if: ${{ inputs.submit == true }}
+    environment: production
+    params:
+      profile: production
+      build_id: ${{ needs.build_android.outputs.build_id }}

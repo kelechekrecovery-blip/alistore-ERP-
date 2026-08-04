@@ -1,0 +1,121 @@
+name: CD — Production
+
+# Controlled production deploy for the Render Blueprint `render.yaml`.
+#
+# The production Blueprint has `autoDeployTrigger: off`, so the only way to
+# update the live services is through these explicit deploy hooks. The workflow
+# rehearses every pending Prisma migration against an ephemeral PostgreSQL,
+# then fires the hooks and polls the production health endpoints.
+#
+# Owner configuration (one-time):
+#   Secrets: RENDER_DEPLOY_HOOK_API_PROD / _WEB_PROD / _WORKER_PROD
+#     Render dashboard → each production service → Settings → Deploy Hook → copy URL.
+#   Vars (optional): PROD_API_BASE_URL, PROD_WEB_BASE_URL override defaults.
+# No secret values belong in this file or anywhere in git.
+#
+# ROLLBACK: Render dashboard → service → Events → "Rollback" to the previous
+# successful deploy. Never reverse a data-bearing migration during an image
+# rollback — ship a forward migration instead.
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+env:
+  PROD_API_BASE_URL: ${{ vars.PROD_API_BASE_URL || 'https://api.ali.kg' }}
+  PROD_WEB_BASE_URL: ${{ vars.PROD_WEB_BASE_URL || 'https://ali.kg' }}
+
+jobs:
+  migration-rehearsal:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: alistore
+          POSTGRES_PASSWORD: alistore
+          POSTGRES_DB: alistore_cd_rehearsal
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U alistore -d alistore_cd_rehearsal"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://alistore:alistore@localhost:5432/alistore_cd_rehearsal?schema=public
+      DIRECT_DATABASE_URL: postgresql://alistore:alistore@localhost:5432/alistore_cd_rehearsal?schema=public
+      JWT_SECRET: cd-rehearsal-secret
+      AUTH_REFRESH_ROTATION_GRACE_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:generate -w @alistore/api
+      - run: npm run db:deploy -w @alistore/api
+
+  deploy:
+    needs: migration-rehearsal
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render production deploy hooks
+        env:
+          API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API_PROD }}
+          WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB_PROD }}
+          WORKER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WORKER_PROD }}
+        run: |
+          set -euo pipefail
+          triggered=0
+          for pair in "api:$API_HOOK" "web:$WEB_HOOK" "worker:$WORKER_HOOK"; do
+            name="${pair%%:*}"
+            url="${pair#*:}"
+            if [ -n "$url" ]; then
+              echo "Triggering $name deploy hook"
+              curl -fsS -X POST "$url"
+              triggered=1
+            else
+              echo "::notice::RENDER_DEPLOY_HOOK_$(echo "$name" | tr '[:lower:]' '[:upper:]')_PROD is not set — skipping $name"
+            fi
+          done
+          if [ "$triggered" -eq 0 ]; then
+            echo "::error::No Render production deploy hooks configured; nothing was deployed."
+            exit 1
+          fi
+
+  health-check:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for production health endpoints
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 1200 ))
+          until curl -fsS "$PROD_API_BASE_URL/api/health/live" >/dev/null \
+             && curl -fsS "$PROD_API_BASE_URL/api/health/ready" >/dev/null \
+             && curl -fsS "$PROD_WEB_BASE_URL/healthz" >/dev/null; do
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Production health checks did not pass within 20 minutes — inspect the Render deploy events."
+              exit 1
+            fi
+            echo "Waiting for production health (api=$PROD_API_BASE_URL web=$PROD_WEB_BASE_URL)..."
+            sleep 30
+          done
+          echo "Production health endpoints are live."
+      - name: Deployment smoke
+        env:
+          WEB_BASE_URL: ${{ env.PROD_WEB_BASE_URL }}
+          API_BASE_URL: ${{ env.PROD_API_BASE_URL }}
+        run: node scripts/deployment-smoke.mjs
