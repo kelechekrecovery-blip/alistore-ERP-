@@ -126,6 +126,12 @@ Expected:
 - `metabase` is up on port `3001`.
 - `metabase-db` is healthy.
 
+After the first Metabase migration completes, verify the read-only health probe:
+
+```bash
+METABASE_URL=http://127.0.0.1:3001 npm run infra:metabase-smoke
+```
+
 Metabase must connect to AliStore PostgreSQL with a read-only reporting user,
 not the app read-write user.
 
