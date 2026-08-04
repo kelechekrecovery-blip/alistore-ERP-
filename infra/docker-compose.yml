@@ -75,15 +75,13 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-alistore}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me-please}
       MINIO_BUCKET: ${MINIO_BUCKET:-alistore}
-    volumes:
-      - ./minio-public-media-policy.json:/config/minio-public-media-policy.json:ro
     entrypoint: >
       /bin/sh -c "
+      set -eu;
       until mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}; do sleep 2; done;
       mc mb --ignore-existing local/$${MINIO_BUCKET};
-      sed \"s/__MINIO_BUCKET__/$${MINIO_BUCKET}/g\" /config/minio-public-media-policy.json > /tmp/public-media-policy.json;
+      printf '%s' \"{\\\"Version\\\":\\\"2012-10-17\\\",\\\"Statement\\\":[{\\\"Effect\\\":\\\"Allow\\\",\\\"Principal\\\":{\\\"AWS\\\":[\\\"*\\\"]},\\\"Action\\\":[\\\"s3:GetObject\\\"],\\\"Resource\\\":[\\\"arn:aws:s3:::$${MINIO_BUCKET}/media/*\\\"]}]}\" > /tmp/public-media-policy.json;
       mc anonymous set-json /tmp/public-media-policy.json local/$${MINIO_BUCKET};
-      exit 0;
       "
 
   # Owner BI / Command Center dashboards. Connect it to alistore_dev (read-only
