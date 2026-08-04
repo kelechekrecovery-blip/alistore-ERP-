@@ -4,8 +4,8 @@ import { join, relative } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const root = join(process.cwd(), 'apps', 'api');
-// The integration suites intentionally use a shared database but do not all
-// clean every related aggregate. Keep one file per process by default so a
+// Each Jest process owns a disposable PostgreSQL schema (created by globalSetup
+// and dropped by globalTeardown). Keep one file per process by default so a
 // suite cannot inherit fixtures or open handles from a sibling suite.
 const batchSize = Number(process.env.API_JEST_BATCH_SIZE ?? 1);
 if (!Number.isInteger(batchSize) || batchSize < 1) {
@@ -45,12 +45,6 @@ function runWithEnv(command, args, label, env) {
   return result.status ?? 1;
 }
 
-function migrationEnv() {
-  const testDatabaseUrl = process.env.TEST_DATABASE_URL;
-  if (!testDatabaseUrl) throw new Error('TEST_DATABASE_URL is required for API reset');
-  return { ...process.env, DATABASE_URL: testDatabaseUrl };
-}
-
 const batches = [];
 for (let index = 0; index < files.length; index += batchSize) {
   batches.push(files.slice(index, index + batchSize));
@@ -61,19 +55,12 @@ for (const [index, batch] of batches.entries()) {
   let status = 1;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     const suffix = attempt === 0 ? '' : ` retry ${attempt}/${retries}`;
-    status = runWithEnv('npx', [
-      'prisma', 'migrate', 'reset',
-      '--schema', 'apps/api/prisma/schema.prisma',
-      '--force', '--skip-seed', '--skip-generate',
-    ], `API database reset ${index + 1}/${batches.length}${suffix}`, migrationEnv());
-    if (status !== 0) break;
-
     status = run('npm', [
       'run', 'test', '-w', '@alistore/api', '--', '--runInBand', ...batch,
     ], `API Jest batch ${index + 1}/${batches.length}${suffix}`);
     if (status === 0) break;
     if (attempt < retries) {
-      console.warn(`\nAPI batch ${index + 1}/${batches.length} failed; resetting and retrying once.`);
+      console.warn(`\nAPI batch ${index + 1}/${batches.length} failed; retrying in a fresh isolated schema.`);
     }
   }
   if (status !== 0) {

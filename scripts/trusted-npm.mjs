@@ -62,11 +62,15 @@ export const hashDependencyTree = (directory) => {
     for (const entry of entries) {
       const entryPath = path.join(current, entry.name);
       const relativePath = path.join(relative, entry.name);
-      if (entry.isDirectory()) {
+      // Check links first: npm leaves dangling optional-dependency links for
+      // non-host platforms (e.g. lightningcss-android on macOS). Following
+      // one as a directory makes the reproducibility hash crash instead of
+      // reporting the actual tree.
+      if (entry.isSymbolicLink()) {
+        hash.update('l\0').update(relativePath).update('\0').update(fs.readlinkSync(entryPath)).update('\0');
+      } else if (entry.isDirectory()) {
         hash.update('d\0').update(relativePath).update('\0');
         visit(entryPath, relativePath);
-      } else if (entry.isSymbolicLink()) {
-        hash.update('l\0').update(relativePath).update('\0').update(fs.readlinkSync(entryPath)).update('\0');
       } else if (entry.isFile()) {
         hash.update('f\0').update(relativePath).update('\0');
         updateHashWithFile(hash, entryPath);
