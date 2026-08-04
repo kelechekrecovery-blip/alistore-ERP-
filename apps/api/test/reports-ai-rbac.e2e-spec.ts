@@ -243,6 +243,15 @@ describe('Reports and AI RBAC', () => {
     });
     expect(approved?.status).toBe('approved');
     expect((await prisma.aiDecision.findUnique({ where: { id: response.body.decision.id } }))?.status).toBe('approved');
+    const replay = await request(app.getHttpServer())
+      .get(`/ai/orchestrator/runs/${response.body.runId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(replay.body.decisions[0]).toEqual(expect.objectContaining({
+      id: response.body.decision.id,
+      approvalId: response.body.decision.approvalId,
+      approvalStatus: 'approved',
+    }));
     const unchanged = await prisma.supportTicket.findUniqueOrThrow({ where: { id: ticket.id } });
     expect(unchanged.status).toBe('new');
     expect(unchanged.priority).toBe('normal');

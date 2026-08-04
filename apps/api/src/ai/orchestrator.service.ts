@@ -135,7 +135,22 @@ export class AiOrchestratorService {
     assertGlobalReadRole(actor);
     const run = await this.prisma.aiRun.findFirst({ where: { id, actorId: actor.customerId }, include: { steps: true, decisions: true } });
     if (!run) throw new NotFoundException('AI run not found');
-    return run;
+    const decisionIds = run.decisions.map((decision) => decision.id);
+    const approvals = decisionIds.length === 0
+      ? []
+      : await this.prisma.approval.findMany({
+        where: { sourceRef: { in: decisionIds } },
+        select: { id: true, sourceRef: true, status: true },
+      });
+    const approvalByDecision = new Map(approvals.map((approval) => [approval.sourceRef, approval]));
+    return {
+      ...run,
+      decisions: run.decisions.map((decision) => ({
+        ...decision,
+        approvalId: approvalByDecision.get(decision.id)?.id,
+        approvalStatus: approvalByDecision.get(decision.id)?.status,
+      })),
+    };
   }
 
   private async executeReadTool(tool: AiReadTool, ticketId?: string): Promise<unknown> {
