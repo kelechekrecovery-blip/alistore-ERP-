@@ -12,7 +12,7 @@ import { useFavorites } from '@/lib/favorites';
 import { useCompare } from '@/lib/compare';
 import { productImage } from '@/components/ProductCard';
 import { StatusPill } from '@/components/ui/Badge';
-import { ImageOff } from 'lucide-react';
+import { Heart, ImageOff } from 'lucide-react';
 
 interface MobileProductCardProps {
   product: CatalogProduct;
@@ -77,7 +77,11 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
           aria-label={has(product.id) ? 'Убрать из избранного' : 'В избранное'}
           className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-lime-ink/60 text-sm"
         >
-          <span className={has(product.id) ? 'text-coral' : 'text-white'}>{has(product.id) ? '♥' : '♡'}</span>
+          <Heart
+            size={15}
+            aria-hidden
+            className={has(product.id) ? 'fill-coral text-coral' : 'text-white'}
+          />
         </button>
       </Link>
       <div className="px-[11px] pb-3 pt-2.5">

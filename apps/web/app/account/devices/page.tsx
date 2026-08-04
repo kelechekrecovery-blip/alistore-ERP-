@@ -40,7 +40,14 @@ export default function DevicesPage() {
     }
     setWorkOrders(nextWorkOrders.status === 'fulfilled' ? nextWorkOrders.value : []);
     setLoaners(nextLoaners.status === 'fulfilled' ? nextLoaners.value : []);
-    if (nextLoaners.status === 'rejected') setServiceError('Статус подменного устройства временно недоступен.');
+    // Пустой список и не пришедший список — разные вещи. Молчаливое []
+    // прятало смету, ждущую подтверждения владельца, вместе с кнопкой
+    // «Подтвердить смету»: ремонт стоял, а человек не знал почему.
+    if (nextWorkOrders.status === 'rejected') {
+      setServiceError('Заявки сервисного центра временно недоступны. Повторите попытку.');
+    } else if (nextLoaners.status === 'rejected') {
+      setServiceError('Статус подменного устройства временно недоступен.');
+    }
   }
 
   useEffect(() => { if (hydrated && !user) router.replace('/login?next=/account/devices'); }, [hydrated, user, router]);

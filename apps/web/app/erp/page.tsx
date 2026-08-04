@@ -1,7 +1,34 @@
 'use client';
 
 import Link from 'next/link';
-import { Bell, LogOut, Menu, Search, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  BarChart3,
+  Bell,
+  Bot,
+  CalendarClock,
+  CheckSquare,
+  ClipboardCheck,
+  LayoutDashboard,
+  LayoutTemplate,
+  LogOut,
+  Megaphone,
+  Menu,
+  Package,
+  ScrollText,
+  Search,
+  Settings,
+  ShieldCheck,
+  ShoppingCart,
+  SlidersHorizontal,
+  Tag,
+  Truck,
+  Users,
+  Wallet,
+  Wrench,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -51,29 +78,29 @@ import { erpRouteAllowed, staffCan, type ErpRoute } from '@/lib/staff-permission
 
 type Route = ErpRoute;
 
-const CORE_NAV: { id: Route; icon: string; label: string }[] = [
-  { id: 'dash', icon: '▦', label: 'Дашборд' },
-  { id: 'stock', icon: '📦', label: 'Склад' },
-  { id: 'finance', icon: '💰', label: 'Финансы' },
-  { id: 'tasks', icon: '✅', label: 'Задачи' },
-  { id: 'kpi', icon: '📊', label: 'KPI и ЗП' },
-  { id: 'crm', icon: '👥', label: 'CRM' },
-  { id: 'ai', icon: '🤖', label: 'AI-ассистент' },
+const CORE_NAV: { id: Route; Icon: LucideIcon; label: string }[] = [
+  { id: 'dash', Icon: LayoutDashboard, label: 'Дашборд' },
+  { id: 'stock', Icon: Package, label: 'Склад' },
+  { id: 'finance', Icon: Wallet, label: 'Финансы' },
+  { id: 'tasks', Icon: CheckSquare, label: 'Задачи' },
+  { id: 'kpi', Icon: BarChart3, label: 'KPI и ЗП' },
+  { id: 'crm', Icon: Users, label: 'CRM' },
+  { id: 'ai', Icon: Bot, label: 'AI-ассистент' },
 ];
-const EXTENDED_NAV: { id: Route; icon: string; label: string }[] = [
-  { id: 'admin', icon: '⚙', label: 'Администрирование' },
-  { id: 'hr', icon: '◫', label: 'HR · Смены' },
-  { id: 'logistics', icon: '⌖', label: 'Логистика' },
-  { id: 'operations', icon: '✓', label: 'Операции точки' },
-  { id: 'service', icon: '⚒', label: 'Сервис-центр' },
-  { id: 'pricing', icon: '🏷️', label: 'Цены' },
-  { id: 'reorder', icon: '🛒', label: 'Закупки' },
-  { id: 'campaigns', icon: '◌', label: 'Кампании' },
-  { id: 'storefront', icon: '▤', label: 'Управление сайтом' },
-  { id: 'risks', icon: '⚠', label: 'Риски' },
-  { id: 'readiness', icon: '✓', label: 'Готовность' },
-  { id: 'settings', icon: '🎛', label: 'Параметры' },
-  { id: 'ledger', icon: '📜', label: 'Event Ledger' },
+const EXTENDED_NAV: { id: Route; Icon: LucideIcon; label: string }[] = [
+  { id: 'admin', Icon: Settings, label: 'Администрирование' },
+  { id: 'hr', Icon: CalendarClock, label: 'HR · Смены' },
+  { id: 'logistics', Icon: Truck, label: 'Логистика' },
+  { id: 'operations', Icon: ClipboardCheck, label: 'Операции точки' },
+  { id: 'service', Icon: Wrench, label: 'Сервис-центр' },
+  { id: 'pricing', Icon: Tag, label: 'Цены' },
+  { id: 'reorder', Icon: ShoppingCart, label: 'Закупки' },
+  { id: 'campaigns', Icon: Megaphone, label: 'Кампании' },
+  { id: 'storefront', Icon: LayoutTemplate, label: 'Управление сайтом' },
+  { id: 'risks', Icon: AlertTriangle, label: 'Риски' },
+  { id: 'readiness', Icon: ShieldCheck, label: 'Готовность' },
+  { id: 'settings', Icon: SlidersHorizontal, label: 'Параметры' },
+  { id: 'ledger', Icon: ScrollText, label: 'Event Ledger' },
 ];
 const TITLES: Record<Route, [string, string]> = {
   dash: ['Дашборд', 'Обзор сети · сегодня'],
@@ -360,7 +387,7 @@ export default function ErpPage() {
                 activeRoute === m.id ? 'erp3-glass-strong font-bold text-white' : 'border-transparent font-medium text-muted hover:border-white/10 hover:bg-white/5 hover:text-white'
               }`}
             >
-              <span className="text-base">{m.icon}</span>
+              <m.Icon size={16} strokeWidth={1.9} aria-hidden className="shrink-0" />
               <span>{m.label}</span>
               {m.id === 'tasks' && openTasks ? (
                 <span className="ml-auto rounded-chip bg-coral px-1.5 text-[10px] font-bold text-white">{openTasks}</span>
@@ -382,7 +409,7 @@ export default function ErpPage() {
                 activeRoute === m.id ? 'erp3-glass-strong font-bold text-white' : 'border-transparent font-medium text-muted hover:border-white/10 hover:bg-white/5 hover:text-white'
               }`}
             >
-              <span className="text-base">{m.icon}</span>
+              <m.Icon size={16} strokeWidth={1.9} aria-hidden className="shrink-0" />
               <span>{m.label}</span>
               {m.id === 'risks' && (risks?.length ?? 0) > 0 && <span className="ml-auto rounded-chip bg-coral px-1.5 text-[10px] font-bold text-white">{risks!.length}</span>}
               {m.id === 'readiness' && readiness?.summary.blockingRemaining ? <span className="ml-auto rounded-chip bg-coral px-1.5 text-[10px] font-bold text-white">{readiness.summary.blockingRemaining}</span> : null}
@@ -427,7 +454,7 @@ export default function ErpPage() {
               aria-label="Открыть AI-ассистент"
               className="erp3-coral-action flex items-center gap-2 rounded-[11px] px-[15px] py-[9px] text-[13px] font-semibold text-white transition hover:brightness-110"
             >
-              <span>🤖</span><span className="hidden lg:inline">AI-ассистент</span>
+              <Bot size={15} aria-hidden /><span className="hidden lg:inline">AI-ассистент</span>
             </button>
             <span className="grid h-9 w-9 place-items-center rounded-full bg-surface-3 text-sm text-white">В</span>
           </div>

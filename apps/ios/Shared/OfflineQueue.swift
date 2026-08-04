@@ -49,18 +49,29 @@ public enum OfflineOrderQueue {
     /// уже чинили в POS-очереди (`replayable`, `testSaleStuckInSyncingIsRetried`);
     /// здесь фикс не применили. `idempotencyKey` защищает от дубля, если заказ на
     /// самом деле ушёл.
-    public static func replayable(_ all: [PendingMutation]) -> [PendingMutation] {
+    /// - Parameter owner: чьи записи проигрывать. Записи без владельца —
+    ///   созданные до появления поля — проигрываются любому: терять оформленный
+    ///   заказ хуже, чем однажды отдать его не тому. Новые всегда с владельцем.
+    public static func replayable(_ all: [PendingMutation], owner: String? = nil) -> [PendingMutation] {
         all.filter { mutation in
             guard mutation.endpoint == "orders/mine" else { return false }
-            return mutation.state == "queued" || mutation.state == "failed" || mutation.state == "syncing"
+            guard mutation.state == "queued" || mutation.state == "failed" || mutation.state == "syncing" else { return false }
+            guard let mutationOwner = mutation.owner else { return true }
+            return mutationOwner == owner
         }
     }
 
+    /// - Parameter owner: покупатель, оформивший заказ. Без него очередь была
+    ///   единственной из трёх, где заказ не привязан к владельцу: на общем
+    ///   телефоне заказ, поставленный в очередь одним человеком, отправлялся
+    ///   токеном того, кто вошёл следующим, — и попадал в его историю.
+    ///   Касса и курьер уже передают сюда `session.staffId`.
     @MainActor
     public static func enqueue(
         _ request: CreateOrderRequest,
         idempotencyKey: String,
-        context: ModelContext
+        context: ModelContext,
+        owner: String? = nil
     ) throws {
         // Канон — как в кассе и у курьера: сравнивать сырое кодирование
         // бессмысленно, порядок ключей не гарантирован.
@@ -80,7 +91,8 @@ public enum OfflineOrderQueue {
             endpoint: "orders/mine",
             method: "POST",
             body: body,
-            idempotencyKey: idempotencyKey
+            idempotencyKey: idempotencyKey,
+            owner: owner
         ))
         try context.save()
     }

@@ -17,7 +17,9 @@ export function SiteFooter() {
           </Link>
           <p className="mt-4 max-w-sm text-sm leading-6 text-muted">{storefront?.content.aboutBody ?? 'Каталог, заказ, получение и сервис AliStore.'}</p>
         </div>
-        <FooterColumn title="Покупателям" links={[["Каталог", "/catalog"], ["Trade-in", "/trade-in"], ["Гарантия", "/warranty"], ["Поддержка", "/support"]]} />
+        {/* «Гарантия» ведёт в кабинет устройств покупателя, а не на /warranty:
+            тот маршрут — рабочее место сервисной службы за логином сотрудника. */}
+        <FooterColumn title="Покупателям" links={[["Каталог", "/catalog"], ["Trade-in", "/trade-in"], ["Гарантия", "/account/devices"], ["Поддержка", "/support"]]} />
         <FooterColumn title="Аккаунт" links={[["Кабинет", "/account"], ["Заказы", "/account"], ["Избранное", "/favorites"], ["Бонусы", "/account/bonuses"]]} />
         <FooterColumn title="Документы" links={[["Политика конфиденциальности", "/privacy"], ["Публичная оферта", "/oferta"]]} />
         <div>

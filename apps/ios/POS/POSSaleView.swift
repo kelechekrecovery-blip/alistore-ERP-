@@ -252,11 +252,34 @@ struct POSSaleView: View {
         isLoading = true
         defer { isLoading = false }
         do {
-            async let catalog: CatalogResponse = api.get("catalog/products")
+            async let catalog: [Product] = loadWholeCatalog()
             async let currentShift: CashShift? = api.get("shifts/current", token: session.accessToken)
-            products = try await catalog.items
+            products = try await catalog
             shift = try await currentShift
         } catch { errorMessage = error.localizedDescription }
+    }
+
+    /// Касса обязана знать весь ассортимент точки, а не первую страницу.
+    ///
+    /// Запрос шёл без `limit`, а серверный дефолт — 24 позиции
+    /// (`apps/api/src/catalog/catalog.dto.ts:54`). Товар с 25-й строки нельзя
+    /// было ни выбрать, ни продать по сканеру: `applyScanner` ищет товар в
+    /// загруженном списке и отвечал «Товар IMEI отсутствует в каталоге» на
+    /// вполне существующий IMEI. Потолок `limit` — 100, поэтому забираем
+    /// страницами по `total`.
+    private func loadWholeCatalog() async throws -> [Product] {
+        let pageSize = 100
+        var collected: [Product] = []
+        var offset = 0
+        while true {
+            let page: CatalogResponse = try await api.get("catalog/products?limit=\(pageSize)&offset=\(offset)")
+            collected.append(contentsOf: page.items)
+            offset += page.items.count
+            // Пустая страница — страховка от бесконечного цикла, если сервер
+            // однажды начнёт отдавать total больше, чем реально возвращает.
+            if page.items.isEmpty || collected.count >= page.total { break }
+        }
+        return collected
     }
 
     @MainActor private func applyScanner(_ raw: String) async {

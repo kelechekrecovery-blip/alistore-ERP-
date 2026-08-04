@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { fetchCatalog, inventoryCount, printServerSvgLabels, receiveInventoryBatch, receiveQuantityInventory, renderImeiLabel, requestInventoryMovement, transferQuantityInventory, transferUnit, uploadEvidenceImages, type CatalogProduct } from '@/lib/api';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { fetchCatalog, inventoryCount, isCatalogUnavailable, printServerSvgLabels, receiveInventoryBatch, receiveQuantityInventory, renderImeiLabel, requestInventoryMovement, transferQuantityInventory, transferUnit, uploadEvidenceImages, type CatalogProduct } from '@/lib/api';
 import { EvidencePicker } from './EvidencePicker';
+import { LoadFailure } from './LoadFailure';
 import { useOperationalStorePoint } from '@/lib/use-operational-store-point';
 
 /** Transfer + inventory-count operations for the warehouse console. */
@@ -35,19 +36,34 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
   const [labelsBusy, setLabelsBusy] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   const pendingCount = useRef<{ fingerprint: string; idempotencyKey: string } | null>(null);
 
-  useEffect(() => {
-    fetchCatalog({ limit: 100 }).then((c) => {
-      setProducts(c.items);
-      if (c.items[0]) {
-        setProductId(c.items[0].id);
-        setReceiveProductId(c.items[0].id);
-        setTransferProductId(c.items[0].id);
-        setAdjustProductId(c.items.find((product) => product.trackingMode === 'quantity')?.id ?? c.items[0].id);
-      }
-    });
+  const loadCatalog = useCallback(async () => {
+    const c = await fetchCatalog({ limit: 100 });
+    // `fetchCatalog` не бросает: при сбое она возвращает сентинел
+    // `CATALOG_UNAVAILABLE` с пустым `items`. Без этой проверки консоль
+    // рисовалась целиком и выглядела рабочей, но селекты товара были пусты —
+    // и все четыре операции (приёмка, перемещение, списание, инвентаризация)
+    // молча становились невыполнимыми, без единого признака, что каталог
+    // просто не ответил.
+    if (isCatalogUnavailable(c)) {
+      setCatalogError('Приёмка, перемещение, списание и инвентаризация недоступны, пока каталог не ответил.');
+      return;
+    }
+    setCatalogError(null);
+    setProducts(c.items);
+    if (c.items[0]) {
+      setProductId(c.items[0].id);
+      setReceiveProductId(c.items[0].id);
+      setTransferProductId(c.items[0].id);
+      setAdjustProductId(c.items.find((product) => product.trackingMode === 'quantity')?.id ?? c.items[0].id);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadCatalog();
+  }, [loadCatalog]);
   useEffect(() => {
     if (!point) return;
     setTransferFrom(point);
@@ -163,7 +179,9 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
       setReceiveImeis('');
       setReceiveQuantity('');
       const refreshed = await fetchCatalog({ limit: 100 });
-      setProducts(refreshed.items);
+      // Тот же сентинел: сбой обновления после успешной приёмки не должен
+      // опустошать селекты — приёмка уже прошла, список товаров остаётся прежним.
+      if (!isCatalogUnavailable(refreshed)) setProducts(refreshed.items);
     } catch (e) {
       flash(e instanceof Error ? errMsg(e) : 'Ошибка приёмки');
     } finally {
@@ -211,6 +229,9 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
   return (
     <div className="mb-4 rounded-card border border-surface-3 bg-surface p-4 ">
       <div className="mb-3 font-display text-sm font-bold text-white">Операции склада</div>
+      {catalogError !== null ? (
+        <LoadFailure what="каталог" detail={catalogError} onRetry={() => { void loadCatalog(); }} />
+      ) : (
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
         {/* receive */}
         <div className="min-w-0">
@@ -325,6 +346,7 @@ export function WarehouseOps({ accessToken, actor }: { accessToken: string; acto
           </div>
         </div>
       </div>
+      )}
       {msg && <div className="mt-3 rounded-btn bg-surface-2 px-3 py-2 text-sm text-lime">{msg}</div>}
     </div>
   );

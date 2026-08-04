@@ -15,8 +15,16 @@ export default function SearchPage() {
   useEffect(() => {
     if (window.matchMedia('(min-width: 768px)').matches) {
       const q = new URLSearchParams(window.location.search).get('q');
-      router.replace(q ? `/catalog?q=${encodeURIComponent(q)}` : '/catalog');
+      const target = q ? `/catalog?q=${encodeURIComponent(q)}` : '/catalog';
+      router.replace(target);
+      const fallback = window.setTimeout(() => {
+        if (window.location.pathname === '/search') {
+          window.location.assign(target);
+        }
+      }, 250);
+      return () => window.clearTimeout(fallback);
     }
+    return undefined;
   }, [router]);
 
   return (

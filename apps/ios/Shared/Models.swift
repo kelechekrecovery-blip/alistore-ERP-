@@ -129,6 +129,12 @@ public struct CheckoutOptions: Decodable, Sendable {
 
 public struct StaffSession: Codable, Sendable {
     public let accessToken: String
+    /// Сервер отдаёт его нативному клиенту (вырезает только для веб-сессий —
+    /// `isStaffWebSessionRequest` в staff-auth.controller.ts), но поля здесь не
+    /// было, и `Decodable` его молча выбрасывал. Access живёт 15 минут, а
+    /// обновить его было нечем: кассир вводил пароль каждые четверть часа.
+    /// Optional — старые сохранённые сессии и веб-ответы приходят без него.
+    public let refreshToken: String?
     public let staffId: String
     public let username: String
     public let role: String
@@ -140,6 +146,7 @@ public struct StaffSession: Codable, Sendable {
 
     public init(
         accessToken: String,
+        refreshToken: String? = nil,
         staffId: String,
         username: String,
         role: String,
@@ -148,6 +155,7 @@ public struct StaffSession: Codable, Sendable {
         capabilities: [String]? = nil
     ) {
         self.accessToken = accessToken
+        self.refreshToken = refreshToken
         self.staffId = staffId
         self.username = username
         self.role = role

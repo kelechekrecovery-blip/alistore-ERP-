@@ -59,6 +59,10 @@ struct AliStoreStaffApp: App {
     var body: some Scene {
         WindowGroup {
             content
+                // Ставит общий обработчик 401: access-токен живёт 15 минут, а до
+                // этого обновлять его было нечем — сотрудник вводил пароль заново
+                // каждые четверть часа посреди смены.
+                .task { await auth.installUnauthorizedHandler() }
                 // Закрываем рабочее место при уходе в фон: разблокированный
                 // телефон сотрудника иначе открывает смену, выручку и Customer 360
                 // до следующего перезапуска, которого может не быть весь день.
@@ -263,32 +267,54 @@ private struct StaffHomeView: View {
         .preferredColorScheme(.dark)
     }
 
+    /// Шапка берётся из сессии.
+    ///
+    /// Здесь стояли «Аз», «Азизбек» и «Продавец · AliStore Центр» — одни и те же
+    /// для любого вошедшего. Кассир в другой точке видел чужое имя и чужой
+    /// магазин на своём же главном экране, а плашка «вне смены» была текстом,
+    /// не связанным ни с какой сменой. Имя, роль и точка есть в `StaffSession`;
+    /// плашку статуса убрали, пока за ней нет настоящих данных о смене —
+    /// её честное место на карточке смены ниже, где состояние приходит с сервера.
     private var header: some View {
         HStack(spacing: 12) {
             ZStack {
                 Circle().fill(coral)
-                Text("Аз")
+                Text(Self.initials(session.username))
                     .font(.headline.weight(.black))
                     .foregroundStyle(.white)
             }
             .frame(width: 48, height: 48)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Азизбек")
+                Text(session.username)
                     .font(.title3.weight(.black))
                     .foregroundStyle(primaryText)
-                Text("Продавец · AliStore Центр")
+                Text(Self.subtitle(role: session.role, point: session.point))
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(secondaryText)
             }
             Spacer()
-            Text("○ вне смены")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(primaryText)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 7)
-                .background(surfaceSoft, in: Capsule())
         }
         .accessibilityElement(children: .combine)
+    }
+
+    static func initials(_ username: String) -> String {
+        let letters = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = letters.first else { return "—" }
+        return String(first).uppercased()
+    }
+
+    static func subtitle(role: String, point: String?) -> String {
+        let roleTitle: String
+        switch role {
+        case "cashier": roleTitle = "Кассир"
+        case "seller": roleTitle = "Продавец"
+        case "courier": roleTitle = "Курьер"
+        case "admin": roleTitle = "Администратор"
+        case "owner": roleTitle = "Владелец"
+        default: roleTitle = role
+        }
+        guard let point, !point.isEmpty else { return roleTitle }
+        return "\(roleTitle) · \(point)"
     }
 
     private var shiftCard: some View {
@@ -1135,12 +1161,26 @@ struct StaffOrdersView: View {
         }
     }
 
+    // Упакованный курьерский заказ здесь намеренно без действия.
+    //
+    // Раньше эта ветка возвращала "courier_assigned" и уходила в
+    // POST orders/{id}/transition. Переход разрешён (order-state-machine.ts:28),
+    // но transition пишет только `status` — `courierId` не ставит никто, кроме
+    // POST /courier/runs. Заказ оказывался в `courier_assigned` с courierId = null:
+    // listMine фильтрует по courierId, поэтому его не видел ни один курьер;
+    // createRun требует статус paid|packed и отвергал его как order_not_assignable;
+    // startDelivery матчит по courierId и не обновлял ни строки. Единственным
+    // выходом оставалась отмена — то есть кнопка теряла оплаченный заказ.
+    //
+    // Назначение курьера живёт на вебе (apps/web/lib/api/logistics.ts → /courier/runs),
+    // где рейс создаётся вместе с courierId. Пока в iOS нет выбора курьера,
+    // честнее не показывать действие, чем показывать подвешивающее.
     private func nextAction(_ order: CustomerOrder) -> String? {
         switch order.status {
         case "created": "fulfill"
         case "paid": "picking"
         case "picking": "packed"
-        case "packed": order.fulfillmentType == "courier" ? "courier_assigned" : "ready_for_pickup"
+        case "packed": order.fulfillmentType == "courier" ? nil : "ready_for_pickup"
         case "ready_for_pickup": "completed"
         default: nil
         }

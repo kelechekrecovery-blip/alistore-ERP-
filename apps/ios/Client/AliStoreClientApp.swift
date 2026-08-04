@@ -1267,7 +1267,7 @@ private struct ClientRootView: View {
                         case .home:
                             ClientHomeView(environment: environment, products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites, openCatalog: { selectedTab = .catalog })
                         case .catalog:
-                            CatalogView(environment: environment, products: products, isLoading: catalogLoading, errorMessage: catalogError, cart: $cart, favorites: $favorites)
+                            CatalogView(environment: environment, products: products, isLoading: catalogLoading, errorMessage: catalogError, retry: { Task { await loadCatalog() } }, cart: $cart, favorites: $favorites)
                         case .favorites:
                             FavoritesView(environment: environment, products: products, cart: $cart, favorites: $favorites)
                         case .cart:
@@ -1319,6 +1319,10 @@ private struct ClientRootView: View {
         }
         .task {
             restoreLocalState()
+            // До этого 401 никем не перехватывался: через 15 минут работы
+            // истекал access-токен, и оформление заказа падало «Ошибка сервера 401»
+            // без пути назад, кроме перезапуска приложения.
+            await auth.installUnauthorizedHandler()
             #if DEBUG
             if UITestBootstrap.startsAppleEnrollment {
                 auth.useUITestAppleEnrollment()
@@ -1468,7 +1472,7 @@ private struct ClientRootView: View {
         guard let mutations = try? modelContext.fetch(descriptor) else { return }
         // Включая `syncing`: заказ, на котором приложение убили посреди отправки,
         // иначе застревал бы навсегда (см. OfflineOrderQueue.replayable).
-        for mutation in OfflineOrderQueue.replayable(mutations) {
+        for mutation in OfflineOrderQueue.replayable(mutations, owner: auth.session?.customerId) {
             await OfflineOrderQueue.replay(
                 mutation,
                 api: APIClient(baseURL: environment.apiBaseURL),
@@ -2328,7 +2332,12 @@ private struct CartView: View {
                 return nil
             }
             do {
-                try OfflineOrderQueue.enqueue(request, idempotencyKey: idempotencyKey, context: modelContext)
+                try OfflineOrderQueue.enqueue(
+                    request,
+                    idempotencyKey: idempotencyKey,
+                    context: modelContext,
+                    owner: auth.session?.customerId
+                )
                 queuedOffline = true
                 cart.removeAll()
             } catch {
@@ -3569,13 +3578,15 @@ private struct CustomerReturnsView: View {
         return productTitle(for: sku)
     }
 
+    /// Название берём из каталога по SKU.
+    ///
+    /// Раньше здесь была таблица подстрок: любой SKU со словом IPHONE
+    /// показывался покупателю как «iPhone 15 128 GB Black», любой AirPods —
+    /// как «AirPods Pro 2». Человек оформлял возврат iPhone 17 Pro Max и видел
+    /// в своей же заявке чужое устройство. Незнакомый SKU честнее показать как
+    /// есть, чем назвать наугад.
     private func productTitle(for sku: String) -> String {
-        let uppercased = sku.uppercased()
-        if uppercased.contains("AIRPODS") { return "AirPods Pro 2" }
-        if uppercased.contains("IPHONE") { return "iPhone 15 128 GB Black" }
-        if uppercased.contains("WATCH") { return "Apple Watch S9" }
-        if uppercased.contains("MACBOOK") { return "MacBook Air" }
-        return sku
+        products.first { $0.sku == sku }?.name ?? sku
     }
 }
 
@@ -3791,14 +3802,6 @@ private struct CustomerTradeInsView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingForm = false
-    @State private var selectedCondition = 1
-    @State private var showingEstimate = false
-
-    private let conditions = [
-        ("Как новый", "Без царапин, полный комплект"),
-        ("Хорошее", "Есть мелкие следы использования"),
-        ("Нужен ремонт", "Экран, батарея или корпус требуют проверки")
-    ]
 
     var body: some View {
         ZStack {
@@ -3820,120 +3823,48 @@ private struct CustomerTradeInsView: View {
                                 .padding(.leading, 30)
                         }
 
-                        if showingEstimate {
-                            VStack(spacing: 8) {
-                                Text("Предварительная оценка")
-                                    .font(ClientTheme.body(13))
-                                    .foregroundStyle(ClientTheme.muted)
-                                Text("28 000–32 000")
-                                    .font(ClientTheme.display(34, weight: .black))
-                                    .foregroundStyle(ClientTheme.lime)
-                                Text("Точная цена — после диагностики в магазине. Можно зачесть в счёт нового устройства.")
-                                    .font(ClientTheme.body(12))
-                                    .foregroundStyle(Design3.textMuted)
-                                    .multilineTextAlignment(.center)
-                                    .lineSpacing(3)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(22)
-                            .background(
-                                LinearGradient(
-                                    colors: [Design3.surfaceRaised, ClientTheme.surface],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                in: RoundedRectangle(cornerRadius: 18)
-                            )
-                            .overlay(RoundedRectangle(cornerRadius: 18).stroke(ClientTheme.line))
-                            .accessibilityIdentifier("tradein-estimate-card")
-
-                            Button {
-                                showingForm = true
-                            } label: {
-                                Text("Выбрать новое устройство")
-                                    .font(ClientTheme.body(15, weight: .bold))
-                                    .foregroundStyle(.black)
-                                    .frame(maxWidth: .infinity, minHeight: 50)
-                                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("tradein-open-request")
-
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.18)) {
-                                    showingEstimate = false
-                                }
-                            } label: {
-                                Text("Оценить другое")
-                                    .font(ClientTheme.body(13))
-                                    .foregroundStyle(ClientTheme.muted)
-                                    .frame(maxWidth: .infinity, minHeight: 38)
-                            }
-                            .buttonStyle(.plain)
-                        } else {
-                            Text("Модель")
-                                .font(ClientTheme.body(13))
-                                .foregroundStyle(ClientTheme.muted)
-                            Text("iPhone 13 · 128 ГБ")
-                                .font(ClientTheme.body(14))
+                        // Здесь стоял «калькулятор»: захардкоженная модель
+                        // «iPhone 13 · 128 ГБ», радиокнопки состояния, которые
+                        // никуда не вели, заглушка под фото и предварительная
+                        // оценка «28 000–32 000» — одна и та же для любого
+                        // устройства в любом состоянии. Ни одно из этих полей не
+                        // доходило до сервера, а число было выдумано. Apple уже
+                        // дважды отклоняла сборку за макеты, выданные за рабочие
+                        // функции (Guideline 2.3), а покупателю названная цена
+                        // читается как обещание. Настоящая заявка живёт в
+                        // CustomerTradeInFormView → POST tradeins, и ведём мы
+                        // теперь прямо туда.
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Цену называет диагностика")
+                                .font(ClientTheme.body(15, weight: .bold))
                                 .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(13)
-                                .glass(radius: 12)
-                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
-
-                            Text("Состояние")
+                            Text("Сумму зачёта определяет проверка устройства в магазине: экран, батарея, корпус и комплект. Оставьте заявку — мы свяжемся и назовём точную цену.")
                                 .font(ClientTheme.body(13))
                                 .foregroundStyle(ClientTheme.muted)
-                                .padding(.top, 2)
-                            ForEach(Array(conditions.enumerated()), id: \.offset) { index, condition in
-                                Button {
-                                    selectedCondition = index
-                                } label: {
-                                    HStack(spacing: 10) {
-                                        Circle()
-                                            .stroke(selectedCondition == index ? ClientTheme.lime : Design3.hairline, lineWidth: 2)
-                                            .frame(width: 18, height: 18)
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            Text(condition.0)
-                                                .font(ClientTheme.body(13))
-                                                .foregroundStyle(.white)
-                                            Text(condition.1)
-                                                .font(ClientTheme.body(11))
-                                                .foregroundStyle(Design3.textMuted)
-                                        }
-                                        Spacer()
-                                    }
-                                    .padding(12)
-                                    .glass(radius: 11)
-                                    .overlay(RoundedRectangle(cornerRadius: 11).stroke(selectedCondition == index ? ClientTheme.lime : ClientTheme.line))
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier("tradein-condition-\(index)")
-                            }
-
-                            Text("📷 Фото устройства (4 ракурса)")
-                                .font(ClientTheme.body(12))
-                                .foregroundStyle(Design3.textFaint)
-                                .frame(maxWidth: .infinity, minHeight: 54)
-                                .glass(radius: 11)
-                                .overlay(RoundedRectangle(cornerRadius: 11).stroke(Design3.hairline, style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
-                                .accessibilityIdentifier("tradein-photo-placeholder")
-
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.18)) {
-                                    showingEstimate = true
-                                }
-                            } label: {
-                                Text("Узнать цену")
-                                    .font(ClientTheme.body(15, weight: .bold))
-                                    .foregroundStyle(.black)
-                                    .frame(maxWidth: .infinity, minHeight: 50)
-                                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("tradein-evaluate")
+                                .lineSpacing(3)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(18)
+                        .background(
+                            LinearGradient(
+                                colors: [Design3.surfaceRaised, ClientTheme.surface],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            in: RoundedRectangle(cornerRadius: 18)
+                        )
+
+                        Button {
+                            showingForm = true
+                        } label: {
+                            Text("Оставить заявку на trade-in")
+                                .font(ClientTheme.body(15, weight: .bold))
+                                .foregroundStyle(.black)
+                                .frame(maxWidth: .infinity, minHeight: 50)
+                                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("tradein-evaluate")
 
                         if !tradeIns.isEmpty {
                             Text("Мои заявки")
@@ -6300,6 +6231,10 @@ private struct CatalogView: View {
     let products: [Product]
     let isLoading: Bool
     let errorMessage: String?
+    /// Перезапрос каталога у владельца состояния. Без него «Повторить» была
+    /// пустым замыканием: на упавшей загрузке магазин оставался пустым
+    /// навсегда, и единственным выходом был перезапуск приложения.
+    let retry: () -> Void
     @Binding var cart: [String: Int]
     @Binding var favorites: Set<String>
     @State private var search = ""
@@ -6429,7 +6364,7 @@ private struct CatalogView: View {
                                 .tint(ClientTheme.lime)
                                 .frame(maxWidth: .infinity, minHeight: 120)
                         } else if let errorMessage, products.isEmpty {
-                            ClientDataErrorView(message: errorMessage, retry: {})
+                            ClientDataErrorView(message: errorMessage, retry: retry)
                         } else if visibleProducts.isEmpty {
                             EmptyStateView(title: "Ничего не найдено", detail: "Попробуйте изменить фильтры.", symbol: "magnifyingglass")
                         } else {

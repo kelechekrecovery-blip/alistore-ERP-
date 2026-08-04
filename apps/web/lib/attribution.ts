@@ -62,7 +62,17 @@ export function loadAttribution(): StoredAttribution | null {
     }
     return parsed;
   } catch {
-    window.localStorage.removeItem(STORAGE_KEY);
+    // Сюда попадают два разных отказа, и различать их обязательно.
+    // Битый JSON — чиним, удалив запись. Но если бросил сам localStorage
+    // (Safari в приватном режиме, заблокированное хранилище), то `removeItem`
+    // бросит снова — уже из catch, то есть наружу. А наружу нельзя: track()
+    // зовётся из обработчика «В корзину», и падение там роняет добавление
+    // товара из-за телеметрии. Атрибуция не стоит корзины.
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // хранилище недоступно целиком — чистить нечего и незачем
+    }
     return null;
   }
 }

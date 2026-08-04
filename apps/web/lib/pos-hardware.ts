@@ -53,34 +53,68 @@ export function createScannerKeyHandler(onScan: (code: string) => void) {
   };
 }
 
-export async function checkPaymentTerminal(method: string, online: boolean): Promise<{ ok: boolean; message: string }> {
-  if (method === 'cash') return { ok: true, message: 'Касса готова' };
+/**
+ * `unknown` — честное «мы ничего не спрашивали»: у веб-кассы нет ни канала, ни
+ * протокола к эквайринговому терминалу. Раньше проверка ждала 160 мс и отвечала
+ * «готов» — кассир читал подтверждение проверки, которой не было, и верил, что
+ * терминал на связи. Незнание нельзя выдавать за проверенную готовность.
+ */
+export type PosTerminalStatus = 'ready' | 'unknown' | 'unavailable';
+
+export type PosTerminalCheck = {
+  /** `unknown` продажу не блокирует: оплату подтверждает сам терминал в руках кассира. */
+  ok: boolean;
+  status: PosTerminalStatus;
+  message: string;
+};
+
+export async function checkPaymentTerminal(method: string, online: boolean): Promise<PosTerminalCheck> {
+  // Наличные терминала не касаются — проверять нечего, и заявлять нечего.
+  if (method === 'cash') return { ok: true, status: 'ready', message: 'Касса готова' };
   // Сообщение обещало «продажа уйдёт в очередь» — и она действительно уходила,
   // как состоявшаяся оплата картой. Терминал при этом не авторизовал ничего.
   // Безналичную оплату без связи принять нельзя; обещать обратное — значит
   // отдать товар бесплатно.
-  if (!online) return { ok: false, message: `Нет связи: ${methodName(method)} принять нельзя. Возьмите наличными или дождитесь сети.` };
-  await new Promise((resolve) => window.setTimeout(resolve, 160));
-  return { ok: true, message: `${methodName(method)} готов к оплате` };
+  if (!online) return { ok: false, status: 'unavailable', message: `Нет связи: ${methodName(method)} принять нельзя. Возьмите наличными или дождитесь сети.` };
+  return { ok: true, status: 'unknown', message: `${methodName(method)}: терминал не проверен — сверьте оплату на терминале` };
 }
 
-export function printPosReceipt(snapshot: PosReceiptSnapshot, result?: PosSaleResult | null) {
-  if (typeof window === 'undefined') return;
+/**
+ * Результат печати в духе `ScannerMatch`. Блокировщик всплывающих окон — самый
+ * частый отказ печати на кассе: `window.open` отдаёт `null` (а часть
+ * блокировщиков отдаёт окно и закрывает его сразу). Раньше все печатные функции
+ * в этом случае молча возвращались, и кассир жал «Печать» вхолостую, не понимая,
+ * что чека/этикетки не будет. Провал обязан дойти до вызывающего.
+ */
+export type PrintResult =
+  | { ok: true }
+  | { ok: false; reason: string };
+
+const PRINT_BLOCKED = 'Браузер заблокировал окно печати — разрешите всплывающие окна для этого сайта';
+
+function openPrintWindow(name: string): Window | null {
+  const popup = window.open('', name, 'width=420,height=720');
+  return popup && !popup.closed ? popup : null;
+}
+
+export function printPosReceipt(snapshot: PosReceiptSnapshot, result?: PosSaleResult | null): PrintResult {
+  if (typeof window === 'undefined') return { ok: false, reason: 'Печать доступна только в браузере' };
   const receiptNo = result?.receiptNo ?? snapshot.localReceiptNo;
-  const popup = window.open('', `alistore-receipt-${receiptNo}`, 'width=420,height=720');
-  if (!popup) return;
+  const popup = openPrintWindow(`alistore-receipt-${receiptNo}`);
+  if (!popup) return { ok: false, reason: PRINT_BLOCKED };
 
   popup.document.write(receiptHtml(snapshot, receiptNo, result));
   popup.document.close();
   popup.focus();
   window.setTimeout(() => popup.print(), 100);
+  return { ok: true };
 }
 
 /** Print a server-rendered SVG document (receipt preview, barcode label) in a popup. */
-export function printServerSvg(svg: string, title: string, caption?: string) {
-  if (typeof window === 'undefined') return;
-  const popup = window.open('', `alistore-print-${title}`, 'width=420,height=720');
-  if (!popup) return;
+export function printServerSvg(svg: string, title: string, caption?: string): PrintResult {
+  if (typeof window === 'undefined') return { ok: false, reason: 'Печать доступна только в браузере' };
+  const popup = openPrintWindow(`alistore-print-${title}`);
+  if (!popup) return { ok: false, reason: PRINT_BLOCKED };
 
   popup.document.write(`<!doctype html>
   <html>
@@ -98,13 +132,15 @@ export function printServerSvg(svg: string, title: string, caption?: string) {
   popup.document.close();
   popup.focus();
   window.setTimeout(() => popup.print(), 100);
+  return { ok: true };
 }
 
 /** Print several server-rendered SVG labels in one popup — one label per page. */
-export function printServerSvgLabels(svgs: string[], title: string) {
-  if (typeof window === 'undefined' || svgs.length === 0) return;
-  const popup = window.open('', `alistore-print-${title}`, 'width=420,height=720');
-  if (!popup) return;
+export function printServerSvgLabels(svgs: string[], title: string): PrintResult {
+  if (typeof window === 'undefined') return { ok: false, reason: 'Печать доступна только в браузере' };
+  if (svgs.length === 0) return { ok: false, reason: 'Нечего печатать: список этикеток пуст' };
+  const popup = openPrintWindow(`alistore-print-${title}`);
+  if (!popup) return { ok: false, reason: PRINT_BLOCKED };
 
   popup.document.write(`<!doctype html>
   <html>
@@ -122,6 +158,7 @@ export function printServerSvgLabels(svgs: string[], title: string) {
   popup.document.close();
   popup.focus();
   window.setTimeout(() => popup.print(), 100);
+  return { ok: true };
 }
 
 function receiptHtml(snapshot: PosReceiptSnapshot, receiptNo: string, result?: PosSaleResult | null) {

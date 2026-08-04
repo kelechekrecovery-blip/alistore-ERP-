@@ -13,6 +13,35 @@ import { useCart } from "@/lib/cart";
 import { useCompare } from "@/lib/compare";
 import { conditionLabel, som } from "@/lib/format";
 
+const CATALOG_PAGE_SIZE = 100; // потолок `limit` у /catalog/products
+const MAX_CATALOG_PAGES = 50; // предохранитель: дальше 5000 товаров не листаем
+
+/**
+ * Достать отложенные на сравнение товары по их id.
+ *
+ * Раньше читалась только первая сотня каталога, и товар, лежащий дальше, молча
+ * пропадал из сравнения: покупатель его добавил, а колонки нет и объяснения
+ * нет. By-id эндпоинт каталога здесь не помогает — на удалённый товар он даёт
+ * 422, по которому не отличить «товара больше нет» от «сервер лёг». Поэтому
+ * листаем страницами и останавливаемся, как только найдены все id.
+ *
+ * Первая страница запрашивается всегда, даже когда сравнивать нечего: пустой
+ * список при упавшем каталоге обязан остаться экраном сбоя, а не тишиной.
+ */
+async function fetchSavedProducts(ids: string[]): Promise<CatalogProduct[]> {
+  const wanted = new Set(ids);
+  const found = new Map<string, CatalogProduct>();
+  for (let page = 0; page < MAX_CATALOG_PAGES; page += 1) {
+    const response = await fetchCatalog({ limit: CATALOG_PAGE_SIZE, offset: page * CATALOG_PAGE_SIZE, sort: "name" });
+    if (isCatalogUnavailable(response)) throw new Error("Каталог не ответил");
+    for (const product of response.items) if (wanted.has(product.id)) found.set(product.id, product);
+    if (found.size >= wanted.size) break;
+    if (response.items.length < CATALOG_PAGE_SIZE || (page + 1) * CATALOG_PAGE_SIZE >= response.total) break;
+  }
+  // Товара больше нет в каталоге — он тихо выпадает из списка, это не сбой.
+  return ids.map((id) => found.get(id)).filter((product): product is CatalogProduct => product !== undefined);
+}
+
 function attr(product: CatalogProduct, keys: string[]) {
   const attributes = product.attrs ?? {};
   for (const key of keys) {
@@ -30,16 +59,22 @@ export default function ComparePage() {
   const [loadError, setLoadError] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
   useEffect(() => {
-    fetchCatalog({ limit: 100 })
-      .then((response) => { if (isCatalogUnavailable(response)) throw new Error("Каталог не ответил"); return response; })
-      .then((response) => setProducts(response.items))
+    // До гидрации id ещё не прочитаны из localStorage — спрашивать нечего.
+    if (!compare.hydrated) return;
+    let cancelled = false;
+    // `compare.ids` намеренно не в зависимостях: берём снимок на момент
+    // загрузки, иначе удаление колонки перезапрашивало бы каталог.
+    fetchSavedProducts(compare.ids)
+      .then((items) => { if (!cancelled) setProducts(items); })
       .catch((cause: unknown) => {
+      if (cancelled) return;
       // Пустой список и упавший запрос — разные экраны. Раньше сбой показывал
       // покупателю то же, что видит владелец пустого магазина.
       setProducts(null);
       setLoadError(cause instanceof Error && cause.message ? cause.message : ' ');
     });
-  }, [reloadToken]);
+    return () => { cancelled = true; };
+  }, [compare.hydrated, reloadToken]);
   const list = compare.ids
     .map((id) => (products ?? []).find((product) => product.id === id))
     .filter(Boolean) as CatalogProduct[];

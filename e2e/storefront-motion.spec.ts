@@ -139,7 +139,7 @@ test('remaining desktop customer routes use the shop system through account entr
 
   await page.goto('/favorites');
   expect(await page.locator('.md\\:block').first().evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
-  await page.goto('/compare');
+  await gotoCommitted(page, '/compare');
   expect(await page.locator('main').locator('..').evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 10, 8)');
   await page.goto('/login?next=/account');
   await expect(page.locator('.login-shell')).toHaveCount(1);

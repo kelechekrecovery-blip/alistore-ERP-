@@ -39,10 +39,42 @@ public enum EvidenceMultipart {
     }
 }
 
+/// Общий на приложение обработчик 401.
+///
+/// Экземпляры `APIClient` в этом проекте создаются на месте — прямо в свойствах
+/// экранов и внутри методов (`APIClient(baseURL: environment.apiBaseURL)` встречается
+/// в POS, Staff и Courier по отдельности). Общего клиента нет, поэтому хук,
+/// поставленный только на клиент хранилища сессии, покрыл бы одни лишь
+/// вызовы авторизации, а падали бы бизнес-запросы. Реестр один на процесс —
+/// как и сессия, которую он обновляет.
+public actor UnauthorizedRegistry {
+    public static let shared = UnauthorizedRegistry()
+    private var handler: APIClient.UnauthorizedHandler?
+
+    public func set(_ handler: APIClient.UnauthorizedHandler?) { self.handler = handler }
+    func current() -> APIClient.UnauthorizedHandler? { handler }
+}
+
 public actor APIClient {
+    /// Обновляет протухший доступ и возвращает новый токен, либо `nil`, если
+    /// сессию восстановить нельзя.
+    public typealias UnauthorizedHandler = @Sendable () async -> String?
+
     private let baseURL: URL
     private let session: URLSession
     private let decoder: JSONDecoder
+    private var onUnauthorized: UnauthorizedHandler?
+
+    /// Единственная точка, где живёт реакция на 401.
+    ///
+    /// Access-токен живёт 15 минут (`ACCESS_TTL` в apps/api/src/auth/auth.service.ts),
+    /// а обновлял его только холодный старт. Через четверть часа падало всё
+    /// разом — оформление заказа, кабинет, смена кассира — и выходом был
+    /// перезапуск приложения. Хук ставит владелец сессии; здесь мы лишь
+    /// один раз повторяем запрос с новым токеном.
+    public func setUnauthorizedHandler(_ handler: UnauthorizedHandler?) {
+        onUnauthorized = handler
+    }
 
     public init(baseURL: URL, session: URLSession = .shared) {
         self.baseURL = baseURL
@@ -192,6 +224,18 @@ public actor APIClient {
         idempotencyKey: String? = nil,
         as type: Response.Type
     ) async throws -> Response {
+        try await request(path, method: method, token: token, body: body, idempotencyKey: idempotencyKey, as: type, isRetry: false)
+    }
+
+    private func request<Response: Decodable & Sendable>(
+        _ path: String,
+        method: String,
+        token: String?,
+        body: Data?,
+        idempotencyKey: String?,
+        as type: Response.Type,
+        isRetry: Bool
+    ) async throws -> Response {
         let cleanPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
         guard let url = URL(string: cleanPath, relativeTo: baseURL.appendingPathComponent("/")) else {
             throw APIError.invalidResponse
@@ -207,6 +251,25 @@ public actor APIClient {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
+            // Ровно одна попытка обновления: второй 401 подряд означает, что
+            // refresh-токен тоже мёртв, и сессию надо гасить, а не крутить цикл.
+            // Идемпотентный ключ переносим в повтор — иначе сервер увидит
+            // повтор как новую операцию.
+            if http.statusCode == 401, !isRetry, token != nil {
+                var handler = onUnauthorized
+                if handler == nil { handler = await UnauthorizedRegistry.shared.current() }
+                if let handler, let renewed = await handler() {
+                    return try await self.request(
+                        path,
+                        method: method,
+                        token: renewed,
+                        body: body,
+                        idempotencyKey: idempotencyKey,
+                        as: type,
+                        isRetry: true
+                    )
+                }
+            }
             let payload = try? JSONDecoder().decode(ErrorPayload.self, from: data)
             throw APIError.rejected(status: http.statusCode, message: payload?.message ?? "Ошибка сервера \(http.statusCode)")
         }

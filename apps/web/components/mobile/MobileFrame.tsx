@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ArrowLeftRight, Bell, ChevronDown, MapPin, Search } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { MobileTabBar, type Tab } from '@/components/MobileTabBar';
 import { loginHref } from '@/components/mobile/login-next';
@@ -34,7 +35,11 @@ export function MobileFrame({ active, children, header = true, city = 'Бишк�
         {header && (
           <header className="sticky top-0 z-20 flex-shrink-0 bg-ink-dark/95 px-4 pb-3 pt-3 backdrop-blur">
             <div className="mb-2.5 flex items-center gap-2">
-              <span className="flex items-center gap-1 text-xs text-muted">📍 {city} ▾</span>
+              <span className="flex items-center gap-1 text-xs text-muted">
+                <MapPin size={13} aria-hidden />
+                {city}
+                <ChevronDown size={13} aria-hidden />
+              </span>
               <div className="ml-auto flex items-center gap-3.5">
                 {showLogin && (
                   <Link
@@ -44,16 +49,16 @@ export function MobileFrame({ active, children, header = true, city = 'Бишк�
                     Войти
                   </Link>
                 )}
-                <Link href="/compare" className="relative text-[17px]" aria-label="Сравнение">
-                  ⇄
+                <Link href="/compare" className="relative" aria-label="Сравнение">
+                  <ArrowLeftRight size={18} aria-hidden />
                   {favCount > 0 && (
                     <span className="absolute -right-2 -top-1.5 rounded-full bg-lime px-1 text-[9px] font-bold text-lime-ink">
                       {favCount}
                     </span>
                   )}
                 </Link>
-                <Link href="/account/notifications" className="relative text-[17px]" aria-label="Уведомления">
-                  🔔
+                <Link href="/account/notifications" className="relative" aria-label="Уведомления">
+                  <Bell size={18} aria-hidden />
                   <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-coral" />
                 </Link>
               </div>
@@ -62,7 +67,7 @@ export function MobileFrame({ active, children, header = true, city = 'Бишк�
               href="/search"
               className="flex items-center gap-2.5 rounded-[13px] border border-surface-3 bg-surface-2 px-3.5 py-2.5"
             >
-              <span className="text-faint">🔍</span>
+              <Search size={16} className="text-faint" aria-hidden />
               <span className="text-sm text-faint">Поиск техники, брендов…</span>
             </Link>
           </header>

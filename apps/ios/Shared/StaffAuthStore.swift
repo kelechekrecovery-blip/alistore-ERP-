@@ -46,10 +46,12 @@ public final class StaffAuthStore {
     public func restore() async {
         defer { isRestoring = false }
         guard let token = try? tokens.read() else { return }
+        let storedRefresh = try? tokens.read(account: Self.refreshAccount)
         do {
             let principal: StaffPrincipal = try await api.get("staff-auth/me", token: token)
             session = StaffSession(
                 accessToken: token,
+                refreshToken: storedRefresh,
                 staffId: principal.id,
                 username: principal.username,
                 role: principal.role,
@@ -59,8 +61,56 @@ public final class StaffAuthStore {
             )
             requiresQuickUnlock = true
         } catch {
+            // Протухший доступ — не повод выкидывать смену: сначала пробуем обменять
+            // refresh-токен, и только его отказ означает, что входить надо заново.
+            if case let APIError.rejected(status, _) = error, status == 401 || status == 403,
+               let refreshToken = storedRefresh,
+               await renew(using: refreshToken, requiringUnlock: true) {
+                return
+            }
+            // Всё остальное — сеть, 5xx, разобранный ответ — оставляет сессию на месте.
+            // Раньше любой такой отказ стирал и токен, и PIN: холодный старт без
+            // интернета разлогинивал кассира и требовал полноценного входа.
+            guard case let APIError.rejected(status, _) = error, status == 401 || status == 403 else { return }
             try? tokens.clear()
+            try? tokens.clear(account: Self.refreshAccount)
             clearQuickUnlock()
+        }
+    }
+
+    static let refreshAccount = "staff-refresh-token"
+
+    /// Обменивает refresh-токен на новую пару и сохраняет её.
+    @discardableResult
+    private func renew(using refreshToken: String, requiringUnlock: Bool) async -> Bool {
+        do {
+            let next: StaffSession = try await api.post(
+                "staff-auth/refresh",
+                body: RefreshRequest(refreshToken: refreshToken)
+            )
+            try? tokens.save(next.accessToken)
+            if let rotated = next.refreshToken {
+                try? tokens.save(rotated, account: Self.refreshAccount)
+            }
+            session = next
+            if requiringUnlock { requiresQuickUnlock = true }
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Тихое обновление по 401 — без требования PIN посреди работы кассира.
+    func renewAccessToken() async -> String? {
+        guard let refreshToken = session?.refreshToken ?? (try? tokens.read(account: Self.refreshAccount)) else { return nil }
+        guard await renew(using: refreshToken, requiringUnlock: false) else { return nil }
+        return session?.accessToken
+    }
+
+    /// Ставит общий на приложение обработчик 401. Вызывать один раз при старте.
+    public func installUnauthorizedHandler() async {
+        await UnauthorizedRegistry.shared.set { [weak self] in
+            await self?.renewAccessToken()
         }
     }
 
@@ -75,6 +125,9 @@ public final class StaffAuthStore {
             )
             clearQuickUnlock()
             try tokens.save(session.accessToken)
+            if let refreshToken = session.refreshToken {
+                try? tokens.save(refreshToken, account: Self.refreshAccount)
+            }
             self.session = session
             requiresQuickUnlock = false
         } catch {
@@ -86,6 +139,7 @@ public final class StaffAuthStore {
         do {
             clearQuickUnlock()
             try tokens.clear()
+            try? tokens.clear(account: Self.refreshAccount)
             session = nil
             requiresQuickUnlock = false
             errorMessage = nil

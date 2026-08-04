@@ -147,6 +147,10 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [piiConsent, setPiiConsent] = useState(false);
   const [done, setDone] = useState<DoneState | null>(null);
+  // Заказ, который сервер уже создал, а следующий вызов (подарочная карта или
+  // платёжный intent) упал. Он существует на сервере — покупатель обязан уйти
+  // с его номером и ссылкой на статус, а не с голым «Не удалось оформить».
+  const [strandedOrder, setStrandedOrder] = useState<CreatedOrder | null>(null);
   const checkoutAttempt = useRef<number | null>(null);
 
   function currentCheckoutAttempt() {
@@ -293,6 +297,11 @@ export default function CheckoutPage() {
   const toOrderCheckoutDisabled = items.some(
     (item) => item.supplyMode === 'to_order' && item.orderable === false,
   );
+  // Сервер не назвал ни одного способа оплаты — платить нечем. Раньше шаг всё
+  // равно пропускал дальше, и в подтверждении стояло «Картой»: способ, который
+  // покупатель не выбирал и которого сервер не предлагал. Заказные строки сюда
+  // не относятся — там оплаты на этом шаге нет вообще, задаток вносят в магазине.
+  const paymentUnavailable = !hasToOrderLine && paymentOptions.blocked;
 
   async function applyGiftCard() {
     const code = giftCode.trim();
@@ -321,7 +330,10 @@ export default function CheckoutPage() {
       setError('Оформление товаров под заказ временно отключено.');
       return;
     }
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setStrandedOrder(null);
+    // Заказ создаётся первым, а деньги проводятся следующими вызовами. Держим
+    // созданный заказ вне try: в catch иначе не видно, дошло ли дело до сервера.
+    let placedOrder: CreatedOrder | null = null;
     try {
       const orderInput = {
         channel: 'web',
@@ -363,6 +375,7 @@ export default function CheckoutPage() {
         order = await createOrder({ ...orderInput, customerId: customer.id }, guestCapability, orderKey);
         if (order.guestAccess) saveGuestOrderAccess(order.id, order.guestAccess.capability, order.guestAccess.expiresIn);
       }
+      placedOrder = order;
       if (hasToOrderLine) {
         setDone({
           order,
@@ -417,6 +430,9 @@ export default function CheckoutPage() {
       setDone({ order: { ...currentOrder, status: intent.orderStatus }, intent });
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Не удалось оформить заказ.');
+      // Корзину и счётчик попыток не трогаем намеренно: тот же снимок даёт тот
+      // же idempotency-key, поэтому повтор попадёт в уже созданный заказ.
+      if (placedOrder) setStrandedOrder(placedOrder);
     } finally { setBusy(false); }
   }
 
@@ -683,7 +699,13 @@ export default function CheckoutPage() {
                 </div>
               </>
             )}
-            <button type="button" onClick={() => setStep(3)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink">К подтверждению</button>
+            {paymentUnavailable && (
+              <p id="checkout-payment-unavailable" className="mb-2 text-xs text-coral-tint">
+                Оплатить этот заказ сейчас нечем: сервер не предложил ни одного способа.
+                Вернитесь к способу получения и выберите другой.
+              </p>
+            )}
+            <button type="button" disabled={paymentUnavailable} aria-describedby={paymentUnavailable ? 'checkout-payment-unavailable' : undefined} onClick={() => setStep(3)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-50">К подтверждению</button>
           </>
         )}
         {step === 3 && (
@@ -734,6 +756,25 @@ export default function CheckoutPage() {
               </span>
             </label>
             {error && <p className="mt-3 text-sm text-danger-soft">{error}</p>}
+            {strandedOrder && (
+              <div role="alert" className="checkout-surface mt-3 rounded-[13px] border border-warn/50 bg-warn/10 p-3.5 text-left">
+                <div className="text-sm font-semibold text-warn">
+                  Заказ № <span className="font-mono">{strandedOrder.id.slice(-8)}</span> уже создан
+                </div>
+                <p className="mt-1 text-xs text-muted">
+                  Сорвалась только оплата — сам заказ на сервере есть и не потерялся.
+                  Откройте его статус: там можно оплатить или связаться с магазином.
+                </p>
+                <Link
+                  href={strandedOrder.guestAccess
+                    ? guestOrderLink(strandedOrder.id, strandedOrder.guestAccess.capability)
+                    : `/account/orders/${strandedOrder.id}/status`}
+                  className="checkout-primary mt-3 inline-block rounded-[11px] bg-lime px-4 py-2.5 text-[13px] font-bold text-lime-ink"
+                >
+                  Статус заказа
+                </Link>
+              </div>
+            )}
             <button type="button" disabled={busy || !piiConsent} onClick={place} className="checkout-primary mt-3 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:opacity-60">{busy ? 'Оформляем…' : 'Подтвердить заказ'}</button>
           </>
         )}

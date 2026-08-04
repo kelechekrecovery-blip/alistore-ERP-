@@ -309,7 +309,11 @@ public final class CustomerAuthStore {
         }
     }
 
-    private func refresh(_ stored: CustomerSession) async {
+    /// - Parameter requiringUnlock: `true` — обновление на холодном старте, после
+    ///   него экран быстрого разблокирования уместен. `false` — тихое обновление
+    ///   по 401 посреди работы: требовать PIN в этот момент значит выкинуть
+    ///   человека из оформления заказа за то, что истёк токен.
+    private func refresh(_ stored: CustomerSession, requiringUnlock: Bool = true) async {
         let generation = sessionGeneration
         let flight: RefreshFlight
         if let current = refreshFlight,
@@ -345,9 +349,14 @@ public final class CustomerAuthStore {
             if restoresStoredSession { try save(next) }
             session = next
             sessionGeneration &+= 1
-            requiresQuickUnlock = true
+            if requiringUnlock { requiresQuickUnlock = true }
         } catch {
             guard canApplyRefresh(flight, stored: stored) else { return }
+            // Сессию гасим только когда сервер сам отверг refresh-токен.
+            // Раньше сюда попадал и запуск без сети: пропавший интернет стирал
+            // и сохранённую сессию, и PIN быстрого входа — человек в самолёте
+            // терял аккаунт и не мог его вернуть до полноценного входа.
+            guard case let APIError.rejected(status, _) = error, status == 401 || status == 403 else { return }
             clearQuickUnlock()
             try? tokens.clear(account: "customer-session")
             session = nil
@@ -365,6 +374,24 @@ public final class CustomerAuthStore {
         guard let session else { return false }
         await refresh(session)
         return self.session != nil
+    }
+
+    /// Ставит в `APIClient` реакцию на 401: обновить доступ и отдать новый токен
+    /// для одного повтора. Вызывать один раз при сборке окружения приложения.
+    ///
+    /// `refreshFlight` уже коалесцирует параллельные вызовы, поэтому пачка
+    /// одновременных 401 обменяет ротируемый refresh-токен ровно один раз.
+    public func installUnauthorizedHandler() async {
+        await UnauthorizedRegistry.shared.set { [weak self] in
+            await self?.renewAccessToken()
+        }
+    }
+
+    /// Тихое обновление для повтора запроса: без требования PIN.
+    func renewAccessToken() async -> String? {
+        guard let current = session else { return nil }
+        await refresh(current, requiringUnlock: false)
+        return session?.accessToken
     }
 
     public func unlock() { requiresQuickUnlock = false }

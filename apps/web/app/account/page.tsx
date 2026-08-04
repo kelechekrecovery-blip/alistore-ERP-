@@ -50,7 +50,7 @@ export default function AccountPage() {
   if (!hydrated || !user) return <div className="min-h-screen bg-[#0b0a08] text-white/45"><SiteHeader variant="design3" /><div className="grid min-h-[70vh] place-items-center">Загрузка кабинета...</div></div>;
 
   return <>
-    <div className="md:hidden"><MobileProfile phone={user.phone} orders={orders} loyalty={loyalty} onLogout={async () => { await logout(); router.push('/'); }} /></div>
+    <div className="md:hidden"><MobileProfile phone={user.phone} orders={orders} ordersError={ordersError} loyalty={loyalty} onLogout={async () => { await logout(); router.push('/'); }} /></div>
     <div className="hidden min-h-screen bg-[#0b0a08] font-sans text-[#e5dcd3] md:block">
     <SiteHeader variant="design3" />
     <main className="mx-auto max-w-[1400px] px-5 py-10">

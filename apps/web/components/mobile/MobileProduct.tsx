@@ -7,7 +7,7 @@ import { useState } from "react";
 import { MobileFrame } from "@/components/mobile/MobileFrame";
 import { productImage, productSpecEntries } from "@/components/ProductCard";
 import { StatusPill } from "@/components/ui/Badge";
-import { ImageOff } from "lucide-react";
+import { Heart, ImageOff } from "lucide-react";
 import { som, conditionLabel } from "@/lib/format";
 import { TO_ORDER_CART_QTY_CAP, useCart } from "@/lib/cart";
 import { availabilityLabel, catalogAvailability } from "@/lib/to-order";
@@ -104,9 +104,11 @@ export default function MobileProduct({
             }
             className="absolute right-3 top-3 grid h-[34px] w-[34px] place-items-center rounded-full bg-lime-ink/55"
           >
-            <span className={faved(product.id) ? "text-coral" : "text-white"}>
-              {faved(product.id) ? "♥" : "♡"}
-            </span>
+            <Heart
+              size={17}
+              aria-hidden
+              className={faved(product.id) ? "fill-coral text-coral" : "text-white"}
+            />
           </button>
         </div>
 

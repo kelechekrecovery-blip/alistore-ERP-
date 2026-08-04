@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { SearchX } from 'lucide-react';
 import { MobileFrame } from '@/components/mobile/MobileFrame';
 import { MobileProductCard } from '@/components/mobile/MobileProductCard';
 import { fetchCatalog, fetchCatalogCategories, isCatalogUnavailable, type CatalogProduct, type CatalogQuery } from '@/lib/api';
@@ -103,7 +104,7 @@ export default function MobileCatalog() {
           </div><div className="mt-5 flex justify-center gap-2"><button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 20))} className="rounded-[10px] border border-surface-3 px-4 py-2 text-xs text-white disabled:opacity-30">Назад</button><button disabled={offset + 20 >= total} onClick={() => setOffset(offset + 20)} className="rounded-[10px] border border-surface-3 px-4 py-2 text-xs text-white disabled:opacity-30">Дальше</button></div></>
         ) : (
           <div className="py-14 text-center">
-            <div className="text-5xl">🔍</div>
+            <SearchX size={48} strokeWidth={1.4} aria-hidden className="mx-auto text-faint" />
             <div className="mt-3.5 font-display text-[17px] font-bold text-white">Ничего не найдено</div>
             <div className="mt-2 text-[13px] text-muted">Попробуйте изменить фильтры</div>
             <button

@@ -13,12 +13,14 @@ export function WarrantyRequest({ imei, customerId }: { imei: string; customerId
   const [problem, setProblem] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [state, setState] = useState<'idle' | 'sending' | 'done'>('idle');
+  const [error, setError] = useState('');
   const [evidenceCount, setEvidenceCount] = useState(0);
   const idempotencyKey = useRef(crypto.randomUUID());
 
   async function submit() {
     if (!problem.trim()) return;
     setState('sending');
+    setError('');
     try {
       const warranty = await authed((accessToken) => openWarranty(
         { imei, customerId, problem: problem.trim() },
@@ -36,7 +38,12 @@ export function WarrantyRequest({ imei, customerId }: { imei: string; customerId
         : [];
       setEvidenceCount(evidence.length);
       setState('done');
-    } catch {
+    } catch (cause: unknown) {
+      // Молчаливый откат в 'idle' выглядел как «ничего не произошло»: форма
+      // возвращалась с текстом внутри, и человек не мог отличить отказ сервера
+      // от собственного промаха по кнопке. Идемпотентный ключ переживает
+      // ошибку, поэтому повтор безопасен — но сказать о нём обязаны.
+      setError(cause instanceof Error && cause.message ? cause.message : 'Не удалось отправить обращение. Попробуйте ещё раз.');
       setState('idle');
     }
   }
@@ -77,6 +84,7 @@ export function WarrantyRequest({ imei, customerId }: { imei: string; customerId
         {state === 'sending' ? '…' : 'Отправить'}
       </button>
       </div>
+      {error && <p role="alert" className="mt-2 text-[11px] text-coral-light">{error}</p>}
       <div className="mt-2">
         <EvidencePicker files={files} onChange={setFiles} label="Фото дефекта" hint="Экран, корпус, IMEI/SN или ошибка" max={3} />
       </div>

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import { Bell, MapPin } from 'lucide-react';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
 import { authConfirmEmailAttach, authRequestEmailAttach, deleteAuthJson, fetchMySettings, getJson, updateMySettings, type CustomerSettings } from '@/lib/api';
@@ -169,11 +170,11 @@ export default function SettingsPage() {
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Link href="/account/notifications" className="rounded-[14px] border border-surface-3 bg-surface-2 p-4">
-          <div className="text-2xl">🔔</div>
+          <Bell size={22} strokeWidth={1.8} aria-hidden className="text-lime" />
           <div className="mt-2 text-[13px] font-semibold">Уведомления</div>
         </Link>
         <Link href="/account/addresses" className="rounded-[14px] border border-surface-3 bg-surface-2 p-4">
-          <div className="text-2xl">📍</div>
+          <MapPin size={22} strokeWidth={1.8} aria-hidden className="text-lime" />
           <div className="mt-2 text-[13px] font-semibold">Адреса</div>
         </Link>
       </div>

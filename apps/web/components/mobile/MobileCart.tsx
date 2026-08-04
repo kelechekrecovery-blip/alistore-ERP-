@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { ShoppingCart } from "lucide-react";
 import { MobileFrame } from "@/components/mobile/MobileFrame";
 import { som } from "@/lib/format";
 import { useCart } from "@/lib/cart";
@@ -51,7 +52,7 @@ export default function MobileCart() {
 
         {empty ? (
           <div className="py-12 text-center">
-            <div className="text-5xl">🛒</div>
+            <ShoppingCart size={48} strokeWidth={1.4} aria-hidden className="mx-auto text-faint" />
             <div className="mt-3.5 font-display text-[17px] font-bold text-white">
               Корзина пуста
             </div>

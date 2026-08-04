@@ -11,18 +11,54 @@ import MobileFavorites from '@/components/mobile/MobileFavorites';
 import { fetchCatalog, isCatalogUnavailable, type CatalogProduct } from '@/lib/api';
 import { useFavorites } from '@/lib/favorites';
 
+const CATALOG_PAGE_SIZE = 100; // потолок `limit` у /catalog/products
+const MAX_CATALOG_PAGES = 50; // предохранитель: дальше 5000 товаров не листаем
+
+/**
+ * Достать сохранённые товары по их id.
+ *
+ * Раньше читалась только первая сотня каталога, и товар, лежащий дальше, молча
+ * пропадал из избранного: покупатель его сохранил, а списка нет и объяснения
+ * нет. By-id эндпоинт каталога здесь не помогает — на удалённый товар он даёт
+ * 422, по которому не отличить «товара больше нет» от «сервер лёг». Поэтому
+ * листаем страницами и останавливаемся, как только найдены все id.
+ *
+ * Первая страница запрашивается всегда, даже когда сохранять нечего: пустое
+ * избранное при упавшем каталоге обязано остаться экраном сбоя, а не тишиной.
+ */
+async function fetchSavedProducts(ids: string[]): Promise<CatalogProduct[]> {
+  const wanted = new Set(ids);
+  const found = new Map<string, CatalogProduct>();
+  for (let page = 0; page < MAX_CATALOG_PAGES; page += 1) {
+    const response = await fetchCatalog({ limit: CATALOG_PAGE_SIZE, offset: page * CATALOG_PAGE_SIZE, sort: 'name' });
+    if (isCatalogUnavailable(response)) throw new Error('Каталог не ответил');
+    for (const product of response.items) if (wanted.has(product.id)) found.set(product.id, product);
+    if (found.size >= wanted.size) break;
+    if (response.items.length < CATALOG_PAGE_SIZE || (page + 1) * CATALOG_PAGE_SIZE >= response.total) break;
+  }
+  // Товара больше нет в каталоге — он тихо выпадает из списка, это не сбой.
+  return ids.map((id) => found.get(id)).filter((product): product is CatalogProduct => product !== undefined);
+}
+
 export default function FavoritesPage() {
   const favorites = useFavorites();
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
   const [loadError, setLoadError] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
   useEffect(() => {
-    fetchCatalog({ limit: 100 }).then((response) => { if (isCatalogUnavailable(response)) throw new Error('Каталог не ответил'); setProducts(response.items); }).catch((cause: unknown) => {
+    // До гидрации id ещё не прочитаны из localStorage — спрашивать нечего.
+    if (!favorites.hydrated) return;
+    let cancelled = false;
+    // `favorites.ids` намеренно не в зависимостях: берём снимок на момент
+    // загрузки, иначе каждое нажатие сердечка перезапрашивало бы каталог.
+    fetchSavedProducts(favorites.ids).then((items) => { if (!cancelled) setProducts(items); }).catch((cause: unknown) => {
+      if (cancelled) return;
       // Пустое избранное и упавший запрос — разные экраны.
       setProducts(null);
       setLoadError(cause instanceof Error && cause.message ? cause.message : ' ');
     });
-  }, [reloadToken]);
+    return () => { cancelled = true; };
+  }, [favorites.hydrated, reloadToken]);
   const items = useMemo(() => (products ?? []).filter((product) => favorites.has(product.id)), [products, favorites]);
 
   return <>

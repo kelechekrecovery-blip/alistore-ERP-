@@ -56,6 +56,10 @@ struct AliStorePOSApp: App {
     var body: some Scene {
         WindowGroup {
             content
+                // Ставит общий обработчик 401: access-токен живёт 15 минут, а до
+                // этого обновлять его было нечем — сотрудник вводил пароль заново
+                // каждые четверть часа посреди смены.
+                .task { await auth.installUnauthorizedHandler() }
                 // Касса без связи — самый острый случай: разблокированный
                 // терминал открывает смену и выручку. Закрываем при уходе в фон.
                 .onChange(of: scenePhase) { _, phase in

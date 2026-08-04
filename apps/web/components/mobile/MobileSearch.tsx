@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { Search, SearchX } from 'lucide-react';
 import { LoadFailure } from '@/components/LoadFailure';
 import { MobileFrame } from '@/components/mobile/MobileFrame';
 import { MobileProductCard } from '@/components/mobile/MobileProductCard';
@@ -49,7 +50,7 @@ export default function MobileSearch() {
             ←
           </button>
           <div className="flex flex-1 items-center gap-2 rounded-[13px] border border-surface-3 bg-surface-2 px-3.5 py-2.5">
-            <span className="text-faint">🔍</span>
+            <Search size={16} className="text-faint" aria-hidden />
             <input
               autoFocus
               value={q}
@@ -94,7 +95,7 @@ export default function MobileSearch() {
           <div className="py-10 text-center text-sm text-subtle">Поиск…</div>
         ) : (
           <div className="py-12 text-center">
-            <div className="text-5xl">🔍</div>
+            <SearchX size={48} strokeWidth={1.4} aria-hidden className="mx-auto text-faint" />
             <div className="mt-3.5 font-display text-[17px] font-bold text-white">Ничего не найдено</div>
             <div className="mt-2 text-[13px] text-muted">Попробуйте другой запрос</div>
             <Link href="/catalog" className="mt-4 inline-block rounded-[11px] bg-lime px-5 py-2.5 text-[13px] font-bold text-lime-ink">

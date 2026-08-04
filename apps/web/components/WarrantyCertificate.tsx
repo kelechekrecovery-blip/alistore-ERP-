@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ReceiptText } from 'lucide-react';
 import type { MyDevice } from '@/lib/api';
 import { WarrantyRequest } from '@/components/WarrantyRequest';
 
@@ -57,8 +58,8 @@ export function WarrantyCertificate({ device, customerId }: { device: MyDevice; 
         ) : (
           <WarrantyRequest imei={device.imei} customerId={customerId} />
         )}
-        <Link href="/account/orders" className="grid place-items-center rounded-[11px] border border-surface-3 bg-surface-2 px-3 py-3 text-center text-[13px] text-bright">
-          🧾 Чек
+        <Link href="/account" className="flex items-center justify-center gap-1.5 rounded-[11px] border border-surface-3 bg-surface-2 px-3 py-3 text-center text-[13px] text-bright">
+          <ReceiptText size={15} aria-hidden /> Чек
         </Link>
       </div>
 

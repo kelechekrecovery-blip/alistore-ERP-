@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { BarChart3, CalendarClock, Home, Package, RotateCcw, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent, HTMLAttributes } from 'react';
 import { closeShift, currentShift, openShift, type Shift } from '@/lib/staff';
@@ -49,12 +50,12 @@ import {
 } from '@/lib/staff-session';
 
 type Tab = StaffAppTab | 'debts' | 'cards';
-const NAV: { id: StaffAppTab; icon: string; label: string }[] = [
-  { id: 'home', icon: '⌂', label: 'Главная' },
-  { id: 'orders', icon: '📦', label: 'Заказы' },
-  { id: 'tasks', icon: '📊', label: 'KPI' },
-  { id: 'buyback', icon: '♻️', label: 'Скупка' },
-  { id: 'hr', icon: '◫', label: 'HR' },
+const NAV: { id: StaffAppTab; Icon: LucideIcon; label: string }[] = [
+  { id: 'home', Icon: Home, label: 'Главная' },
+  { id: 'orders', Icon: Package, label: 'Заказы' },
+  { id: 'tasks', Icon: BarChart3, label: 'KPI' },
+  { id: 'buyback', Icon: RotateCcw, label: 'Скупка' },
+  { id: 'hr', Icon: CalendarClock, label: 'HR' },
 ];
 const BUYBACK = ['Проверить IMEI по базе краденого', 'Осмотреть состояние, присвоить грейд', 'Сделать фото (4 ракурса)', 'Внести данные клиента и паспорт'];
 const ABSENCE_LABEL: Record<string, string> = { annual_leave: 'Отпуск', sick_leave: 'Больничный', unpaid_leave: 'Без оплаты', other: 'Другое' };
@@ -112,6 +113,8 @@ export default function StaffPage() {
   const sessionVersion = useRef(0);
   const [hrWeek, setHrWeek] = useState<HrWeek | null>(null);
   const [hrError, setHrError] = useState('');
+  const [shiftError, setShiftError] = useState('');
+  const [ordersError, setOrdersError] = useState('');
   const [absenceForm, setAbsenceForm] = useState({ type: 'annual_leave' as HrAbsenceType, startsOn: '', endsOn: '', reason: '' });
 
   useEffect(() => {
@@ -149,7 +152,18 @@ export default function StaffPage() {
   const loadShift = useCallback(async () => {
     if (!session) return;
     const requestVersion = ++shiftLoadVersion.current;
-    const loaded = await currentShift(session.accessToken);
+    setShiftError('');
+    let loaded: Shift | null;
+    try {
+      loaded = await currentShift(session.accessToken);
+    } catch (cause: unknown) {
+      // Без этого отказ /shifts/current оставлял главную кассира на «Загрузка…»
+      // навсегда: ни открытия смены, ни слепого пересчёта, ни объяснения.
+      if (requestVersion === shiftLoadVersion.current) {
+        setShiftError(cause instanceof Error && cause.message ? cause.message : 'Не удалось загрузить смену');
+      }
+      return;
+    }
     const persistedSession = loadStaffSession();
     if (
       requestVersion === shiftLoadVersion.current
@@ -163,11 +177,16 @@ export default function StaffPage() {
   const loadOrders = useCallback(async () => {
     if (!session) return;
     setOrders(null);
-    const [a, b] = await Promise.all([
-      fetchOrdersByStatus('created', session.accessToken),
-      fetchOrdersByStatus('reserved', session.accessToken),
-    ]);
-    setOrders([...a, ...b]);
+    setOrdersError('');
+    try {
+      const [a, b] = await Promise.all([
+        fetchOrdersByStatus('created', session.accessToken),
+        fetchOrdersByStatus('reserved', session.accessToken),
+      ]);
+      setOrders([...a, ...b]);
+    } catch (cause: unknown) {
+      setOrdersError(cause instanceof Error && cause.message ? cause.message : 'Не удалось загрузить заказы');
+    }
   }, [session]);
   useEffect(() => { if (tab === 'orders' && session && staffTabAllowed(session.role, 'orders')) loadOrders(); }, [tab, loadOrders, session]);
 
@@ -570,7 +589,14 @@ export default function StaffPage() {
         <div className="flex-1 overflow-y-auto px-4 pb-4">
           {tab === 'home' && (
             <>
-              {shift === undefined ? (
+              {shiftError ? (
+                <div className="mb-4 rounded-[14px] border border-[#5A3A32] bg-[#2A1E1A] p-4">
+                  <p className="text-sm text-[#D69A83]">{shiftError}</p>
+                  <button type="button" onClick={loadShift} className="erp3-coral-action mt-3 rounded-[9px] px-4 py-2 text-xs font-bold text-white">
+                    Повторить
+                  </button>
+                </div>
+              ) : shift === undefined ? (
                 <p className="py-6 font-mono text-sm text-[#8A7F76]">Загрузка…</p>
               ) : shift ? (
                 <div className="mb-4 rounded-[18px] border border-[#2E2822] bg-[#221E19] p-4.5" style={{ padding: 18 }}>
@@ -716,7 +742,15 @@ export default function StaffPage() {
           {tab === 'orders' && (
             <div className="pt-1">
               <SectionTitle title="Заказы" onBack={() => setTab('home')} />
-              {orders === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
+              {ordersError && (
+                <div className="rounded-[14px] border border-[#5A3A32] bg-[#2A1E1A] p-4">
+                  <p className="text-sm text-[#D69A83]">{ordersError}</p>
+                  <button type="button" onClick={loadOrders} className="erp3-coral-action mt-3 rounded-[9px] px-4 py-2 text-xs font-bold text-white">
+                    Повторить
+                  </button>
+                </div>
+              )}
+              {!ordersError && orders === null && <p className="font-mono text-sm text-[#8A7F76]">Загрузка…</p>}
               {orders && orders.length === 0 && <p className="py-8 text-center text-sm text-[#8A7F76]">Очередь пуста</p>}
               {(orders ?? []).map((o) => (
                 <div key={o.id} className="mb-2.5 rounded-[14px] border border-[#2E2822] bg-[#221E19] p-3.5">
@@ -1079,7 +1113,7 @@ export default function StaffPage() {
         <div className="flex flex-shrink-0 border-t border-[#2E2822] bg-[#1A1611] px-1.5 pb-6 pt-2">
           {NAV.filter((n) => n.id !== 'hr' && staffTabAllowed(session.role, n.id)).map((n) => (
             <button key={n.id} type="button" onClick={() => setTab(n.id)} className="flex-1 text-center">
-              <div className="text-xl">{n.icon}</div>
+              <n.Icon size={20} strokeWidth={1.8} aria-hidden className="mx-auto" />
               <div className={`mt-0.5 text-[10px] ${tab === n.id ? 'font-bold text-lime' : 'text-[#8A7F76]'}`}>{n.label}</div>
             </button>
           ))}

@@ -1,21 +1,34 @@
 'use client';
 
 import Link from 'next/link';
+import {
+  Bell,
+  Building2,
+  Gift,
+  MapPin,
+  MessageCircle,
+  RotateCcw,
+  Settings,
+  ShieldCheck,
+  Smartphone,
+  Undo2,
+  type LucideIcon,
+} from 'lucide-react';
 import { MobileFrame } from '@/components/mobile/MobileFrame';
 import { som } from '@/lib/format';
 import type { CustomerLoyalty, MyOrder } from '@/lib/api';
 
-const MENU: { href: string; icon: string; label: string; meta?: string }[] = [
-  { href: '/account/devices', icon: '📱', label: 'Устройства', meta: 'Гарантия' },
-  { href: '/account/returns', icon: '↩️', label: 'Возвраты' },
-  { href: '/account/bonuses', icon: '🎁', label: 'Бонусы' },
-  { href: '/account/addresses', icon: '📍', label: 'Адреса' },
-  { href: '/account/notifications', icon: '🔔', label: 'Уведомления' },
-  { href: '/support', icon: '💬', label: 'Поддержка' },
-  { href: '/trade-in', icon: '♻️', label: 'Trade-in' },
-  { href: '/account/protection', icon: '🛡', label: 'Защита' },
-  { href: '/account/settings', icon: '⚙️', label: 'Настройки' },
-  { href: '/b2b', icon: '🏢', label: 'Для бизнеса' },
+const MENU: { href: string; Icon: LucideIcon; label: string; meta?: string }[] = [
+  { href: '/account/devices', Icon: Smartphone, label: 'Устройства', meta: 'Гарантия' },
+  { href: '/account/returns', Icon: Undo2, label: 'Возвраты' },
+  { href: '/account/bonuses', Icon: Gift, label: 'Бонусы' },
+  { href: '/account/addresses', Icon: MapPin, label: 'Адреса' },
+  { href: '/account/notifications', Icon: Bell, label: 'Уведомления' },
+  { href: '/support', Icon: MessageCircle, label: 'Поддержка' },
+  { href: '/trade-in', Icon: RotateCcw, label: 'Trade-in' },
+  { href: '/account/protection', Icon: ShieldCheck, label: 'Защита' },
+  { href: '/account/settings', Icon: Settings, label: 'Настройки' },
+  { href: '/b2b', Icon: Building2, label: 'Для бизнеса' },
 ];
 
 const STATUS_RU: Record<string, string> = {
@@ -30,11 +43,14 @@ const STATUS_RU: Record<string, string> = {
 export default function MobileProfile({
   phone,
   orders,
+  ordersError = '',
   loyalty,
   onLogout,
 }: {
   phone: string;
   orders: MyOrder[] | null;
+  /** Текст отказа загрузки заказов; пустая строка — отказа не было. */
+  ordersError?: string;
   loyalty: CustomerLoyalty | null;
   onLogout: () => void;
 }) {
@@ -71,7 +87,7 @@ export default function MobileProfile({
         <div className="grid grid-cols-2 gap-2.5">
           {MENU.map((m) => (
             <Link key={m.href} href={m.href} className="rounded-[14px] border border-surface-3 bg-surface-2 p-4">
-              <div className="text-[22px]">{m.icon}</div>
+              <m.Icon size={22} strokeWidth={1.8} aria-hidden className="text-lime" />
               <div className="mt-2 text-[13px] font-semibold text-white">{m.label}</div>
               {m.meta && <div className="mt-0.5 text-[11px] text-lime">{m.meta}</div>}
             </Link>
@@ -79,7 +95,24 @@ export default function MobileProfile({
         </div>
 
         {/* recent orders */}
-        {orders && orders.length > 0 && (
+        {/* Раньше секция просто исчезала: и на загрузке, и на отказе, и на
+            пустом списке — покупатель после оформления не находил свой заказ
+            и не понимал, оформился ли он вообще. */}
+        {ordersError ? (
+          <>
+            <div className="mb-2 mt-5 font-display text-[15px] font-bold text-white">Мои заказы</div>
+            <div role="alert" className="rounded-[14px] border border-coral/30 bg-coral/[.07] px-4 py-4 text-center">
+              <p className="text-[13px] text-white">Не удалось загрузить заказы</p>
+              <p className="mt-1 text-[11px] text-muted">{ordersError}</p>
+            </div>
+          </>
+        ) : orders === null ? (
+          <>
+            <div className="mb-2 mt-5 font-display text-[15px] font-bold text-white">Мои заказы</div>
+            <div className="rounded-[14px] border border-surface-3 bg-surface-2 px-4 py-4 text-center text-[12px] text-muted">Загрузка…</div>
+          </>
+        ) : null}
+        {!ordersError && orders && orders.length > 0 && (
           <>
             <div className="mb-2 mt-5 font-display text-[15px] font-bold text-white">Мои заказы</div>
             <div className="overflow-hidden rounded-[14px] border border-surface-3 bg-surface-2">

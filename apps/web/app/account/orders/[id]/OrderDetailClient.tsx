@@ -53,7 +53,7 @@ const LINE_STATUS: Record<string, string> = {
 
 export default function OrderDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { add } = useCart();
+  const { add, items: cartItems } = useCart();
   const { user, hydrated, authed } = useAuth();
   const [order, setOrder] = useState<OrderDetail | null | 'missing'>(null);
   const [orderLoadError, setOrderLoadError] = useState(false);
@@ -64,6 +64,10 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const [cancellationResult, setCancellationResult] = useState<string | null>(null);
   const [cancellationError, setCancellationError] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
+  const [catalogLoadError, setCatalogLoadError] = useState(false);
+  // Итог «Повторить» обязан быть виден: молчащая кнопка читается покупателем как
+  // сломанный сайт, и он жмёт её снова вместо того, чтобы узнать причину.
+  const [reorderNotice, setReorderNotice] = useState<{ text: string; cartLink: boolean } | null>(null);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -77,7 +81,9 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     authed((token) => fetchOrderCancellationPreview(params.id, token))
       .then(setCancellation)
       .catch(() => setCancellationLoadError(true));
-    fetchCatalog({ limit: 100 }).then((c) => setCatalog(c.items));
+    fetchCatalog({ limit: 100 })
+      .then((c) => setCatalog(c.items))
+      .catch(() => setCatalogLoadError(true));
   }, [authed, hydrated, params.id, user]);
   const bySku = useMemo(() => new Map(catalog.map((p) => [p.sku, p])), [catalog]);
 
@@ -110,23 +116,59 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 
   function reorder() {
     if (order === null || order === 'missing') return;
-    let any = false;
+    const skipped: string[] = [];
+    let added = 0;
     for (const i of order.items) {
       const p = bySku.get(i.sku);
-      if (!p) continue;
+      const title = p?.name ?? i.sku;
+      if (!p) {
+        skipped.push(`${title} — больше нет в каталоге`);
+        continue;
+      }
       const availability = catalogAvailability(p);
       const toOrder = availability.isToOrder;
-      if (!availability.buyable) continue;
+      if (!availability.buyable) {
+        skipped.push(`${title} — ${availability.kind === 'unavailable' ? 'нет в наличии' : 'недоступен к заказу'}`);
+        continue;
+      }
+      // Корзина молча игнорирует добавление сверх потолка, поэтому упёршуюся
+      // строку считаем пропущенной, а не добавленной.
+      const stockLimit = toOrder ? TO_ORDER_CART_QTY_CAP : p.availableUnits;
+      const inCart = cartItems.find((line) => line.id === p.id)?.qty ?? 0;
+      if (stockLimit - inCart <= 0) {
+        skipped.push(`${title} — ${stockLimit <= 0 ? 'нет свободного остатка' : `в корзине уже максимум, ${stockLimit} шт.`}`);
+        continue;
+      }
       add({
         id: p.id, sku: p.sku, name: p.name, price: i.price,
-        stockLimit: toOrder ? TO_ORDER_CART_QTY_CAP : p.availableUnits,
+        stockLimit,
         supplyMode: toOrder ? 'to_order' : 'own_stock',
         supplyLeadDays: toOrder ? availability.leadTimeDays : null,
         orderable: availability.buyable,
       }, i.qty);
-      any = true;
+      added += 1;
     }
-    if (any) router.push('/cart');
+    if (added > 0 && skipped.length === 0) {
+      router.push('/cart');
+      return;
+    }
+    if (added > 0) {
+      setReorderNotice({
+        text: `В корзину добавлено ${added} из ${order.items.length}. Не добавили: ${skipped.join('; ')}.`,
+        cartLink: true,
+      });
+      return;
+    }
+    setReorderNotice({
+      // Упавший каталог проверяем раньше списка причин: без товаров в `bySku`
+      // каждая строка выглядит выбывшей, а это неправда.
+      text: catalogLoadError
+        ? 'Каталог не загрузился — наличие проверить не удалось. Обновите страницу и попробуйте снова.'
+        : skipped.length > 0
+          ? `Ни одну позицию заказа сейчас нельзя добавить в корзину. ${skipped.join('; ')}.`
+          : 'Состав заказа не загрузился — повторять нечего.',
+      cartLink: false,
+    });
   }
 
   async function requestCancellation() {
@@ -388,6 +430,14 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         <button type="button" onClick={reorder} className="rounded-[13px] border border-surface-3 bg-surface-2 py-3.5 text-center text-[13px] font-semibold text-lime">🔁 Повторить</button>
         <Link href="/account/returns" className="rounded-[13px] border border-surface-3 bg-surface-2 py-3.5 text-center text-[13px] font-semibold text-bright">↩ Возврат</Link>
       </div>
+      {reorderNotice && (
+        <div role="status" className="mt-2 rounded-[13px] border border-surface-3 bg-surface-2 px-3 py-2 text-[12px] leading-5 text-muted">
+          {reorderNotice.text}
+          {reorderNotice.cartLink && (
+            <Link href="/cart" className="mt-1 block font-semibold text-lime">Перейти в корзину →</Link>
+          )}
+        </div>
+      )}
       <Link href="/support" className="mt-2 block rounded-[13px] border border-surface-3 bg-surface-2 py-3.5 text-center text-[13px] font-semibold text-bright">💬 Написать в поддержку</Link>
     </div>,
   );

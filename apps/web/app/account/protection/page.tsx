@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { LoadFailure } from '@/components/LoadFailure';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import {
   acceptProtection,
@@ -31,6 +32,12 @@ export default function ProtectionPage() {
   const [coverageMonths, setCoverageMonths] = useState<12 | 24>(12);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  // Отдельно от `message`: тот рендерится внутри формы, а форму при отказе
+  // загрузки не показывают вовсе — иначе владелец устройств читает «устройств
+  // нет» вместо «сервер не ответил». См. LoadFailure.
+  // null — отказа не было; строка (возможно пустая) — отказ с деталью или без.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     if (hydrated && !user) router.replace('/login?next=/account/protection');
@@ -42,13 +49,17 @@ export default function ProtectionPage() {
     Promise.all([authed(fetchMyDevices), authed(fetchMyProtection)])
       .then(([owned, current]) => {
         if (cancelled) return;
+        setLoadError(null);
         setDevices(owned);
         setPolicies(current);
         setImei((value) => value || owned[0]?.imei || '');
       })
-      .catch(() => setMessage('Не удалось загрузить устройства'));
+      .catch((cause: unknown) => {
+        if (cancelled) return;
+        setLoadError(cause instanceof Error && cause.message ? cause.message : '');
+      });
     return () => { cancelled = true; };
-  }, [authed, user]);
+  }, [authed, user, reloadToken]);
 
   async function submit() {
     if (!imei) return;
@@ -84,7 +95,13 @@ export default function ProtectionPage() {
 
   return (
     <MobileAppFrame title="Защита устройства" subtitle="Дополнительное покрытие для техники, купленной в AliStore." active="account" backHref="/account">
-      {devices.length === 0 ? (
+      {loadError !== null ? (
+        <LoadFailure
+          what="устройства"
+          detail={loadError.trim()}
+          onRetry={() => { setLoadError(null); setReloadToken((value) => value + 1); }}
+        />
+      ) : devices.length === 0 ? (
         <div className="rounded-[14px] border border-surface-3 bg-surface-2 p-5 text-center text-sm text-muted">После покупки устройство появится здесь и станет доступно для защиты.</div>
       ) : (
         <section className="rounded-[14px] border border-surface-3 bg-surface-2 p-4" data-testid="protection-form">

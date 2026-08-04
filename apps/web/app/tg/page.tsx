@@ -264,9 +264,9 @@ export default function TelegramMiniAppPage() {
             </div>
           )}
           {done.order.guestAccess && (
-            <Link href={guestOrderLink(done.order.id, done.order.guestAccess.capability)} className="mt-5 w-full rounded-[13px] bg-lime px-6 py-3.5 text-sm font-bold text-lime-ink">
+            <a href={guestOrderLink(done.order.id, done.order.guestAccess.capability)} className="mt-5 w-full rounded-[13px] bg-lime px-6 py-3.5 text-sm font-bold text-lime-ink">
               Статус и чек
-            </Link>
+            </a>
           )}
           <button
             type="button"

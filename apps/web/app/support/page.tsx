@@ -1,16 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { MessageCircle, Phone, Send, type LucideIcon } from 'lucide-react';
 import { EvidencePicker } from '@/components/EvidencePicker';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
 import { createCustomer, fetchStorefrontContent, fetchSupportTickets, openSupportTicket, uploadEvidenceImages, type StorefrontPayload, type SupportTicket } from '@/lib/api';
 
 const faq = ['Как отследить заказ?', 'Условия возврата и обмена', 'Как работает рассрочка?', 'Гарантия на Б/У технику'];
-const channels = [
-  { id: 'whatsapp', icon: '💬', label: 'WhatsApp', cls: 'bg-[#1F3D2E] text-lime' },
-  { id: 'telegram', icon: '✈️', label: 'Telegram', cls: 'bg-[#1E3346] text-info' },
-  { id: 'call', icon: '📞', label: 'Звонок', cls: 'border border-surface-3 bg-surface-2 text-bright' },
+const channels: readonly {
+  id: 'whatsapp' | 'telegram' | 'call';
+  Icon: LucideIcon;
+  label: string;
+  cls: string;
+}[] = [
+  { id: 'whatsapp', Icon: MessageCircle, label: 'WhatsApp', cls: 'bg-[#1F3D2E] text-lime' },
+  { id: 'telegram', Icon: Send, label: 'Telegram', cls: 'bg-[#1E3346] text-info' },
+  { id: 'call', Icon: Phone, label: 'Звонок', cls: 'border border-surface-3 bg-surface-2 text-bright' },
 ] as const;
 
 export default function SupportPage() {
@@ -106,17 +112,17 @@ export default function SupportPage() {
             <div className="mt-2.5 grid grid-cols-2 gap-2 text-[13px]">
               <a
                 href={`tel:${storefront.content.contactPhone.replace(/[^\d+]/g, '')}`}
-                className="rounded-[11px] border border-surface-3 bg-surface-1 py-3 text-center text-bright"
+                className="flex items-center justify-center gap-1.5 rounded-[11px] border border-surface-3 bg-surface-1 py-3 text-center text-bright"
               >
-                📞 Позвонить
+                <Phone size={15} aria-hidden /> Позвонить
               </a>
               <a
                 href={`https://wa.me/${storefront.content.contactPhone.replace(/\D/g, '')}`}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-[11px] border border-surface-3 bg-surface-1 py-3 text-center text-bright"
+                className="flex items-center justify-center gap-1.5 rounded-[11px] border border-surface-3 bg-surface-1 py-3 text-center text-bright"
               >
-                💬 WhatsApp
+                <MessageCircle size={15} aria-hidden /> WhatsApp
               </a>
             </div>
             <div className="mt-2 text-[12px] text-muted">
@@ -141,7 +147,7 @@ export default function SupportPage() {
       <div className="mb-4 grid grid-cols-3 gap-2">
         {channels.map((c) => (
           <button key={c.id} type="button" onClick={() => setChannel(c.id)} className={`rounded-[13px] p-3.5 text-center ${c.cls} ${channel === c.id ? 'ring-2 ring-lime' : ''}`}>
-            <div className="text-2xl">{c.icon}</div>
+            <c.Icon size={22} strokeWidth={1.8} aria-hidden className="mx-auto" />
             <div className="mt-1.5 text-[12px] font-semibold">{c.label}</div>
           </button>
         ))}

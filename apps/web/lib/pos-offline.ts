@@ -45,6 +45,8 @@ export interface OfflinePosQueueItem {
   status: OfflinePosQueueStatus;
   attempts: number;
   lastError?: string;
+  /** Прогон синка, который держит статус `syncing`; см. SYNC_RUN_ID. */
+  syncRunId?: string;
   payload: OfflinePosPayload;
   snapshot: PosReceiptSnapshot;
   result?: PosSaleResult;
@@ -95,13 +97,52 @@ export function createLocalReceiptNo(clientSaleId: string): string {
   return `OFF-${clientSaleId.replace(/^pos-/, '').slice(0, 8).toUpperCase()}`;
 }
 
+/**
+ * Метка живого прогона синхронизации: `syncing` без неё — продажа, за которую уже
+ * некому ответить.
+ *
+ * Статус `syncing` пишется в localStorage перед `await sendSale` и снимается только
+ * после ответа. Вкладку закрыли, приложение убили, запрос повис на оборванной сети —
+ * и продажа остаётся `syncing` навсегда: цикл синка берёт только
+ * `queued`/`failed`/`approval_required`, в `offlineQueueStats` она не попадает ни в
+ * pending, ни в failed, «очистить synced» её не трогает. Деньги приняты, чек отдан,
+ * на сервер продажа не ушла, а у кассира нет ни повтора, ни удаления.
+ *
+ * Идентификатор живёт в памяти модуля, то есть ровно столько же, сколько вкладка
+ * (это просто уникальный токен, к самой продаже он отношения не имеет): чужой или
+ * отсутствующий id при загрузке означает, что тот прогон уже не жив. Повтор
+ * безопасен — ключ идемпотентности `clientSaleId` лежит в самом элементе очереди и
+ * не пересоздаётся, поэтому сервер по `pos:<clientSaleId>` либо проведёт продажу
+ * впервые, либо вернёт ту же самую вместо второй.
+ */
+const SYNC_RUN_ID = createPosClientSaleId();
+
+/**
+ * Запас на живой запрос из соседней вкладки: у fetch здесь нет таймаута, так что
+ * чужой `syncing` считаем брошенным не сразу, а когда он старше этого окна.
+ */
+const STALE_SYNC_MS = 120_000;
+
+function reviveInterruptedSync(item: OfflinePosQueueItem): OfflinePosQueueItem {
+  if (item.status !== 'syncing' || item.syncRunId === SYNC_RUN_ID) return item;
+  // Битую или уехавшую вперёд метку времени считаем не «свежей», а мёртвой:
+  // зависнуть в очереди навсегда хуже, чем повториться по идемпотентному ключу.
+  const elapsed = Date.now() - Date.parse(item.updatedAt);
+  if (Number.isFinite(elapsed) && elapsed >= 0 && elapsed < STALE_SYNC_MS) return item;
+  return {
+    ...item,
+    status: 'failed',
+    lastError: 'Синхронизация прервана — продажа не подтверждена, нужен повтор',
+  };
+}
+
 export function loadOfflinePosQueue(): OfflinePosQueueItem[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as OfflinePosQueueItem[];
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.map(reviveInterruptedSync) : [];
   } catch {
     return [];
   }
@@ -175,6 +216,7 @@ export async function syncOfflinePosQueue(
     let item: OfflinePosQueueItem = {
       ...current,
       status: 'syncing',
+      syncRunId: SYNC_RUN_ID,
       attempts: current.attempts + 1,
       lastError: undefined,
       updatedAt: new Date().toISOString(),

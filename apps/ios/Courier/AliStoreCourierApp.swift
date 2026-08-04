@@ -57,6 +57,10 @@ struct AliStoreCourierApp: App {
     var body: some Scene {
         WindowGroup {
             content
+                // Ставит общий обработчик 401: access-токен живёт 15 минут, а до
+                // этого обновлять его было нечем — сотрудник вводил пароль заново
+                // каждые четверть часа посреди смены.
+                .task { await auth.installUnauthorizedHandler() }
                 // Закрываем рабочее место курьера при уходе в фон: иначе
                 // разблокированный телефон открывает маршрут, адреса и суммы COD.
                 .onChange(of: scenePhase) { _, phase in

@@ -3,19 +3,20 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import { Cable, CheckCircle2, Headphones, Laptop, RotateCcw, Smartphone, Store, Tablet, Watch, type LucideIcon } from 'lucide-react';
 import { LoadFailure } from '@/components/LoadFailure';
 import { MobileFrame } from '@/components/mobile/MobileFrame';
 import { MobileProductCard } from '@/components/mobile/MobileProductCard';
 import { Pressable, Stagger, StaggerItem } from '@/components/motion/primitives';
 import { fetchCatalog, isCatalogUnavailable, fetchPublicStorefrontBlocks, fetchStorefrontContent, type CatalogProduct, type StorefrontBlock, type StorefrontPayload } from '@/lib/api';
 
-const CATS: [string, string][] = [
-  ['📱', 'Смартфоны'],
-  ['💻', 'Ноутбуки'],
-  ['🎧', 'Аудио'],
-  ['⌚', 'Часы'],
-  ['📲', 'Планшеты'],
-  ['🔌', 'Аксессуары'],
+const CATS: { Icon: LucideIcon; name: string }[] = [
+  { Icon: Smartphone, name: 'Смартфоны' },
+  { Icon: Laptop, name: 'Ноутбуки' },
+  { Icon: Headphones, name: 'Аудио' },
+  { Icon: Watch, name: 'Часы' },
+  { Icon: Tablet, name: 'Планшеты' },
+  { Icon: Cable, name: 'Аксессуары' },
 ];
 
 export default function MobileHome() {
@@ -57,21 +58,21 @@ export default function MobileHome() {
         <StaggerItem className="mb-3.5 flex gap-2">
           <Pressable className="flex-1" hover={false}>
             <div className="rounded-[15px] bg-gradient-to-br from-coral to-deep p-3.5">
-              <div className="text-xl">✓</div>
+              <CheckCircle2 size={20} strokeWidth={1.9} aria-hidden className="text-white" />
               <div className="mt-1.5 text-[13px] font-bold text-white">{storefront?.content.benefits[0]?.title ?? 'Актуальное наличие'}</div>
               <div className="text-[11px] text-tint">{storefront?.content.benefits[0]?.body ?? 'из складской системы'}</div>
             </div>
           </Pressable>
           <Pressable className="flex-1" hover={false}>
             <div className="rounded-[15px] border border-surface-3 bg-surface-2 p-3.5">
-              <div className="text-xl">⌖</div>
+              <Store size={20} strokeWidth={1.8} aria-hidden className="text-white" />
               <div className="mt-1.5 text-[13px] font-bold text-white">Получение</div>
               <div className="text-[11px] text-muted">условия в checkout</div>
             </div>
           </Pressable>
           <Pressable className="flex-1" hover={false}>
             <Link href="/trade-in" className="block rounded-[15px] border border-surface-3 bg-surface-2 p-3.5">
-              <div className="text-xl">♻️</div>
+              <RotateCcw size={20} strokeWidth={1.8} aria-hidden className="text-lime" />
               <div className="mt-1.5 text-[13px] font-bold text-white">Trade-in</div>
               <div className="text-[11px] text-lime">оценка устройства</div>
             </Link>
@@ -80,13 +81,13 @@ export default function MobileHome() {
 
         {/* categories */}
         <StaggerItem className="mb-5 flex gap-2 overflow-x-auto pb-1">
-          {CATS.map(([icon, name]) => (
+          {CATS.map(({ Icon, name }) => (
             <Pressable key={name} className="flex-shrink-0" hover={false}>
               <Link
                 href={`/catalog?category=${encodeURIComponent(name)}`}
                 className="block rounded-[12px] border border-surface-3 bg-surface-2 px-3.5 py-2.5 text-center"
               >
-                <div className="text-[22px]">{icon}</div>
+                <Icon size={22} strokeWidth={1.7} aria-hidden className="mx-auto text-lime" />
                 <div className="mt-1 whitespace-nowrap text-[11px] text-bright">{name}</div>
               </Link>
             </Pressable>
@@ -106,7 +107,12 @@ export default function MobileHome() {
               <span className="mt-4 inline-block rounded-[10px] bg-lime px-[18px] py-2.5 text-[13px] font-bold text-lime-ink">
                 {storefront?.content.heroCtaLabel ?? 'Смотреть'}
               </span>
-              <div className="pointer-events-none absolute -bottom-2.5 -right-2.5 text-[90px] opacity-[0.15]">📱</div>
+              <Smartphone
+                size={90}
+                strokeWidth={1.2}
+                aria-hidden
+                className="pointer-events-none absolute -bottom-2.5 -right-2.5 opacity-[0.15]"
+              />
             </Link>
           </Pressable>
         </StaggerItem>}

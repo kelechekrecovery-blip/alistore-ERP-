@@ -40,15 +40,25 @@ function sessionId(): string {
 
 export function track(type: FunnelEvent, options: TrackOptions = {}): void {
   if (optedOut()) return;
-  const body = JSON.stringify({
-    type,
-    sessionId: sessionId(),
-    productId: options.productId,
-    // Last-touch campaign source, so the funnel can be attributed to the campaign
-    // that drove this session. Absent → the server records it as «(direct)».
-    source: loadAttribution()?.last.source,
-    props: options.props,
-  });
+  // Телеметрия не имеет права ронять то, из чего её позвали. `sessionId()` и
+  // `loadAttribution()` оба читают и пишут localStorage, а он бросает целиком
+  // при заблокированном хранилище (Safari private, запрет сторонних данных).
+  // Раньше это исключение поднималось прямо в обработчик «В корзину»:
+  // покупатель не мог положить товар из-за счётчика.
+  let body: string;
+  try {
+    body = JSON.stringify({
+      type,
+      sessionId: sessionId(),
+      productId: options.productId,
+      // Last-touch campaign source, so the funnel can be attributed to the campaign
+      // that drove this session. Absent → the server records it as «(direct)».
+      source: loadAttribution()?.last.source,
+      props: options.props,
+    });
+  } catch {
+    return;
+  }
   // keepalive lets the beacon survive a navigation (e.g. add-to-cart → cart);
   // the catch swallows everything — telemetry never surfaces to the user.
   void fetch(`${API_BASE}/analytics/events`, {
