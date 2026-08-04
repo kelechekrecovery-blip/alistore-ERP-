@@ -120,7 +120,7 @@ export default function MobileHome() {
         {/* hits */}
         {!blocks.some((block) => block.type === 'collection') && <><StaggerItem className="mb-3 flex items-center">
           <span className="font-display text-[18px] font-bold text-white">{storefront?.content.featuredTitle ?? 'Товары в каталоге'}</span>
-          <Link href="/catalog" className="ml-auto text-[13px] text-lime">
+          <Link href="/catalog" className="tap-target ml-auto px-1 text-[13px] text-lime">
             Все →
           </Link>
         </StaggerItem>

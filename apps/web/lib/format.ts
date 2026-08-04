@@ -33,6 +33,33 @@ export function daysLabel(days: number): string {
   return `${days} ${dayWord(days)}`;
 }
 
+/**
+ * Склонение «товар» по числу: 1 товар / 2 товара / 5 товаров.
+ *
+ * Счётчик в каталоге писал «товаров» при любом числе, и на четырёх позициях
+ * заголовок читался как «4 товаров». Правило то же, что у `dayWord`, включая
+ * исключение для 11–14.
+ */
+function productWord(count: number): string {
+  const lastTwo = count % 100;
+  if (lastTwo >= 11 && lastTwo <= 14) return 'товаров';
+  switch (count % 10) {
+    case 1:
+      return 'товар';
+    case 2:
+    case 3:
+    case 4:
+      return 'товара';
+    default:
+      return 'товаров';
+  }
+}
+
+/** "N товаров" в правильной форме — счётчики выдачи каталога и поиска. */
+export function productsLabel(count: number): string {
+  return `${count} ${productWord(count)}`;
+}
+
 /** Honest lead-time label for a to-order product: "Под заказ · N дней". */
 export function supplyLeadLabel(days: number): string {
   return `Под заказ · ${daysLabel(days)}`;

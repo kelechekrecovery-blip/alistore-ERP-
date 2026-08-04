@@ -9,6 +9,7 @@ import { SiteHeader } from '@/components/SiteHeader';
 import MobileCatalog from '@/components/mobile/MobileCatalog';
 import { fetchCatalog, fetchCatalogCategories, isCatalogUnavailable, type CatalogProduct, type CatalogQuery } from '@/lib/api';
 import { CATALOG_PAGE_SIZE as PAGE_SIZE } from '@/lib/catalog-view';
+import { productsLabel } from '@/lib/format';
 
 interface CatalogPageProps {
   /** Первая страница, уже полученная сервером; `null` — каталог не ответил. */
@@ -66,7 +67,7 @@ export default function CatalogPage({ initialProducts = null, initialTotal = 0, 
     <main className="mx-auto max-w-[1400px] px-5 py-8">
       <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div><div className="text-xs text-white/40">Главная / Каталог</div><h1 className="mt-3 text-[34px] font-extrabold text-white">Каталог техники</h1><p className="mt-2 text-white/45">Новое и проверенное Б/У с гарантией AliStore</p></div>
-        <div className="text-sm text-white/45">{products === null ? 'Загрузка...' : `${total} товаров`}</div>
+        <div className="text-sm text-white/45">{products === null ? 'Загрузка...' : productsLabel(total)}</div>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[238px_1fr]">

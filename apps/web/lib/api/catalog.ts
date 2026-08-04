@@ -20,6 +20,19 @@ export interface CatalogProduct {
   availableUnits: number;
   reviewCount: number;
   avgRating: number | null;
+  /**
+   * Лучшая партнёрская рассрочка для этой цены — «от N сом/мес».
+   * Считает сервер по договорным условиям владельца (`installment.*` в
+   * настройках): срок, потолок суммы и наценка магазина. `null` или отсутствие
+   * поля — рассрочка недоступна, и витрина молчит, а не придумывает цифру.
+   */
+  installment?: {
+    id: string;
+    label: string;
+    months: number;
+    monthlySom: number;
+    totalSom: number;
+  } | null;
   updatedAt?: string;
 }
 

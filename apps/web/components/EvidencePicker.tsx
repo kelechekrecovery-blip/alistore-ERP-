@@ -1,5 +1,7 @@
 'use client';
 
+import { Camera } from 'lucide-react';
+
 export function EvidencePicker({
   files,
   onChange,
@@ -27,7 +29,7 @@ export function EvidencePicker({
             event.target.value = '';
           }}
         />
-        <span className="block text-xl">📷</span>
+        <Camera size={22} strokeWidth={1.8} aria-hidden className="mx-auto" />
         <span className="mt-1 block text-[13px] font-semibold text-lime">{label}</span>
         <span className="mt-1 block text-[11px] leading-relaxed text-faint">{hint}</span>
       </label>

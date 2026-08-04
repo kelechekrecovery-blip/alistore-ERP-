@@ -1,15 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { SearchX } from 'lucide-react';
+import { ArrowUpDown, Check, SearchX } from 'lucide-react';
 import { MobileFrame } from '@/components/mobile/MobileFrame';
 import { MobileProductCard } from '@/components/mobile/MobileProductCard';
 import { fetchCatalog, fetchCatalogCategories, isCatalogUnavailable, type CatalogProduct, type CatalogQuery } from '@/lib/api';
 
+// Подписи сортировки — те же слова, что в десктопном `<select>`
+// (`CatalogClient.tsx:83`). Раньше первая была «В наличии» и стояла вплотную к
+// переключателю «✓ В наличии»: две соседние кнопки читались одинаково, хотя
+// одна сортирует, а другая фильтрует.
 const SORTS = [
-  { id: 'stock_desc', label: 'В наличии' },
-  { id: 'price_asc', label: 'Дешевле' },
-  { id: 'price_desc', label: 'Дороже' },
+  { id: 'stock_desc', label: 'Сначала в наличии' },
+  { id: 'price_asc', label: 'Сначала дешевле' },
+  { id: 'price_desc', label: 'Сначала дороже' },
 ] as const;
 
 export default function MobileCatalog() {
@@ -72,18 +76,18 @@ export default function MobileCatalog() {
           <button
             type="button"
             onClick={() => { setSortIdx((i) => (i + 1) % SORTS.length); setOffset(0); }}
-            className="flex-1 rounded-[10px] border border-surface-3 bg-surface-2 py-2.5 text-center text-xs text-bright"
+            className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-surface-3 bg-surface-2 py-2.5 text-center text-xs text-bright"
           >
-            ↕ {sort.label}
+            <ArrowUpDown size={14} aria-hidden /> {sort.label}
           </button>
           <button
             type="button"
             onClick={() => { setStockOnly((v) => !v); setOffset(0); }}
-            className={`flex-1 rounded-[10px] border border-surface-3 py-2.5 text-center text-xs transition ${
+            className={`flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-surface-3 py-2.5 text-center text-xs transition ${
               stockOnly ? 'bg-lime/10 text-lime' : 'bg-surface-2 text-bright'
             }`}
           >
-            ✓ В наличии
+            <Check size={14} aria-hidden /> Только в наличии
           </button>
         </div>
 

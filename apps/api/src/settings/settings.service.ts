@@ -42,6 +42,23 @@ export class SettingsService {
     }
   }
 
+  /** Read a group of effective values in one query for request-time consumers. */
+  async values(keys: readonly string[]): Promise<Record<string, number>> {
+    if (keys.length === 0) return {};
+    const definitions = keys.map((key) => settingDefinition(key));
+    const rows = await this.prisma.setting.findMany({ where: { key: { in: [...keys] } } });
+    const stored = new Map(rows.map((row) => [row.key, row.value]));
+    return Object.fromEntries(definitions.map((definition) => {
+      const raw = stored.get(definition.key);
+      if (raw === undefined) return [definition.key, definition.fallback];
+      try {
+        return [definition.key, parseSettingValue(definition, raw)];
+      } catch {
+        return [definition.key, definition.fallback];
+      }
+    }));
+  }
+
   /** Every parameter with its effective value — powers the settings screen. */
   async list(): Promise<SettingView[]> {
     const rows = await this.prisma.setting.findMany();

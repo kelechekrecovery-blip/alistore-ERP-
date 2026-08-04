@@ -189,6 +189,25 @@
 }
 
 @layer components {
+  /**
+   * Минимальная зона нажатия 44×44 — веб-двойник `minTapTarget(_:)` из
+   * `apps/ios/Shared/TapTarget.swift`, который натив уже применяет к тем же
+   * иконкам сравнения и уведомлений (`AliStoreClientApp.swift:182-184`).
+   *
+   * На вебе такой утилиты не было, и у иконочных ссылок зона нажатия равнялась
+   * самому глифу: замер на мобильной витрине дал 18×18 у «Сравнения» и
+   * «Уведомлений». Промах по такой цели — обычное дело на телефоне, а
+   * телефон здесь основной канал.
+   *
+   * Растёт только зона, не вид: иконка остаётся своего размера, а
+   * `inline-flex` + центрирование удерживают её на месте.
+   */
+  .tap-target {
+    @apply inline-flex items-center justify-center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   .input {
     @apply w-full rounded-btn border border-ink/15 bg-white px-4 py-2.5 text-base text-ink outline-none transition placeholder:text-ink/35 focus:border-coral focus:ring-4 focus:ring-coral/15;
   }

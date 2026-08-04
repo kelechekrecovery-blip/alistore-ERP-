@@ -1030,7 +1030,12 @@ private struct ClientOverlayView: View {
                 .foregroundStyle(.white)
             VStack(alignment: .leading, spacing: 3) {
                 Text(product.category)
-                Text("🛡 Гарантия 12 мес")
+                // SF Symbol вместо эмодзи: 🛡 рисуется системным шрифтом эмодзи,
+                // не наследует ни начертание, ни цвет строки и выглядит инородно
+                // рядом с «● В наличии» ниже. Оба скила — веб и SwiftUI — держат
+                // эмодзи-как-иконку в запрещённых.
+                Label("Гарантия 12 мес", systemImage: "checkmark.shield")
+                    .labelStyle(.titleAndIcon)
                 Text(product.availableUnits > 0 ? "● В наличии" : "● Нет в наличии")
                     .foregroundStyle(product.availableUnits > 0 ? ClientTheme.lime : ClientTheme.coral)
             }
@@ -1435,6 +1440,17 @@ private struct ClientRootView: View {
             if UITestBootstrap.startsAtCheckout || UITestBootstrap.startsAtCart, let product = products.first {
                 cart[product.id] = 1
             }
+            catalogError = nil
+            return
+        }
+        // Signed-in UI tests use the same deterministic catalog as their
+        // orders/devices fixtures. Without this branch a reachable API could
+        // return a different catalog (or omit the return item's SKU), making
+        // the exact-SKU product-title contract nondeterministic.
+        if UITestBootstrap.startsSignedIn,
+           !UITestBootstrap.startsAtCheckout,
+           !UITestBootstrap.startsAtCart {
+            products = ClientUIFixture.products
             catalogError = nil
             return
         }
@@ -4315,6 +4331,9 @@ private struct AccountView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .tint(ClientTheme.lime)
+        // The storefront shell hides its navigation bar, but account flows
+        // use this stack for titles and back navigation.
+        .toolbar(.visible, for: .navigationBar)
         .preferredColorScheme(.dark)
         .task(id: auth.session?.accessToken) { await loadAccountSummary() }
     }
@@ -4407,7 +4426,12 @@ private struct AccountView: View {
                     DevicesView(environment: environment, auth: auth)
                 }
                 AccountMenuTile(title: "Возвраты", detail: "Заявки и refund", symbol: "arrow.uturn.backward.circle.fill") {
-                    CustomerReturnsView(environment: environment, auth: auth, products: products)
+                    // Keep the return flow's navigation chrome visible even though
+                    // the shell hides its own bar; this destination owns the
+                    // title and the request sheet's back affordance.
+                    NavigationStack {
+                        CustomerReturnsView(environment: environment, auth: auth, products: products)
+                    }
                 }
                 AccountMenuTile(title: "Поддержка", detail: "Обращения и ответы", symbol: "bubble.left.and.bubble.right.fill") {
                     CustomerSupportView(environment: environment, auth: auth)
@@ -6860,7 +6884,9 @@ private struct ClientHomeView: View {
                     .buttonStyle(.plain)
                     if !products.isEmpty {
                         HStack {
-                            Text("✨ Для вас").font(ClientTheme.display(18, weight: .bold))
+                            Label("Для вас", systemImage: "sparkles")
+                                .labelStyle(.titleAndIcon)
+                                .font(ClientTheme.display(18, weight: .bold))
                             Spacer()
                             Text("подобрано").font(ClientTheme.body(11, weight: .semibold)).foregroundStyle(Design3.orange)
                         }
@@ -6882,7 +6908,9 @@ private struct ClientHomeView: View {
                         .accessibilityIdentifier("home-for-you")
                     }
                     HStack {
-                    Text("🔥 Хиты продаж").font(ClientTheme.display(18, weight: .bold))
+                    Label("Хиты продаж", systemImage: "flame")
+                        .labelStyle(.titleAndIcon)
+                        .font(ClientTheme.display(18, weight: .bold))
                         Spacer()
                         Button("Все", action: openCatalog).foregroundStyle(ClientTheme.lime)
                     }

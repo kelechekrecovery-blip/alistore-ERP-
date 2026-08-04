@@ -75,7 +75,9 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
             toggle(product.id);
           }}
           aria-label={has(product.id) ? 'Убрать из избранного' : 'В избранное'}
-          className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-lime-ink/60 text-sm"
+          // Кружок остаётся 28px, а нажимается 44: вынести сердце в отдельную
+          // видимую кнопку 44×44 значило бы закрыть ею четверть фото товара.
+          className="tap-target absolute right-0 top-0 rounded-full text-sm before:absolute before:h-7 before:w-7 before:rounded-full before:bg-lime-ink/60 before:content-['']"
         >
           <Heart
             size={15}
@@ -89,6 +91,7 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
           {product.name}
         </Link>
         <div className="mt-1.5 font-display text-[16px] font-extrabold text-white">{som(product.price)}</div>
+        {product.installment && <div className="mt-1 text-[10px] text-lime">от {som(product.installment.monthlySom)}/мес · {product.installment.label}</div>}
         <div className="mt-0.5 text-[10px] text-subtle">
           {inStock ? (
             `${product.availableUnits} в наличии`

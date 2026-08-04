@@ -266,6 +266,10 @@ final class AliStoreClientUITests: XCTestCase {
         returnsApp.staticTexts["Возвраты"].tap()
         XCTAssertTrue(returnsApp.navigationBars["Возвраты"].waitForExistence(timeout: 5))
         XCTAssertTrue(returnsApp.staticTexts["Возврат товара"].waitForExistence(timeout: 5))
+        // Список возвратов больше не придумывает названия по подстроке SKU
+        // (любой SKU со словом IPHONE показывался как «iPhone 15 128 GB Black»,
+        // в том числе для чужого устройства). Имя берётся из каталога по точному
+        // SKU; эта fixture-позиция есть в нём явно, поэтому проверяем canonical name.
         XCTAssertTrue(returnsApp.staticTexts["iPhone 15 128 GB Black"].exists)
         XCTAssertTrue(returnsApp.staticTexts["Заявка принята"].exists)
         XCTAssertTrue(returnsApp.staticTexts["Проверка товара"].exists)

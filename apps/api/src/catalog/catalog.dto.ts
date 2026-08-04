@@ -61,7 +61,23 @@ export class CatalogSearchQueryDto {
   offset = 0;
 }
 
+export class InstallmentOfferDto {
+  @ApiProperty({ example: 'omarket' }) id!: string;
+  @ApiProperty({ example: 'O!Market' }) label!: string;
+  @ApiProperty({ example: 12 }) months!: number;
+  @ApiProperty({ example: 2075, description: 'Ежемесячный платёж, сом.' }) monthlySom!: number;
+  @ApiProperty({ example: 24900, description: 'Итого к выплате: цена плюс наценка магазина.' }) totalSom!: number;
+}
+
 export class CatalogProductDto {
+  /**
+   * Лучшая партнёрская рассрочка для этой цены — «от N сом/мес» на карточке.
+   * `null` — рассрочка недоступна или все провайдеры выключены в настройках.
+   * Считает сервер: витрина не имеет права придумывать финансовое условие.
+   */
+  @ApiPropertyOptional({ type: () => InstallmentOfferDto, nullable: true })
+  installment?: InstallmentOfferDto | null;
+
   @ApiProperty() id!: string;
   @ApiProperty() sku!: string;
   @ApiPropertyOptional({ nullable: true }) barcode!: string | null;

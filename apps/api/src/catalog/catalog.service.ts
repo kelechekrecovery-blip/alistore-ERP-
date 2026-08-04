@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { ForbiddenError, ValidationError } from '../common/errors';
+import { bestInstallmentOffer, type InstallmentPlan } from './installments';
+import { SettingsService } from '../settings/settings.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CatalogDeltaQueryDto,
@@ -98,6 +100,10 @@ export class CatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    // Опционально: каталог обязан отвечать и там, где модуль настроек не поднят
+    // (узкие тестовые сборки). Без него рассрочка просто не показывается —
+    // отсутствие условия честнее выдуманного.
+    @Optional() private readonly settings?: SettingsService,
   ) {}
 
   async search(query: CatalogSearchQueryDto): Promise<CatalogSearchResponseDto> {
@@ -176,7 +182,7 @@ export class CatalogService {
         orderBy: [{ name: 'asc' }], take: 12, include: this.stockCountInclude(),
       }),
     ]);
-    const enriched = await this.enrichReviews([product, ...variants, ...related].map((item) => this.toCatalogProduct(item)));
+    const enriched = await this.enrichInstallments(await this.enrichReviews([product, ...variants, ...related].map((item) => this.toCatalogProduct(item))));
     const [main, ...rest] = enriched;
     return { product: main, variants: rest.slice(0, variants.length), related: rest.slice(variants.length) };
   }
@@ -277,7 +283,7 @@ export class CatalogService {
       total: response.estimatedTotalHits ?? response.totalHits ?? ordered.length,
       limit: query.limit,
       offset: query.offset,
-      items: await this.enrichReviews(ordered),
+      items: await this.enrichInstallments(await this.enrichReviews(ordered)),
     };
   }
 
@@ -303,7 +309,7 @@ export class CatalogService {
         total: sorted.length,
         limit: query.limit,
         offset: query.offset,
-        items: await this.enrichReviews(sorted.slice(query.offset, query.offset + query.limit)),
+        items: await this.enrichInstallments(await this.enrichReviews(sorted.slice(query.offset, query.offset + query.limit))),
       };
     }
     const [total, products] = await this.prisma.$transaction([
@@ -323,7 +329,7 @@ export class CatalogService {
       total,
       limit: query.limit,
       offset: query.offset,
-      items: await this.enrichReviews(products.map((product) => this.toCatalogProduct(product))),
+      items: await this.enrichInstallments(await this.enrichReviews(products.map((product) => this.toCatalogProduct(product)))),
     };
   }
 
@@ -417,6 +423,42 @@ export class CatalogService {
       avgRating: null,
       updatedAt: product.updatedAt.toISOString(),
     };
+  }
+
+  /**
+   * Партнёрские рассрочки владельца: Payda (Оптима Банк), O!Market (O!Bank),
+   * ZERO (А Банк), M+. Сроки, потолки и наценка магазина задаются в настройках,
+   * потому что это коммерческие условия договора, а не константы кода.
+   * Провайдер со сроком 0 выключен — так по умолчанию стоят те, чьи условия
+   * не опубликованы: показывать срок, которого мы не знаем, нельзя.
+   */
+  private async installmentPlans(): Promise<InstallmentPlan[]> {
+    const settings = this.settings;
+    if (!settings) return [];
+    // Ключи выписаны литералами намеренно: `settings-wired.e2e-spec` следит,
+    // что каждый объявленный параметр где-то действительно читается, а
+    // шаблонная строка эту проверку обходит — мёртвая настройка проползла бы
+    // в реестр незамеченной.
+    const values = await settings.values([
+      'installment.payda.months', 'installment.payda.markup_bps', 'installment.payda.limit_som',
+      'installment.omarket.months', 'installment.omarket.markup_bps', 'installment.omarket.limit_som',
+      'installment.zero.months', 'installment.zero.markup_bps', 'installment.zero.limit_som',
+      'installment.mplus.months', 'installment.mplus.markup_bps', 'installment.mplus.limit_som',
+    ]);
+    return [
+      { id: 'payda', label: 'Payda', months: values['installment.payda.months'], markupBps: values['installment.payda.markup_bps'], limitSom: values['installment.payda.limit_som'] },
+      { id: 'omarket', label: 'O!Market', months: values['installment.omarket.months'], markupBps: values['installment.omarket.markup_bps'], limitSom: values['installment.omarket.limit_som'] },
+      { id: 'zero', label: 'ZERO', months: values['installment.zero.months'], markupBps: values['installment.zero.markup_bps'], limitSom: values['installment.zero.limit_som'] },
+      { id: 'mplus', label: 'M+', months: values['installment.mplus.months'], markupBps: values['installment.mplus.markup_bps'], limitSom: values['installment.mplus.limit_som'] },
+    ];
+  }
+
+  /** «от N сом/мес» на карточке: платёж считает сервер, не вёрстка. */
+  private async enrichInstallments(items: CatalogProductDto[]): Promise<CatalogProductDto[]> {
+    if (items.length === 0) return items;
+    const plans = await this.installmentPlans();
+    if (plans.every((plan) => plan.months <= 0)) return items;
+    return items.map((item) => ({ ...item, installment: bestInstallmentOffer(item.price, plans) }));
   }
 
   private async enrichReviews(items: CatalogProductDto[]): Promise<CatalogProductDto[]> {
