@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DeliverableMessage, NotificationTransport } from '../outbox.types';
+import { fetchWithTimeout } from './fetch-with-timeout';
 
 const EXPO_PUSH_TOKEN = /^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]$/;
 
@@ -37,7 +38,7 @@ export class ExpoPushTransport implements NotificationTransport {
     }
 
     const payload = jsonObject(message.payload);
-    const response = await fetch(this.apiUrl, {
+    const response = await fetchWithTimeout(this.apiUrl, {
       method: 'POST',
       headers: {
         Accept: 'application/json',

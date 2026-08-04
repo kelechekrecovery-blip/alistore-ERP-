@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DeliverableMessage, NotificationTransport } from '../outbox.types';
+import { fetchWithTimeout } from './fetch-with-timeout';
 
 /**
  * Delivers outbox messages through Novu's REST trigger API
@@ -23,7 +24,7 @@ export class NovuHttpTransport implements NotificationTransport {
   }
 
   async deliver(message: DeliverableMessage): Promise<void> {
-    const response = await fetch(`${this.apiUrl}/v1/events/trigger`, {
+    const response = await fetchWithTimeout(`${this.apiUrl}/v1/events/trigger`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

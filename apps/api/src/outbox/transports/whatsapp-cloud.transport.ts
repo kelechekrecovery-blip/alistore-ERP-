@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DeliverableMessage, NotificationTransport } from '../outbox.types';
 import { notificationText } from './message-text';
+import { fetchWithTimeout } from './fetch-with-timeout';
 
 @Injectable()
 export class WhatsAppCloudTransport implements NotificationTransport {
@@ -20,7 +21,7 @@ export class WhatsAppCloudTransport implements NotificationTransport {
   }
 
   async deliver(message: DeliverableMessage): Promise<void> {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${this.apiUrl}/${this.apiVersion}/${this.phoneNumberId}/messages`,
       {
         method: 'POST',

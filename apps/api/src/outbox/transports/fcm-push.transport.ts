@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FCM_TOKEN_PATTERN } from '../../notifications/push-token.dto';
 import { DeliverableMessage, NotificationTransport } from '../outbox.types';
+import { fetchWithTimeout } from './fetch-with-timeout';
 
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 const DEFAULT_TOKEN_URI = 'https://oauth2.googleapis.com/token';
@@ -111,7 +112,7 @@ class FcmHttpV1Sender implements FcmSender {
 
   async send(message: FcmMessage): Promise<FcmSendResult> {
     const accessToken = await this.getAccessToken();
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(this.account.project_id)}/messages:send`,
       {
         method: 'POST',
@@ -130,7 +131,7 @@ class FcmHttpV1Sender implements FcmSender {
 
     const tokenUri = this.account.token_uri?.trim() || DEFAULT_TOKEN_URI;
     const assertion = serviceAccountAssertion(this.account, tokenUri, Math.floor(now / 1000));
-    const response = await fetch(tokenUri, {
+    const response = await fetchWithTimeout(tokenUri, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
