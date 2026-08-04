@@ -1,7 +1,8 @@
 # AliStore — self-hosted v1 infrastructure
 
-> Docker is not installed on the current dev machine, so the Compose document is
-> parser-validated but still requires a live container smoke on staging.
+> Compose has been smoke-tested locally: Redis authentication/BullMQ worker and
+> MinIO bucket policy were verified live. Meilisearch/Metabase remain optional
+> local services and must be health-checked after their images are available.
 
 ## Services (`docker-compose.yml`)
 
