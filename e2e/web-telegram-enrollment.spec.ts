@@ -48,6 +48,7 @@ async function fulfillAuthenticated(route: Route) {
     body: JSON.stringify({
       status: 'authenticated',
       accessToken,
+      refreshToken: 'telegram-web-refresh-token',
       tokenType: 'Bearer',
       expiresIn: '15m',
     }),
@@ -98,9 +99,30 @@ test('linked Telegram identity follows the existing success path and preserves n
   }])));
   await page.route('**/api/auth/v2/social/telegram', fulfillAuthenticated);
   await page.route('**/api/catalog/products/kept', (route) => route.fulfill({
-    status: 404,
+    status: 200,
     contentType: 'application/json',
-    body: '{}',
+    body: JSON.stringify({
+      product: {
+        id: 'kept',
+        sku: 'KEPT-1',
+        name: 'Kept cart item',
+        price: 100,
+        category: 'Тест',
+        trackingMode: 'quantity',
+        supplyMode: 'to_order',
+        supplyLeadDays: 5,
+        orderable: true,
+        availabilityKind: 'to_order',
+        leadTimeDays: 5,
+        estimatedDeliveryDate: null,
+        attrs: null,
+        availableUnits: 0,
+        reviewCount: 0,
+        avgRating: null,
+      },
+      variants: [],
+      related: [],
+    }),
   }));
   await mockMe(page);
 

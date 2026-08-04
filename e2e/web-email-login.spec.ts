@@ -91,7 +91,7 @@ test('login presents one phone sign-in/create flow and only available providers'
 
   await expect(page.getByRole('heading', { name: 'Войти или создать аккаунт' })).toBeVisible();
   await expect(page.getByText(/Если номер ещё не зарегистрирован, после проверки кода мы создадим аккаунт/)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Восстановить' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Восстановить' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Apple' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Telegram' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Продолжить как гость/ })).toBeVisible();
