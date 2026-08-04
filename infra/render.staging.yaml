@@ -117,7 +117,7 @@ envVarGroups:
   - name: alistore-staging-common
     envVars:
       - { key: NODE_ENV, value: production }
-      - { key: JWT_SECRET, generateValue: true }
+      - { key: JWT_SECRET, value: "59aa2f497ab4725c56244e0347a058ed3b26f830d5ab451fdad2a25de9f820f4" }
       - { key: AUTH_REFRESH_ROTATION_GRACE_ENABLED, value: "false" }
       # Генерируется Render, чтобы не хранить секрет в git; в проде заменяется
       # на управляемый владельцем ключ через Environment Group.
