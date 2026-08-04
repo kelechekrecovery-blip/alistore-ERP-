@@ -33,6 +33,15 @@ const nextConfig = {
   async headers() {
     const noIndexHeaders = [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }];
     return [
+      // HTML carries references to build-id-specific Next chunks. Never let a
+      // CDN keep an interactive route for a year: after a deploy those chunks
+      // may no longer exist, turning client navigation into ChunkLoadError and
+      // forcing a full reload. Hashed assets keep their immutable cache policy
+      // because this rule only matches application routes, not _next/static.
+      {
+        source: '/((?!api(?:/|$)|_next/static|_next/image|favicon.ico).*)',
+        headers: [{ key: 'Cache-Control', value: 'no-store, max-age=0' }],
+      },
       {
         source: '/(.*)',
         headers: [

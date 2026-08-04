@@ -59,6 +59,12 @@ jobs. The API runs the same core check before production bootstrap and applies H
 `launch:readiness` prints a secret-safe external report. `launch:check` runs the
 strict core preflight and strict external readiness gates together.
 
+The deployment smoke also verifies that interactive HTML routes such as
+`/checkout` and `/cart` return `Cache-Control: no-store`. If an existing
+deployment still reports `s-maxage=31536000`, purge the CDN/Cloudflare cache once
+after deploying the web image; otherwise browsers can receive HTML that references
+chunks from a previous Next build.
+
 For machine-readable automation:
 
 ```bash
