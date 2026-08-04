@@ -1,5 +1,5 @@
 // Wire-contract declarations mirror server payloads and keep related fields together.
-// swiftlint:disable line_length
+// swiftlint:disable file_length line_length
 import Foundation
 
 public struct CatalogResponse: Decodable, Sendable {
