@@ -22,9 +22,10 @@ import { PriceScoutService } from './price-scout.service';
 import { PriceScoutController } from './price-scout.controller';
 import { AiOrchestratorService } from './orchestrator.service';
 import { AiOrchestratorController } from './orchestrator.controller';
+import { SupportModule } from '../support/support.module';
 
 @Module({
-  imports: [SettingsModule, ReportsModule, StaffAuthModule, AuthzModule, ModerationModule],
+  imports: [SettingsModule, ReportsModule, StaffAuthModule, AuthzModule, ModerationModule, SupportModule],
   providers: [
     InsightsService,
     ValuationService,

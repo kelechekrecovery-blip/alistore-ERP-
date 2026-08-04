@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, ArrowRight } from 'lucide-react';
 import { previewCampaign } from '@/lib/api/campaigns';
 import { fetchTickets, type Ticket } from '@/lib/crm';
-import type { RiskSignal } from '@/lib/reports';
+import { runAiTool, type AiRunResult, type RiskSignal } from '@/lib/reports';
 import { AsyncPanel } from './AsyncPanel';
 import { CustomerCard } from './CustomerCard';
 
@@ -56,6 +56,9 @@ export function CrmView({ accessToken, risks, onOpenCampaigns }: Props) {
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
   const [ticketsError, setTicketsError] = useState('');
   const [openCustomer, setOpenCustomer] = useState<string | null>(null);
+  const [triage, setTriage] = useState<Record<string, AiRunResult>>({});
+  const [triageBusy, setTriageBusy] = useState<string | null>(null);
+  const [triageError, setTriageError] = useState<Record<string, string>>({});
 
   const loadTiles = useCallback(async () => {
     setTilesError('');
@@ -91,6 +94,19 @@ export function CrmView({ accessToken, risks, onOpenCampaigns }: Props) {
   useEffect(() => { void loadTiles(); void loadTickets(); }, [loadTiles, loadTickets]);
 
   const crmSignals = (risks ?? []).filter((signal) => CRM_SIGNAL_KINDS.has(signal.kind));
+
+  async function runTriage(ticketId: string) {
+    setTriageBusy(ticketId);
+    setTriageError((current) => ({ ...current, [ticketId]: '' }));
+    try {
+      const result = await runAiTool('support_triage', accessToken, ticketId);
+      setTriage((current) => ({ ...current, [ticketId]: result }));
+    } catch (cause) {
+      setTriageError((current) => ({ ...current, [ticketId]: cause instanceof Error ? cause.message : 'AI triage недоступен' }));
+    } finally {
+      setTriageBusy(null);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -159,16 +175,18 @@ export function CrmView({ accessToken, risks, onOpenCampaigns }: Props) {
             <ul className="divide-y divide-surface-3 overflow-hidden rounded-[14px] border border-surface-3 bg-ink-dark">
               {list.map((ticket) => (
                 <li key={ticket.id}>
-                  <button
-                    type="button"
-                    onClick={() => setOpenCustomer((current) => (current === ticket.customerId ? null : ticket.customerId))}
-                    className="flex w-full flex-wrap items-center gap-2 px-4 py-3 text-left text-xs transition hover:bg-surface"
-                  >
-                    <span className="min-w-0 flex-1 truncate text-white">{ticket.subject}</span>
+                  <div className="flex w-full flex-wrap items-center gap-2 px-4 py-3 text-left text-xs">
+                    <button type="button" onClick={() => setOpenCustomer((current) => (current === ticket.customerId ? null : ticket.customerId))} className="min-w-0 flex-1 truncate text-left text-white hover:text-lime">{ticket.subject}</button>
                     <span className={`rounded-[5px] border px-2 py-0.5 text-[10px] ${PRIORITY_STYLE[ticket.priority] ?? PRIORITY_STYLE.normal}`}>{ticket.priority}</span>
                     <span className="text-[10px] text-subtle">{ticket.status}</span>
                     <span className="text-[10px] text-subtle">SLA {ticket.sla}</span>
-                  </button>
+                    <button type="button" onClick={() => void runTriage(ticket.id)} disabled={triageBusy === ticket.id} className="rounded-[5px] border border-[#FF7A4D]/50 px-2 py-0.5 text-[10px] font-semibold text-[#FF9A78] hover:bg-[#FF7A4D]/10 disabled:opacity-50">{triageBusy === ticket.id ? 'AI…' : 'AI triage'}</button>
+                  </div>
+                  {triageError[ticket.id] && <p role="alert" className="border-t border-danger-soft/20 bg-danger-soft/5 px-4 py-2 text-xs text-danger-soft">{triageError[ticket.id]}</p>}
+                  {triage[ticket.id] && <div className="border-t border-[#FF7A4D]/20 bg-[#FF7A4D]/[.04] px-4 py-3 text-xs text-sand">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1"><span>Категория: <b className="text-white">{String((triage[ticket.id].output as Record<string, unknown>).category ?? 'general')}</b></span><span>Приоритет: <b className="text-warn">{String((triage[ticket.id].output as Record<string, unknown>).suggestedPriority ?? ticket.priority)}</b></span><span className="text-subtle">Только черновик · требуется проверка</span></div>
+                    <p className="mt-2">{String((triage[ticket.id].output as Record<string, unknown>).draft ?? '')}</p>
+                  </div>}
                   {openCustomer === ticket.customerId && (
                     <div className="px-4 pb-4">
                       <CustomerCard customerId={ticket.customerId} accessToken={accessToken} />

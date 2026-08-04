@@ -203,6 +203,35 @@ describe('Reports and AI RBAC', () => {
     }
   });
 
+  it('triages a support ticket into a reviewable draft without changing ticket state', async () => {
+    const customer = await prisma.customer.create({ data: { phone: `+996700${RUN}91`, name: 'AI Support Customer' } });
+    const ticket = await prisma.supportTicket.create({
+      data: {
+        customerId: customer.id,
+        channel: 'web',
+        subject: 'Телефон не работает после покупки',
+        body: 'Нужна гарантия и ремонт, срочно.',
+        priority: 'normal',
+        sla: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    });
+
+    const response = await request(app.getHttpServer())
+      .post('/ai/orchestrator/runs')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ tool: 'support_triage', ticketId: ticket.id, intent: 'triage_ticket', surface: 'erp' })
+      .expect(201);
+
+    expect(response.body.output).toEqual(expect.objectContaining({
+      category: 'warranty',
+      suggestedPriority: 'urgent',
+      requiresHumanReview: true,
+    }));
+    const unchanged = await prisma.supportTicket.findUniqueOrThrow({ where: { id: ticket.id } });
+    expect(unchanged.status).toBe('new');
+    expect(unchanged.priority).toBe('normal');
+  });
+
   it('keeps order timeline ledger scoped to the owning customer or staff queue readers', async () => {
     const owner = await prisma.customer.create({
       data: { phone: `+996700${RUN}11`, name: 'Ledger Owner' },

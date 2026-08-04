@@ -54,7 +54,7 @@ export class AiOrchestratorService {
     });
 
     try {
-      const output = boundToolOutput(await withTimeout(this.executeReadTool(dto.tool), 30_000));
+      const output = boundToolOutput(await withTimeout(this.executeReadTool(dto.tool, dto.ticketId), 30_000));
       const summary = summarize(output);
       const decision = await this.audit.transaction(async (tx) => {
         await tx.aiRunStep.create({
@@ -62,7 +62,7 @@ export class AiOrchestratorService {
             runId: run.id,
             kind: 'tool_call',
             toolName: dto.tool,
-            inputHash: hash({ tool: dto.tool, intent: dto.intent }),
+            inputHash: hash({ tool: dto.tool, intent: dto.intent, ticketId: dto.ticketId ?? null }),
             outputSummary: summary,
             status: 'completed',
           },
@@ -119,13 +119,32 @@ export class AiOrchestratorService {
     return run;
   }
 
-  private executeReadTool(tool: AiReadTool): Promise<unknown> {
+  private async executeReadTool(tool: AiReadTool, ticketId?: string): Promise<unknown> {
     switch (tool) {
       case 'insights': return this.insights.insights();
       case 'pricing_review': return this.pricing.review();
       case 'reorder_review': return this.reorder.review();
       case 'risk_signals': return this.reports.risks();
+      case 'support_triage': return this.supportTriage(ticketId);
     }
+  }
+
+  private async supportTriage(ticketId?: string) {
+    if (!ticketId?.trim()) throw new Error('support_triage_requires_ticket_id');
+    const ticket = await this.prisma.supportTicket.findUnique({ where: { id: ticketId.trim() } });
+    if (!ticket) throw new NotFoundException('Support ticket not found');
+    const text = `${ticket.subject} ${ticket.body ?? ''}`.toLowerCase();
+    const category = /возврат|refund|обмен|exchange/.test(text) ? 'returns'
+      : /гарант|ремонт|слом|warranty|repair/.test(text) ? 'warranty'
+      : /оплат|платеж|касс|payment/.test(text) ? 'payment'
+      : /достав|курьер|delivery/.test(text) ? 'delivery' : 'general';
+    const suggestedPriority = ticket.priority === 'urgent' || /срочно|urgent|не работает/.test(text) ? 'urgent' : ticket.priority;
+    return {
+      source: 'rules', ticketId: ticket.id, category, suggestedPriority,
+      status: ticket.status, sla: ticket.sla,
+      draft: `Здравствуйте! Мы получили обращение «${ticket.subject}». Специалист проверит его и вернётся с ответом в рамках SLA.`,
+      requiresHumanReview: true,
+    };
   }
 
 }

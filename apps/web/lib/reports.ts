@@ -170,11 +170,11 @@ export interface AiRunResult {
 }
 
 /** Starts an audited, read-only control-plane run for the ERP cockpit. */
-export function runAiTool(tool: 'insights' | 'pricing_review' | 'reorder_review' | 'risk_signals', accessToken: string): Promise<AiRunResult> {
+export function runAiTool(tool: 'insights' | 'pricing_review' | 'reorder_review' | 'risk_signals' | 'support_triage', accessToken: string, ticketId?: string): Promise<AiRunResult> {
   return fetch(`${API_BASE}/ai/orchestrator/runs`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tool, intent: `erp_${tool}`, surface: 'erp' }),
+    body: JSON.stringify({ tool, intent: `erp_${tool}`, surface: 'erp', ...(ticketId ? { ticketId } : {}) }),
     cache: 'no-store',
   }).then(async (res) => {
     if (!res.ok) throw new Error(`/ai/orchestrator/runs → ${res.status}`);
