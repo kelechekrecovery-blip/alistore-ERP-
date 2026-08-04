@@ -65,7 +65,8 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # One-shot: create the default bucket and make it read-download on first boot.
+  # One-shot: create the default bucket and expose only non-sensitive product
+  # media. Evidence objects stay private and are served through signed URLs.
   minio-init:
     image: minio/mc:latest
     depends_on:
@@ -74,11 +75,14 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-alistore}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me-please}
       MINIO_BUCKET: ${MINIO_BUCKET:-alistore}
+    volumes:
+      - ./minio-public-media-policy.json:/config/minio-public-media-policy.json:ro
     entrypoint: >
       /bin/sh -c "
       until mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}; do sleep 2; done;
       mc mb --ignore-existing local/$${MINIO_BUCKET};
-      mc anonymous set download local/$${MINIO_BUCKET};
+      sed \"s/__MINIO_BUCKET__/$${MINIO_BUCKET}/g\" /config/minio-public-media-policy.json > /tmp/public-media-policy.json;
+      mc anonymous set-json /tmp/public-media-policy.json local/$${MINIO_BUCKET};
       exit 0;
       "
 

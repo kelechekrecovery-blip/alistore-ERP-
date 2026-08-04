@@ -26,6 +26,8 @@ For production deployment, backup, restore drill and rollback steps, use
 
 - **MinIO console** — http://localhost:9001 (login: `MINIO_ROOT_USER` /
   `MINIO_ROOT_PASSWORD`). S3 endpoint for the app: `http://localhost:9000`.
+  The bootstrap policy exposes only `media/*` product images. `evidence/*`
+  remains private and must be read through the API's short-lived signed URLs.
 - **Metabase** — http://localhost:3001. On first boot, connect it to the AliStore
   Postgres (`alistore_dev`) with a **read-only** reporting user — never the app's
   read-write credentials.
@@ -65,7 +67,7 @@ Until `NOTIFICATION_TRANSPORT=novu`, outbox deliveries are logged
 | Concern       | App env                                   | Where it's used            |
 | ------------- | ----------------------------------------- | -------------------------- |
 | Notifications | `NOTIFICATION_TRANSPORT`, `NOVU_API_*`    | `OutboxModule` transport   |
-| Object store  | `MINIO_*`                                 | (pending an upload surface)|
+| Object store  | `MEDIA_STORAGE=s3`, `MINIO_*`             | `MediaService` / Evidence Vault |
 | Jobs/cache    | `JOB_BACKEND`, `PROCESS_ROLE`, `REDIS_URL`| BullMQ API producer/worker |
 | Search        | `MEILI_HOST`, `MEILI_API_KEY`             | Catalog adapter            |
 | BI            | connect Metabase → `alistore_dev` (RO)    | Metabase UI                |
