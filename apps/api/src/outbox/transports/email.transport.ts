@@ -28,6 +28,11 @@ export class EmailNotificationTransport implements NotificationTransport {
           host,
           port: Number(config.get<string>('SMTP_PORT') ?? 587),
           secure: config.get<string>('SMTP_SECURE') === 'true',
+          // A stalled SMTP socket must reach the outbox retry path instead of
+          // occupying a worker indefinitely.
+          connectionTimeout: 3_000,
+          greetingTimeout: 3_000,
+          socketTimeout: 3_000,
           auth: config.get<string>('SMTP_USER')
             ? {
                 user: config.get<string>('SMTP_USER') as string,
