@@ -73,7 +73,10 @@ export class AiOrchestratorService {
             summary,
             confidence: 1,
             status: 'draft',
-            requiresApproval: false,
+            // Support triage creates a customer-facing draft and therefore
+            // must remain explicitly human-approved. The other current tools
+            // are read-only reports/recommendations with no executable action.
+            requiresApproval: dto.tool === 'support_triage',
             sourceRefs: [run.id],
             recommendation: output as object,
           },

@@ -227,6 +227,7 @@ describe('Reports and AI RBAC', () => {
       suggestedPriority: 'urgent',
       requiresHumanReview: true,
     }));
+    expect(response.body.decision.requiresApproval).toBe(true);
     const unchanged = await prisma.supportTicket.findUniqueOrThrow({ where: { id: ticket.id } });
     expect(unchanged.status).toBe('new');
     expect(unchanged.priority).toBe('normal');
