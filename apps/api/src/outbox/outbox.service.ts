@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -14,6 +14,7 @@ import {
 const MAX_ATTEMPTS = 5;
 const RETRY_BASE_MS = 5_000;
 const RETRY_MAX_MS = 60 * 60 * 1_000;
+const CLAIM_LEASE_MS = 5 * 60 * 1_000;
 
 /**
  * Transactional outbox. Producers enqueue a message in the SAME transaction as
@@ -72,8 +73,17 @@ export class OutboxService {
    * `pending` rows are considered, so an already-sent message is never re-sent.
    */
   async relayPending(limit = 50): Promise<{ sent: number; failed: number }> {
+    const now = new Date();
     const pending = await this.prisma.outboxMessage.findMany({
-      where: { status: 'pending', attempts: { lt: MAX_ATTEMPTS }, nextAttemptAt: { lte: new Date() } },
+      where: {
+        attempts: { lt: MAX_ATTEMPTS },
+        OR: [
+          { status: 'pending', nextAttemptAt: { lte: now } },
+          // A crashed worker leaves a processing row behind. Its lease is
+          // eligible for one new claimant after the deadline.
+          { status: 'processing', nextAttemptAt: { lte: now } },
+        ],
+      },
       orderBy: { createdAt: 'asc' },
       take: limit,
     });
@@ -81,6 +91,33 @@ export class OutboxService {
     let sent = 0;
     let failed = 0;
     for (const message of pending) {
+      // Multiple API/worker processes can read the same pending snapshot. Claim
+      // the row before calling an external provider so only one relay owns the
+      // delivery attempt. Telegram replies use their identity/subject lock in
+      // deliverTelegramAgentReply and remain pending until that transaction.
+      const isTelegramAgentReply = message.channel === 'telegram' && message.template === 'telegram_agent_reply';
+      const processingToken = isTelegramAgentReply ? null : randomUUID();
+      const claimed = isTelegramAgentReply
+        ? { count: 1 }
+        : await this.prisma.outboxMessage.updateMany({
+            where: {
+              id: message.id,
+              attempts: { lt: MAX_ATTEMPTS },
+              OR: [
+                { status: 'pending', nextAttemptAt: { lte: now } },
+                { status: 'processing', nextAttemptAt: { lte: now } },
+              ],
+            },
+            data: {
+              status: 'processing',
+              processingToken,
+              nextAttemptAt: new Date(Date.now() + CLAIM_LEASE_MS),
+            },
+          });
+      if (claimed.count !== 1) continue;
+      const deliveryWhere = isTelegramAgentReply
+        ? { id: message.id, status: 'pending' as const }
+        : { id: message.id, status: 'processing' as const, processingToken };
       try {
         if (message.channel === 'telegram' && message.template === 'telegram_agent_reply') {
           const outcome = await this.deliverTelegramAgentReply(message);
@@ -94,8 +131,8 @@ export class OutboxService {
           payload: message.payload,
         });
         await this.prisma.outboxMessage.update({
-          where: { id: message.id },
-          data: { status: 'sent', sentAt: new Date(), nextAttemptAt: null },
+          where: deliveryWhere,
+          data: { status: 'sent', processingToken: null, sentAt: new Date(), nextAttemptAt: null },
         });
         sent += 1;
       } catch (err) {
@@ -106,17 +143,18 @@ export class OutboxService {
           attempts,
           lastError: err instanceof Error ? err.message : 'unknown error',
           status: capped ? 'failed' as const : 'pending' as const,
+          processingToken: null,
           nextAttemptAt: capped ? null : new Date(Date.now() + delayMs),
         };
-        const updated = message.channel === 'telegram' && message.template === 'telegram_agent_reply'
+        const updated = isTelegramAgentReply
           ? await this.prisma.outboxMessage.updateMany({
-              where: { id: message.id, status: 'pending' },
+              where: deliveryWhere,
               data,
             })
-          : await this.prisma.outboxMessage.update({
-              where: { id: message.id },
+          : await this.prisma.outboxMessage.updateMany({
+              where: deliveryWhere,
               data,
-            }).then(() => ({ count: 1 }));
+            });
         if (capped && updated.count === 1) failed += 1;
         this.logger.warn(
           `Outbox delivery failed (${message.channel} ${message.id}), attempt ${attempts}`,

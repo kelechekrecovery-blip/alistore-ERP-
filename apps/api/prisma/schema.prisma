@@ -3617,6 +3617,7 @@ model RefreshToken {
 // ---------- OUTBOX ----------
 enum OutboxStatus {
   pending
+  processing
   sent
   failed
   cancelled
@@ -3626,22 +3627,24 @@ enum OutboxStatus {
 // webhook follow-ups). Producers write a message in the SAME transaction as the
 // business change (invariant #10); a pg-boss relay delivers it with retries.
 model OutboxMessage {
-  id            String       @id @default(cuid())
-  campaign      Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  campaignId    String?
-  channel       String // sms | email | push | telegram | webhook
-  recipient     String
-  template      String
-  payload       Json
-  status        OutboxStatus @default(pending)
-  attempts      Int          @default(0)
-  lastError     String?
-  nextAttemptAt DateTime?    @default(now())
-  createdAt     DateTime     @default(now())
-  sentAt        DateTime?
+  id              String       @id @default(cuid())
+  campaign        Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignId      String?
+  channel         String // sms | email | push | telegram | webhook
+  recipient       String
+  template        String
+  payload         Json
+  status          OutboxStatus @default(pending)
+  processingToken String?
+  attempts        Int          @default(0)
+  lastError       String?
+  nextAttemptAt   DateTime?    @default(now())
+  createdAt       DateTime     @default(now())
+  sentAt          DateTime?
 
   @@index([status])
   @@index([status, nextAttemptAt])
+  @@index([status, processingToken])
   @@index([campaignId, status])
 }
 
