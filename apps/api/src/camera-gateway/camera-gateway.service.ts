@@ -1,9 +1,11 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConflictError } from '../common/errors';
 import { IngestCameraEventDto, RegisterEdgeDeviceDto } from './camera-gateway.dto';
+
+const SIGNATURE_MAX_AGE_SECONDS = 300;
 
 @Injectable()
 export class CameraGatewayService {
@@ -26,10 +28,11 @@ export class CameraGatewayService {
     return { deviceId: device.id, storePointId: device.storePointId, secret };
   }
 
-  async ingest(dto: IngestCameraEventDto, secret: string) {
+  async ingest(dto: IngestCameraEventDto, secret: string, timestamp: string, signature: string) {
     if (flag('EDGE_CAMERA_KILL_SWITCH')) throw new ForbiddenException('Camera ingestion disabled by safety kill switch');
     const device = await this.prisma.edgeDevice.findUnique({ where: { id: dto.deviceId } });
     if (!device || device.status !== 'active' || !safeSecret(secret, device.secretHash)) throw new ForbiddenException('Invalid edge device credentials');
+    assertSignedRequest(dto, secret, timestamp, signature);
     if (device.storePointId !== dto.storePointId) throw new ForbiddenException('Device/store point mismatch');
     assertMetadata(dto.value);
     const occurredAt = new Date(dto.occurredAt);
@@ -67,6 +70,26 @@ export class CameraGatewayService {
 
 function hashSecret(secret: string): string { return createHash('sha256').update(secret).digest('hex'); }
 function hashRequest(value: unknown): string { return createHash('sha256').update(JSON.stringify(value)).digest('hex'); }
+function assertSignedRequest(dto: IngestCameraEventDto, secret: string, timestamp: string, signature: string): void {
+  const seconds = Number(timestamp);
+  if (!Number.isSafeInteger(seconds) || Math.abs(Math.floor(Date.now() / 1000) - seconds) > SIGNATURE_MAX_AGE_SECONDS) {
+    throw new ForbiddenException('Camera event signature expired');
+  }
+  const expected = createHmac('sha256', secret).update(`${seconds}.${canonicalJson(dto)}`).digest('hex');
+  const actual = Buffer.from(signature.trim(), 'hex');
+  const wanted = Buffer.from(expected, 'hex');
+  if (actual.length !== wanted.length || !timingSafeEqual(actual, wanted)) {
+    throw new ForbiddenException('Invalid camera event signature');
+  }
+}
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => compareKeys(a, b)).map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+function compareKeys(a: string, b: string): number { return a < b ? -1 : a > b ? 1 : 0; }
 function assertMetadata(value: Record<string, unknown>): void {
   const encoded = JSON.stringify(value);
   if (encoded.length > 4_096) throw new ForbiddenException('Camera event metadata is too large');

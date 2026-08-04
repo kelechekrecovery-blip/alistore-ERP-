@@ -9,6 +9,7 @@ import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
+import { createHmac } from 'node:crypto';
 
 describe('Camera edge gateway', () => {
   let app: INestApplication;
@@ -42,6 +43,14 @@ describe('Camera edge gateway', () => {
     delete process.env.EDGE_CAMERA_KILL_SWITCH;
   });
 
+  function signedHeaders(payload: Record<string, unknown>, secret: string, at = Math.floor(Date.now() / 1000)) {
+    return {
+      'x-edge-device-secret': secret,
+      'x-edge-device-timestamp': String(at),
+      'x-edge-device-signature': createHmac('sha256', secret).update(`${at}.${canonicalJson(payload)}`).digest('hex'),
+    };
+  }
+
   afterAll(async () => { await app.close(); });
 
   it('enrolls a device and accepts signed, idempotent metadata only', async () => {
@@ -50,9 +59,9 @@ describe('Camera edge gateway', () => {
     expect(enrolled.body.secret).toEqual(expect.any(String));
 
     const payload = { idempotencyKey: `camera:${run}:1`, deviceId: enrolled.body.deviceId, storePointId: 'alistore-bishkek-1', eventType: 'queue_length_estimated', confidence: 0.86, value: { count: 4 }, occurredAt: new Date().toISOString(), retentionHours: 24 };
-    const first = await request(app.getHttpServer()).post('/camera-gateway/events').set('x-edge-device-secret', enrolled.body.secret).send(payload).expect(201);
+    const first = await request(app.getHttpServer()).post('/camera-gateway/events').set(signedHeaders(payload, enrolled.body.secret)).send(payload).expect(201);
     expect(first.body).toEqual(expect.objectContaining({ accepted: true, replay: false, action: 'review_required' }));
-    const replay = await request(app.getHttpServer()).post('/camera-gateway/events').set('x-edge-device-secret', enrolled.body.secret).send(payload).expect(201);
+    const replay = await request(app.getHttpServer()).post('/camera-gateway/events').set(signedHeaders(payload, enrolled.body.secret)).send(payload).expect(201);
     expect(replay.body).toEqual(expect.objectContaining({ accepted: true, replay: true, eventId: first.body.eventId }));
     expect(await prisma.cameraDetection.count()).toBe(1);
     expect(await prisma.auditEvent.count({ where: { type: 'camera.detection_recorded' } })).toBe(1);
@@ -61,17 +70,31 @@ describe('Camera edge gateway', () => {
   it('rejects wrong secrets, mismatched points and the global camera kill switch', async () => {
     const enrolled = await request(app.getHttpServer()).post('/camera-gateway/devices').set('Authorization', `Bearer ${ownerToken}`).send({ name: 'EZVIZ warehouse', storePointId: 'alistore-bishkek-1' }).expect(201);
     const payload = { idempotencyKey: `camera:${run}:2`, deviceId: enrolled.body.deviceId, storePointId: 'alistore-bishkek-1', eventType: 'camera_offline', confidence: 1, value: {}, occurredAt: new Date().toISOString() };
-    await request(app.getHttpServer()).post('/camera-gateway/events').set('x-edge-device-secret', 'wrong').send(payload).expect(403);
-    await request(app.getHttpServer()).post('/camera-gateway/events').set('x-edge-device-secret', enrolled.body.secret).send({ ...payload, storePointId: 'jest-bishkek-2' }).expect(403);
+    await request(app.getHttpServer()).post('/camera-gateway/events').set(signedHeaders(payload, 'wrong')).send(payload).expect(403);
+    const mismatched = { ...payload, storePointId: 'jest-bishkek-2' };
+    await request(app.getHttpServer()).post('/camera-gateway/events').set(signedHeaders(mismatched, enrolled.body.secret)).send(mismatched).expect(403);
     process.env.EDGE_CAMERA_KILL_SWITCH = '1';
-    await request(app.getHttpServer()).post('/camera-gateway/events').set('x-edge-device-secret', enrolled.body.secret).send(payload).expect(403);
+    await request(app.getHttpServer()).post('/camera-gateway/events').set(signedHeaders(payload, enrolled.body.secret)).send(payload).expect(403);
     expect(await prisma.cameraDetection.count()).toBe(0);
+  });
+
+  it('rejects missing, tampered and expired event signatures', async () => {
+    const enrolled = await request(app.getHttpServer()).post('/camera-gateway/devices').set('Authorization', `Bearer ${ownerToken}`).send({ name: 'EZVIZ signatures', storePointId: 'alistore-bishkek-1' }).expect(201);
+    const payload = { idempotencyKey: `camera:${run}:signatures`, deviceId: enrolled.body.deviceId, storePointId: 'alistore-bishkek-1', eventType: 'camera_offline', confidence: 1, value: {}, occurredAt: new Date().toISOString() };
+    await request(app.getHttpServer()).post('/camera-gateway/events').set('x-edge-device-secret', enrolled.body.secret).send(payload).expect(403);
+    const withUnknownField = { ...payload, unexpected: true };
+    await request(app.getHttpServer()).post('/camera-gateway/events').set(signedHeaders(withUnknownField, enrolled.body.secret)).send(withUnknownField).expect(403);
+    const withCoercedNumber = { ...payload, confidence: '1' };
+    await request(app.getHttpServer()).post('/camera-gateway/events').set(signedHeaders(withCoercedNumber, enrolled.body.secret)).send(withCoercedNumber).expect(400);
+    const tampered = { ...payload, value: { zone: 'changed' } };
+    await request(app.getHttpServer()).post('/camera-gateway/events').set(signedHeaders(payload, enrolled.body.secret)).send(tampered).expect(403);
+    await request(app.getHttpServer()).post('/camera-gateway/events').set(signedHeaders(payload, enrolled.body.secret, Math.floor(Date.now() / 1000) - 301)).send(payload).expect(403);
   });
 
   it('purges expired metadata into an auditable tombstone', async () => {
     const enrolled = await request(app.getHttpServer()).post('/camera-gateway/devices').set('Authorization', `Bearer ${ownerToken}`).send({ name: 'EZVIZ retention', storePointId: 'alistore-bishkek-1' }).expect(201);
     const payload = { idempotencyKey: `camera:${run}:3`, deviceId: enrolled.body.deviceId, storePointId: 'alistore-bishkek-1', eventType: 'camera_tamper_detected', confidence: 1, value: { zone: 'warehouse' }, occurredAt: new Date().toISOString(), retentionHours: 1 };
-    const created = await request(app.getHttpServer()).post('/camera-gateway/events').set('x-edge-device-secret', enrolled.body.secret).send(payload).expect(201);
+    const created = await request(app.getHttpServer()).post('/camera-gateway/events').set(signedHeaders(payload, enrolled.body.secret)).send(payload).expect(201);
     await prisma.cameraDetection.update({ where: { id: created.body.eventId }, data: { retentionUntil: new Date(Date.now() - 1_000) } });
     expect(await retention.purgeExpired()).toBe(1);
     const purged = await prisma.cameraDetection.findUniqueOrThrow({ where: { id: created.body.eventId } });
@@ -85,11 +108,17 @@ describe('Camera edge gateway', () => {
     const enrolled = await request(app.getHttpServer()).post('/camera-gateway/devices').set('Authorization', `Bearer ${ownerToken}`).send({ name: 'EZVIZ concurrent', storePointId: 'alistore-bishkek-1' }).expect(201);
     const payload = { idempotencyKey: `camera:${run}:4`, deviceId: enrolled.body.deviceId, storePointId: 'alistore-bishkek-1', eventType: 'queue_length_estimated', confidence: 0.9, value: { count: 2 }, occurredAt: new Date().toISOString() };
     const responses = await Promise.all([
-      request(app.getHttpServer()).post('/camera-gateway/events').set('x-edge-device-secret', enrolled.body.secret).send(payload),
-      request(app.getHttpServer()).post('/camera-gateway/events').set('x-edge-device-secret', enrolled.body.secret).send(payload),
+      request(app.getHttpServer()).post('/camera-gateway/events').set(signedHeaders(payload, enrolled.body.secret)).send(payload),
+      request(app.getHttpServer()).post('/camera-gateway/events').set(signedHeaders(payload, enrolled.body.secret)).send(payload),
     ]);
     expect(responses.every((response) => response.status === 201)).toBe(true);
     expect(responses.map((response) => response.body.eventId)).toEqual([responses[0].body.eventId, responses[0].body.eventId]);
     expect(await prisma.cameraDetection.count()).toBe(1);
   });
 });
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(',')}}`;
+  return JSON.stringify(value);
+}

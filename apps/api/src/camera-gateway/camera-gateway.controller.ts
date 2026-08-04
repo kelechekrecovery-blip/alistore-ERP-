@@ -25,7 +25,12 @@ export class CameraGatewayController {
   @Post('events')
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 120, ttl: 60_000 } })
-  ingest(@Body() dto: IngestCameraEventDto, @Headers('x-edge-device-secret') secret?: string) {
-    return this.gateway.ingest(dto, secret ?? '');
+  ingest(
+    @Body() dto: IngestCameraEventDto,
+    @Headers('x-edge-device-secret') secret?: string,
+    @Headers('x-edge-device-timestamp') timestamp?: string,
+    @Headers('x-edge-device-signature') signature?: string,
+  ) {
+    return this.gateway.ingest(dto, secret ?? '', timestamp ?? '', signature ?? '');
   }
 }
