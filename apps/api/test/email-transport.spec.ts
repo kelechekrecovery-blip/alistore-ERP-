@@ -29,4 +29,19 @@ describe('EmailNotificationTransport (nodemailer)', () => {
       }),
     ).resolves.toBeUndefined();
   });
+
+  it('fails closed in production when SMTP is not configured', async () => {
+    const productionConfig = {
+      get: (key: string) => (key === 'NODE_ENV' ? 'production' : undefined),
+    } as unknown as ConfigService;
+    const productionTransport = new EmailNotificationTransport(productionConfig);
+    await expect(
+      productionTransport.deliver({
+        channel: 'email',
+        recipient: 'buyer@a.kg',
+        template: 'order_paid',
+        payload: {},
+      }),
+    ).rejects.toThrow('SMTP_HOST is not configured');
+  });
 });

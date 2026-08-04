@@ -38,7 +38,9 @@ OUTBOX_RELAY_ENABLED=true
 RESERVATION_SWEEP_ENABLED=true
 SERVICE_SLA_SWEEP_ENABLED=true
 DEBT_REMINDERS_ENABLED=true
-NOTIFICATION_TRANSPORT=log
+# Production must use a configured provider transport; `log` is development-only
+# and is rejected by the strict production preflight.
+NOTIFICATION_TRANSPORT=channels
 MEDIA_STORAGE=s3
 MEDIA_PUBLIC_BASE=https://api.ali.kg/uploads
 S3_ENDPOINT=http://127.0.0.1:9000
@@ -56,6 +58,11 @@ NOTIFICATION_TRANSPORT=novu
 NOVU_API_URL=https://api.novu.co
 NOVU_API_KEY=<secret>
 ```
+
+For `NOTIFICATION_TRANSPORT=channels`, configure every channel that the business
+uses (including SMTP for email) and verify delivery before enabling the outbox
+relay. Missing providers are fail-closed and remain retryable; production must
+not be worked around by switching back to `log`.
 
 Never enable `AUTH_OTP_DEV_ECHO=true` outside local development.
 

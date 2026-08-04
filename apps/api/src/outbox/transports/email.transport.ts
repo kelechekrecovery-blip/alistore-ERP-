@@ -5,18 +5,24 @@ import { DeliverableMessage, NotificationTransport } from '../outbox.types';
 
 /**
  * Delivers outbox messages by email via nodemailer SMTP. With no SMTP_HOST set it
- * falls back to jsonTransport — builds the message but never sends — a safe
- * default for dev/tests. Set SMTP_HOST/PORT/USER/PASS to actually send.
+ * falls back to jsonTransport in development/tests so mail can be inspected
+ * without network access. Production fails closed instead of marking a message
+ * delivered without sending it.
  */
 @Injectable()
 export class EmailNotificationTransport implements NotificationTransport {
   private readonly transporter: Transporter;
   private readonly from: string;
+  private readonly isProduction: boolean;
+  private readonly smtpConfigured: boolean;
 
   constructor(config: ConfigService) {
     this.from =
       config.get<string>('SMTP_FROM') ?? 'AliStore <no-reply@ali.kg>';
     const host = config.get<string>('SMTP_HOST');
+    this.isProduction =
+      config.get<string>('NODE_ENV')?.trim().toLowerCase() === 'production';
+    this.smtpConfigured = Boolean(host?.trim());
     this.transporter = host
       ? createTransport({
           host,
@@ -52,6 +58,9 @@ export class EmailNotificationTransport implements NotificationTransport {
   }
 
   async deliver(message: DeliverableMessage): Promise<void> {
+    if (this.isProduction && !this.smtpConfigured) {
+      throw new Error('SMTP_HOST is not configured; production email delivery is disabled');
+    }
     await this.transporter.sendMail(this.buildMail(message));
   }
 }
