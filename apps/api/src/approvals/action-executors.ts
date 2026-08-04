@@ -809,6 +809,39 @@ const storefront_publish: ActionExecutor = async (tx, payload, approver, approva
   });
 };
 
+/** ai_support_triage — approve/reject a customer-facing AI draft explicitly. */
+const ai_support_triage: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
+  const decisionId = String(payload['decisionId'] ?? '');
+  if (!decisionId) throw new ValidationError('ai_decision_missing', 'AI approval snapshot is missing decisionId');
+  const decision = await tx.aiDecision.findUnique({ where: { id: decisionId } });
+  if (!decision || !decision.requiresApproval || decision.status !== 'draft') {
+    throw new ConflictError('ai_decision_changed', 'AI decision is no longer awaiting approval');
+  }
+  await tx.aiDecision.update({ where: { id: decisionId }, data: { status: 'approved' } });
+  events.push({
+    type: 'ai.decision_approved',
+    actor: approver,
+    payload: { decisionId, approvalId },
+    refs: [decisionId, approvalId],
+  });
+};
+
+const reject_ai_support_triage: ActionRejectionExecutor = async (tx, payload, approver, approvalId, reason, events) => {
+  const decisionId = String(payload['decisionId'] ?? '');
+  if (!decisionId) throw new ValidationError('ai_decision_missing', 'AI approval snapshot is missing decisionId');
+  const decision = await tx.aiDecision.findUnique({ where: { id: decisionId } });
+  if (!decision || !decision.requiresApproval || decision.status !== 'draft') {
+    throw new ConflictError('ai_decision_changed', 'AI decision is no longer awaiting approval');
+  }
+  await tx.aiDecision.update({ where: { id: decisionId }, data: { status: 'rejected' } });
+  events.push({
+    type: 'ai.decision_rejected',
+    actor: approver,
+    payload: { decisionId, approvalId, reason: reason ?? null },
+    refs: [decisionId, approvalId],
+  });
+};
+
 export const ACTION_EXECUTORS: Record<string, ActionExecutor> = {
   campaign_budget,
   refund,
@@ -820,10 +853,12 @@ export const ACTION_EXECUTORS: Record<string, ActionExecutor> = {
   debt,
   manual_adjustment,
   storefront_publish,
+  ai_support_triage,
 };
 
 export const ACTION_REJECTION_EXECUTORS: Record<string, ActionRejectionExecutor> = {
   campaign_budget: reject_campaign_budget,
   refund: reject_refund,
   quarantine_write_off: reject_quarantine_write_off,
+  ai_support_triage: reject_ai_support_triage,
 };

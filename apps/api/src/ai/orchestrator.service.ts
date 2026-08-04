@@ -1,11 +1,12 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
-import { AuditService } from '../audit/audit.service';
+import { AuditInput, AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportsService } from '../reports/reports.service';
 import { InsightsService } from './insights.service';
 import { PricingService } from './pricing.service';
 import { ReorderService } from './reorder.service';
+import { ApprovalsService } from '../approvals/approvals.service';
 import { AiReadTool, CreateAiRunDto } from './orchestrator.dto';
 
 type Actor = { customerId: string; typ: string; role?: string };
@@ -24,6 +25,7 @@ export class AiOrchestratorService {
     private readonly pricing: PricingService,
     private readonly reorder: ReorderService,
     private readonly reports: ReportsService,
+    private readonly approvals: ApprovalsService,
   ) {}
 
   async run(dto: CreateAiRunDto, actor: Actor) {
@@ -81,18 +83,32 @@ export class AiOrchestratorService {
             recommendation: output as object,
           },
         });
+        let approvalId: string | undefined;
+        const events: AuditInput[] = [{
+          type: 'ai.run_completed',
+          actor: actorId,
+          payload: { runId: run.id, tool: dto.tool, decisionId: created.id },
+          refs: [run.id, created.id],
+        }];
+        if (dto.tool === 'support_triage') {
+          const approval = await this.approvals.requestOnTx(tx, {
+            action: 'ai_support_triage',
+            requester: actorId,
+            reason: dto.intent.trim(),
+            sourceRef: created.id,
+            idempotencyKey: `ai-support-triage:${run.id}`,
+            payload: { decisionId: created.id, runId: run.id, ticketId: dto.ticketId ?? null },
+          });
+          approvalId = approval.result.approvalId;
+          events.push(...approval.events);
+        }
         await tx.aiRun.update({
           where: { id: run.id },
           data: { status: 'completed', completedAt: new Date() },
         });
         return {
-          result: created,
-          events: [{
-            type: 'ai.run_completed',
-            actor: actorId,
-            payload: { runId: run.id, tool: dto.tool, decisionId: created.id },
-            refs: [run.id, created.id],
-          }],
+          result: { ...created, approvalId },
+          events,
         };
       });
       return { runId: run.id, status: 'completed', decision, output };

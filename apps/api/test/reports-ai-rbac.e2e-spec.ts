@@ -11,6 +11,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { ReportsModule } from '../src/reports/reports.module';
 import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
+import { ApprovalsService } from '../src/approvals/approvals.service';
 
 describe('Reports and AI RBAC', () => {
   let app: INestApplication;
@@ -23,6 +24,8 @@ describe('Reports and AI RBAC', () => {
   let sellerToken: string;
   let warehouseToken: string;
   let adminId: string;
+  let ownerId: string;
+  let approvals: ApprovalsService;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -42,6 +45,7 @@ describe('Reports and AI RBAC', () => {
     await app.init();
     prisma = moduleRef.get(PrismaService);
     staffAuth = moduleRef.get(StaffAuthService);
+    approvals = moduleRef.get(ApprovalsService);
 
     const createSession = async (role: 'admin' | 'owner' | 'seller' | 'warehouse') => {
       const username = `${role}-reports-ai-${RUN}`;
@@ -53,7 +57,9 @@ describe('Reports and AI RBAC', () => {
     const admin = await createSession('admin');
     adminId = admin.id;
     adminToken = admin.token;
-    ownerToken = (await createSession('owner')).token;
+    const owner = await createSession('owner');
+    ownerId = owner.id;
+    ownerToken = owner.token;
     sellerToken = (await createSession('seller')).token;
     warehouseToken = (await createSession('warehouse')).token;
   });
@@ -64,6 +70,7 @@ describe('Reports and AI RBAC', () => {
 
   beforeEach(async () => {
     await prisma.aiRun.deleteMany();
+    await prisma.approval.deleteMany({ where: { action: 'ai_support_triage' } });
     await prisma.auditEvent.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();
@@ -228,6 +235,14 @@ describe('Reports and AI RBAC', () => {
       requiresHumanReview: true,
     }));
     expect(response.body.decision.requiresApproval).toBe(true);
+    expect(response.body.decision.approvalId).toEqual(expect.any(String));
+    const pending = await prisma.approval.findUnique({ where: { id: response.body.decision.approvalId } });
+    expect(pending).toMatchObject({ action: 'ai_support_triage', status: 'requested', sourceRef: response.body.decision.id });
+    const approved = await approvals.decide(response.body.decision.approvalId, {
+      status: 'approved', approver: ownerId, approverRole: 'owner',
+    });
+    expect(approved?.status).toBe('approved');
+    expect((await prisma.aiDecision.findUnique({ where: { id: response.body.decision.id } }))?.status).toBe('approved');
     const unchanged = await prisma.supportTicket.findUniqueOrThrow({ where: { id: ticket.id } });
     expect(unchanged.status).toBe('new');
     expect(unchanged.priority).toBe('normal');

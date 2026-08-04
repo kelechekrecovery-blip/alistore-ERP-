@@ -25,6 +25,7 @@ export interface ApprovalRequest {
    * key, the repeat replays the first approval instead.
    */
   idempotencyKey?: string;
+  sourceRef?: string;
 }
 
 /**
@@ -37,6 +38,7 @@ export interface ApprovalRequest {
 export const FOUR_EYES_ACTIONS: readonly string[] = [
   'campaign_budget',
   'storefront_publish',
+  'ai_support_triage',
   'refund',
   'quarantine_write_off',
   'exchange',
@@ -202,6 +204,7 @@ export class ApprovalsService {
           reason: req.reason,
           status: 'requested',
           idempotencyKey: key,
+          sourceRef: req.sourceRef,
           evidence: {
             payload: req.payload ?? null,
             evidence: req.evidence ?? null,

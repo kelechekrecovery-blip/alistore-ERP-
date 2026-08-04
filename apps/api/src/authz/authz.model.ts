@@ -29,6 +29,8 @@ p, admin, pii, approve
 p, owner, quarantine_write_off, approve
 p, senior_seller, exchange, approve
 p, admin, campaign_budget, approve
+p, admin, ai_support_triage, approve
+p, owner, ai_support_triage, approve
 p, owner, staff, manage
 p, owner, settings, manage
 p, marketer, approvals, read
