@@ -199,27 +199,27 @@ describe('Auth: App Store review login (integration)', () => {
     });
   });
 
-  it('allows three review retries, then durably disables and audits the credential', async () => {
+  it('allows a review-session budget, then durably disables and audits the credential', async () => {
     const customer = await seedReviewAccount();
     const auth = makeAuth(configured());
     const startedAt = new Date();
 
-    await expect(auth.verifyOtp(reviewPhone, reviewOtp)).resolves.toHaveProperty('accessToken');
-    await expect(auth.verifyOtp(reviewPhone, reviewOtp)).resolves.toHaveProperty('accessToken');
-    await expect(auth.verifyOtp(reviewPhone, reviewOtp)).resolves.toHaveProperty('accessToken');
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await expect(auth.verifyOtp(reviewPhone, reviewOtp)).resolves.toHaveProperty('accessToken');
+    }
     await expect(auth.verifyOtp(reviewPhone, reviewOtp)).rejects.toBeInstanceOf(ValidationError);
 
     await expect(prisma.reviewLoginGuard.findUniqueOrThrow({
       where: { phone: reviewPhone },
     })).resolves.toMatchObject({
       attempts: 0,
-      successes: 3,
+      successes: 20,
       lockedUntil: null,
       disabledAt: expect.any(Date),
     });
     await expect(prisma.refreshToken.count({
       where: { customerId: customer.id, revokedAt: null },
-    })).resolves.toBe(3);
+    })).resolves.toBe(20);
     const events = await prisma.auditEvent.findMany({
       where: {
         type: { in: ['auth.review_login_success', 'auth.review_login_success_disabled'] },
@@ -227,11 +227,9 @@ describe('Auth: App Store review login (integration)', () => {
       },
       orderBy: { ts: 'asc' },
     });
-    expect(events.map((event) => event.type)).toEqual([
-      'auth.review_login_success',
-      'auth.review_login_success',
-      'auth.review_login_success_disabled',
-    ]);
+    expect(events).toHaveLength(20);
+    expect(events.slice(0, -1).every((event) => event.type === 'auth.review_login_success')).toBe(true);
+    expect(events.at(-1)?.type).toBe('auth.review_login_success_disabled');
   });
 });
 
