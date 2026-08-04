@@ -87,7 +87,9 @@ services:
   # Owner BI / Command Center dashboards. Connect it to alistore_dev (read-only
   # user) from its UI on first boot; this DB holds only Metabase's own app data.
   metabase:
-    image: metabase/metabase:latest
+    # Pin the UI image so a future `latest` cannot change the dashboard runtime
+    # without a reviewed release. Pull this image before the first boot.
+    image: metabase/metabase:v0.55.4
     ports:
       - "3001:3000"
     environment:

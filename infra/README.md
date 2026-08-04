@@ -12,7 +12,7 @@
 | `meilisearch` | 7700                         | Catalog search with PostgreSQL fallback            |
 | `minio`       | 9000 (S3 API), 9001 (console)| Object storage — product photos, Evidence Vault    |
 | `minio-init`  | —                            | One-shot: creates the default bucket               |
-| `metabase`    | 3001                         | Owner BI / Command Center dashboards               |
+| `metabase`    | 3001                         | Owner BI / Command Center dashboards (v0.55.4)    |
 | `metabase-db` | —                            | Postgres for Metabase's own app data               |
 
 ## Run
