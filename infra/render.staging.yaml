@@ -8,6 +8,8 @@ services:
     dockerContext: .
     autoDeployTrigger: checksPass
     healthCheckPath: /api/health/ready
+    domains:
+      - api-staging.ali.kg
     preDeployCommand: npm run db:deploy -w @alistore/api
     envVars:
       - fromGroup: alistore-staging-common
@@ -39,8 +41,11 @@ services:
     dockerContext: .
     autoDeployTrigger: checksPass
     healthCheckPath: /healthz
+    domains:
+      - staging.ali.kg
+      - admin-staging.ali.kg
     envVars:
-      - { key: ALLOWED_HOSTS, value: "staging.ali.kg" }
+      - { key: ALLOWED_HOSTS, value: "staging.ali.kg,admin-staging.ali.kg" }
       # The browser must use the staging API hostname at build time. Without
       # this value Next falls back to the web origin and checkout/account
       # requests are sent to the wrong service after deployment.
