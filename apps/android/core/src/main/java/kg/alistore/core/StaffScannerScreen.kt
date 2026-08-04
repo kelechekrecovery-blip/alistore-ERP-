@@ -74,6 +74,18 @@ interface StaffEvidenceGateway {
     bytes: ByteArray,
     token: String,
   ): EvidenceAttachment
+
+  /** Upload evidence with a caller-owned key that can be referenced by a follow-up command. */
+  suspend fun uploadStaffEvidenceWithKey(
+    entityType: String,
+    entityId: String,
+    label: String,
+    fileName: String,
+    mimeType: String,
+    bytes: ByteArray,
+    token: String,
+    idempotencyKey: String,
+  ): EvidenceAttachment
 }
 
 data class StaffEvidenceDraft(val bytes: ByteArray, val mimeType: String = "image/jpeg", val fileName: String = "evidence.jpg")

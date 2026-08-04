@@ -108,4 +108,9 @@ private class UiEvidenceGateway : StaffEvidenceGateway {
     uploads += UiEvidenceUpload(entityType, entityId, label, token, bytes)
     return EvidenceAttachment("evidence/$entityId.webp", "/media/$entityId.webp")
   }
+
+  override suspend fun uploadStaffEvidenceWithKey(
+    entityType: String, entityId: String, label: String, fileName: String,
+    mimeType: String, bytes: ByteArray, token: String, idempotencyKey: String,
+  ) = uploadStaffEvidence(entityType, entityId, label, fileName, mimeType, bytes, token)
 }

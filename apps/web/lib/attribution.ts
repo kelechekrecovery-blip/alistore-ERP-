@@ -70,8 +70,11 @@ export function loadAttribution(): StoredAttribution | null {
     // товара из-за телеметрии. Атрибуция не стоит корзины.
     try {
       window.localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // хранилище недоступно целиком — чистить нечего и незачем
+    } catch (storageError) {
+      // Хранилище недоступно целиком — чистить нечего и незачем. В debug
+      // оставляем след для диагностики Safari private mode, но telemetry не
+      // должна ломать пользовательское действие.
+      if (process.env.NODE_ENV !== 'production') console.debug('[attribution] storage unavailable', storageError);
     }
     return null;
   }

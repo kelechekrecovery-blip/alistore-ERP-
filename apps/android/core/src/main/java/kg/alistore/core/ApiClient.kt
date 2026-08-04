@@ -430,7 +430,8 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
   ): CourierDelivery = request(
     "courier/orders/$orderId/deliver",
     "POST",
-    JSONObject().put("codAmount", codAmount).putOpt("reason", reason),
+    JSONObject().put("codAmount", codAmount).putOpt("reason", reason)
+      .put("evidenceIdempotencyKey", idempotencyKey),
     token,
     idempotencyKey = idempotencyKey,
   ).courierDelivery()
@@ -439,7 +440,7 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     request(
       "deliveries/$orderId/fail",
       "POST",
-      JSONObject().put("reason", reason),
+      JSONObject().put("reason", reason).put("evidenceIdempotencyKey", idempotencyKey),
       token,
       idempotencyKey = idempotencyKey,
     )
@@ -546,6 +547,17 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     bytes: ByteArray,
     token: String,
   ): EvidenceAttachment = uploadEvidenceRequest(entityType, entityId, label, fileName, mimeType, bytes, token)
+
+  override suspend fun uploadStaffEvidenceWithKey(
+    entityType: String,
+    entityId: String,
+    label: String,
+    fileName: String,
+    mimeType: String,
+    bytes: ByteArray,
+    token: String,
+    idempotencyKey: String,
+  ): EvidenceAttachment = uploadEvidenceRequest(entityType, entityId, label, fileName, mimeType, bytes, token, idempotencyKey)
 
   private suspend fun uploadEvidenceRequest(
     entityType: String,

@@ -68,6 +68,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -96,14 +97,14 @@ class CourierCommandManager(
 
   suspend fun deliver(orderId: String, codAmount: Int, reason: String?, token: String, key: String): CourierCommandResult = submit(
     endpoint = "courier/orders/$orderId/deliver",
-    body = JSONObject().put("codAmount", codAmount).putOpt("reason", reason),
+    body = JSONObject().put("codAmount", codAmount).putOpt("reason", reason).put("evidenceIdempotencyKey", key),
     key = key,
     online = { gateway.completeDelivery(orderId, codAmount, reason, token, key) },
   )
 
   suspend fun fail(orderId: String, reason: String, token: String, key: String): CourierCommandResult = submit(
     endpoint = "deliveries/$orderId/fail",
-    body = JSONObject().put("reason", reason),
+    body = JSONObject().put("reason", reason).put("evidenceIdempotencyKey", key),
     key = key,
     online = { gateway.failDelivery(orderId, reason, token, key) },
   )
@@ -290,6 +291,10 @@ private fun CourierRoute(
       var partialCodReason by rememberSaveable(delivery.id) { mutableStateOf("") }
       var busy by remember(delivery.id) { mutableStateOf(false) }
       var statusMessage by remember(delivery.id) { mutableStateOf<String?>(null) }
+      var deliveryEvidenceKey by rememberSaveable(delivery.id) { mutableStateOf(UUID.randomUUID().toString()) }
+      var deliveryEvidenceUploaded by rememberSaveable(delivery.id) { mutableStateOf(false) }
+      var failureEvidenceKey by rememberSaveable("failure-${delivery.id}") { mutableStateOf(UUID.randomUUID().toString()) }
+      var failureEvidenceUploaded by rememberSaveable("failure-uploaded-${delivery.id}") { mutableStateOf(false) }
       val collectedCod = collectedCodText.toIntOrNull()
       val validCollectedCod = collectedCod != null && collectedCod in 0..delivery.outstandingCod
       val partialReasonRequired = collectedCod != null && collectedCod < delivery.outstandingCod
@@ -330,7 +335,16 @@ private fun CourierRoute(
             }
           }
           if (delivery.status == "out_for_delivery") {
-            CourierEvidencePicker(delivery.id, session, evidenceGateway, Modifier.fillMaxWidth().padding(top = 8.dp))
+            CourierEvidencePicker(
+              delivery.id,
+              session,
+              evidenceGateway,
+              Modifier.fillMaxWidth().padding(top = 8.dp),
+              deliveryEvidenceKey,
+              { deliveryEvidenceKey = it },
+              { deliveryEvidenceUploaded = it },
+              label = "Подтверждение доставки",
+            )
             OutlinedTextField(
               collectedCodText,
               { collectedCodText = it.filter(Char::isDigit) },
@@ -347,23 +361,23 @@ private fun CourierRoute(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("courier-cod-reason"),
               )
             }
-            CourierActionButton("Доставлено · ${collectedCod ?: delivery.outstandingCod} сом", busy || !validCollectedCod || (partialReasonRequired && partialCodReason.isBlank())) {
+            CourierActionButton("Доставлено · ${collectedCod ?: delivery.outstandingCod} сом", busy || !deliveryEvidenceUploaded || !validCollectedCod || (partialReasonRequired && partialCodReason.isBlank())) {
               val reason = partialCodReason.trim().ifEmpty { null }
               val amount = collectedCod ?: 0
               busy = true
               scope.launch {
-                val intent = intentStore.courierDeliver(delivery.id, amount, reason)
+                intentStore.courierDeliver(delivery.id, amount, reason, deliveryEvidenceKey)
                 runCatching {
                   commands.deliver(
                     delivery.id,
                     amount,
                     reason,
                     session.accessToken,
-                    intent.idempotencyKey,
+                    deliveryEvidenceKey,
                   )
                 }
                   .onSuccess {
-                    if (it is CourierCommandResult.Sent) intentStore.close(intent)
+                    if (it is CourierCommandResult.Sent) intentStore.closeByIdempotencyKey(deliveryEvidenceKey)
                     statusMessage = if (it is CourierCommandResult.Queued) "Сохранено офлайн" else "Доставка завершена"
                     scheduleCourierSync(context.applicationContext, apiBaseUrl)
                     onRefresh()
@@ -372,22 +386,32 @@ private fun CourierRoute(
                 busy = false
               }
             }
+            CourierEvidencePicker(
+              delivery.id,
+              session,
+              evidenceGateway,
+              Modifier.fillMaxWidth().padding(top = 8.dp),
+              failureEvidenceKey,
+              { failureEvidenceKey = it },
+              { failureEvidenceUploaded = it },
+              label = "Неуспешная доставка",
+            )
             OutlinedTextField(failureReason, { failureReason = it }, label = { Text("Причина неудачи") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
             OutlinedButton(
               onClick = {
                 busy = true
                 scope.launch {
-                  val intent = intentStore.courierFail(delivery.id, failureReason)
+                  intentStore.courierFail(delivery.id, failureReason, failureEvidenceKey)
                   runCatching {
                     commands.fail(
                       delivery.id,
                       failureReason,
                       session.accessToken,
-                      intent.idempotencyKey,
+                      failureEvidenceKey,
                     )
                   }
                     .onSuccess {
-                      if (it is CourierCommandResult.Sent) intentStore.close(intent)
+                      if (it is CourierCommandResult.Sent) intentStore.closeByIdempotencyKey(failureEvidenceKey)
                       statusMessage = if (it is CourierCommandResult.Queued) "Сохранено офлайн" else "Попытка записана"
                       scheduleCourierSync(context.applicationContext, apiBaseUrl)
                     }
@@ -395,7 +419,7 @@ private fun CourierRoute(
                   busy = false
                 }
               },
-              enabled = !busy && failureReason.isNotBlank(),
+              enabled = !busy && failureEvidenceUploaded && failureReason.isNotBlank(),
               modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             ) { Text("Не удалось доставить") }
           }
@@ -412,7 +436,11 @@ internal fun CourierEvidencePicker(
   session: StaffSession,
   gateway: StaffEvidenceGateway,
   modifier: Modifier,
+  evidenceIdempotencyKey: String = UUID.randomUUID().toString(),
+  onEvidenceKeyChanged: (String) -> Unit = {},
+  onEvidenceUploaded: (Boolean) -> Unit = {},
   initialEvidence: StaffEvidenceDraft? = null,
+  label: String = "Подтверждение доставки",
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -421,6 +449,10 @@ internal fun CourierEvidencePicker(
   var busy by remember(orderId) { mutableStateOf(false) }
   val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
     draft = bitmap?.courierEvidenceDraft()
+    if (bitmap != null) {
+      onEvidenceKeyChanged(UUID.randomUUID().toString())
+      onEvidenceUploaded(false)
+    }
     if (bitmap != null) message = "Фото готово к загрузке"
   }
   val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -433,10 +465,15 @@ internal fun CourierEvidencePicker(
         context.contentResolver.getType(uri) ?: "image/jpeg",
         "courier-evidence.jpg",
       )
-    }.onSuccess { draft = it; message = "Фото готово к загрузке" }.onFailure { message = it.message }
+    }.onSuccess {
+      draft = it
+      onEvidenceKeyChanged(UUID.randomUUID().toString())
+      onEvidenceUploaded(false)
+      message = "Фото готово к загрузке"
+    }.onFailure { message = it.message }
   }
   Column(modifier) {
-    Text("Evidence доставки", color = Color.White, fontWeight = FontWeight.Bold)
+    Text(label, color = Color.White, fontWeight = FontWeight.Bold)
     Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
       OutlinedButton(onClick = {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) camera.launch(null)
@@ -449,8 +486,8 @@ internal fun CourierEvidencePicker(
         val file = draft ?: return@Button
         busy = true
         scope.launch {
-          runCatching { gateway.uploadStaffEvidence("order", orderId, "Подтверждение доставки", file.fileName, file.mimeType, file.bytes, session.accessToken) }
-            .onSuccess { draft = null; message = "Evidence сохранён" }
+          runCatching { gateway.uploadStaffEvidenceWithKey("order", orderId, label, file.fileName, file.mimeType, file.bytes, session.accessToken, evidenceIdempotencyKey) }
+            .onSuccess { draft = null; onEvidenceUploaded(true); message = "Evidence сохранён" }
             .onFailure { message = it.message ?: "Ошибка Evidence" }
           busy = false
         }

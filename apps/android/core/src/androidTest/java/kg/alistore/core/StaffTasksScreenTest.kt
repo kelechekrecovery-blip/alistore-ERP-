@@ -122,6 +122,11 @@ private object NoopStaffEvidence : StaffEvidenceGateway {
     entityType: String, entityId: String, label: String, fileName: String,
     mimeType: String, bytes: ByteArray, token: String,
   ) = error("unused")
+
+  override suspend fun uploadStaffEvidenceWithKey(
+    entityType: String, entityId: String, label: String, fileName: String,
+    mimeType: String, bytes: ByteArray, token: String, idempotencyKey: String,
+  ) = error("unused")
 }
 
 private object NoopStaffCustomer : StaffCustomerGateway {

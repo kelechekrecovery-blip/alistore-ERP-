@@ -44,8 +44,9 @@ export function completeCancellationAttempt(
     memoryAttempts.delete(storageKey);
     try {
       storage.removeItem(storageKey);
-    } catch {
+    } catch (storageError) {
       // The successful response still completes the in-memory attempt.
+      if (process.env.NODE_ENV !== 'production') console.debug('[cancellation] storage cleanup unavailable', storageError);
     }
   }
 }
@@ -103,7 +104,8 @@ function writeStoredAttempt(
   memoryAttempts.set(storageKey, attempt);
   try {
     storage.setItem(storageKey, JSON.stringify(attempt));
-  } catch {
+  } catch (storageError) {
     // Private/blocked storage falls back to this module's per-tab memory.
+    if (process.env.NODE_ENV !== 'production') console.debug('[cancellation] storage write unavailable', storageError);
   }
 }

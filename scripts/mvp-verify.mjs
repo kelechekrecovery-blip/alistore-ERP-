@@ -10,15 +10,15 @@ const env = { ...process.env, ...loadEnvFile('apps/api/.env') };
 if (!env.E2E_DATABASE_URL && env.TEST_DATABASE_URL) {
   env.E2E_DATABASE_URL = env.TEST_DATABASE_URL;
 }
-const testDatabaseEnv = testDatabaseOverride(env);
+const { migrationEnv, testEnv } = testDatabaseOverride(env);
 
 const steps = [
   ['Prisma schema validate', 'npx', ['prisma', 'validate', '--schema', 'apps/api/prisma/schema.prisma']],
   ['Prisma client generate', 'npm', ['run', 'prisma:generate', '-w', '@alistore/api']],
-  ['Refund migration upgrade path', 'npm', ['run', 'test:refund-migration-upgrade', '-w', '@alistore/api'], testDatabaseEnv],
-  ['Inventory roll-forward migration upgrade path', 'npm', ['run', 'test:inventory-roll-forward-migration-upgrade', '-w', '@alistore/api'], testDatabaseEnv],
-  ['Exchange migration upgrade path', 'npm', ['run', 'test:exchange-migration-upgrade', '-w', '@alistore/api'], testDatabaseEnv],
-  ['Order payment-mode migration upgrade path', 'npm', ['run', 'test:order-payment-mode-migration-upgrade', '-w', '@alistore/api'], testDatabaseEnv],
+  ['Refund migration upgrade path', 'npm', ['run', 'test:refund-migration-upgrade', '-w', '@alistore/api'], migrationEnv],
+  ['Inventory roll-forward migration upgrade path', 'npm', ['run', 'test:inventory-roll-forward-migration-upgrade', '-w', '@alistore/api'], migrationEnv],
+  ['Exchange migration upgrade path', 'npm', ['run', 'test:exchange-migration-upgrade', '-w', '@alistore/api'], migrationEnv],
+  ['Order payment-mode migration upgrade path', 'npm', ['run', 'test:order-payment-mode-migration-upgrade', '-w', '@alistore/api'], migrationEnv],
   // Cheap and fails fast: catches invented business data in ERP screens before
   // the expensive builds run. Ratcheted — see scripts/no-fixtures-baseline.json.
   ['Нет новых фикстур в ERP', 'node', ['scripts/check-no-fixtures.mjs']],
@@ -34,11 +34,11 @@ const steps = [
     'Test database reset',
     'npx',
     ['prisma', 'migrate', 'reset', '--schema', 'apps/api/prisma/schema.prisma', '--force', '--skip-seed', '--skip-generate'],
-    testDatabaseEnv,
+    migrationEnv,
   ],
-  ['Test database post-deploy indexes', 'node', ['apps/api/scripts/postdeploy-indexes.mjs'], testDatabaseEnv],
+  ['Test database post-deploy indexes', 'node', ['apps/api/scripts/postdeploy-indexes.mjs'], migrationEnv],
   // Integration suites share one test database and must not clean fixtures concurrently.
-  ['API Jest batches', 'node', ['scripts/run-api-test-batches.mjs'], testDatabaseEnv],
+  ['API Jest batches', 'node', ['scripts/run-api-test-batches.mjs'], testEnv],
 ];
 
 if (!skipE2e) {
@@ -127,12 +127,25 @@ function testDatabaseOverride(runtimeEnv) {
   // still reserve many idle connections. Keep the destructive verification
   // gate bounded and prevent a developer's long-running API from starving it.
   const boundedTestUrl = withConnectionLimit(testUrl, 5);
-  return {
+  // Keep Jest's safety invariant meaningful: DATABASE_URL remains the
+  // configured dev/prod target while TEST_DATABASE_URL points at the named
+  // disposable database. Migration/reset steps receive migrationEnv below and
+  // are the only commands allowed to target that database directly.
+  const migrationEnv = {
+    ...runtimeEnv,
     DATABASE_URL: boundedTestUrl,
     TEST_DATABASE_URL: boundedTestUrl,
     E2E_DATABASE_URL: boundedTestUrl,
     ALISTORE_TEST_DATABASE_CONFIRMED: runtimeEnv.ALISTORE_TEST_DATABASE_CONFIRMED,
   };
+  const testEnv = {
+    ...runtimeEnv,
+    DATABASE_URL: runtimeEnv.DATABASE_URL,
+    TEST_DATABASE_URL: boundedTestUrl,
+    E2E_DATABASE_URL: boundedTestUrl,
+    ALISTORE_TEST_DATABASE_CONFIRMED: runtimeEnv.ALISTORE_TEST_DATABASE_CONFIRMED,
+  };
+  return { migrationEnv, testEnv };
 }
 
 function withConnectionLimit(value, limit) {

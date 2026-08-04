@@ -55,6 +55,18 @@ class StableCommandIntentStoreTest {
   }
 
   @Test
+  fun `courier evidence key is preserved by the command intent`() = runTest {
+    val store = store()
+    val evidenceKey = "evidence-key-1"
+
+    val intent = store.courierDeliver("order-1", 2_500, null, evidenceKey)
+    val retry = store.courierDeliver("order-1", 2_500, null, evidenceKey)
+
+    assertEquals(evidenceKey, intent.idempotencyKey)
+    assertEquals(evidenceKey, retry.idempotencyKey)
+  }
+
+  @Test
   fun `stale success cannot close a rotated intent`() = runTest {
     val store = store()
     val original = store.courierHandover("run-1", 5_000, null)

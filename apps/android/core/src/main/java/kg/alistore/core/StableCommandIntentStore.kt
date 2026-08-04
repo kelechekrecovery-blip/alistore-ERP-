@@ -111,11 +111,11 @@ internal class StableCommandIntentStore internal constructor(
   suspend fun courierStart(orderId: String) =
     open("courier-start:$orderId", "courier-start")
 
-  suspend fun courierDeliver(orderId: String, codAmount: Int, reason: String?) =
-    open("courier-deliver:$orderId", "courier-deliver", codAmount, canonicalReason(reason))
+  suspend fun courierDeliver(orderId: String, codAmount: Int, reason: String?, idempotencyKey: String? = null) =
+    open("courier-deliver:$orderId", "courier-deliver", codAmount, canonicalReason(reason), requestedKey = idempotencyKey)
 
-  suspend fun courierFail(orderId: String, reason: String) =
-    open("courier-fail:$orderId", "courier-fail", canonicalReason(reason))
+  suspend fun courierFail(orderId: String, reason: String, idempotencyKey: String? = null) =
+    open("courier-fail:$orderId", "courier-fail", canonicalReason(reason), requestedKey = idempotencyKey)
 
   suspend fun courierHandover(runId: String, amount: Int, reason: String?) =
     open("courier-handover:$runId", "courier-handover", amount, canonicalReason(reason))
@@ -140,14 +140,14 @@ internal class StableCommandIntentStore internal constructor(
     true
   }
 
-  private suspend fun open(scope: String, command: String, vararg fields: Any?): StableCommandIntent =
+  private suspend fun open(scope: String, command: String, vararg fields: Any?, requestedKey: String? = null): StableCommandIntent =
     mutationMutex.withLock {
     val actorScope = "$actorScopePrefix$scope"
     val fingerprint = fingerprint(command, *fields)
     persistence.read(actorScope)?.parse(actorScope)
-      ?.takeIf { it.payloadFingerprint == fingerprint }
+      ?.takeIf { it.payloadFingerprint == fingerprint && (requestedKey == null || it.idempotencyKey == requestedKey) }
       ?.let { return@withLock it }
-    StableCommandIntent(actorScope, fingerprint, commandId()).also {
+    StableCommandIntent(actorScope, fingerprint, requestedKey ?: commandId()).also {
       persistence.write(actorScope, it.serialized())
     }
   }

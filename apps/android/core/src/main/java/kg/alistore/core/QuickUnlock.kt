@@ -112,6 +112,22 @@ class QuickUnlockStore(context: Context, private val alias: String) {
     }.getOrDefault(false)
   }
 
+  /**
+   * Canonical PIN verification for unlocking. The lockout check and attempt
+   * mutation live in the store so a new caller cannot accidentally use
+   * [matches] as an unlimited brute-force oracle.
+   */
+  fun verifyPin(pin: String, nowMillis: Long = System.currentTimeMillis()): Boolean {
+    val current = pinStatus(nowMillis)
+    if (!current.allowed) return false
+    if (!matches(pin)) {
+      registerPinFailure(nowMillis)
+      return false
+    }
+    registerPinSuccess()
+    return true
+  }
+
   fun pinStatus(nowMillis: Long = System.currentTimeMillis()): PinAttemptStatus = PinAttemptLimiter.status(
     prefs.getInt(failuresKey, 0),
     prefs.getLong(lockedUntilKey, 0L),
@@ -209,8 +225,8 @@ fun QuickUnlockGate(
     OutlinedTextField(pin, { pin = it.filter(Char::isDigit).take(6) }, label = { Text("6-значный PIN") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth().testTag("quick-unlock-pin"))
     Button(onClick = {
       if (!pinStatus.allowed) pinStatus = store.pinStatus()
-      else if (store.matches(pin)) { store.registerPinSuccess(); unlocked = true; onUnlocked() }
-      else { pinStatus = store.registerPinFailure(); message = if (pinStatus.allowed) "Неверный PIN" else "Слишком много попыток" }
+      else if (store.verifyPin(pin)) { pinStatus = store.pinStatus(); unlocked = true; onUnlocked() }
+      else { pinStatus = store.pinStatus(); message = if (pinStatus.allowed) "Неверный PIN" else "Слишком много попыток" }
     }, enabled = pin.length == 6 && pinStatus.allowed, modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("quick-unlock-pin-submit")) { Text("Открыть по PIN") }
     val pinConfigured = store.isPinConfigured
     if (pinConfigured) {

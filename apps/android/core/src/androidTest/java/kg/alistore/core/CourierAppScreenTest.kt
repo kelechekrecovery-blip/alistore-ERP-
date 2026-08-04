@@ -43,10 +43,33 @@ class CourierAppScreenTest {
     check(gateway.upload == Triple("order", "order-42", "courier-token"))
     compose.onNodeWithText("Evidence сохранён").assertIsDisplayed()
   }
+
+  @Test
+  fun failedDeliveryEvidenceUsesFailureContractLabel() {
+    val gateway = CourierUiEvidenceGateway()
+    val session = StaffSession("courier-token", "courier-1", "courier", "courier", false)
+    compose.setContent {
+      MaterialTheme {
+        CourierEvidencePicker(
+          orderId = "order-42",
+          session = session,
+          gateway = gateway,
+          modifier = Modifier,
+          initialEvidence = StaffEvidenceDraft(byteArrayOf(4, 2)),
+          label = "Неуспешная доставка",
+        )
+      }
+    }
+
+    compose.onNodeWithTag("courier-evidence-upload").performClick()
+    compose.waitUntil(5_000) { gateway.uploadLabel != null }
+    check(gateway.uploadLabel == "Неуспешная доставка")
+  }
 }
 
 private class CourierUiEvidenceGateway : StaffEvidenceGateway {
   var upload: Triple<String, String, String>? = null
+  var uploadLabel: String? = null
 
   override suspend fun uploadStaffEvidence(
     entityType: String,
@@ -58,6 +81,12 @@ private class CourierUiEvidenceGateway : StaffEvidenceGateway {
     token: String,
   ): EvidenceAttachment {
     upload = Triple(entityType, entityId, token)
+    uploadLabel = label
     return EvidenceAttachment("evidence/order-42.jpg", "https://example.invalid/evidence")
   }
+
+  override suspend fun uploadStaffEvidenceWithKey(
+    entityType: String, entityId: String, label: String, fileName: String,
+    mimeType: String, bytes: ByteArray, token: String, idempotencyKey: String,
+  ) = uploadStaffEvidence(entityType, entityId, label, fileName, mimeType, bytes, token)
 }

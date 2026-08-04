@@ -18,7 +18,9 @@ class CourierCommandManagerTest {
     assertTrue(result is CourierCommandResult.Queued)
     assertEquals("courier/orders/order-1/deliver", queue.endpoint)
     assertEquals("delivery-key", queue.key)
-    assertEquals("{\"codAmount\":2500}", queue.body)
+    val body = JSONObject(requireNotNull(queue.body))
+    assertEquals(2500, body.getInt("codAmount"))
+    assertEquals("delivery-key", body.getString("evidenceIdempotencyKey"))
   }
 
   @Test
@@ -32,6 +34,7 @@ class CourierCommandManagerTest {
     assertEquals(500, body.getInt("codAmount"))
     assertEquals("customer paid the remainder later", body.getString("reason"))
     assertEquals("partial-key", queue.key)
+    assertEquals("partial-key", body.getString("evidenceIdempotencyKey"))
   }
 
   @Test

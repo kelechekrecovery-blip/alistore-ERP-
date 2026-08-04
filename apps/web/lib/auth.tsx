@@ -142,7 +142,8 @@ export function safeStorageSet(
   try {
     storage.setItem(key, value);
     return true;
-  } catch {
+  } catch (storageError) {
+    if (process.env.NODE_ENV !== 'production') console.debug('[auth] storage write unavailable', storageError);
     return false;
   }
 }
@@ -165,8 +166,9 @@ function expireCookie(doc: CookieDocument | undefined, name: string): void {
   if (!doc) return;
   try {
     doc.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
-  } catch {
+  } catch (cookieError) {
     // The storage marker still protects browsers that reject cookie writes.
+    if (process.env.NODE_ENV !== 'production') console.debug('[auth] cookie clear unavailable', cookieError);
   }
 }
 
@@ -178,8 +180,9 @@ export function markClientSignedOut(
   safeStorageSet(storage, SIGNED_OUT_STORAGE_KEY, String(epoch));
   try {
     if (doc) doc.cookie = `${SIGNED_OUT_COOKIE}=1; Path=/; Max-Age=31536000; SameSite=Lax`;
-  } catch {
+  } catch (cookieError) {
     // A same-page in-memory generation still prevents resurrection this turn.
+    if (process.env.NODE_ENV !== 'production') console.debug('[auth] signed-out cookie unavailable', cookieError);
   }
   // The hint is readable and must disappear synchronously. This does not
   // claim that the HttpOnly refresh cookie was revoked by the server.
@@ -255,8 +258,9 @@ function writeBrowserRefreshEpoch(epoch: number): void {
     // This is only a coordination counter. Tokens remain in the HttpOnly
     // cookie and the provider's in-memory access-token ref.
     localStorage.setItem(REFRESH_EPOCH_KEY, String(epoch));
-  } catch {
+  } catch (storageError) {
     // A disabled/full storage area does not weaken the Web Lock serialization.
+    if (process.env.NODE_ENV !== 'production') console.debug('[auth] refresh epoch storage unavailable', storageError);
   }
 }
 

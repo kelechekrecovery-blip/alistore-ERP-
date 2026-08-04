@@ -83,4 +83,16 @@ class QuickUnlockStoreTest {
     assertTrue("PIN must remain the original one while locked out", store.matches("111111"))
     store.clear()
   }
+
+  @Test
+  fun verifyPinOwnsTheAttemptCounterAndClearsItOnSuccess() {
+    val store = freshStore()
+    store.setInitialPin("111111")
+
+    assertFalse(store.verifyPin("000000"))
+    assertEquals(1, store.pinStatus().failures)
+    assertTrue(store.verifyPin("111111"))
+    assertEquals(0, store.pinStatus().failures)
+    store.clear()
+  }
 }

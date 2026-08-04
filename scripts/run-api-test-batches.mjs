@@ -31,14 +31,24 @@ const files = collect(root);
 if (files.length === 0) throw new Error('No API Jest files found');
 
 function run(command, args, label) {
+  return runWithEnv(command, args, label, process.env);
+}
+
+function runWithEnv(command, args, label, env) {
   console.log(`\n==> ${label}`);
   const result = spawnSync(command, args, {
     cwd: process.cwd(),
-    env: process.env,
+    env,
     shell: false,
     stdio: 'inherit',
   });
   return result.status ?? 1;
+}
+
+function migrationEnv() {
+  const testDatabaseUrl = process.env.TEST_DATABASE_URL;
+  if (!testDatabaseUrl) throw new Error('TEST_DATABASE_URL is required for API reset');
+  return { ...process.env, DATABASE_URL: testDatabaseUrl };
 }
 
 const batches = [];
@@ -51,11 +61,11 @@ for (const [index, batch] of batches.entries()) {
   let status = 1;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     const suffix = attempt === 0 ? '' : ` retry ${attempt}/${retries}`;
-    status = run('npx', [
+    status = runWithEnv('npx', [
       'prisma', 'migrate', 'reset',
       '--schema', 'apps/api/prisma/schema.prisma',
       '--force', '--skip-seed', '--skip-generate',
-    ], `API database reset ${index + 1}/${batches.length}${suffix}`);
+    ], `API database reset ${index + 1}/${batches.length}${suffix}`, migrationEnv());
     if (status !== 0) break;
 
     status = run('npm', [
