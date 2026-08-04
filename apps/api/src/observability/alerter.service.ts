@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { fetchWithTimeout } from '../outbox/transports/fetch-with-timeout';
 
 export interface CriticalAlert {
   /** Stable source tag, e.g. 'api', 'refund-relay', 'outbox-relay'. */
@@ -20,6 +21,7 @@ const DEFAULT_DEDUP_WINDOW_MS = 5 * 60 * 1000;
 const DEFAULT_MAX_PER_WINDOW = 10;
 const RECENT_LIMIT = 50;
 const TEXT_LIMIT = 900;
+const DELIVERY_TIMEOUT_MS = 5_000;
 
 /**
  * Critical-alert channel (Telegram ops chat) for unhandled API errors and
@@ -129,7 +131,7 @@ export class AlerterService {
     const text = [`🚨 [AliStore ${this.environment}] ${source}: ${message}`];
     if (detail && detail !== message) text.push(detail.slice(0, 300));
 
-    const response = await fetch(`${this.apiUrl}/bot${this.botToken}/sendMessage`, {
+    const response = await fetchWithTimeout(`${this.apiUrl}/bot${this.botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -137,7 +139,7 @@ export class AlerterService {
         text: text.join('\n').slice(0, TEXT_LIMIT),
         disable_web_page_preview: true,
       }),
-    });
+    }, DELIVERY_TIMEOUT_MS);
 
     if (!response.ok) {
       const body = await response.text().catch(() => '');
