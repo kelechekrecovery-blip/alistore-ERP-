@@ -937,8 +937,54 @@ model StorePoint {
   supplyQuarantineResolutions SupplyQuarantineResolution[]
   createdAt                   DateTime                     @default(now())
   updatedAt                   DateTime                     @updatedAt
+  edgeDevices                 EdgeDevice[]
+  cameraDetections            CameraDetection[]
 
   @@index([active, sortOrder])
+}
+
+// Camera/edge metadata only. Raw video is intentionally outside the ERP ledger
+// and must be attached through the Evidence Vault with an explicit TTL.
+model EdgeDevice {
+  id             String   @id @default(cuid())
+  storePointId   String
+  kind           String   @default("camera")
+  name           String
+  secretHash     String
+  status         String   @default("active")
+  lastSeenAt     DateTime?
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  storePoint     StorePoint @relation(fields: [storePointId], references: [id], onDelete: Restrict)
+  detections     CameraDetection[]
+
+  @@index([storePointId, status])
+  @@index([lastSeenAt])
+}
+
+model CameraDetection {
+  id             String      @id @default(cuid())
+  idempotencyKey String      @unique
+  requestHash    String
+  edgeDeviceId   String
+  storePointId   String
+  eventType      String
+  confidence     Float
+  value          Json
+  privacyLevel   String      @default("non_identifying")
+  evidenceRef    String?
+  occurredAt     DateTime
+  retentionUntil DateTime?
+  purgedAt       DateTime?
+  purgeReason    String?
+  createdAt      DateTime    @default(now())
+  edgeDevice     EdgeDevice  @relation(fields: [edgeDeviceId], references: [id], onDelete: Restrict)
+  storePoint     StorePoint  @relation(fields: [storePointId], references: [id], onDelete: Restrict)
+
+  @@index([storePointId, occurredAt])
+  @@index([eventType, occurredAt])
+  @@index([retentionUntil])
 }
 
 model StorePointCommand {
