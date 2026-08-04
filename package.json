@@ -17,6 +17,8 @@
     "api:contract:matrix": "node scripts/cloudflare-api-contract-matrix.mjs",
     "api:smoke:local": "node scripts/cloudflare-local-smoke.mjs",
     "infra:meili-smoke": "node scripts/meilisearch-smoke.mjs",
+    "camera:edge:send": "node scripts/camera-edge-send.mjs",
+    "camera:edge:send:test": "node --test scripts/__tests__/camera-edge-send.test.mjs",
     "api:build": "npm run build -w @alistore/api",
     "api:test": "npm run test -w @alistore/api -- --runInBand",
     "api:test:isolated": "node scripts/run-isolated-api-tests.mjs",

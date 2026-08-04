@@ -48,6 +48,21 @@ review-событие; камера не может напрямую менят�
 
 ## Privacy and operations
 
+Для небольшого edge-адаптера можно использовать проверенный отправитель из
+репозитория:
+
+```bash
+CAMERA_EDGE_SECRET='<'secret из enrollment'>' \\
+  npm run camera:edge:send -- \\
+  --api http://127.0.0.1:4000/api/camera-gateway/events \\
+  --device-id edge_123 --store-point-id alistore-bishkek-1 \\
+  --event-type queue_length_estimated --confidence 0.92 \\
+  --value '{"count":3}' --idempotency-key ezviz:queue:1
+```
+
+Удалённый endpoint обязан быть HTTPS. HTTP разрешён только для loopback или
+явно разрешённой изолированной лабораторной сети.
+
 - `EDGE_CAMERA_KILL_SWITCH=1` немедленно блокирует ingestion.
 - Сервер принимает только metadata (`value` ограничен 4 KiB); поля `frame`,
   `video`, `audio`, `image`, `face`, `passport` и `document` запрещены.
