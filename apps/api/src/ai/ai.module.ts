@@ -20,6 +20,8 @@ import { GradingService } from './grading.service';
 import { GradingController } from './grading.controller';
 import { PriceScoutService } from './price-scout.service';
 import { PriceScoutController } from './price-scout.controller';
+import { AiOrchestratorService } from './orchestrator.service';
+import { AiOrchestratorController } from './orchestrator.controller';
 
 @Module({
   imports: [SettingsModule, ReportsModule, StaffAuthModule, AuthzModule, ModerationModule],
@@ -32,6 +34,7 @@ import { PriceScoutController } from './price-scout.controller';
     GradingService,
     PriceScoutService,
     CategorizeService,
+    AiOrchestratorService,
   ],
   controllers: [
     InsightsController,
@@ -42,6 +45,7 @@ import { PriceScoutController } from './price-scout.controller';
     DescribeController,
     GradingController,
     PriceScoutController,
+    AiOrchestratorController,
   ],
 })
 export class AiModule {}
