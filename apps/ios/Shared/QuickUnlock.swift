@@ -87,16 +87,26 @@ public struct LocalPINStore: Sendable {
     public var attemptStatus: PINAttemptStatus {
         guard let stored = read(account: Self.attemptsAccount) else { return PINAttemptStatus() }
         let parts = stored.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
-        guard parts.count == 2, let failures = Int(parts[0]), let lockedUntil = Int64(parts[1]) else {
+        guard parts.count == 2, let failures = Int(parts[0]), let storedUntil = Int64(parts[1]) else {
             return PINAttemptStatus()
         }
-        // Клампим остаток к полному окну лок-аута. Дедлайн хранится в монотонных
-        // часах (`systemUptime`), которые пользователь не может отмотать назад,
-        // но которые обнуляются при перезагрузке. После ребута сохранённый дедлайн
-        // окажется «в будущем» относительно нового аптайма — кламп превращает это
-        // в повторное наложение тех же 30 секунд, а не в вечную блокировку.
+        // Дедлайн хранится в монотонных часах (`systemUptime`), которые пользователь
+        // не может отмотать назад, но которые обнуляются при перезагрузке. После
+        // ребута сохранённый дедлайн оказывается впереди нового аптайма на весь
+        // прежний аптайм — а прежний кламп подрезал только ПОКАЗ остатка, не трогая
+        // сам дедлайн: экран бесконечно показывал «30 сек», и быстрый вход оставался
+        // заперт столько, сколько устройство проработало до перезагрузки. Остаток
+        // больше окна лок-аута внутри одной загрузки невозможен, поэтому он
+        // однозначно опознаёт ребут — перевешиваем дедлайн на те же 30 секунд от
+        // текущего аптайма и СОХРАНЯЕМ, иначе отсчёт снова не сдвинется с места.
         // Инвариант: лок-аут нельзя ни обойти сменой часов, ни растянуть сверх окна.
-        let remaining = min(Self.lockoutMillis, max(0, lockedUntil - Self.nowMillis))
+        let now = Self.nowMillis
+        var lockedUntil = storedUntil
+        if lockedUntil - now > Self.lockoutMillis {
+            lockedUntil = now + Self.lockoutMillis
+            try? tokens.save("\(failures):\(lockedUntil)", account: Self.attemptsAccount)
+        }
+        let remaining = min(Self.lockoutMillis, max(0, lockedUntil - now))
         return PINAttemptStatus(
             allowed: remaining == 0,
             retryAfterSeconds: Int((remaining + 999) / 1000),
@@ -201,7 +211,8 @@ public struct LocalPINStore: Sendable {
 
     /// Монотонные часы: секунды с загрузки, а не настенное время. Перевод
     /// системных часов на них не влияет — иначе лок-аут снимался бы установкой
-    /// времени вперёд. Обнуление при ребуте обезврежено клампом в `attemptStatus`.
+    /// времени вперёд. Обнуление при ребуте обезврежено перевешиванием дедлайна
+    /// в `attemptStatus`.
     private static var nowMillis: Int64 { Int64(ProcessInfo.processInfo.systemUptime * 1000) }
 }
 

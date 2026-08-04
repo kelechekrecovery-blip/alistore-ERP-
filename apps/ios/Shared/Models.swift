@@ -38,6 +38,33 @@ public struct ProductAttributes: Decodable, Sendable {
     }
 }
 
+/// Три состояния наличия из каталога (`availabilityKind` в apps/api/src/catalog/catalog.dto.ts).
+public enum ProductAvailabilityKind: String, Sendable, Equatable {
+    case inStock = "in_stock"
+    case toOrder = "to_order"
+    case unavailable
+}
+
+/// Разобранное наличие товара — зеркало `catalogAvailability` из apps/web/lib/to-order.ts.
+public struct ProductAvailability: Sendable, Equatable {
+    public let kind: ProductAvailabilityKind
+    /// Можно ли класть в корзину. Решает сервер (`orderable`), а не остаток на складе.
+    public let buyable: Bool
+    /// Срок и дата — только для «под заказ»: у складского товара их нет, и показывать там нечего.
+    public let leadTimeDays: Int?
+    public let estimatedDeliveryDate: Date?
+
+    public var isInStock: Bool { kind == .inStock }
+    public var isToOrder: Bool { kind == .toOrder }
+
+    public init(kind: ProductAvailabilityKind, buyable: Bool, leadTimeDays: Int?, estimatedDeliveryDate: Date?) {
+        self.kind = kind
+        self.buyable = buyable
+        self.leadTimeDays = leadTimeDays
+        self.estimatedDeliveryDate = estimatedDeliveryDate
+    }
+}
+
 public struct Product: Decodable, Identifiable, Sendable {
     public let id: String
     public let sku: String
@@ -82,6 +109,35 @@ public struct Product: Decodable, Identifiable, Sendable {
         availabilityKind = try? container.decodeIfPresent(String.self, forKey: .availabilityKind)
         leadTimeDays = try? container.decodeIfPresent(Int.self, forKey: .leadTimeDays)
         estimatedDeliveryDate = try? container.decodeIfPresent(Date.self, forKey: .estimatedDeliveryDate)
+    }
+
+    /// Наличие в разобранном виде. Поля `availabilityKind`/`orderable`/`leadTimeDays`
+    /// декодировались, но нигде не читались: экраны смотрели только на
+    /// `availableUnits > 0`, и товар «под заказ» (остатка нет, но магазин его
+    /// привезёт) читался как «нет в наличии» — покупатель терял товар, который
+    /// ему готовы продать. Фолбэк на `supplyMode` держит ответы каталога, где
+    /// поля ещё нет, но недоступный товар покупаемым не делает никогда.
+    public var availability: ProductAvailability {
+        let fallback: ProductAvailabilityKind
+        if availableUnits > 0 {
+            fallback = .inStock
+        } else if supplyMode == "to_order" {
+            fallback = .toOrder
+        } else {
+            fallback = .unavailable
+        }
+        let kind = ProductAvailabilityKind(rawValue: availabilityKind ?? "") ?? fallback
+        // Без серверного `orderable` заказным товар не считаем: разрешение на
+        // покупку под заказ даёт только сервер (действующий оффер, маржа, флаг).
+        let isBuyable = (orderable ?? (kind == .inStock)) && kind != .unavailable
+        // Ноль и отрицательный срок — это «сервер не знает», а не «привезём сегодня».
+        let leadTime: Int? = (leadTimeDays ?? 0) > 0 ? leadTimeDays : nil
+        return ProductAvailability(
+            kind: kind,
+            buyable: isBuyable,
+            leadTimeDays: kind == .toOrder ? leadTime : nil,
+            estimatedDeliveryDate: kind == .toOrder ? estimatedDeliveryDate : nil
+        )
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -995,6 +1051,24 @@ public struct OrderTimelineStep: Equatable, Sendable {
     }
 }
 
+/// Терминальный исход заказа: движение прекратилось и не возобновится.
+/// Зеркало `TERMINAL_BAD` из apps/web/lib/order-status.ts.
+public enum OrderTerminalOutcome: String, Sendable, Equatable {
+    case cancelled
+    case refunded
+    case returned
+    case exchanged
+
+    public var title: String {
+        switch self {
+        case .cancelled: "Заказ отменён"
+        case .refunded: "Возврат денег оформлен"
+        case .returned: "Товар возвращён"
+        case .exchanged: "Оформлен обмен"
+        }
+    }
+}
+
 /// Customer-facing fulfillment timeline built from the order ledger.
 /// Mirrors apps/web/lib/order-status.ts: a step is done when one of its events
 /// exists (timestamped from that event); the first pending step is current.
@@ -1009,6 +1083,24 @@ public enum OrderTimelineBuilder {
 
     public static var stepTitles: [String] {
         steps.map(\.title)
+    }
+
+    public static func terminalOutcome(status: String) -> OrderTerminalOutcome? {
+        OrderTerminalOutcome(rawValue: status.lowercased())
+    }
+
+    /// Таймлайн с оглядкой на статус заказа. Отменённый и возвращённый заказ
+    /// приходил сюда обычным `status`, а шаги строились по одному леджеру — и
+    /// экран продолжал подсвечивать «Собираем заказ» у заказа, который никто
+    /// уже не собирает. Подсветка следующего шага читается как обещание, что
+    /// заказ едет, поэтому у терминального исхода текущего шага нет вовсе.
+    /// Пройденные шаги остаются пройденными: эти события действительно были.
+    public static func build(events: [OrderLedgerEvent], status: String?) -> [OrderTimelineStep] {
+        let ledgerSteps = build(events: events)
+        guard let status, terminalOutcome(status: status) != nil else { return ledgerSteps }
+        return ledgerSteps.map { step in
+            OrderTimelineStep(title: step.title, isDone: step.isDone, isCurrent: false, time: step.time)
+        }
     }
 
     public static func build(events: [OrderLedgerEvent]) -> [OrderTimelineStep] {
@@ -1233,6 +1325,13 @@ public struct CreateOrderRequest: Codable, Sendable {
     public let deliveryZoneId: String?
     public let deliverySlotId: String?
     public let deliverySlot: String?
+    /// Согласие с офертой и обработкой персональных данных. Веб шлёт его флажком
+    /// с экрана оформления (`apps/web/app/checkout/page.tsx`), и по нему сервер
+    /// ставит `piiConsentAt` (`apps/api/src/orders/orders.service.ts:719`).
+    /// В запросе с iOS поля не было вовсе — заказы с приложения ложились без
+    /// отметки согласия, хотя веб её требует. Умолчание `nil` намеренное:
+    /// согласие проставляет только человек, поставивший галочку, а не клиент.
+    public let piiConsent: Bool?
 
     public init(
         customerId: String,
@@ -1246,7 +1345,8 @@ public struct CreateOrderRequest: Codable, Sendable {
         loyaltyPoints: Int? = nil,
         deliveryZoneId: String? = nil,
         deliverySlotId: String? = nil,
-        deliverySlot: String? = nil
+        deliverySlot: String? = nil,
+        piiConsent: Bool? = nil
     ) {
         self.customerId = customerId
         self.channel = "mobile"
@@ -1261,6 +1361,7 @@ public struct CreateOrderRequest: Codable, Sendable {
         self.deliveryZoneId = deliveryZoneId
         self.deliverySlotId = deliverySlotId
         self.deliverySlot = deliverySlot
+        self.piiConsent = piiConsent
     }
 }
 

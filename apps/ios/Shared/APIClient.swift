@@ -289,6 +289,35 @@ public actor APIClient {
 
 private struct EmptyResponse: Decodable, Sendable {}
 
+/// Тело ошибки NestJS. `message` приходит двух форм: строкой от брошенного
+/// `HttpException` и массивом строк от глобального `ValidationPipe`
+/// (`apps/api/src/main.ts:38`) — по строке на каждое правило class-validator.
+/// Декодер знал только строковую форму, поэтому массив ронял разбор целиком,
+/// и любая ошибка валидации схлопывалась в бесполезное «Ошибка сервера 400»:
+/// пользователь не узнавал, какое поле сервер не принял.
 private struct ErrorPayload: Decodable {
     let message: String
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let single = try? container.decode(String.self, forKey: .message), !single.isEmpty {
+            message = single
+            return
+        }
+        let lines = try container.decode([String].self, forKey: .message).filter { !$0.isEmpty }
+        // Пустой список причин хуже кода статуса: показали бы пустую плашку.
+        // Роняем разбор, чтобы вызывающий взял запасной текст со статусом.
+        guard !lines.isEmpty else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .message,
+                in: container,
+                debugDescription: "Empty validation message list"
+            )
+        }
+        message = lines.joined(separator: "\n")
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case message
+    }
 }

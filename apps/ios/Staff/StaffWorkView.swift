@@ -44,14 +44,16 @@ struct StaffWorkView: View {
             .padding(.horizontal, 18)
             .padding(.top, 14)
             .padding(.bottom, 12)
-            Picker("Работа", selection: $mode) {
-                ForEach(StaffWorkMode.allCases) { Text($0.rawValue).tag($0) }
+            if availableModes.count > 1 {
+                Picker("Работа", selection: $mode) {
+                    ForEach(availableModes) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.vertical, 8)
 
-            switch mode {
+            switch effectiveMode {
             case .orders:
                 StaffOrdersView(session: session)
             case .tasks:
@@ -64,10 +66,41 @@ struct StaffWorkView: View {
         .background(background.ignoresSafeArea())
         .navigationTitle("Работа")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear(perform: normalizeMode)
+    }
+
+    /// Сегменты, которые роль вправе открыть (`StaffAccess`).
+    ///
+    /// Переключатель предлагал все три любому вошедшему, хотя очередь заказов
+    /// требует `orders:queue`, а инбокс поддержки — `support:read`. Продавец
+    /// нажимал «Заказы» и получал 403 вместо очереди. Задачи (`staff-tasks/mine`)
+    /// открыты всем, поэтому список никогда не пуст.
+    private var availableModes: [StaffWorkMode] {
+        StaffWorkMode.allCases.filter(isModeAvailable)
+    }
+
+    private func isModeAvailable(_ mode: StaffWorkMode) -> Bool {
+        switch mode {
+        case .orders: StaffAccess.canReadOrderQueue(session.role)
+        case .tasks: true
+        case .support: StaffAccess.canReadSupport(session.role)
+        }
+    }
+
+    /// Экран строится по разрешённому режиму сразу, а не после `onAppear`:
+    /// иначе первый кадр успевал создать закрытый экран и отправить запрос,
+    /// который вернётся 403.
+    private var effectiveMode: StaffWorkMode {
+        isModeAvailable(mode) ? mode : (availableModes.first ?? .tasks)
+    }
+
+    private func normalizeMode() {
+        guard !isModeAvailable(mode), let fallback = availableModes.first else { return }
+        mode = fallback
     }
 
     private var screenTitle: String {
-        switch mode {
+        switch effectiveMode {
         case .orders: "Заказы"
         case .tasks: "Задачи и KPI"
         case .support: "Поддержка"
@@ -107,14 +140,16 @@ private struct StaffTasksView: View {
                 } actions: {
                     Button("Повторить", systemImage: "arrow.clockwise") { Task { await load() } }
                 }
-            } else if tasks.isEmpty {
-                ContentUnavailableView("Нет активных задач", systemImage: "checkmark.circle", description: Text("Новые назначения появятся здесь."))
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         kpiCard
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(tasks) { task in taskRow(task) }
+                        if tasks.isEmpty {
+                            ContentUnavailableView("Нет активных задач", systemImage: "checkmark.circle", description: Text("Новые назначения появятся здесь."))
+                        } else {
+                            VStack(alignment: .leading, spacing: 10) {
+                                ForEach(tasks) { task in taskRow(task) }
+                            }
                         }
                     }
                     .padding(.horizontal, 18)
@@ -127,32 +162,68 @@ private struct StaffTasksView: View {
         .task { await load() }
     }
 
+    /// Процент считается по загруженным задачам, а не берётся с потолка.
+    ///
+    /// Здесь стояли «92%» и полоса на `0.92` — одно и то же число любому
+    /// сотруднику в любой день, а при пустом списке карточка исчезала вместе с
+    /// ним. Сотрудник читает KPI как обещание по зарплате, поэтому выдуманная
+    /// цифра здесь дороже, чем на витрине. `staff-tasks/mine` не знает ни
+    /// периода, ни плана (staff-tasks.service.ts:28 — все неотменённые задачи
+    /// исполнителя), поэтому заголовок больше не обещает «месяц»: считаем ровно
+    /// то, что есть, — долю выполненных среди назначенных. Нет задач — нет и
+    /// процента, и карточка честно это говорит, а не прячется.
     private var kpiCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("KPI месяца")
+                Text("KPI по задачам")
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(primaryText)
                 Spacer()
-                Text("92%")
-                    .font(.system(.title3, design: .monospaced).weight(.black))
-                    .foregroundStyle(lime)
+                if let completionRate {
+                    Text("\(completionRate)%")
+                        .font(.system(.title3, design: .monospaced).weight(.black))
+                        .foregroundStyle(lime)
+                        .accessibilityIdentifier("staff-kpi-value")
+                } else {
+                    Text("нет данных")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(secondaryText)
+                        .accessibilityIdentifier("staff-kpi-value")
+                }
             }
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     Capsule().fill(surfaceSoft)
-                    Capsule().fill(lime)
-                        .frame(width: max(16, proxy.size.width * 0.92))
+                    if let completionRate, completionRate > 0 {
+                        Capsule().fill(lime)
+                            .frame(width: proxy.size.width * CGFloat(completionRate) / 100)
+                    }
                 }
             }
             .frame(height: 8)
-            Text("Цель: аксессуары, ценники, обучение и контроль остатков до конца смены.")
+            Text(kpiCaption)
                 .font(.caption)
                 .foregroundStyle(secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(surfaceSoft))
+    }
+
+    private var completedTasks: Int {
+        tasks.filter { $0.status == "completed" }.count
+    }
+
+    private var completionRate: Int? {
+        guard !tasks.isEmpty else { return nil }
+        return Int((Double(completedTasks) / Double(tasks.count) * 100).rounded())
+    }
+
+    private var kpiCaption: String {
+        tasks.isEmpty
+            ? "Задач пока не назначено — процент считать не из чего."
+            : "Выполнено \(completedTasks) из \(tasks.count) назначенных задач."
     }
 
     private func taskRow(_ task: StaffTask) -> some View {

@@ -271,9 +271,15 @@ struct POSOperationsView: View {
     @State private var refundAmount = ""
     @State private var refundReason = ""
     @State private var oldIMEI = ""
+    // У обмена свой заказ, а не тот, что ищут в чеке: на одном общем поле
+    // набранный для поиска чека id молча уезжал в заявку на обмен, а выбранный
+    // для обмена — так же молча подменял поиск чека и выдачу строки заказа.
+    @State private var exchangeOrderId = ""
     @State private var newProductId = ""
     @State private var exchangeMethod = "cash"
     @State private var exchangeKey = UUID().uuidString
+    /// Заявка, созданная на сервере, но оставшаяся без фото состояния.
+    @State private var pendingExchange: POSExchangeResult?
     @State private var exchangePhotoItem: PhotosPickerItem?
     @State private var exchangeEvidence: Data?
     @State private var isBusy = false
@@ -360,7 +366,7 @@ struct POSOperationsView: View {
                     }
                 }
                 Section("Обмен устройства") {
-                    TextField("Исходный заказ", text: $orderId).textInputAutocapitalization(.never)
+                    TextField("Исходный заказ", text: $exchangeOrderId).textInputAutocapitalization(.never)
                     TextField("Старый IMEI", text: $oldIMEI).keyboardType(.numberPad)
                     Picker("Новый товар", selection: $newProductId) {
                         Text("Выберите товар").tag("")
@@ -377,7 +383,25 @@ struct POSOperationsView: View {
                         Task { exchangeEvidence = try? await item?.loadTransferable(type: Data.self) }
                     }
                     Button("Создать заявку на обмен", systemImage: "checkmark.shield") { Task { await exchange() } }
-                        .disabled(orderId.isEmpty || oldIMEI.isEmpty || newProductId.isEmpty || exchangeEvidence == nil || isBusy)
+                        .disabled(
+                            exchangeOrderId.isEmpty || oldIMEI.isEmpty || newProductId.isEmpty
+                            || exchangeEvidence == nil || isBusy
+                        )
+                    if let pendingExchange {
+                        // Заявка и approval на сервере уже есть, а фото — нет.
+                        // Пока фото не приложено, старший её не одобрит, и
+                        // повторное «Создать заявку» этого не исправит.
+                        let warning = """
+                            Заявка #\(pendingExchange.exchangeRequestId.suffix(8)) создана без фото. \
+                            Согласование не пройдёт, пока фото не приложено.
+                            """
+                        Text(warning).font(.caption).foregroundStyle(POSPalette.coral)
+                        Button("Приложить фото ещё раз", systemImage: "arrow.clockwise") {
+                            guard let evidence = exchangeEvidence else { return }
+                            Task { await attachExchangeEvidence(evidence, to: pendingExchange) }
+                        }
+                        .disabled(isBusy || exchangeEvidence == nil)
+                    }
                 }
                 if isBusy { Section { ProgressView() } }
                 if let message { Section { Text(message).foregroundStyle(POSPalette.lime) } }
@@ -491,27 +515,71 @@ struct POSOperationsView: View {
     }
 
     @MainActor private func exchange() async {
-        isBusy = true; errorMessage = nil; defer { isBusy = false }
+        guard let evidence = exchangeEvidence else {
+            errorMessage = "Приложите фото состояния устройства — без него обмен не согласуют"
+            return
+        }
+        isBusy = true; errorMessage = nil; message = nil; defer { isBusy = false }
+        let created: POSExchangeResult
         do {
-            let result: POSExchangeResult = try await api.post(
+            created = try await api.post(
                 "exchanges",
-                body: POSExchangeRequest(originalOrderId: orderId, oldImei: oldIMEI, newProductId: newProductId, method: exchangeMethod),
+                body: POSExchangeRequest(
+                    originalOrderId: exchangeOrderId,
+                    oldImei: oldIMEI,
+                    newProductId: newProductId,
+                    method: exchangeMethod
+                ),
                 token: session.accessToken,
                 idempotencyKey: exchangeKey
             )
-            guard let exchangeEvidence else { return }
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
+        // Ответ 202: заявка и approval уже созданы, а IMEI-замена переведена в
+        // `reserved` (`exchanges.service.ts:58-108`). Дальше упасть может только
+        // догрузка фото — и молчать об этом нельзя: оператор видел бы одну
+        // ошибку, считал, что не создалось ничего, и повторял операцию целиком.
+        pendingExchange = created
+        await attachExchangeEvidence(evidence, to: created)
+    }
+
+    /// Фото уходит вторым запросом, когда заявка на сервере уже есть.
+    ///
+    /// Без него старший не одобрит обмен (`exchanges.service.ts:172`), а заявка
+    /// до истечения TTL держит резерв на товар-замену. Поэтому при неудаче
+    /// повторяем именно загрузку фото и говорим, что заявка создана.
+    /// `exchangeKey` ротируем только здесь, после полного успеха: до этого
+    /// случайный повтор попадёт в ту же заявку, а не создаст вторую.
+    @MainActor private func attachExchangeEvidence(_ evidence: Data, to request: POSExchangeResult) async {
+        isBusy = true; defer { isBusy = false }
+        do {
             let _: EvidenceAttachment = try await api.uploadEvidence(
-                imageData: exchangeEvidence,
+                imageData: evidence,
                 entityType: "exchange",
-                entityId: result.exchangeRequestId,
+                entityId: request.exchangeRequestId,
                 label: "exchange_condition",
                 token: session.accessToken
             )
-            message = "Ожидает согласования #\(result.approvalId.suffix(8)) · доплата \(result.surchargeAmount) сом · IMEI …\(result.newImei.suffix(6))"
-            exchangeKey = UUID().uuidString
-            oldIMEI = ""; newProductId = ""; exchangePhotoItem = nil; self.exchangeEvidence = nil
-            await refresh()
-        } catch { errorMessage = error.localizedDescription }
+        } catch {
+            errorMessage = """
+                Заявка #\(request.exchangeRequestId.suffix(8)) создана и ждёт согласования \
+                #\(request.approvalId.suffix(8)), но фото не приложилось: \
+                \(error.localizedDescription). Повторите загрузку фото — \
+                создавать заявку заново не нужно.
+                """
+            return
+        }
+        errorMessage = nil
+        pendingExchange = nil
+        message = """
+            Ожидает согласования #\(request.approvalId.suffix(8)) · \
+            доплата \(request.surchargeAmount) сом · IMEI …\(request.newImei.suffix(6))
+            """
+        exchangeKey = UUID().uuidString
+        oldIMEI = ""; newProductId = ""; exchangePhotoItem = nil; exchangeEvidence = nil
+        await refresh()
     }
 }
 

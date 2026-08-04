@@ -129,11 +129,15 @@ private struct StaffRootView: View {
             }
             .tabItem { Label("Главная", systemImage: "house.fill") }
             .tag(StaffTab.home)
-            NavigationStack {
-                StaffWorkView(session: session, mode: $workMode, routedTaskId: $routedTaskId)
+            // Вкладки скрыты по правам роли, а не показаны всем и отбиты 403 —
+            // см. StaffAccess.
+            if StaffAccess.canReadOrderQueue(session.role) {
+                NavigationStack {
+                    StaffWorkView(session: session, mode: $workMode, routedTaskId: $routedTaskId)
+                }
+                .tabItem { Label("Заказы", systemImage: "shippingbox.fill") }
+                .tag(StaffTab.orders)
             }
-            .tabItem { Label("Заказы", systemImage: "shippingbox.fill") }
-            .tag(StaffTab.orders)
             NavigationStack {
                 StaffWorkView(session: session, mode: $workMode, routedTaskId: $routedTaskId)
             }
@@ -144,11 +148,13 @@ private struct StaffRootView: View {
             }
             .tabItem { Label("Скупка", systemImage: "barcode.viewfinder") }
             .tag(StaffTab.buyback)
-            NavigationStack {
-                Customer360View(session: session)
+            if StaffAccess.canReadCustomers(session.role) {
+                NavigationStack {
+                    Customer360View(session: session)
+                }
+                .tabItem { Label("Клиент", systemImage: "person.text.rectangle.fill") }
+                .tag(StaffTab.customer)
             }
-            .tabItem { Label("Клиент", systemImage: "person.text.rectangle.fill") }
-            .tag(StaffTab.customer)
             NavigationStack {
                 StaffShiftView(session: session, pushStatus: pushStatus, enablePush: enablePush, logout: logout)
             }
@@ -179,16 +185,19 @@ private struct StaffRootView: View {
         }
     }
 
+    // Пуш ведёт только на вкладку, которая у этой роли есть. Иначе deep link
+    // выбирал скрытый таб, и TabView оставался пустым экраном без объяснения.
     private func route(_ url: URL) {
         guard url.scheme == "alistore-staff" else { return }
         if url.host == "tasks" {
             selectedTab = .kpi
             workMode = .tasks
             routedTaskId = url.pathComponents.dropFirst().first
-        } else if url.host == "support" {
+        } else if url.host == "support", StaffAccess.canReadSupport(session.role) {
             selectedTab = .orders
             workMode = .support
         } else if url.host == "customers" || url.host == "customer" {
+            guard StaffAccess.canReadCustomers(session.role) else { return }
             selectedTab = .customer
         } else if url.host == "shift" || url.host == "attendance" || url.host == "account" {
             selectedTab = .shift
@@ -231,6 +240,46 @@ private struct StaffRootView: View {
 }
 
 private enum StaffTab: Hashable { case home, orders, kpi, buyback, customer, shift }
+
+/// Что роль реально может — зеркало серверной матрицы прав casbin
+/// (`apps/api/src/authz/authz.model.ts`).
+///
+/// Приложение показывало все шесть вкладок любому вошедшему, хотя `GET /orders`
+/// закрыт `orders:queue` (склад/админ/владелец), `support/tickets` — `support:read`
+/// (админ/владелец), а `customers/:id/overview` — `customers:read`. Продавец,
+/// которого приложение само называет продавцом, открывал «Заказы» и упирался в
+/// 403: экран ошибки вместо честного «этой очереди у вас нет». Роль приходит в
+/// сессии, так что спросить можно до запроса, а не после отказа.
+///
+/// Роли перечислены буквально, как в политике: там `admin` и `owner` прописаны
+/// отдельной строкой на каждом праве, поэтому наследование `g` (owner → admin →
+/// senior_seller) ничего к этим спискам не добавляет.
+enum StaffAccess {
+    /// `p, warehouse|admin|owner, orders, queue`
+    static func canReadOrderQueue(_ role: String) -> Bool {
+        ["warehouse", "admin", "owner"].contains(role)
+    }
+
+    /// `p, admin|owner, support, read`
+    static func canReadSupport(_ role: String) -> Bool {
+        ["admin", "owner"].contains(role)
+    }
+
+    /// `p, seller|senior_seller|service|admin|owner, customers, read`
+    static func canReadCustomers(_ role: String) -> Bool {
+        ["seller", "senior_seller", "service", "admin", "owner"].contains(role)
+    }
+
+    /// `p, warehouse|admin|owner, inventory, count` (и `inventory, movement`)
+    static func canCountInventory(_ role: String) -> Bool {
+        ["warehouse", "admin", "owner"].contains(role)
+    }
+
+    /// `p, cashier|seller|senior_seller|admin|owner, shift, read|open|close`
+    static func canUseCashShift(_ role: String) -> Bool {
+        ["cashier", "seller", "senior_seller", "admin", "owner"].contains(role)
+    }
+}
 
 private struct StaffHomeView: View {
     let session: StaffSession
@@ -359,16 +408,22 @@ private struct StaffHomeView: View {
                 .font(.headline.weight(.black))
                 .foregroundStyle(primaryText)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                actionTile(.init(title: "Заказы", subtitle: "3 новых", icon: "shippingbox.fill", tint: coral, identifier: "staff-home-orders"), action: openOrders)
+                // Плитки повторяют права роли: иначе быстрое действие уводило на
+                // вкладку, которой у роли нет, или сразу в 403 (см. StaffAccess).
+                if StaffAccess.canReadOrderQueue(session.role) {
+                    actionTile(.init(title: "Заказы", subtitle: "3 новых", icon: "shippingbox.fill", tint: coral, identifier: "staff-home-orders"), action: openOrders)
+                }
                 actionTile(.init(title: "Скупка Б/У", subtitle: "оценка", icon: "iphone.gen3", tint: Design3.blue, identifier: "staff-home-buyback"), action: openBuyback)
                 actionTile(.init(title: "Задачи и KPI", subtitle: "2 активных", icon: "chart.bar.fill", tint: Design3.gold, identifier: "staff-home-kpi"), action: openTasks)
-                NavigationLink {
-                    StaffInventoryView(session: session, environment: AppEnvironment.live())
-                } label: {
-                    inventoryTileLabel
+                if StaffAccess.canCountInventory(session.role) {
+                    NavigationLink {
+                        StaffInventoryView(session: session, environment: AppEnvironment.live())
+                    } label: {
+                        inventoryTileLabel
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("staff-home-inventory")
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("staff-home-inventory")
             }
         }
     }
@@ -403,7 +458,9 @@ private struct StaffHomeView: View {
                 .font(.headline.weight(.black))
                 .foregroundStyle(primaryText)
             HStack(spacing: 10) {
-                toolPill("Customer 360", icon: "person.text.rectangle", identifier: "staff-home-customer360", action: openCustomer360)
+                if StaffAccess.canReadCustomers(session.role) {
+                    toolPill("Customer 360", icon: "person.text.rectangle", identifier: "staff-home-customer360", action: openCustomer360)
+                }
                 toolPill("Evidence", icon: "photo.stack", identifier: "staff-home-evidence", action: openEvidence)
             }
         }
@@ -927,7 +984,7 @@ private struct Customer360View: View {
     }
 
     private func money(_ amount: Int) -> String {
-        amount.formatted(.currency(code: "KGS").precision(.fractionLength(0)))
+        Money.som(amount)
     }
 
     private static var fixtureOverview: Customer360 {
@@ -979,6 +1036,11 @@ struct StaffOrdersView: View {
     @State private var isLoading = true
     @State private var busyOrderId: String?
     @State private var errorMessage: String?
+    // Отказ действия держится отдельно от отказа загрузки: один `errorMessage`
+    // на оба означал, что неудавшийся переход стирал уже загруженную очередь и
+    // подменял её экраном «Очередь недоступна». Сотрудник терял из виду заказы,
+    // с которыми работал, а причина — в одном заказе, а не в связи.
+    @State private var actionError: String?
     private let environment = AppEnvironment.live()
     private let background = Design3.screen
     private let surface = Design3.surface
@@ -986,6 +1048,7 @@ struct StaffOrdersView: View {
     private let primaryText = Design3.textBright
     private let secondaryText = Design3.textMuted
     private let mutedText = Design3.textSubtle
+    private let coral = Design3.orange
     private let lime = Design3.lime
     private let amber = Design3.gold
 
@@ -1020,6 +1083,9 @@ struct StaffOrdersView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         statusChips
+                        if let actionError {
+                            actionErrorBanner(actionError)
+                        }
                         ForEach(orders) { order in
                             NavigationLink {
                                 StaffOrderDetailView(
@@ -1066,6 +1132,23 @@ struct StaffOrdersView: View {
         }
     }
 
+    private func actionErrorBanner(_ message: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Действие не выполнено", systemImage: "exclamationmark.triangle.fill")
+                .font(.caption.weight(.black))
+                .foregroundStyle(coral)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(coral.opacity(0.45)))
+        .accessibilityIdentifier("staff-orders-action-error")
+    }
+
     private func orderCard(_ order: CustomerOrder) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center) {
@@ -1105,6 +1188,12 @@ struct StaffOrdersView: View {
                 .buttonStyle(.plain)
                 .disabled(busyOrderId != nil)
                 .accessibilityIdentifier("staff-order-action-\(order.id)")
+            } else if let hint = queueHint(order) {
+                Text(hint)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("staff-order-hint-\(order.id)")
             }
         }
         .padding(14)
@@ -1117,6 +1206,7 @@ struct StaffOrdersView: View {
     private func loadOrders() async {
         isLoading = true
         errorMessage = nil
+        actionError = nil
         defer { isLoading = false }
         #if DEBUG
         if UITestBootstrap.startsSignedIn {
@@ -1138,7 +1228,7 @@ struct StaffOrdersView: View {
     private func performAction(_ order: CustomerOrder) async {
         guard let action = nextAction(order) else { return }
         busyOrderId = order.id
-        errorMessage = nil
+        actionError = nil
         defer { busyOrderId = nil }
         do {
             let api = APIClient(baseURL: environment.apiBaseURL)
@@ -1157,7 +1247,7 @@ struct StaffOrdersView: View {
             }
             await loadOrders()
         } catch {
-            errorMessage = error.localizedDescription
+            actionError = error.localizedDescription
         }
     }
 
@@ -1184,6 +1274,23 @@ struct StaffOrdersView: View {
         case "ready_for_pickup": "completed"
         default: nil
         }
+    }
+
+    // Очередь без кнопки объясняет себя вместо того, чтобы молчать.
+    //
+    // «Резерв» был тупиком: из `reserved` сервер принимает только
+    // `awaiting_payment`, `paid`, `picking` и `cancelled`
+    // (order-state-machine.ts:21), но `paid` через transition отбивается
+    // («статус paid устанавливает только сервис оплаты», orders.service.ts:1134),
+    // `picking` разрешён лишь для COD и лишь при полном покрытии резерва
+    // (orders.service.ts:1128) — а в списке заказов нет ни paymentMode, ни
+    // покрытия, так что кнопка ловила бы 422 на любом некассовом заказе.
+    // Отмены в приложении сотрудника нет вовсе. Реальный выход из резерва —
+    // оплата (payments.service.ts:709), то есть касса или онлайн; это и написано.
+    private func queueHint(_ order: CustomerOrder) -> String? {
+        order.status == "reserved"
+            ? "Из резерва заказ выводит оплата — на кассе или онлайн. В приложении сотрудника действий нет."
+            : nil
     }
 
     private func actionLabel(_ order: CustomerOrder) -> String? {
@@ -1242,7 +1349,7 @@ struct StaffOrdersView: View {
     }
 
     private func money(_ amount: Int) -> String {
-        amount.formatted(.currency(code: "KGS").precision(.fractionLength(0)))
+        Money.som(amount)
     }
 
     private static var fixtureOrders: [CustomerOrder] {
@@ -1296,13 +1403,13 @@ struct StaffOrdersView: View {
                     LabeledContent("Номер", value: "#\(order.id.suffix(8))")
                     LabeledContent("Статус", value: order.status)
                     LabeledContent("Канал", value: order.channel)
-                    LabeledContent("Сумма", value: order.total.formatted(.currency(code: "KGS").precision(.fractionLength(0))))
+                    LabeledContent("Сумма", value: Money.som(order.total))
                 }
                 Section("Товары") {
                     ForEach(Array(order.items.enumerated()), id: \.offset) { _, item in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.sku).fontWeight(.semibold)
-                            Text("\(item.qty) × \(item.price.formatted()) сом")
+                            Text("\(item.qty) × \(Money.som(item.price))")
                             if let imei = item.imei { Text("IMEI \(imei)").font(.caption.monospaced()).foregroundStyle(.secondary) }
                         }
                     }
@@ -1365,28 +1472,35 @@ private struct StaffShiftView: View {
                 Button("Включить уведомления", systemImage: "bell.badge", action: enablePush)
             }
             attendanceSection
-            if isLoading {
-                Section { ProgressView("Проверяем смену…") }
-            } else if let errorMessage {
-                Section {
-                    ContentUnavailableView("Не удалось загрузить смену", systemImage: "wifi.exclamationmark", description: Text(errorMessage))
-                    Button("Повторить", systemImage: "arrow.clockwise") { Task { await loadShift() } }
-                }
-            } else if let shift {
-                openShiftSection(shift)
-            } else {
-                if let closedShift {
-                    closedShiftSection(closedShift)
-                }
-                Section("Открытие смены") {
-                    TextField("Точка", text: $point)
-                        .textInputAutocapitalization(.characters)
-                    TextField("Наличные на начало", text: $openCash)
-                        .keyboardType(.numberPad)
-                    Button("Открыть смену", systemImage: "play.circle.fill") {
-                        Task { await openShift() }
+            // Кассовая смена — только для ролей с правом `shift` (StaffAccess).
+            // Складу и курьеру `shifts/current` отвечает 403, и вкладка встречала
+            // их красным «Не удалось загрузить смену» — как будто сломалась сеть,
+            // хотя кассы у этих ролей просто нет. Учёт рабочего времени и выход
+            // из аккаунта живут выше и ниже и остаются всем.
+            if StaffAccess.canUseCashShift(session.role) {
+                if isLoading {
+                    Section { ProgressView("Проверяем смену…") }
+                } else if let errorMessage {
+                    Section {
+                        ContentUnavailableView("Не удалось загрузить смену", systemImage: "wifi.exclamationmark", description: Text(errorMessage))
+                        Button("Повторить", systemImage: "arrow.clockwise") { Task { await loadShift() } }
                     }
-                    .disabled(isSubmitting || point.trimmingCharacters(in: .whitespaces).isEmpty || Int(openCash) == nil)
+                } else if let shift {
+                    openShiftSection(shift)
+                } else {
+                    if let closedShift {
+                        closedShiftSection(closedShift)
+                    }
+                    Section("Открытие смены") {
+                        TextField("Точка", text: $point)
+                            .textInputAutocapitalization(.characters)
+                        TextField("Наличные на начало", text: $openCash)
+                            .keyboardType(.numberPad)
+                        Button("Открыть смену", systemImage: "play.circle.fill") {
+                            Task { await openShift() }
+                        }
+                        .disabled(isSubmitting || point.trimmingCharacters(in: .whitespaces).isEmpty || Int(openCash) == nil)
+                    }
                 }
             }
             Section {
@@ -1521,6 +1635,12 @@ private struct StaffShiftView: View {
 
     @MainActor
     private func loadShift() async {
+        // Роль без права на кассу не дёргает `shifts/current` вовсе: раньше
+        // экран сначала получал 403, а потом показывал его как сбой загрузки.
+        guard StaffAccess.canUseCashShift(session.role) else {
+            isLoading = false
+            return
+        }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -1705,8 +1825,13 @@ private struct StaffShiftView: View {
         }
     }
 
+    // Суммы смены печатает общий форматтер (Shared/Money.swift).
+    //
+    // Здесь стоял `.currency(code: "KGS")` по `Locale.current`: на устройстве с
+    // русским языком «Ожидалось 6 200 KGS» вместо «сом» — валюта в отчёте по
+    // кассе зависела от языка телефона кассира, а не от страны.
     private func money(_ amount: Int) -> String {
-        amount.formatted(.currency(code: "KGS").precision(.fractionLength(0)))
+        Money.som(amount)
     }
 
     #if DEBUG

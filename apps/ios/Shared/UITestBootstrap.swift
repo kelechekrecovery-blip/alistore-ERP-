@@ -96,15 +96,24 @@ public enum UITestBootstrap {
         #endif
     }
 
+    /// Роль сотрудника в UI-тестовом контуре.
+    ///
+    /// Здесь стояло «sales» — роли с таким именем в системе нет: сервер знает
+    /// owner, admin, seller, senior_seller, cashier, warehouse, courier, service
+    /// (`apps/api/src/authz/authz.model.ts`). Пока роль никто не проверял, неверное
+    /// значение ничего не ломало; с появлением ролевого гейта в Staff оно закрыло
+    /// бы фикстуре все экраны разом. «admin» — настоящая роль, покрывающая те
+    /// поверхности, которые проходят UI-тесты (очередь, склад, смена, клиенты,
+    /// поддержка); отдельную роль по-прежнему можно задать `--ui-testing-role=`.
     public static var staffRole: String {
         #if DEBUG
         let prefix = "--ui-testing-role="
         if let value = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) }) {
             return String(value.dropFirst(prefix.count))
         }
-        return "sales"
+        return "admin"
         #else
-        return "sales"
+        return "admin"
         #endif
     }
 

@@ -29,8 +29,11 @@ final class AliStoreStaffUITests: XCTestCase {
         app.launchArguments = ["--ui-testing-signed-in"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Продавец · AliStore Центр"].exists)
+        XCTAssertTrue(app.staticTexts["azizbek"].waitForExistence(timeout: 10))
+        // Шапка больше не рисует зашитые «Азизбек» и «Продавец · AliStore Центр»
+        // одинаково для любого вошедшего: имя, роль и точка берутся из
+        // StaffSession. У фикстуры это username «azizbek» и роль admin, точки нет.
+        XCTAssertTrue(app.staticTexts["Администратор"].exists)
         XCTAssertTrue(app.staticTexts["Смена не открыта"].exists)
         XCTAssertTrue(app.buttons["Открыть смену"].exists)
         XCTAssertTrue(app.staticTexts["Быстрые действия"].exists)
@@ -64,7 +67,7 @@ final class AliStoreStaffUITests: XCTestCase {
         app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-cash-shift"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["azizbek"].waitForExistence(timeout: 10))
         app.buttons["Открыть смену"].tap()
 
         let amount = app.textFields["staff-close-cash"]
@@ -117,12 +120,16 @@ final class AliStoreStaffUITests: XCTestCase {
         app.launchArguments = ["--ui-testing-signed-in"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["azizbek"].waitForExistence(timeout: 10))
         app.buttons["staff-home-kpi"].tap()
 
         XCTAssertTrue(app.staticTexts["Задачи и KPI"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["KPI месяца"].exists)
-        XCTAssertTrue(app.staticTexts["92%"].exists)
+        // «KPI месяца · 92%» было двойной неправдой: 92% — константа, одинаковая для
+        // любого сотрудника, а «месяц» — выдуманный период (`staff-tasks/mine` не знает
+        // ни периода, ни плана). Теперь заголовок честный, а доля считается по
+        // загруженным задачам, поэтому конкретное число здесь не закрепляем.
+        XCTAssertTrue(app.staticTexts["KPI по задачам"].exists)
+        XCTAssertFalse(app.staticTexts["KPI месяца"].exists)
         XCTAssertTrue(app.staticTexts["Предлагать аксессуары к телефонам"].exists)
         XCTAssertTrue(app.staticTexts["Обновить ценники на витрине"].exists)
         XCTAssertTrue(app.staticTexts["Пройти тест по новым тарифам"].exists)
@@ -134,7 +141,7 @@ final class AliStoreStaffUITests: XCTestCase {
         app.launchArguments = ["--ui-testing-signed-in"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["azizbek"].waitForExistence(timeout: 10))
         app.buttons["staff-home-orders"].tap()
 
         XCTAssertTrue(app.staticTexts["Заказы"].waitForExistence(timeout: 5))
@@ -145,7 +152,13 @@ final class AliStoreStaffUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["№4098"].exists)
         XCTAssertTrue(app.staticTexts["Сборка"].exists)
         XCTAssertTrue(app.staticTexts["AirPods ×2"].exists)
-        XCTAssertTrue(app.buttons["Собрано → курьеру"].exists)
+        // Кнопка «Собрано → курьеру» снята: она слала `transition` в статус
+        // `courier_assigned`, который сервер принимает, но `courierId` при этом не
+        // ставит никто, кроме POST /courier/runs. Заказ становился невидимым для
+        // курьеров и неназначаемым в рейс — выходом оставалась только отмена.
+        // Назначение курьера живёт на вебе; в iOS у упакованного курьерского
+        // заказа действия теперь нет.
+        XCTAssertFalse(app.buttons["Собрано → курьеру"].exists)
         XCTAssertTrue(app.staticTexts["№4090"].exists)
         XCTAssertTrue(app.staticTexts["Выдан"].exists)
         XCTAssertTrue(app.staticTexts["MacBook Air ×1"].exists)
@@ -156,7 +169,7 @@ final class AliStoreStaffUITests: XCTestCase {
         app.launchArguments = ["--ui-testing-signed-in"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["azizbek"].waitForExistence(timeout: 10))
         app.buttons["staff-home-buyback"].tap()
 
         XCTAssertTrue(app.staticTexts["Скупка Б/У"].waitForExistence(timeout: 5))
@@ -179,7 +192,7 @@ final class AliStoreStaffUITests: XCTestCase {
         app.launchArguments = ["--ui-testing-signed-in"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["azizbek"].waitForExistence(timeout: 10))
         app.buttons["staff-home-orders"].tap()
         XCTAssertTrue(app.staticTexts["Заказы"].waitForExistence(timeout: 5))
         app.buttons["Поддержка"].tap()
@@ -205,7 +218,7 @@ final class AliStoreStaffUITests: XCTestCase {
         app.launchArguments = ["--ui-testing-signed-in"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["azizbek"].waitForExistence(timeout: 10))
         app.buttons["staff-home-customer360"].tap()
 
         XCTAssertTrue(app.staticTexts["Customer 360"].waitForExistence(timeout: 5))
@@ -261,7 +274,7 @@ final class AliStoreStaffUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-visual-evidence"]
         app.launch()
-        XCTAssertTrue(app.staticTexts["Азизбек"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["azizbek"].waitForExistence(timeout: 10))
         return app
     }
 

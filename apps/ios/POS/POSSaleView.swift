@@ -25,6 +25,12 @@ struct POSSaleView: View {
     @State private var activeSaleId = UUID().uuidString
     @State private var approvalId: String?
     @State private var receipt: POSReceipt?
+    // Чек приходит отдельным запросом уже после проведённой продажи, поэтому
+    // «чека ещё нет» и «чек не удалось получить» — разные состояния. Второе
+    // требует повтора и своего текста: сама оплата при этом прошла.
+    @State private var receiptOrderId: String?
+    @State private var receiptError: String?
+    @State private var isReceiptLoading = false
     @State private var isBusy = false
     @State private var message: String?
     @State private var errorMessage: String?
@@ -86,11 +92,13 @@ struct POSSaleView: View {
             .task { await refresh() }
             .refreshable { await refresh() }
             .sheet(isPresented: $showScanner) {
-                POSBarcodeScanner { value in
-                    showScanner = false
-                    Task { await applyScanner(value) }
-                }
-                .ignoresSafeArea()
+                POSScannerSheet(
+                    onCode: { value in
+                        showScanner = false
+                        Task { await applyScanner(value) }
+                    },
+                    onClose: { showScanner = false }
+                )
             }
         }
     }
@@ -233,6 +241,7 @@ struct POSSaleView: View {
                 Text("ESC/POS сформирован; устройство требует отдельной сертификации")
                     .font(.caption2).foregroundStyle(POSPalette.muted)
             }
+            receiptFailure
         }
         .posSurface()
     }
@@ -418,12 +427,32 @@ struct POSSaleView: View {
             message = "Требуется одобрение: \(reason)"
         case let .completed(orderId, receiptNo, paidTotal, _, _, _):
             message = "\(receiptNo) · оплачено \(Money.som(paidTotal)) · Event Ledger"
-            receipt = try? await api.get("receipts/order/\(orderId)", token: session.accessToken)
+            await loadReceipt(orderId: orderId)
             // Скидка раньше не сбрасывалась вместе с остальным: следующий
             // покупатель молча получал скидку предыдущего, а при превышении
             // порога — ещё и требование одобрения на пустом месте.
             resetSale()
             await refresh()
+        }
+    }
+
+    /// Чек — отдельный запрос после того, как продажа уже проведена.
+    ///
+    /// Здесь стоял `try?`: запрос падал молча, и кассир оставался без чека, без
+    /// объяснения и без повтора — печатать было нечего. Провалом оплаты это
+    /// показывать нельзя (деньги приняты), поэтому у неудачи своё состояние.
+    @MainActor private func loadReceipt(orderId: String) async {
+        receiptOrderId = orderId
+        receiptError = nil
+        isReceiptLoading = true
+        defer { isReceiptLoading = false }
+        do {
+            receipt = try await api.get("receipts/order/\(orderId)", token: session.accessToken)
+        } catch {
+            // Чек прошлой продажи не оставляем: распечатанный как текущий, он
+            // стал бы документом на чужие суммы.
+            receipt = nil
+            receiptError = error.localizedDescription
         }
     }
 
@@ -487,6 +516,36 @@ extension POSSaleView {
         .padding(.vertical, 28)
         .accessibilityIdentifier("pos-empty-catalog")
     }
+
+    /// Продажа прошла, а чек не пришёл. Пустое место здесь читалось бы как
+    /// «чека не будет»: кассир не знал ни причины, ни что запрос можно повторить.
+    @ViewBuilder var receiptFailure: some View {
+        if let receiptError, let receiptOrderId {
+            Divider()
+            Label("Продажа проведена, чек не загрузился", systemImage: "exclamationmark.triangle.fill")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(POSPalette.coral)
+            // Заказ называем явно: на экране может висеть ошибка по прошлой
+            // продаже, пока идёт следующая.
+            Text("Заказ …\(receiptOrderId.suffix(8)) · \(receiptError)")
+                .font(.caption)
+                .foregroundStyle(POSPalette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("pos-receipt-error")
+            Button {
+                Task { await loadReceipt(orderId: receiptOrderId) }
+            } label: {
+                if isReceiptLoading {
+                    ProgressView()
+                } else {
+                    Label("Загрузить чек ещё раз", systemImage: "arrow.clockwise")
+                }
+            }
+            .buttonStyle(.bordered)
+            .disabled(isReceiptLoading)
+            .accessibilityIdentifier("pos-receipt-retry")
+        }
+    }
 }
 
 struct POSNotice: View {
@@ -510,25 +569,113 @@ enum POSReceiptPrinter {
 
 struct POSBarcodeScanner: UIViewControllerRepresentable {
     let onCode: (String) -> Void
+    /// Сигнал «камеру запустить не удалось». Без него лист оставался чёрным:
+    /// контроллер просто выходил из `viewDidLoad`, а экран об этом не узнавал.
+    var onUnavailable: () -> Void = {}
     func makeUIViewController(context: Context) -> POSScannerController {
         let controller = POSScannerController()
         controller.onCode = onCode
+        controller.onUnavailable = onUnavailable
         return controller
     }
     func updateUIViewController(_ uiViewController: POSScannerController, context: Context) {}
 }
 
+/// Лист сканера — это не только камера.
+///
+/// Раньше в лист безусловно ставился `POSBarcodeScanner`, а при отказе в доступе
+/// или отсутствии камеры контроллер молча выходил из `viewDidLoad`. Кассир
+/// получал чёрный прямоугольник: ни причины, ни кнопки выхода, ни подсказки,
+/// что IMEI можно ввести руками. Разрешение спрашиваем явно и на каждый исход
+/// говорим, что делать дальше.
+struct POSScannerSheet: View {
+    let onCode: (String) -> Void
+    let onClose: () -> Void
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var status = AVCaptureDevice.authorizationStatus(for: .video)
+    @State private var isCameraUnavailable = false
+
+    var body: some View {
+        Group {
+            if isCameraUnavailable {
+                notice(
+                    title: "Камера недоступна",
+                    hint: "Запустить камеру не удалось. Введите SKU или IMEI вручную в поле поиска.",
+                    showsSettings: false
+                )
+            } else if status == .authorized {
+                POSBarcodeScanner(onCode: onCode) { isCameraUnavailable = true }
+                    .ignoresSafeArea()
+            } else if status == .notDetermined {
+                ProgressView("Запрашиваем доступ к камере…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(POSPalette.ink.ignoresSafeArea())
+                    .task {
+                        _ = await AVCaptureDevice.requestAccess(for: .video)
+                        status = AVCaptureDevice.authorizationStatus(for: .video)
+                    }
+            } else {
+                notice(
+                    title: "Нет доступа к камере",
+                    hint: "Сканирование выключено в настройках. Разрешите камеру или введите SKU и IMEI вручную.",
+                    showsSettings: true
+                )
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Возврат из настроек: без перечитывания статус остался бы старым,
+            // и только что разрешённая камера всё равно показывала бы отказ.
+            if phase == .active { status = AVCaptureDevice.authorizationStatus(for: .video) }
+        }
+    }
+
+    private func notice(title: String, hint: String, showsSettings: Bool) -> some View {
+        VStack(spacing: 14) {
+            Image(systemName: "video.slash.fill")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(POSPalette.muted)
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(Design3.textPrimary)
+            Text(hint)
+                .font(.subheadline)
+                .foregroundStyle(POSPalette.muted)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            if showsSettings, let settings = URL(string: UIApplication.openSettingsURLString) {
+                Link("Открыть настройки", destination: settings)
+                    .buttonStyle(.borderedProminent)
+                    .tint(POSPalette.coral)
+            }
+            Button("Закрыть", action: onClose)
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("pos-scanner-close")
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(POSPalette.ink.ignoresSafeArea())
+        .accessibilityIdentifier("pos-scanner-unavailable")
+    }
+}
+
 final class POSScannerController: UIViewController, @preconcurrency AVCaptureMetadataOutputObjectsDelegate {
     var onCode: ((String) -> Void)?
+    var onUnavailable: (() -> Void)?
     private let captureSession = AVCaptureSession()
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
         guard let device = AVCaptureDevice.default(for: .video),
-              let input = try? AVCaptureDeviceInput(device: device), captureSession.canAddInput(input) else { return }
+              let input = try? AVCaptureDeviceInput(device: device), captureSession.canAddInput(input) else {
+            reportUnavailable()
+            return
+        }
         captureSession.addInput(input)
         let output = AVCaptureMetadataOutput()
-        guard captureSession.canAddOutput(output) else { return }
+        guard captureSession.canAddOutput(output) else {
+            reportUnavailable()
+            return
+        }
         captureSession.addOutput(output)
         output.setMetadataObjectsDelegate(self, queue: .main)
         output.metadataObjectTypes = [.ean8, .ean13, .code128, .qr]
@@ -537,6 +684,12 @@ final class POSScannerController: UIViewController, @preconcurrency AVCaptureMet
         preview.frame = view.bounds
         view.layer.addSublayer(preview)
         Task.detached { [captureSession] in captureSession.startRunning() }
+    }
+    /// Сообщаем следующим шагом, а не прямо из `viewDidLoad`: контроллер
+    /// создаётся внутри цикла обновления SwiftUI, и правка состояния оттуда —
+    /// гонка с отрисовкой того же листа.
+    private func reportUnavailable() {
+        Task { @MainActor [weak self] in self?.onUnavailable?() }
     }
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
         guard let value = (metadataObjects.first as? AVMetadataMachineReadableCodeObject)?.stringValue else { return }

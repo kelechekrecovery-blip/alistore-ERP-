@@ -316,10 +316,13 @@ final class AliStoreClientUITests: XCTestCase {
         let app = launchSignedInAccount()
         app.staticTexts["Поддержка"].tap()
         XCTAssertTrue(app.navigationBars["Поддержка"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["WhatsApp"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Telegram"].exists)
-        XCTAssertTrue(app.staticTexts["Звонок"].exists)
-        XCTAssertTrue(app.staticTexts["Частые вопросы"].exists)
+        // Плитки «WhatsApp / Telegram / Звонок» были декорацией без действия, и три
+        // ассерта на их подписи проверяли, что декорация нарисована. Каналы теперь
+        // строятся из `storefront/content → contactPhone`: в UI-тестовом контуре
+        // этот запрос не выполняется, поэтому экран честно говорит, что контакты
+        // недоступны, вместо выдуманного номера. Telegram убран совсем — такого
+        // поля в контенте витрины нет. Проверяем то, что на экране есть всегда.
+        XCTAssertTrue(app.staticTexts["Частые вопросы"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Как отследить заказ?"].exists)
         XCTAssertTrue(app.staticTexts["Условия возврата и обмена"].exists)
         XCTAssertTrue(app.buttons["support-open-form"].exists)
@@ -329,22 +332,25 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.buttons["support-submit"].exists)
     }
 
-    func testSignedInTradeInUsesPrototypeEstimator() {
+    // Тест назывался «UsesPrototypeEstimator» и проверял ровно прототип: зашитую
+    // модель «iPhone 13 · 128 ГБ», радиокнопки состояния, заглушку под фото и
+    // «предварительную оценку», одинаковую для любого устройства. Ни одно из этих
+    // полей не доходило до сервера — то есть тест закреплял макет, выданный за
+    // рабочую функцию. Экран заменён честным: цену называет диагностика, а заявка
+    // уходит настоящей формой (POST tradeins).
+    func testSignedInTradeInOffersHonestEstimateAndRealRequest() {
         let app = launchSignedInAccount()
         app.staticTexts["Trade-in"].tap()
         XCTAssertTrue(app.navigationBars["Trade-in"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Trade-in оценка"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Оцените старое устройство за 30 секунд"].exists)
-        XCTAssertTrue(app.staticTexts["iPhone 13 · 128 ГБ"].exists)
-        XCTAssertTrue(app.buttons["tradein-condition-1"].exists)
-        XCTAssertTrue(app.staticTexts["tradein-photo-placeholder"].exists)
+        XCTAssertTrue(app.staticTexts["Цену называет диагностика"].exists)
+        XCTAssertFalse(app.staticTexts["28 000–32 000"].exists)
         XCTAssertTrue(app.buttons["tradein-evaluate"].exists)
 
         app.buttons["tradein-evaluate"].tap()
-        XCTAssertTrue(app.staticTexts["Предварительная оценка"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["28 000–32 000"].exists)
-        XCTAssertTrue(app.buttons["tradein-open-request"].exists)
-        XCTAssertTrue(app.buttons["tradein-save-request"].exists)
+        // Кнопка открывает настоящую форму заявки, а не показывает выдуманную вилку.
+        XCTAssertTrue(app.navigationBars["Trade-in"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Отмена"].waitForExistence(timeout: 5))
     }
 
     func testSignedInAccountFixturesRenderDeviceAndWarranty() {
@@ -357,7 +363,11 @@ final class AliStoreClientUITests: XCTestCase {
         app.buttons["Открыть гарантию для iPhone 15 128 GB Black"].tap()
         XCTAssertTrue(app.navigationBars["Гарантия"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Гарантийный талон"].exists)
-        XCTAssertTrue(app.staticTexts["iPhone 15 · 128 ГБ"].exists)
+        // Раньше здесь проверялась строка «iPhone 15 · 128 ГБ» — константа, которой
+        // талон подменял любое имя устройства с подстрокой «iPhone 15». Ассерт
+        // закреплял сам дефект: он бы прошёл и для чужого устройства. Талон теперь
+        // показывает настоящее имя — то же, что строкой выше в списке устройств.
+        XCTAssertTrue(app.staticTexts["iPhone 15 128 GB Black"].exists)
         XCTAssertTrue(app.staticTexts["Активна"].exists)
         XCTAssertTrue(app.staticTexts["Обращение в сервис"].exists)
         XCTAssertTrue(app.buttons["warranty-open-service"].exists)
@@ -550,15 +560,20 @@ final class AliStoreClientUITests: XCTestCase {
         let support = launchSignedInAccount()
         support.staticTexts["Поддержка"].tap()
         XCTAssertTrue(support.navigationBars["Поддержка"].waitForExistence(timeout: 5))
-        XCTAssertTrue(support.staticTexts["WhatsApp"].waitForExistence(timeout: 5))
+        // См. testSignedInSupportUsesPrototypeChannelsAndFaq: подпись «WhatsApp»
+        // была у декоративной плитки и появлялась безусловно. Теперь канал зависит
+        // от контактов витрины, а в этом контуре их нет — ждём то, что стабильно.
+        XCTAssertTrue(support.staticTexts["Частые вопросы"].waitForExistence(timeout: 5))
         capture(support, named: "client-support")
 
         let tradeIn = launchSignedInAccount()
         tradeIn.staticTexts["Trade-in"].tap()
         XCTAssertTrue(tradeIn.navigationBars["Trade-in"].waitForExistence(timeout: 5))
-        XCTAssertTrue(tradeIn.buttons["tradein-evaluate"].waitForExistence(timeout: 5))
-        tradeIn.buttons["tradein-evaluate"].tap()
-        XCTAssertTrue(tradeIn.staticTexts["Предварительная оценка"].waitForExistence(timeout: 5))
+        // Снимок делаем на самом экране trade-in, не открывая форму: прежний кадр
+        // показывал «предварительную оценку 28 000–32 000», то есть выдуманную цену
+        // в магазинных скриншотах.
+        XCTAssertTrue(tradeIn.staticTexts["Цену называет диагностика"].waitForExistence(timeout: 5))
+        XCTAssertTrue(tradeIn.buttons["tradein-evaluate"].exists)
         capture(tradeIn, named: "client-trade-in")
 
         let warranty = launchSignedInAccount()

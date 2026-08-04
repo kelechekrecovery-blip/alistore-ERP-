@@ -1459,6 +1459,16 @@ private struct ClientRootView: View {
                 products = [fixture]
                 cart[fixture.id] = 1
             }
+            #if DEBUG
+            // В контуре «вошедшего» сети нет, и каталог оставался пустым. Пока
+            // возвраты подставляли название по подстроке SKU, это не мешало;
+            // теперь имя ищется в каталоге, и без фикстуры покупателю показался бы
+            // сырой SKU. Фикстура ставится только когда каталог не ответил, и
+            // только в отладочной сборке — рабочий экран сбоя при этом сохраняется.
+            if UITestBootstrap.startsSignedIn, products.isEmpty {
+                products = ClientUIFixture.products
+            }
+            #endif
             catalogError = error.localizedDescription
         }
     }
@@ -1710,6 +1720,7 @@ private struct CartView: View {
     @State private var promoError: String?
     @State private var isApplyingPromo = false
     @State private var loyaltyBalance = 0
+    @State private var loyaltyError: String?
     @State private var bonusApplied = false
     @State private var isSubmitting = false
     @State private var errorMessage: String?
@@ -1991,6 +2002,11 @@ private struct CartView: View {
                 if loyaltyBalance > 0 {
                     ClientChoiceRow(symbol: "gift.fill", title: "Списать бонусы", detail: "Доступно \(loyaltyBalance.formatted()) · спишем \(Money.som(bonusDiscount))", trailing: bonusApplied ? "−\(Money.som(bonusDiscount))" : nil, selected: bonusApplied) { bonusApplied.toggle() }
                     .accessibilityIdentifier("checkout-bonus-toggle")
+                } else if let loyaltyError {
+                    // Упавший запрос баланса обнулял его в 0 и строка исчезала:
+                    // покупатель с бонусами на счету видел ровно то же, что
+                    // покупатель без бонусов, — и оплачивал заказ целиком.
+                    ClientCallout(symbol: "gift", title: "Бонусы сейчас недоступны", detail: loyaltyError)
                 }
             case .review:
                 reviewStep
@@ -2198,6 +2214,7 @@ private struct CartView: View {
         promoDiscount = 0
         promoError = nil
         bonusApplied = false
+        loyaltyError = nil
         checkoutStep = .delivery
         showingCheckout = false
     }
@@ -2404,9 +2421,12 @@ private struct CartView: View {
         do {
             let loyalty: CustomerLoyalty = try await APIClient(baseURL: environment.apiBaseURL).get("customers/me/loyalty", token: token)
             loyaltyBalance = loyalty.balance
+            loyaltyError = nil
+        } catch is CancellationError {
         } catch {
             loyaltyBalance = 0
             bonusApplied = false
+            loyaltyError = "Не удалось получить бонусный баланс: \(error.localizedDescription). Заказ можно оформить без списания."
         }
     }
 
@@ -2587,6 +2607,8 @@ private struct ClientOrderStatusView: View {
     @State private var cancellationReason = ""
     @State private var isRequestingCancellation = false
     @State private var cancellationError: String?
+    @State private var cancellationPreviewError: String?
+    @State private var showCancelUnavailable = false
     private let mutationIntents = MutationIntentStore()
 
     private let stepIcons = ["checkmark.circle", "creditcard", "shippingbox", "truck.box", "house"]
@@ -2746,7 +2768,11 @@ private struct ClientOrderStatusView: View {
                             if cancellation == nil, cancellationPreview?.requestEnabled == true, cancellationPreview?.canCancel == true {
                                 showCancelConfirm = true
                             } else {
-                                showSupport = true
+                                // Раньше кнопка молча открывала поддержку: человек
+                                // жал «Отменить», попадал в чат и не знал, отменён
+                                // заказ или нет. Упавший предпросчёт и запрет по
+                                // политике — разные вещи; сначала называем причину.
+                                showCancelUnavailable = true
                             }
                         } label: {
                             ClientStatusAction(
@@ -2825,6 +2851,12 @@ private struct ClientOrderStatusView: View {
                 .tint(ClientTheme.lime)
                 .preferredColorScheme(.dark)
             }
+            .alert("Отмена сейчас недоступна", isPresented: $showCancelUnavailable) {
+                Button("Написать в поддержку") { showSupport = true }
+                Button("Закрыть", role: .cancel) {}
+            } message: {
+                Text(cancelUnavailableReason)
+            }
         }
         .tint(ClientTheme.lime)
         .preferredColorScheme(.dark)
@@ -2832,6 +2864,39 @@ private struct ClientOrderStatusView: View {
             async let ledgerTask: Void = loadLedger()
             async let cancellationTask: Void = loadCancellation()
             _ = await (ledgerTask, cancellationTask)
+        }
+    }
+
+    /// Почему кнопка не открывает форму отмены. Ответ «мы не смогли проверить»
+    /// и ответ «этот заказ отменить уже нельзя» — не одно и то же, и покупатель
+    /// имеет право знать, какой из них его.
+    private var cancelUnavailableReason: String {
+        if cancellation != nil {
+            return "Запрос на отмену уже отправлен — статус появится в этом же заказе."
+        }
+        if let cancellationPreviewError {
+            return "Не удалось проверить условия отмены: \(cancellationPreviewError). Откройте заказ ещё раз или напишите в поддержку."
+        }
+        guard let preview = cancellationPreview else {
+            return "Условия отмены ещё загружаются. Откройте заказ ещё раз через несколько секунд."
+        }
+        if let blockedReason = preview.blockedReason {
+            return Self.cancellationBlockedMessage(blockedReason)
+        }
+        return "Отмена этого заказа из приложения сейчас недоступна. Поддержка разберётся вручную."
+    }
+
+    /// Причины блокировки приходят кодами; текст зеркалит серверный
+    /// `cancellationBlockedMessage` (apps/api/src/orders/order-cancellations.service.ts).
+    /// Показывать покупателю `supply_lines_required` — то же, что не сказать ничего.
+    private static func cancellationBlockedMessage(_ code: String) -> String {
+        switch code {
+        case "demo_order_blocked": "Демо-заказ нельзя отменить денежной операцией."
+        case "supply_lines_required": "Этот маршрут отмены доступен только для заказных товаров."
+        case "mixed_cancellation_not_ready": "Отмена смешанного заказа пока оформляется через поддержку."
+        case "order_already_terminal": "Заказ уже завершён или отменён."
+        case "handed_over_items_require_return": "Выданный товар оформляется через возврат."
+        default: "Этот заказ нельзя отменить из приложения."
         }
     }
 
@@ -2852,7 +2917,16 @@ private struct ClientOrderStatusView: View {
     private func loadCancellation() async {
         guard let token = auth.session?.accessToken else { return }
         let api = APIClient(baseURL: environment.apiBaseURL)
-        cancellationPreview = try? await api.get("orders/mine/\(order.id)/cancellation-preview", token: token)
+        do {
+            cancellationPreview = try await api.get("orders/mine/\(order.id)/cancellation-preview", token: token)
+            cancellationPreviewError = nil
+        } catch is CancellationError {
+        } catch {
+            // Различаем «отменять нечего» и «мы не смогли спросить»: без этого
+            // кнопка вела себя одинаково в обоих случаях и молчала про причину.
+            cancellationPreview = nil
+            cancellationPreviewError = error.localizedDescription
+        }
         let current: OrderCancellation? = try? await api.get("orders/mine/\(order.id)/cancellations/current", token: token)
         cancellation = current
     }
@@ -3244,7 +3318,13 @@ private enum ClientUIFixture {
         Product(id: "ui-product-airpods", sku: "UI-AIRPODS-PRO", name: "AirPods Pro 3", price: 24_900, category: "Аудио", availableUnits: 8),
         Product(id: "ui-product-airpods2", sku: "UI-AIRPODS-PRO2", name: "AirPods Pro 2", price: 24_900, category: "Аудио", availableUnits: 8),
         Product(id: "ui-product-watch", sku: "UI-WATCH-S10", name: "Apple Watch Series 10", price: 39_900, category: "Часы", availableUnits: 4),
-        Product(id: "ui-product-ipad", sku: "UI-IPAD-AIR", name: "iPad Air M3", price: 69_900, category: "Планшеты", availableUnits: 1)
+        Product(id: "ui-product-ipad", sku: "UI-IPAD-AIR", name: "iPad Air M3", price: 69_900, category: "Планшеты", availableUnits: 1),
+        // Товар из фикстуры возврата и гарантии: `IPHONE-15-128-BLK` есть в
+        // заказе (`ui-order-2401`) и на устройстве, но в каталоге его не было.
+        // Пока список возвратов подставлял имя по подстроке SKU, расхождение не
+        // было видно; теперь имя берётся из каталога, и без этой строки
+        // покупателю показался бы сырой SKU вместо названия.
+        Product(id: "ui-product-iphone15", sku: "IPHONE-15-128-BLK", name: "iPhone 15 128 GB Black", price: 89_900, category: "Смартфоны", availableUnits: 0)
     ]
 
     static let orders: [CustomerOrder] = [
@@ -3543,12 +3623,12 @@ private struct CustomerReturnsView: View {
                     .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
             }
 
-            Text("📷 Фото товара приложены при оформлении")
-                .font(ClientTheme.body(12))
-                .foregroundStyle(Design3.textFaint)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background(Design3.surface, in: RoundedRectangle(cornerRadius: 11))
-                .overlay(RoundedRectangle(cornerRadius: 11).stroke(Design3.hairline, style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+            // Здесь стояла строка «📷 Фото товара приложены при оформлении» —
+            // она печаталась на каждой заявке, включая оформленные без единого
+            // фото. Ни `returns/mine`, ни модель `CustomerReturn` не отдают
+            // признак вложений (Evidence Vault читается только по ключу
+            // конкретной загрузки), то есть подтвердить это приложению нечем.
+            // Утверждение снято: молчание честнее, чем выдуманная галочка.
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -4209,6 +4289,8 @@ private struct AccountView: View {
     @State private var exportShareFile: ExportShareFile?
     @State private var loyalty: CustomerLoyalty?
     @State private var profileName: String?
+    /// nil — заказы ещё не загрузились или запрос упал; числа в этом случае не называем.
+    @State private var activeOrdersCount: Int?
 
     var body: some View {
         NavigationStack {
@@ -4318,7 +4400,7 @@ private struct AccountView: View {
                 .padding(.top, 2)
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 10)], spacing: 10) {
-                AccountMenuTile(title: "Мои заказы", detail: "1 активный", symbol: "shippingbox.fill", badge: "1 активный") {
+                AccountMenuTile(title: "Мои заказы", detail: "Статусы, выдача и доставка", symbol: "shippingbox.fill", badge: activeOrdersBadge) {
                     OrdersView(environment: environment, auth: auth, refreshRevision: orderRefreshRevision, products: products, cart: $cart)
                 }
                 AccountMenuTile(title: "Устройства", detail: "IMEI и гарантия", symbol: "shield.checkered") {
@@ -4564,21 +4646,45 @@ private struct AccountView: View {
         return CGFloat(percent) / 100
     }
 
+    /// Бейдж плитки «Мои заказы». Раньше в нём стояла константа «1 активный»:
+    /// человек без единого заказа и человек с пятью в работе читали одну и ту же
+    /// цифру. Пока заказы не пришли (или запрос упал) бейджа нет вовсе — плитка
+    /// показывает нейтральное описание вместо выдуманного числа.
+    private var activeOrdersBadge: String? {
+        guard let activeOrdersCount, activeOrdersCount > 0 else { return nil }
+        let isSingular = activeOrdersCount % 10 == 1 && activeOrdersCount % 100 != 11
+        return "\(activeOrdersCount) \(isSingular ? "активный" : "активных")"
+    }
+
+    /// Завершённые статусы: по ним заказ уже не «в работе».
+    private static let terminalOrderStatuses: Set<String> = [
+        "completed", "cancelled", "returned", "refunded", "exchanged"
+    ]
+
     @MainActor
     private func loadAccountSummary() async {
         guard let token = auth.session?.accessToken else { return }
 #if DEBUG
         if UITestBootstrap.startsSignedIn {
-            loyalty = UITestBootstrap.accountFixtureMode == .loaded ? ClientUIFixture.loyalty : nil
+            let isLoaded = UITestBootstrap.accountFixtureMode == .loaded
+            loyalty = isLoaded ? ClientUIFixture.loyalty : nil
+            activeOrdersCount = isLoaded ? Self.activeCount(of: ClientUIFixture.orders) : 0
             profileName = "Нурбек"
             return
         }
 #endif
         let api = APIClient(baseURL: environment.apiBaseURL)
         loyalty = try? await api.get("customers/me/loyalty", token: token)
+        if let orders: [CustomerOrder] = try? await api.get("orders/mine", token: token) {
+            activeOrdersCount = Self.activeCount(of: orders)
+        }
         if let settings: CustomerSettings = try? await api.get("customers/me/settings", token: token) {
             profileName = settings.name
         }
+    }
+
+    private static func activeCount(of orders: [CustomerOrder]) -> Int {
+        orders.filter { !terminalOrderStatuses.contains($0.status.lowercased()) }.count
     }
 
     private func maskedPhone(_ phone: String) -> String {
@@ -4818,6 +4924,15 @@ private struct CustomerAddressesView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var editor: AddressEditorRoute?
+    @State private var pendingDeletion: CustomerAddress?
+    @State private var deletingAddressId: String?
+    /// Ошибка удаления живёт отдельно от `errorMessage`: та подменяет весь экран
+    /// формой повтора, и упавшее удаление стирало бы список адресов с глаз.
+    @State private var deleteError: String?
+
+    private var deletionConfirmation: Binding<Bool> {
+        Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } })
+    }
 
     var body: some View {
         ZStack {
@@ -4844,11 +4959,13 @@ private struct CustomerAddressesView: View {
                             EmptyStateView(title: "Адресов пока нет", detail: "Добавьте адрес, чтобы быстрее оформить доставку.", symbol: "mappin.and.ellipse")
                         } else {
                             ForEach(addresses) { address in
-                                Button { editor = AddressEditorRoute(address: address) } label: {
-                                    addressRow(address)
-                                }
-                                .buttonStyle(.plain)
+                                addressRow(address)
                             }
+                        }
+                        if let deleteError {
+                            Text(deleteError)
+                                .font(ClientTheme.body(12))
+                                .foregroundStyle(Design3.danger)
                         }
                         Button { editor = AddressEditorRoute(address: nil) } label: {
                             Text("+ Добавить адрес")
@@ -4880,44 +4997,93 @@ private struct CustomerAddressesView: View {
             }
             .preferredColorScheme(.dark)
         }
+        .alert("Удалить адрес?", isPresented: deletionConfirmation, presenting: pendingDeletion) { address in
+            Button("Удалить", role: .destructive) { Task { await delete(address) } }
+            Button("Отмена", role: .cancel) { pendingDeletion = nil }
+        } message: { address in
+            Text("«\(address.title)» будет удалён без восстановления.")
+        }
     }
 
+    /// «Удалить» было обычным текстом внутри кнопки-карточки: нажатие открывало
+    /// редактор, а адрес оставался на месте. Теперь это отдельная кнопка рядом с
+    /// карточкой — она действительно вызывает DELETE и спрашивает подтверждение.
     private func addressRow(_ address: CustomerAddress) -> some View {
         VStack(alignment: .leading, spacing: 9) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(address.title)
-                    .font(ClientTheme.body(14, weight: .semibold))
-                    .foregroundStyle(.white)
-                Spacer()
-                if address.isPrimary {
-                    Text("основной")
-                        .font(ClientTheme.body(10, weight: .semibold))
-                        .foregroundStyle(ClientTheme.lime)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(ClientTheme.lime.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
+            Button { editor = AddressEditorRoute(address: address) } label: {
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(address.title)
+                            .font(ClientTheme.body(14, weight: .semibold))
+                            .foregroundStyle(.white)
+                        Spacer()
+                        if address.isPrimary {
+                            Text("основной")
+                                .font(ClientTheme.body(10, weight: .semibold))
+                                .foregroundStyle(ClientTheme.lime)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(ClientTheme.lime.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
+                    Text(address.text)
+                        .font(ClientTheme.body(13))
+                        .foregroundStyle(ClientTheme.muted)
+                        .multilineTextAlignment(.leading)
+                    if let comment = address.comment, !comment.isEmpty {
+                        Text(comment)
+                            .font(ClientTheme.body(11))
+                            .foregroundStyle(ClientTheme.muted.opacity(0.78))
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            Text(address.text)
-                .font(ClientTheme.body(13))
-                .foregroundStyle(ClientTheme.muted)
-                .multilineTextAlignment(.leading)
-            VStack(alignment: .leading, spacing: 5) {
-                if let comment = address.comment, !comment.isEmpty {
-                    Text(comment)
-                        .font(ClientTheme.body(11))
-                        .foregroundStyle(ClientTheme.muted.opacity(0.78))
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("address-edit-\(address.id)")
+
+            Button(role: .destructive) { pendingDeletion = address } label: {
+                HStack(spacing: 6) {
+                    Text(deletingAddressId == address.id ? "Удаляем…" : "Удалить")
+                        .font(ClientTheme.body(12, weight: .semibold))
+                        .foregroundStyle(Design3.danger)
+                    if deletingAddressId == address.id {
+                        ProgressView().tint(Design3.danger)
+                    }
                 }
-            }
-            Text("Удалить")
-                .font(ClientTheme.body(12, weight: .semibold))
-                .foregroundStyle(Design3.danger)
                 .padding(.top, 1)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(deletingAddressId != nil)
+            .accessibilityIdentifier("address-delete-\(address.id)")
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glass(radius: 14)
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(address.isPrimary ? ClientTheme.lime.opacity(0.5) : ClientTheme.line))
+    }
+
+    @MainActor
+    private func delete(_ address: CustomerAddress) async {
+        pendingDeletion = nil
+        guard let token = auth.session?.accessToken else {
+            deleteError = "Войдите в аккаунт, чтобы изменить адреса."
+            return
+        }
+        deletingAddressId = address.id
+        deleteError = nil
+        defer { deletingAddressId = nil }
+        do {
+            let _: DeleteCustomerAddressResponse = try await APIClient(baseURL: environment.apiBaseURL).delete(
+                "customers/me/addresses/\(address.id)",
+                token: token
+            )
+            await load()
+        } catch is CancellationError {
+        } catch {
+            deleteError = "Не удалось удалить «\(address.title)»: \(error.localizedDescription)"
+        }
     }
 
     @MainActor
@@ -5391,6 +5557,17 @@ private struct CustomerSupportView: View {
     @State private var isSubmitting = false
     @State private var submissionError: String?
     @State private var isFormOpen = false
+    /// Контакты витрины — тот же источник, что у шапки и подвала веба.
+    @State private var contactPhone: String?
+    @State private var supportHours: String?
+    @State private var contactsFailed = false
+
+    private static let faqTopics = [
+        "Как отследить заказ?",
+        "Условия возврата и обмена",
+        "Как работает рассрочка?",
+        "Гарантия на Б/У технику"
+    ]
 
     private var normalizedSubject: String {
         subject.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -5399,6 +5576,24 @@ private struct CustomerSupportView: View {
     private var normalizedDetails: String? {
         let value = details.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? nil : value
+    }
+
+    /// Только цифры — так номер годится и для `wa.me`, и для набора.
+    private var contactDigits: String? {
+        let digits = (contactPhone ?? "").filter(\.isNumber)
+        return digits.count >= 9 ? digits : nil
+    }
+
+    private var whatsAppURL: URL? {
+        contactDigits.flatMap { URL(string: "https://wa.me/\($0)") }
+    }
+
+    /// «+» берём из исходной записи владельца, а не дорисовываем: местный номер
+    /// без кода страны с приклеенным плюсом набрал бы чужого абонента.
+    private var callURL: URL? {
+        guard let digits = contactDigits else { return nil }
+        let prefix = contactPhone?.hasPrefix("+") == true ? "+" : ""
+        return URL(string: "tel:\(prefix)\(digits)")
     }
 
     var body: some View {
@@ -5413,28 +5608,38 @@ private struct CustomerSupportView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
-                        HStack(spacing: 8) {
-                            ClientSupportChannel(icon: "💬", title: "WhatsApp", tint: ClientTheme.lime, background: Color(red: 0.122, green: 0.239, blue: 0.18), bordered: false)
-                            ClientSupportChannel(icon: "✈️", title: "Telegram", tint: Color(red: 0.498, green: 0.69, blue: 0.925), background: Color(red: 0.118, green: 0.2, blue: 0.275), bordered: false)
-                            ClientSupportChannel(icon: "📞", title: "Звонок", tint: Color(red: 0.847, green: 0.812, blue: 0.776), background: ClientTheme.surface, bordered: true)
-                        }
+                        supportChannels
 
                         Text("Частые вопросы")
                             .font(ClientTheme.body(13, weight: .semibold))
                             .foregroundStyle(ClientTheme.muted)
-                        ForEach(["Как отследить заказ?", "Условия возврата и обмена", "Как работает рассрочка?", "Гарантия на Б/У технику"], id: \.self) { question in
-                            HStack {
-                                Text(question)
-                                    .font(ClientTheme.body(13))
-                                    .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
-                                Spacer()
-                                Text("▾")
-                                    .font(ClientTheme.body(13, weight: .semibold))
-                                    .foregroundStyle(Design3.textFaint)
+                        // «▾» обещал раскрытие ответа, которого не существовало:
+                        // строка была неинтерактивной вёрсткой. Ответов в
+                        // приложении нет, а сочинять политику магазина нельзя,
+                        // поэтому строка делает то же, что веб
+                        // (apps/web/app/support/page.tsx) — открывает форму и
+                        // подставляет тему обращения.
+                        ForEach(Self.faqTopics, id: \.self) { question in
+                            Button {
+                                prefillTicket(with: question)
+                            } label: {
+                                HStack {
+                                    Text(question)
+                                        .font(ClientTheme.body(13))
+                                        .foregroundStyle(Color(red: 0.847, green: 0.812, blue: 0.776))
+                                        .multilineTextAlignment(.leading)
+                                    Spacer()
+                                    Image(systemName: "square.and.pencil")
+                                        .font(ClientTheme.body(12, weight: .semibold))
+                                        .foregroundStyle(Design3.textFaint)
+                                }
+                                .padding(13)
+                                .glass(radius: 11)
+                                .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+                                .contentShape(Rectangle())
                             }
-                            .padding(13)
-                            .glass(radius: 11)
-                            .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+                            .buttonStyle(.plain)
+                            .accessibilityHint("Создать обращение по этой теме")
                         }
 
                         Button {
@@ -5543,6 +5748,48 @@ private struct CustomerSupportView: View {
         .onChange(of: priority) { _, _ in renewSubmissionKey() }
     }
 
+    /// Три плитки WhatsApp / Telegram / Звонок были декорацией: обычный VStack
+    /// без действия, по которому нельзя было связаться ни одним способом.
+    /// Номер берём из контента витрины — тем же путём, что веб. Telegram убран:
+    /// канала в контенте нет, а выдуманный адрес хуже отсутствующего.
+    @ViewBuilder
+    private var supportChannels: some View {
+        if let whatsAppURL, let callURL {
+            HStack(spacing: 8) {
+                Link(destination: whatsAppURL) {
+                    ClientSupportChannel(icon: "💬", title: "WhatsApp", tint: ClientTheme.lime, background: Color(red: 0.122, green: 0.239, blue: 0.18), bordered: false)
+                }
+                .accessibilityIdentifier("support-channel-whatsapp")
+                Link(destination: callURL) {
+                    ClientSupportChannel(icon: "📞", title: "Звонок", tint: Color(red: 0.847, green: 0.812, blue: 0.776), background: ClientTheme.surface, bordered: true)
+                }
+                .accessibilityIdentifier("support-channel-call")
+            }
+            if let contactPhone {
+                Text(supportHours.map { "\(contactPhone) · \($0)" } ?? contactPhone)
+                    .font(ClientTheme.body(11))
+                    .foregroundStyle(ClientTheme.muted)
+            }
+        } else if contactsFailed {
+            // Не загрузилось и «не задано» — разные вещи, и выглядеть обязаны по-разному.
+            Text("Не удалось загрузить контакты магазина. Форма ниже работает — обращение зарегистрируется в любом случае.")
+                .font(ClientTheme.body(11))
+                .foregroundStyle(ClientTheme.muted)
+        } else {
+            Text("Телефон поддержки пока не указан — создайте обращение ниже, ответ придёт в приложение.")
+                .font(ClientTheme.body(11))
+                .foregroundStyle(ClientTheme.muted)
+        }
+    }
+
+    private func prefillTicket(with question: String) {
+        subject = question
+        if normalizedDetails == nil {
+            details = "\(question): "
+        }
+        withAnimation(.easeInOut(duration: 0.18)) { isFormOpen = true }
+    }
+
     @MainActor
     private func load() async {
         isLoading = true
@@ -5554,6 +5801,7 @@ private struct CustomerSupportView: View {
             return
         }
 #endif
+        await loadSupportContacts()
         guard let token = auth.session?.accessToken else { return }
         do {
             let loaded: [CustomerSupportTicket] = try await APIClient(baseURL: environment.apiBaseURL).get(
@@ -5602,6 +5850,25 @@ private struct CustomerSupportView: View {
         }
     }
 
+    /// `storefront/content` — публичный эндпоинт без токена, тот же, из которого
+    /// веб берёт телефон поддержки для шапки, подвала и страницы поддержки.
+    @MainActor
+    private func loadSupportContacts() async {
+        do {
+            let payload: ClientStorefrontContacts = try await APIClient(baseURL: environment.apiBaseURL).get("storefront/content")
+            let phone = payload.content.contactPhone?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let hours = payload.content.supportHours?.trimmingCharacters(in: .whitespacesAndNewlines)
+            contactPhone = (phone?.isEmpty ?? true) ? nil : phone
+            supportHours = (hours?.isEmpty ?? true) ? nil : hours
+            contactsFailed = false
+        } catch is CancellationError {
+        } catch {
+            contactPhone = nil
+            supportHours = nil
+            contactsFailed = true
+        }
+    }
+
     private func renewSubmissionKey() {
         guard !isSubmitting else { return }
         submissionKey = UUID().uuidString
@@ -5614,6 +5881,17 @@ private struct CustomerSupportView: View {
     private func priorityLabel(_ priority: String) -> String {
         ["normal": "Обычная", "high": "Высокая", "urgent": "Срочная"][priority] ?? priority
     }
+}
+
+/// Срез `GET storefront/content` — только контакты поддержки, остальное витрине
+/// приложения не нужно.
+private struct ClientStorefrontContacts: Decodable, Sendable {
+    struct Content: Decodable, Sendable {
+        let contactPhone: String?
+        let supportHours: String?
+    }
+
+    let content: Content
 }
 
 private struct ClientSupportChannel: View {
@@ -5963,7 +6241,7 @@ private struct WarrantyRequestView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 ClientWarrantyCertificate(device: device)
-                ClientWarrantyActionRow(environment: environment, auth: auth)
+                ClientWarrantyActionRow(environment: environment, auth: auth, device: device)
                 if let warranty = device.warranty {
                     ClientWarrantyStatusCard(warranty: warranty)
                 } else if let created {
@@ -6094,42 +6372,108 @@ private struct ClientWarrantyCertificate: View {
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(ClientTheme.line))
     }
 
+    /// Гарантийный талон обязан называть то устройство, которое человек купил.
+    /// Любое название со словами «iPhone 15» здесь перезаписывалось константой
+    /// «iPhone 15 · 128 ГБ»: владелец iPhone 15 Pro на 512 ГБ читал в своём же
+    /// талоне чужую модель и чужой объём памяти. Если названия нет, показываем
+    /// IMEI — единственный идентификатор, который у нас точно настоящий.
     private var warrantyProductTitle: String {
-        if device.product.localizedCaseInsensitiveContains("iPhone 15") {
-            return "iPhone 15 · 128 ГБ"
-        }
-        return device.product
+        let name = device.product.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "IMEI \(device.imei)" : name
     }
 }
 
 private struct ClientWarrantyActionRow: View {
     let environment: AppEnvironment
     let auth: CustomerAuthStore
+    let device: CustomerDevice
+    /// Заказ, в котором продан именно этот IMEI: чек существует только у него.
+    @State private var receiptOrder: CustomerOrder?
+    @State private var isLookingUpOrder = true
+    @State private var receiptNote: String?
 
     var body: some View {
-        HStack(spacing: 8) {
-            NavigationLink {
-                CustomerSupportView(environment: environment, auth: auth)
-            } label: {
-                Text("Обращение в сервис")
-                    .font(ClientTheme.body(13, weight: .bold))
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: .infinity, minHeight: 46)
-                    .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 11))
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("warranty-open-service")
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                NavigationLink {
+                    CustomerSupportView(environment: environment, auth: auth)
+                } label: {
+                    Text("Обращение в сервис")
+                        .font(ClientTheme.body(13, weight: .bold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity, minHeight: 46)
+                        .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 11))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("warranty-open-service")
 
-            Button {} label: {
-                Text("🧾 Чек")
-                    .font(ClientTheme.body(13, weight: .medium))
-                    .foregroundStyle(Design3.textBright)
-                    .frame(maxWidth: .infinity, minHeight: 46)
-                    .glass(radius: 11)
-                    .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+                // У «Чека» было пустое замыкание: человек жал кнопку столько раз,
+                // сколько хватало терпения, и решал, что чек ему не выдают. Чек
+                // открывает тот же ClientReceiptView, что и карточка заказа, —
+                // нужен только заказ, а он находится по IMEI устройства.
+                if let receiptOrder {
+                    NavigationLink {
+                        ClientReceiptView(environment: environment, auth: auth, order: receiptOrder)
+                    } label: {
+                        receiptLabel("🧾 Чек", muted: false)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("warranty-receipt")
+                } else {
+                    Button {
+                        Task { await lookUpReceiptOrder() }
+                    } label: {
+                        receiptLabel(isLookingUpOrder ? "🧾 Ищем чек" : "🧾 Чек · повторить", muted: true)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isLookingUpOrder)
+                    .accessibilityIdentifier("warranty-receipt")
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("warranty-receipt")
+            if let receiptNote {
+                Text(receiptNote)
+                    .font(ClientTheme.body(11))
+                    .foregroundStyle(ClientTheme.muted)
+            }
+        }
+        .task { await lookUpReceiptOrder() }
+    }
+
+    private func receiptLabel(_ title: String, muted: Bool) -> some View {
+        Text(title)
+            .font(ClientTheme.body(13, weight: .medium))
+            .foregroundStyle(muted ? ClientTheme.muted : Design3.textBright)
+            .frame(maxWidth: .infinity, minHeight: 46)
+            .glass(radius: 11)
+            .overlay(RoundedRectangle(cornerRadius: 11).stroke(ClientTheme.line))
+    }
+
+    /// Заказы клиента отдают IMEI по каждой позиции (`orders/mine` → items.imei),
+    /// поэтому чек для устройства ищется без нового контракта с сервером.
+    @MainActor
+    private func lookUpReceiptOrder() async {
+        isLookingUpOrder = true
+        defer { isLookingUpOrder = false }
+#if DEBUG
+        if UITestBootstrap.startsSignedIn {
+            receiptOrder = ClientUIFixture.orders.first { order in order.items.contains { $0.imei == device.imei } }
+            receiptNote = receiptOrder == nil ? "Чек по этому IMEI не найден среди ваших заказов." : nil
+            return
+        }
+#endif
+        guard let token = auth.session?.accessToken else {
+            receiptNote = "Войдите в аккаунт, чтобы открыть чек."
+            return
+        }
+        do {
+            let orders: [CustomerOrder] = try await APIClient(baseURL: environment.apiBaseURL).get("orders/mine", token: token)
+            receiptOrder = orders.first { order in order.items.contains { $0.imei == device.imei } }
+            receiptNote = receiptOrder == nil ? "Чек по этому IMEI не найден среди ваших заказов." : nil
+        } catch is CancellationError {
+        } catch {
+            // Пустой список заказов и упавший запрос обязаны выглядеть по-разному.
+            receiptOrder = nil
+            receiptNote = "Не удалось загрузить заказы: \(error.localizedDescription)"
         }
     }
 }
@@ -6621,6 +6965,7 @@ private struct NativeProductCard: View {
             : "Нет в наличии"
     }
     private var isFavorite: Bool { favorites.contains(product.id) }
+    private var isInStock: Bool { product.availableUnits > 0 }
 
     private func toggleFavorite() {
         if isFavorite { favorites.remove(product.id) } else { favorites.insert(product.id) }
@@ -6638,8 +6983,13 @@ private struct NativeProductCard: View {
             Text(product.name).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white).lineLimit(2).frame(minHeight: 38, alignment: .top)
             Text(Money.som(product.price)).font(ClientTheme.display(16, weight: .black)).foregroundStyle(.white)
             Text(availabilityText)
-                .font(ClientTheme.body(10)).foregroundStyle(product.availableUnits > 0 ? ClientTheme.muted : Design3.danger)
-            Button { addToCart() } label: { Text(product.availableUnits > 0 ? "В корзину" : "Уведомить").font(ClientTheme.body(12, weight: .bold)).frame(maxWidth: .infinity).frame(height: 38).background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(.black) }.disabled(product.availableUnits == 0)
+                .font(ClientTheme.body(10)).foregroundStyle(isInStock ? ClientTheme.muted : Design3.danger)
+            // Кнопка товара без остатка называлась «Уведомить» и была навсегда
+            // disabled, а действие VoiceOver «Уведомить о наличии» не делало
+            // ничего. Обещание уведомления сервер выполнить не может: листа
+            // ожидания в API нет, экран WaitlistView живёт под `#if DEBUG`.
+            // Кнопка теперь говорит только то, что правда: товара нет.
+            Button { addToCart() } label: { Text(isInStock ? "В корзину" : "Нет в наличии").font(ClientTheme.body(12, weight: .bold)).frame(maxWidth: .infinity).frame(height: 38).background(isInStock ? ClientTheme.lime : ClientTheme.line, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(isInStock ? Color.black : Design3.textDisabled) }.disabled(!isInStock)
         }
         .padding(10)
         .glass(radius: 16)
@@ -6649,10 +6999,14 @@ private struct NativeProductCard: View {
         // по пять свайпов; на экране с полусотней товаров это сотни свайпов.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(product.name). \(Money.som(product.price)). \(availabilityText)")
-        .accessibilityAction(named: product.availableUnits > 0 ? "В корзину" : "Уведомить о наличии") {
-            if product.availableUnits > 0 { addToCart() }
+        .accessibilityActions {
+            // Действие в роторе появляется, только если ему есть что сделать:
+            // пункт-пустышка в списке действий — та же ложь, что мёртвая кнопка.
+            if isInStock {
+                Button("В корзину") { addToCart() }
+            }
+            Button(isFavorite ? "Убрать из избранного" : "В избранное") { toggleFavorite() }
         }
-        .accessibilityAction(named: isFavorite ? "Убрать из избранного" : "В избранное") { toggleFavorite() }
     }
 }
 

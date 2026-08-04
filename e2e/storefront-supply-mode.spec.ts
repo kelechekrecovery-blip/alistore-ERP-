@@ -28,9 +28,17 @@ test('catalog cards and product pages show the real supply lead time, both deskt
   const toOrder = await seedToOrderProduct('SUPPLY-TOORDER', 3);
 
   // Desktop catalog grid.
+  //
+  // Скоуп обязателен по той же причине, что и у карточек товара ниже: `/catalog`
+  // держит обе вёрстки в DOM одновременно (`CatalogClient.tsx:63-64` —
+  // `md:hidden` мобильная и `hidden md:block` десктопная), мобильная лишь скрыта
+  // CSS. Без скоупа ассерт «Под заказ · 3 дня» проходил только пока мобильная
+  // сетка не успевала отрисовать товары: как только она стала догружаться
+  // вовремя, тот же текст нашёлся дважды и strict mode уронил проверку. Ловил
+  // он при этом не дефект витрины, а гонку — обе метки верны и обе нужны.
   await page.goto('/catalog');
-  await expect(page.getByText('В наличии · 1 шт.')).toBeVisible();
-  await expect(page.getByText('Под заказ · 3 дня')).toBeVisible();
+  await expect(page.locator('.md\\:block').getByText('В наличии · 1 шт.')).toBeVisible();
+  await expect(page.locator('.md\\:block').getByText('Под заказ · 3 дня')).toBeVisible();
 
   // Desktop product detail pages (both mirrors are in the DOM at once — the
   // `md:hidden` mobile tree is only CSS-hidden — so scope to the desktop one).
