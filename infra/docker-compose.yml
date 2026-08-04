@@ -1,7 +1,7 @@
 # AliStore — v1 self-hosted services.
 #
-# ⚠️ Authored but NOT run/verified on the dev machine (no Docker installed here).
-# Bring up where Docker is available and adjust before relying on it:
+# Verified locally with Docker (Redis/BullMQ and MinIO policy smoke checks).
+# Bring up the stack with a production secret file before relying on it:
 #   docker compose -f infra/docker-compose.yml --env-file .env up -d
 #
 # Novu (notifications) is intentionally NOT included: self-hosting it is an
