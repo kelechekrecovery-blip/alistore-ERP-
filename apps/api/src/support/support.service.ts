@@ -116,7 +116,9 @@ export class SupportService {
         }
 
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'guest-customer:' + phone}))::text AS locked`;
-        const existingCustomer = await tx.customer.findUnique({ where: { phone } });
+        const existingCustomer = await tx.customer.findFirst({
+          where: { phone: { in: [phone, phone.slice(1)] } },
+        });
         if (existingCustomer) throw guestCustomerRequiresAuth();
         const customer = await tx.customer.create({ data: { phone, name } });
         const sla = slaFor(priority, Date.now());

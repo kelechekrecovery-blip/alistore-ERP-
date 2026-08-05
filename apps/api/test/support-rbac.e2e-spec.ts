@@ -298,4 +298,21 @@ describe('Support CRM RBAC split', () => {
       code: 'guest_support_replay_expired',
     });
   });
+
+  it('does not issue support capability for a surviving legacy no-plus customer', async () => {
+    const legacyPhone = `996710${RUN}`;
+    await prisma.customer.create({ data: { phone: legacyPhone, name: 'Legacy Customer' } });
+
+    await expect(supportController.openGuest(`guest-legacy-${RUN}`, {
+      phone: `+${legacyPhone}`,
+      channel: 'web',
+      subject: 'Must authenticate',
+    })).rejects.toMatchObject({
+      status: 409,
+      response: expect.objectContaining({ code: 'guest_customer_requires_auth' }),
+    });
+
+    expect(await prisma.customer.count({ where: { phone: { in: [legacyPhone, `+${legacyPhone}`] } } })).toBe(1);
+    expect(await prisma.supportTicket.count()).toBe(0);
+  });
 });

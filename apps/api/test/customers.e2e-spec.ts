@@ -27,7 +27,7 @@ describe('Customers find-or-create (integration)', () => {
   });
 
   it('creates a customer on first checkout and reuses it on the next', async () => {
-    const first = await customers.upsert({ phone: '+996700111222', name: 'Айбек' });
+    const first = await customers.upsert({ phone: '996700111222', name: 'Айбек' });
     const again = await customers.upsert({ phone: '+996700111222', name: 'Айбек Т.' });
 
     expect(again.id).toBe(first.id);
@@ -40,7 +40,7 @@ describe('Customers find-or-create (integration)', () => {
   it('does not issue a guest capability for an existing customer', async () => {
     await customers.upsert({ phone: '+996700111333', name: 'Закрытый профиль' });
 
-    await expect(customers.createGuest({ phone: '+996700111333', name: 'Подмена' }))
+    await expect(customers.createGuest({ phone: '996700111333', name: 'Подмена' }))
       .rejects.toMatchObject({
         status: 409,
         response: expect.objectContaining({ code: 'guest_customer_requires_auth' }),
@@ -48,6 +48,40 @@ describe('Customers find-or-create (integration)', () => {
 
     await expect(prisma.customer.findUnique({ where: { phone: '+996700111333' } }))
       .resolves.toMatchObject({ name: 'Закрытый профиль' });
+  });
+
+  it('adopts a legacy no-plus row without changing customer identity', async () => {
+    const legacy = await prisma.customer.create({ data: { phone: '996700111444', name: 'Legacy' } });
+
+    const canonical = await customers.upsert({ phone: '+996700111444', name: 'Canonical' });
+
+    expect(canonical.id).toBe(legacy.id);
+    expect(canonical.phone).toBe('+996700111444');
+    expect(canonical.name).toBe('Canonical');
+    expect(await prisma.customer.count({ where: { phone: { in: ['996700111444', '+996700111444'] } } })).toBe(1);
+  });
+
+  it('serializes concurrent guest creation across plus and no-plus aliases', async () => {
+    const results = await Promise.allSettled([
+      customers.createGuest({ phone: '+996700111555', name: 'First' }),
+      customers.createGuest({ phone: '996700111555', name: 'Second' }),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(await prisma.customer.count({ where: { phone: '+996700111555' } })).toBe(1);
+    expect(await prisma.customer.count({ where: { phone: '996700111555' } })).toBe(0);
+  });
+
+  it('recovers the canonical winner when another phone writer wins the unique race', async () => {
+    const winner = await prisma.customer.create({ data: { phone: '+996700111666', name: 'Auth winner' } });
+    jest.spyOn(prisma, '$transaction').mockRejectedValueOnce({ code: 'P2002' });
+
+    const recovered = await customers.upsert({ phone: '996700111666', name: 'POS update' });
+
+    expect(recovered.id).toBe(winner.id);
+    expect(recovered.name).toBe('POS update');
+    expect(await prisma.customer.count({ where: { phone: '+996700111666' } })).toBe(1);
   });
 
   it('defaults the name when none is given', async () => {

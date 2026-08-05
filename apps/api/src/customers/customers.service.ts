@@ -12,6 +12,7 @@ import { buildCustomerOverview, CustomerOverview } from './customer-overview';
 import { warrantyCoverage } from './warranty-coverage';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
 import { revokeTelegramAgentAccessOnTx } from '../telegram-agent/telegram-agent-revocation';
+import { normalizePhone } from '../auth/phone-normalization';
 
 /**
  * Customers for storefront/guest checkout. Phone is the natural key (unique), so
@@ -186,11 +187,37 @@ export class CustomersService {
 
   /** Find-or-create by phone; updates the name only when a new one is provided. */
   async upsert(dto: UpsertCustomerDto) {
-    return this.prisma.customer.upsert({
-      where: { phone: dto.phone },
-      update: dto.name ? { name: dto.name } : {},
-      create: { phone: dto.phone, name: dto.name ?? 'Клиент' },
-    });
+    const phone = normalizePhone(dto.phone);
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'customer-phone:' + phone}))::text AS locked`;
+        const canonical = await tx.customer.findUnique({ where: { phone } });
+        if (canonical) {
+          return dto.name
+            ? tx.customer.update({ where: { id: canonical.id }, data: { name: dto.name } })
+            : canonical;
+        }
+        const legacy = await tx.customer.findUnique({ where: { phone: phone.slice(1) } });
+        if (legacy) {
+          return tx.customer.update({
+            where: { id: legacy.id },
+            data: { phone, ...(dto.name ? { name: dto.name } : {}) },
+          });
+        }
+        return tx.customer.create({ data: { phone, name: dto.name ?? 'Клиент' } });
+      });
+    } catch (error) {
+      if (!isUniqueConstraintViolation(error)) throw error;
+      // Auth and support use the same canonical unique index but may not hold
+      // this service's advisory lock. If one commits between our read and write,
+      // recover the winner instead of turning an identity race into a 500.
+      const canonical = await this.prisma.customer.findUnique({ where: { phone } });
+      if (!canonical) throw error;
+      if (dto.name) {
+        return this.prisma.customer.update({ where: { id: canonical.id }, data: { name: dto.name } });
+      }
+      return canonical;
+    }
   }
 
   /**
@@ -198,27 +225,23 @@ export class CustomersService {
    * existing customer by phone. Existing customers must authenticate first.
    */
   async createGuest(dto: UpsertCustomerDto) {
-    const existing = await this.prisma.customer.findUnique({
-      where: { phone: dto.phone },
-      select: { id: true },
-    });
-    if (existing) {
-      throw new ConflictException({
-        code: 'guest_customer_requires_auth',
-        message: 'Для этого номера войдите в аккаунт перед оформлением заказа',
-      });
-    }
+    const phone = normalizePhone(dto.phone);
     try {
-      return await this.prisma.customer.create({
-        data: { phone: dto.phone, name: dto.name ?? 'Клиент' },
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'customer-phone:' + phone}))::text AS locked`;
+        const existing = await tx.customer.findFirst({
+          where: { phone: { in: [phone, phone.slice(1)] } },
+          select: { id: true },
+        });
+        if (existing) throw guestCustomerRequiresAuth();
+        return tx.customer.create({
+          data: { phone, name: dto.name ?? 'Клиент' },
+        });
       });
     } catch (error) {
       // A concurrent checkout can win the unique phone race after the lookup.
       if (isUniqueConstraintViolation(error)) {
-        throw new ConflictException({
-          code: 'guest_customer_requires_auth',
-          message: 'Для этого номера войдите в аккаунт перед оформлением заказа',
-        });
+        throw guestCustomerRequiresAuth();
       }
       throw error;
     }
@@ -433,6 +456,13 @@ export class CustomersService {
     ]);
     return buildCustomerOverview({ customer, orders, payments, debts, warranties, tickets });
   }
+}
+
+function guestCustomerRequiresAuth() {
+  return new ConflictException({
+    code: 'guest_customer_requires_auth',
+    message: 'Для этого номера войдите в аккаунт перед оформлением заказа',
+  });
 }
 
 function requiredText(value: string, label: string): string {

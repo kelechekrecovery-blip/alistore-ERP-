@@ -4,7 +4,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export class UpsertCustomerDto {
   @ApiProperty({ example: '+996700123456', description: 'Phone in E.164 (KG)' })
   @IsString()
-  @Matches(/^\+?[0-9]{9,15}$/, { message: 'phone must be 9–15 digits, optional +' })
+  @Matches(/^\+?[1-9][0-9]{8,14}$/, { message: 'phone must be 9–15 digits, optional +, no leading zero' })
   phone!: string;
 
   @ApiPropertyOptional({ example: 'Айбек' })
