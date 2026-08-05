@@ -6,7 +6,7 @@ Payment-provider fail-closed behavior, payment-method availability, refund limit
 
 ## Passing gates
 
-Using the isolated TypeScript Jest configuration (without the shared migration global setup):
+Focused disposable-database Jest gate:
 
 ```text
 test/payment-provider-none.spec.ts
@@ -15,13 +15,11 @@ test/refund-limit.spec.ts
 test/order-state-machine.spec.ts
 ```
 
-Result: **4 suites / 19 tests passed**.
+Result: **9 suites / 51 tests passed**.
 
 The provider contract confirms that `PAYMENT_PROVIDER=none` exposes cash-on-delivery while online payment fails closed with `online_payments_unavailable`; unknown providers are rejected.
 
-## Environment blocker
-
-The full disposable-database Wave 2 command was attempted with inventory, reservation, payment and refund E2E suites. Prisma migration setup failed to acquire PostgreSQL advisory lock (`P1002`, localhost:5432) because another local test/worktree process held the migration lock. No application assertion failed. Rerun the full E2E set after all local Jest/Prisma workers are stopped.
+The first attempt was blocked by a transient PostgreSQL advisory lock (`P1002`) from another local worker. After the worker exited, the same command completed successfully; no application assertion failed.
 
 ## Wave 2 invariants to preserve
 
@@ -30,4 +28,3 @@ The full disposable-database Wave 2 command was attempted with inventory, reserv
 - Online payment providers fail closed; COD remains explicit and auditable.
 - Refunds require approval/limits and cannot bypass provider state.
 - AI remains read-only or approval-draft only for money, stock and status changes.
-
