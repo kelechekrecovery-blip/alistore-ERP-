@@ -45,5 +45,4 @@ No code-level blocker observed in this baseline. Production release still depend
 
 ## Baseline commit
 
-Captured from the Wave 1 execution branch; see Git history for the exact commit SHA.
-
+Baseline evidence commit: `71092b5bdacaf52dfb9aa94c749439fb4a3f77aa`.
