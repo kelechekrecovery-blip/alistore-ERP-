@@ -12,3 +12,6 @@
 
 AI has no direct tools for payment, refund, inventory mutation, role changes, production flags or supplier communication. The only new write path is an approval-gated draft PO created after a human decision.
 
+## Messaging reliability
+
+Outbox/Telegram/provider gate: **4 suites / 39 tests passed**. Coverage includes retry backoff and DLQ/redrive rules, FCM retry propagation, multi-channel transport errors, duplicate Telegram update suppression, webhook-secret validation, Telegram identity scoping, approval routing and retention/redaction.
