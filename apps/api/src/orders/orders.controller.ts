@@ -226,6 +226,9 @@ export class OrdersController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: CreateMyOrderDto,
   ) {
+    if (user.typ !== 'customer') {
+      throw new ForbiddenException('Требуется customer JWT');
+    }
     return this.orders.createFromCatalog(
       { ...dto, customerId: user.customerId, channel: dto.channel === 'web' ? 'web' : 'mobile' },
       user.customerId,

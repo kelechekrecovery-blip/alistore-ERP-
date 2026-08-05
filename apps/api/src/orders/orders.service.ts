@@ -31,6 +31,7 @@ import {
 } from '../inventory/order-inventory-sale';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
 import { resolveActiveStorePoint } from '../common/store-point-identity';
+import { lockActiveCustomerOnTx } from '../auth/customer-session-state';
 
 /** Reservation lifetime — every reservation must have expiresAt (invariant #7). */
 const RESERVATION_TTL_MS = 30 * 60 * 1000; // 30 минут
@@ -397,9 +398,12 @@ export class OrdersService {
   ): Promise<CommerceOrderResult> {
     const requestHash = orderRequestHash(dto, false);
     if (idempotencyKey) {
-      const existing = await this.prisma.order.findUnique({
-        where: { idempotencyKey },
-        include: { items: true, receivables: true },
+      const existing = await this.prisma.$transaction(async (tx) => {
+        await lockActiveCustomerOnTx(tx, dto.customerId);
+        return tx.order.findUnique({
+          where: { idempotencyKey },
+          include: { items: true, receivables: true },
+        });
       });
       if (existing) {
         assertOrderReplayCompatible(existing, dto, false, requestHash);
@@ -624,6 +628,11 @@ export class OrdersService {
       : await this.resolveStorePointFromDatabase(dto.storePointId, dto.pickupPoint, false));
     try {
       return await this.audit.transaction(async (tx) => {
+        // Global customer-scoped mutation order: Customer first, then every
+        // order/idempotency, slot, promotion, loyalty and outbox lock below.
+        // Account deletion uses the same first lock and therefore either waits
+        // for the complete order commit or makes this mutation fail closed.
+        await lockActiveCustomerOnTx(tx, dto.customerId);
         if (idempotencyKey) {
           const existing = await tx.order.findUnique({
             where: { idempotencyKey },
@@ -938,9 +947,12 @@ export class OrdersService {
       });
     } catch (error) {
       if (idempotencyKey && isUniqueConstraintViolation(error)) {
-        const existing = await this.prisma.order.findUnique({
-          where: { idempotencyKey },
-          include: { items: true, receivables: true },
+        const existing = await this.prisma.$transaction(async (tx) => {
+          await lockActiveCustomerOnTx(tx, dto.customerId);
+          return tx.order.findUnique({
+            where: { idempotencyKey },
+            include: { items: true, receivables: true },
+          });
         });
         if (existing) {
           assertOrderReplayCompatible(existing, dto, true, requestHash);

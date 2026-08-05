@@ -15,12 +15,13 @@ import { PromotionsService } from '../src/promotions/promotions.service';
 describe('Orders by customer (account)', () => {
   let prisma: PrismaService;
   let orders: OrdersService;
+  let audit: AuditService;
   let seq = 0;
 
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
-    const audit = new AuditService(prisma);
+    audit = new AuditService(prisma);
     orders = new OrdersService(
       prisma,
       audit,
@@ -60,6 +61,12 @@ describe('Orders by customer (account)', () => {
     return prisma.customer.create({
       data: { phone: `+99670008${seq.toString().padStart(4, '0')}`, name: 'Тест' },
     });
+  }
+
+  function deferred() {
+    let resolve!: () => void;
+    const promise = new Promise<void>((done) => { resolve = done; });
+    return { promise, resolve };
   }
 
   it('returns only the customer own orders', async () => {
@@ -107,6 +114,65 @@ describe('Orders by customer (account)', () => {
       owner.id,
       'native-order-retry-1',
     )).rejects.toMatchObject({ code: 'order_idempotency_mismatch' });
+  });
+
+  it('rejects a new order when deletion commits before the order transaction', async () => {
+    const owner = await customer();
+    const atTransaction = deferred();
+    const resumeTransaction = deferred();
+    const originalTransaction = audit.transaction.bind(audit);
+    const transaction = jest.spyOn(audit, 'transaction').mockImplementationOnce(async (fn) => {
+      atTransaction.resolve();
+      await resumeTransaction.promise;
+      return originalTransaction(fn);
+    });
+
+    try {
+      const creation = orders.create(
+        {
+          customerId: owner.id,
+          channel: 'web',
+          total: 500,
+          deliveryAddress: 'Адрес, который не должен сохраниться',
+          items: [{ sku: 'DELETE-RACE', qty: 1, price: 500 }],
+        },
+        owner.id,
+        'order-after-delete-race',
+      );
+      await atTransaction.promise;
+      await prisma.customer.update({
+        where: { id: owner.id },
+        data: { phone: `deleted:${owner.id}`, name: 'Удалённый пользователь' },
+      });
+      resumeTransaction.resolve();
+
+      await expect(creation).rejects.toMatchObject({ code: 'customer_session_revoked' });
+      expect(await prisma.order.count({ where: { idempotencyKey: 'order-after-delete-race' } }))
+        .toBe(0);
+      expect(await prisma.auditEvent.count({ where: { type: 'order.created', actor: owner.id } }))
+        .toBe(0);
+    } finally {
+      resumeTransaction.resolve();
+      transaction.mockRestore();
+    }
+  });
+
+  it('does not expose an idempotent order replay after account deletion', async () => {
+    const owner = await customer();
+    const input = {
+      customerId: owner.id,
+      channel: 'mobile' as const,
+      total: 700,
+      items: [{ sku: 'DELETE-REPLAY', qty: 1, price: 700 }],
+    };
+    await orders.create(input, owner.id, 'order-delete-replay');
+    await prisma.customer.update({
+      where: { id: owner.id },
+      data: { phone: `deleted:${owner.id}`, name: 'Удалённый пользователь' },
+    });
+
+    await expect(orders.createFromCatalog(input, owner.id, 'order-delete-replay'))
+      .rejects.toMatchObject({ code: 'customer_session_revoked' });
   });
 
   it('serializes concurrent quantity fulfillment without duplicate allocations', async () => {
