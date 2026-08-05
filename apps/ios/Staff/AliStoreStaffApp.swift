@@ -290,6 +290,19 @@ private struct StaffHomeView: View {
     let openCustomer360: () -> Void
     let openShift: () -> Void
 
+    /// Числа на главной приходят с сервера или не приходят вовсе.
+    ///
+    /// Здесь стояли константы: «12 продаж вчера», «3 новых», «2 активных» —
+    /// одни и те же у любого сотрудника в любой день. По ним принимают решения:
+    /// продавец видит «3 новых заказа» и идёт их собирать. Выдуманное число
+    /// хуже отсутствующего, поэтому `nil` — это «не знаем», и подпись тогда
+    /// описывает плитку, а не врёт количеством.
+    @State private var newOrders: Int?
+    @State private var activeTasks: Int?
+    @State private var shift: CashShift?
+    @State private var shiftKnown = false
+
+    private let environment = AppEnvironment.live()
     private let background = Design3.screen
     private let surface = Design3.surface
     private let surfaceSoft = Design3.surfaceRaised
@@ -314,6 +327,42 @@ private struct StaffHomeView: View {
         .background(background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
+        .task { await loadSummary() }
+    }
+
+    /// Сводка для главной: очередь, задачи, смена.
+    ///
+    /// Каждый запрос независим и молча оставляет своё значение неизвестным при
+    /// отказе — сбой одного счётчика не должен превращать главный экран в
+    /// ошибку. Право роли проверяем до запроса: иначе роль без доступа к
+    /// очереди получала бы 403 на каждом открытии главной.
+    @MainActor
+    private func loadSummary() async {
+        let api = APIClient(baseURL: environment.apiBaseURL)
+        if StaffAccess.canReadOrderQueue(session.role) {
+            let orders: [CustomerOrder]? = try? await api.get("orders?status=created", token: session.accessToken)
+            newOrders = orders?.count
+        }
+        let tasks: [StaffTask]? = try? await api.get("staff-tasks/mine", token: session.accessToken)
+        activeTasks = tasks?.filter { $0.status != "done" }.count
+        if StaffAccess.canUseCashShift(session.role) {
+            let current: CashShift?? = try? await api.get("shifts/current", token: session.accessToken)
+            if let current {
+                shift = current
+                shiftKnown = true
+            }
+        }
+    }
+
+    /// Подпись плитки: число, когда оно известно, и описание, когда нет.
+    private func countLabel(_ value: Int?, one: String, few: String, many: String, unknown: String) -> String {
+        guard let value else { return unknown }
+        let rest10 = value % 10, rest100 = value % 100
+        let word: String
+        if rest10 == 1 && rest100 != 11 { word = one }
+        else if (2...4).contains(rest10) && !(12...14).contains(rest100) { word = few }
+        else { word = many }
+        return "\(value) \(word)"
     }
 
     /// Шапка берётся из сессии.
@@ -367,29 +416,26 @@ private struct StaffHomeView: View {
     }
 
     private var shiftCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Смена не открыта")
-                        .font(.title3.weight(.black))
-                        .foregroundStyle(primaryText)
-                    Text("Откройте смену с фото точки, чтобы принимать заказы и фиксировать KPI.")
-                        .font(.subheadline)
-                        .foregroundStyle(secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 12)
-                VStack(alignment: .trailing, spacing: 5) {
-                    Text("12")
-                        .font(.title2.weight(.black))
-                        .foregroundStyle(lime)
-                    Text("продаж вчера")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(secondaryText)
-                }
+        // Состояние смены и подпись кнопки идут от сервера. Раньше карточка
+        // всегда говорила «Смена не открыта» и предлагала её открыть — даже
+        // кассиру, который смену уже открыл: он жал кнопку и получал отказ.
+        // Блок «12 продаж вчера» убран целиком: такого числа у нас нет, а
+        // выдуманное на главном экране сотрудника — это KPI из воздуха.
+        let isOpen = shift != nil && shift?.closedAt == nil
+        return VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(isOpen ? "Смена открыта" : shiftKnown ? "Смена не открыта" : "Смена")
+                    .font(.title3.weight(.black))
+                    .foregroundStyle(primaryText)
+                Text(isOpen
+                     ? "Продажи и KPI пишутся на эту смену. Закройте её в конце дня со сверкой кассы."
+                     : "Откройте смену с фото точки, чтобы принимать заказы и фиксировать KPI.")
+                    .font(.subheadline)
+                    .foregroundStyle(secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Button(action: openShift) {
-                Label("Открыть смену", systemImage: "camera.fill")
+                Label(isOpen ? "Открыть кассу" : "Открыть смену", systemImage: isOpen ? "banknote.fill" : "camera.fill")
                     .font(.headline.weight(.bold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
@@ -411,10 +457,10 @@ private struct StaffHomeView: View {
                 // Плитки повторяют права роли: иначе быстрое действие уводило на
                 // вкладку, которой у роли нет, или сразу в 403 (см. StaffAccess).
                 if StaffAccess.canReadOrderQueue(session.role) {
-                    actionTile(.init(title: "Заказы", subtitle: "3 новых", icon: "shippingbox.fill", tint: coral, identifier: "staff-home-orders"), action: openOrders)
+                    actionTile(.init(title: "Заказы", subtitle: countLabel(newOrders, one: "новый", few: "новых", many: "новых", unknown: "очередь"), icon: "shippingbox.fill", tint: coral, identifier: "staff-home-orders"), action: openOrders)
                 }
                 actionTile(.init(title: "Скупка Б/У", subtitle: "оценка", icon: "iphone.gen3", tint: Design3.blue, identifier: "staff-home-buyback"), action: openBuyback)
-                actionTile(.init(title: "Задачи и KPI", subtitle: "2 активных", icon: "chart.bar.fill", tint: Design3.gold, identifier: "staff-home-kpi"), action: openTasks)
+                actionTile(.init(title: "Задачи и KPI", subtitle: countLabel(activeTasks, one: "активная", few: "активные", many: "активных", unknown: "план дня"), icon: "chart.bar.fill", tint: Design3.gold, identifier: "staff-home-kpi"), action: openTasks)
                 if StaffAccess.canCountInventory(session.role) {
                     NavigationLink {
                         StaffInventoryView(session: session, environment: AppEnvironment.live())
