@@ -1,6 +1,6 @@
 import { AuditService } from '../src/audit/audit.service';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { SETTINGS } from '../src/settings/settings.registry';
+import { SETTINGS, isTextSetting } from '../src/settings/settings.registry';
 import { SettingsService } from '../src/settings/settings.service';
 
 /**
@@ -36,6 +36,14 @@ describe('Настройки владельца · каждый ключ под�
 
   it('значение по умолчанию читается для каждого ключа реестра', async () => {
     for (const definition of SETTINGS) {
+      // Ссылочные параметры (QR провайдеров) читаются через `text()`: их
+      // значение — строка, и требовать от неё числа бессмысленно. Проверка та
+      // же по смыслу — параметр обязан читаться и отдавать свой дефолт.
+      if (isTextSetting(definition)) {
+        expect({ key: definition.key, value: await settings.text(definition.key) })
+          .toEqual({ key: definition.key, value: definition.fallback });
+        continue;
+      }
       const value = await settings.value(definition.key);
       expect({ key: definition.key, isNumber: Number.isFinite(value) })
         .toEqual({ key: definition.key, isNumber: true });
@@ -51,7 +59,15 @@ describe('Настройки владельца · каждый ключ под�
    */
   it('сохранённое владельцем значение возвращается вместо дефолта', async () => {
     for (const definition of SETTINGS) {
-      const changed = definition.fallback + 1;
+      if (isTextSetting(definition)) {
+        const changed = `/media/wired-${definition.key}.png`;
+        await settings.set(definition.key, changed, 'owner-settings-test');
+        expect({ key: definition.key, value: await settings.text(definition.key) })
+          .toEqual({ key: definition.key, value: changed });
+        await settings.set(definition.key, String(definition.fallback), 'owner-settings-test');
+        continue;
+      }
+      const changed = Number(definition.fallback) + 1;
       await settings.set(definition.key, String(changed), 'owner-settings-test');
       expect({ key: definition.key, value: await settings.value(definition.key) })
         .toEqual({ key: definition.key, value: changed });

@@ -253,6 +253,34 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   <div className="mt-2.5 text-[11px] text-white/45">
                     Оформляется в магазине при получении заказа.
                   </div>
+                  {/* QR загружает владелец в ERP. Показываем только провайдеров,
+                      которые тянут эту цену и у которых код действительно есть:
+                      прислать покупателя с кодом, по которому откажут, хуже,
+                      чем не показать ничего. */}
+                  {product.installmentProviders && product.installmentProviders.length > 0 && (
+                    <div className="mt-3 border-t border-white/10 pt-3">
+                      <div className="text-[12px] font-semibold text-white">Где оформить</div>
+                      <div className="mt-2 flex flex-wrap gap-3">
+                        {product.installmentProviders.map((provider) => (
+                          <figure key={provider.id} className="w-[92px] text-center">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={provider.qrUrl}
+                              alt={`QR для оформления рассрочки ${provider.label}`}
+                              width={92}
+                              height={92}
+                              loading="lazy"
+                              className="h-[92px] w-[92px] rounded-[10px] bg-white object-contain p-1.5"
+                            />
+                            <figcaption className="mt-1 text-[11px] text-white/55">{provider.label}</figcaption>
+                          </figure>
+                        ))}
+                      </div>
+                      <div className="mt-2 text-[11px] text-white/45">
+                        Отсканируйте код нужного банка — заявку оформит продавец.
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               {typeof product.bonusPoints === "number" && product.bonusPoints > 0 && (

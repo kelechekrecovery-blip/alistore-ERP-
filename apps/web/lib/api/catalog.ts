@@ -8,6 +8,12 @@ export interface InstallmentOffer {
   totalSom: number;
 }
 
+export interface InstallmentProvider {
+  id: string;
+  label: string;
+  qrUrl: string;
+}
+
 export interface InstallmentStep {
   months: number;
   /** Наименьший платёж на этой ступени. */
@@ -45,6 +51,11 @@ export interface CatalogProduct {
   installment?: InstallmentOffer | null;
   /** Ступени срока — вилка для карточки товара, одна строка на срок. */
   installmentSteps?: InstallmentStep[];
+  /**
+   * Где оформить рассрочку: провайдер и QR, загруженный владельцем в ERP.
+   * Поля нет, пока ни один QR не загружен — блок тогда не показывается.
+   */
+  installmentProviders?: InstallmentProvider[];
   /**
    * Сколько бонусов начислит покупка. Считает сервер той же функцией, что и
    * реальное начисление в заказе, — обещание витрины обязано совпасть с тем,
