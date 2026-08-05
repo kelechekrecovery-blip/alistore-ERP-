@@ -21,5 +21,4 @@ The preflight exits non-zero and must remain blocking until owners configure and
 
 ## CI state
 
-Latest public CD runs for the current release line are failing during deployment because Render deploy hooks are not configured. Migration rehearsal remains separate from the deploy gate; do not claim App Store/production release completion until hooks and provider credentials are configured.
-
+Latest public CD runs for the current release line are failing during deployment because Render deploy hooks are not configured. The latest CI run also stopped in the supply-release-gate pre-step before API/build/E2E execution, while the infrastructure job failed during runner setup; this is not evidence of a green release. Migration rehearsal remains separate from the deploy gate; do not claim App Store/production release completion until the CI pre-step is green, hooks/provider credentials are configured, and the full release gates complete.
