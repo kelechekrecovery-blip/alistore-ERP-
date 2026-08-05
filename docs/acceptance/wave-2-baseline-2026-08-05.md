@@ -17,6 +17,8 @@ test/order-state-machine.spec.ts
 
 Result: **9 suites / 51 tests passed**.
 
+Extended fulfillment/valuation gate: **8 suites / 49 tests passed**, covering quantity inventory, valuation reconciliation/roll-forward, orders and store-point fulfillment, guest order access, and refund aggregation/provider-stale recovery.
+
 The provider contract confirms that `PAYMENT_PROVIDER=none` exposes cash-on-delivery while online payment fails closed with `online_payments_unavailable`; unknown providers are rejected.
 
 The first attempt was blocked by a transient PostgreSQL advisory lock (`P1002`) from another local worker. After the worker exited, the same command completed successfully; no application assertion failed.
