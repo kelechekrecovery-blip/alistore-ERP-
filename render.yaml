@@ -285,6 +285,19 @@ envVarGroups:
       # дежурного, этим проверяется подпись initData.
       - key: TELEGRAM_BOT_TOKEN
         sync: false
+      # Separate production bots: public Support and internal Ops/CEO.
+      - key: TELEGRAM_SUPPORT_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_SUPPORT_WEBHOOK_SECRET
+        sync: false
+      - key: TELEGRAM_SUPPORT_WEBHOOK_URL
+        sync: false
+      - key: TELEGRAM_OPS_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_OPS_WEBHOOK_SECRET
+        sync: false
+      - key: TELEGRAM_OPS_WEBHOOK_URL
+        sync: false
       # Имя бота для Login Widget в обычном браузере (атрибут
       # data-telegram-login). Без него вход через Telegram остаётся доступен
       # только внутри Mini App, где initData подписывает сам Telegram.

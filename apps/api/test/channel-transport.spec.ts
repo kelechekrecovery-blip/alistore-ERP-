@@ -129,6 +129,25 @@ describe('Channel notification transports', () => {
     ).rejects.toThrow(/Telegram sendMessage failed: 429/);
   });
 
+  it('routes agent replies to the bot profile carried by the outbox payload', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({ ok: true, text: async () => '' });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const transport = new TelegramBotTransport(config({
+      TELEGRAM_API_URL: 'https://telegram.test',
+      TELEGRAM_BOT_TOKEN: 'legacy-secret',
+      TELEGRAM_SUPPORT_BOT_TOKEN: 'support-secret',
+      TELEGRAM_OPS_BOT_TOKEN: 'ops-secret',
+    }));
+
+    await transport.deliver({ channel: 'telegram', recipient: '1', template: 'telegram_agent_reply', payload: { message: 'support', botId: 'support' } });
+    await transport.deliver({ channel: 'telegram', recipient: '2', template: 'telegram_agent_reply', payload: { message: 'ops', botId: 'ops' } });
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      'https://telegram.test/botsupport-secret/sendMessage',
+      'https://telegram.test/botops-secret/sendMessage',
+    ]);
+  });
+
   it('throws WhatsApp provider failures so the outbox retries', async () => {
     global.fetch = jest
       .fn()

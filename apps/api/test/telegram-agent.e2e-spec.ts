@@ -145,6 +145,12 @@ describe('Telegram AI Agent (integration)', () => {
     expect(enqueued).not.toHaveBeenCalled();
   });
 
+  it('fails closed when a split bot profile has not been configured', async () => {
+    await expect(agent.handleWebhookProfile('support', webhookSecret, update(900, '7001001', '/start')))
+      .rejects.toThrow('telegram_support_bot_not_configured');
+    expect(await prisma.telegramAgentMessage.count()).toBe(0);
+  });
+
   it('fails closed when an enabled agent has a weak webhook secret', () => {
     const weak = new TelegramAgentService(
       prisma,
@@ -199,7 +205,7 @@ describe('Telegram AI Agent (integration)', () => {
       update(2, '9001001', pairing.command),
     );
     const identity = await prisma.telegramAgentIdentity.findUniqueOrThrow({
-      where: { telegramUserId: '9001001' },
+      where: { botId_telegramUserId: { botId: 'legacy', telegramUserId: '9001001' } },
     });
     expect(identity).toMatchObject({ kind: 'staff', staffId: ownerId, active: true });
     expect(await prisma.telegramAgentPairing.findFirstOrThrow({
@@ -210,7 +216,7 @@ describe('Telegram AI Agent (integration)', () => {
     })).toBe(1);
     expect(replyText(enqueued.mock.calls[0][0])).not.toMatch(/password|otp|парол/i);
     expect((await prisma.telegramAgentMessage.findUniqueOrThrow({
-      where: { externalKey: 'telegram:update:2' },
+      where: { botId_externalKey: { botId: 'legacy', externalKey: 'telegram:update:2' } },
     })).text).toBe('/link [REDACTED]');
   });
 
@@ -218,7 +224,7 @@ describe('Telegram AI Agent (integration)', () => {
     await agent.handleWebhook(webhookSecret, update(3, '9001001', '/help'));
     await agent.handleWebhook(webhookSecret, update(3, '9001001', '/help'));
     expect(await prisma.telegramAgentMessage.count({
-      where: { externalKey: 'telegram:update:3' },
+      where: { botId: 'legacy', externalKey: 'telegram:update:3' },
     })).toBe(1);
     expect(enqueued).toHaveBeenCalledTimes(1);
   });
@@ -264,7 +270,7 @@ describe('Telegram AI Agent (integration)', () => {
 
   it('exposes only fixed read tools and enforces per-message tool budget and replay protection', async () => {
     const identity = await prisma.telegramAgentIdentity.findUniqueOrThrow({
-      where: { telegramUserId: '9001001' },
+      where: { botId_telegramUserId: { botId: 'legacy', telegramUserId: '9001001' } },
     });
     const tools = (agent as unknown as {
       staffReadTools(
@@ -324,7 +330,7 @@ describe('Telegram AI Agent (integration)', () => {
     await expect(killed.handleWebhook(webhookSecret, update(32, '9001001', '/help')))
       .rejects.toThrow('Telegram AI Agent выключен');
     expect(await prisma.telegramAgentMessage.count({
-      where: { externalKey: 'telegram:update:32' },
+      where: { botId: 'legacy', externalKey: 'telegram:update:32' },
     })).toBe(0);
   });
 
@@ -337,7 +343,7 @@ describe('Telegram AI Agent (integration)', () => {
       priority: 'normal',
     }, customerId, `telegram-agent-concurrent-approval:${run}`);
     const identity = await prisma.telegramAgentIdentity.findUniqueOrThrow({
-      where: { telegramUserId: '9001001' },
+      where: { botId_telegramUserId: { botId: 'legacy', telegramUserId: '9001001' } },
     });
     await Promise.all([
       agent.handleWebhook(webhookSecret, update(45, '9001001', `/assign ${ticket.id}`)),
@@ -465,7 +471,7 @@ describe('Telegram AI Agent (integration)', () => {
       where: { evidence: { path: ['payload', 'ticketId'], equals: ticket.id } },
     })).toBe(0);
     expect(await prisma.telegramAgentMessage.findUniqueOrThrow({
-      where: { externalKey: 'telegram:update:53' },
+      where: { botId_externalKey: { botId: 'legacy', externalKey: 'telegram:update:53' } },
     })).toMatchObject({ status: 'answered', intent: 'request_rejected' });
   });
 
@@ -481,7 +487,7 @@ describe('Telegram AI Agent (integration)', () => {
     await agent.handleWebhook(webhookSecret, update(33, '9001001', `/resolve ${ticket.id}`));
     const parked = await prisma.approval.findFirstOrThrow({
       where: { idempotencyKey: { startsWith: `telegram-agent:${(await prisma.telegramAgentIdentity.findUniqueOrThrow({
-        where: { telegramUserId: '9001001' },
+        where: { botId_telegramUserId: { botId: 'legacy', telegramUserId: '9001001' } },
       })).id}:resolve:${ticket.id}:` } },
     });
     expect(parked).toMatchObject({
@@ -521,7 +527,7 @@ describe('Telegram AI Agent (integration)', () => {
 
   it('executes inverse requester/approver approvals without an A/B staff-lock deadlock', async () => {
     await prisma.telegramAgentIdentity.upsert({
-      where: { staffId: approverId },
+      where: { botId_staffId: { botId: 'legacy', staffId: approverId } },
       create: {
         telegramUserId: '9001002',
         chatId: '9001002',
@@ -594,7 +600,7 @@ describe('Telegram AI Agent (integration)', () => {
       priority: 'normal',
     }, customerId, `telegram-agent-expired-ticket:${run}`);
     const identity = await prisma.telegramAgentIdentity.findUniqueOrThrow({
-      where: { telegramUserId: '9001001' },
+      where: { botId_telegramUserId: { botId: 'legacy', telegramUserId: '9001001' } },
     });
     await agent.handleWebhook(webhookSecret, update(39, '9001001', `/resolve ${ticket.id}`));
     const approval = await prisma.approval.findFirstOrThrow({
@@ -642,7 +648,7 @@ describe('Telegram AI Agent (integration)', () => {
       priority: 'normal',
     }, customerId, `telegram-agent-stale-ticket:${run}`);
     const identity = await prisma.telegramAgentIdentity.findUniqueOrThrow({
-      where: { telegramUserId: '9001001' },
+      where: { botId_telegramUserId: { botId: 'legacy', telegramUserId: '9001001' } },
     });
     await agent.handleWebhook(webhookSecret, update(41, '9001001', `/assign ${ticket.id}`));
     const approval = await prisma.approval.findFirstOrThrow({
@@ -732,14 +738,14 @@ describe('Telegram AI Agent (integration)', () => {
     await prisma.staffUser.update({ where: { id: ownerId }, data: { role: 'seller' } });
     await agent.handleWebhook(webhookSecret, update(36, '9001001', '/help'));
     expect(await prisma.telegramAgentMessage.findUniqueOrThrow({
-      where: { externalKey: 'telegram:update:36' },
+      where: { botId_externalKey: { botId: 'legacy', externalKey: 'telegram:update:36' } },
     })).toMatchObject({ intent: 'access_revoked', responseText: null });
     expect(enqueued).not.toHaveBeenCalled();
 
     await prisma.staffUser.update({ where: { id: ownerId }, data: { role: 'owner', active: false } });
     await agent.handleWebhook(webhookSecret, update(37, '9001001', '/help'));
     expect(await prisma.telegramAgentMessage.findUniqueOrThrow({
-      where: { externalKey: 'telegram:update:37' },
+      where: { botId_externalKey: { botId: 'legacy', externalKey: 'telegram:update:37' } },
     })).toMatchObject({ intent: 'access_revoked', responseText: null });
     expect(enqueued).not.toHaveBeenCalled();
     await prisma.staffUser.update({ where: { id: ownerId }, data: { active: true } });
@@ -752,11 +758,11 @@ describe('Telegram AI Agent (integration)', () => {
       where: { staffId: ownerId, usedAt: null },
     })).toBe(0);
     expect(await prisma.telegramAgentIdentity.findUniqueOrThrow({
-      where: { staffId: ownerId },
+      where: { botId_staffId: { botId: 'legacy', staffId: ownerId } },
     })).toMatchObject({ active: false });
     await agent.handleWebhook(webhookSecret, update(5, '9001001', pairing.command));
     expect(await prisma.telegramAgentIdentity.findUniqueOrThrow({
-      where: { staffId: ownerId },
+      where: { botId_staffId: { botId: 'legacy', staffId: ownerId } },
     })).toMatchObject({ active: false });
   });
 
@@ -766,7 +772,7 @@ describe('Telegram AI Agent (integration)', () => {
       update(4, '7001001', 'Где мой заказ?'),
     );
     expect(await prisma.telegramAgentIdentity.findUnique({
-      where: { telegramUserId: '7001001' },
+      where: { botId_telegramUserId: { botId: 'legacy', telegramUserId: '7001001' } },
     })).toMatchObject({ kind: 'customer', customerId });
     const tickets = await prisma.supportTicket.findMany({
       where: { customerId, channel: 'telegram', subject: 'Где мой заказ?' },
@@ -781,12 +787,12 @@ describe('Telegram AI Agent (integration)', () => {
     await expect(agent.handleWebhook(webhookSecret, update(6, '7001001', 'Нужен оператор')))
       .rejects.toThrow('outbox unavailable');
     expect(await prisma.telegramAgentMessage.findUniqueOrThrow({
-      where: { externalKey: 'telegram:update:6' },
+      where: { botId_externalKey: { botId: 'legacy', externalKey: 'telegram:update:6' } },
     })).toMatchObject({ status: 'failed' });
 
     await agent.handleWebhook(webhookSecret, update(6, '7001001', 'Нужен оператор'));
     expect(await prisma.telegramAgentMessage.findUniqueOrThrow({
-      where: { externalKey: 'telegram:update:6' },
+      where: { botId_externalKey: { botId: 'legacy', externalKey: 'telegram:update:6' } },
     })).toMatchObject({ status: 'answered', attempts: 2 });
     expect(await prisma.supportTicket.count({
       where: { customerId, subject: 'Нужен оператор' },
@@ -800,7 +806,7 @@ describe('Telegram AI Agent (integration)', () => {
       update(7, '7001001', `Случайно отправил ${fakeToken}`),
     );
     const message = await prisma.telegramAgentMessage.findUniqueOrThrow({
-      where: { externalKey: 'telegram:update:7' },
+      where: { botId_externalKey: { botId: 'legacy', externalKey: 'telegram:update:7' } },
     });
     expect(message.text).not.toContain(fakeToken);
     expect(message.text).toContain('[BOT_TOKEN_REDACTED]');
@@ -856,7 +862,7 @@ describe('Telegram AI Agent (integration)', () => {
 
   it('delivers one Telegram reply only once across concurrent relay workers', async () => {
     const identity = await prisma.telegramAgentIdentity.upsert({
-      where: { customerId },
+      where: { botId_customerId: { botId: 'legacy', customerId } },
       create: {
         telegramUserId: '7001001',
         chatId: '7001001',

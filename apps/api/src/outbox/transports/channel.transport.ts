@@ -34,7 +34,7 @@ export class ChannelNotificationTransport implements NotificationTransport {
     if (hasConfig(config, 'NOVU_API_KEY')) {
       this.novu = new NovuHttpTransport(config);
     }
-    if (hasConfig(config, 'TELEGRAM_BOT_TOKEN')) {
+    if (hasConfig(config, 'TELEGRAM_BOT_TOKEN') || hasConfig(config, 'TELEGRAM_SUPPORT_BOT_TOKEN') || hasConfig(config, 'TELEGRAM_OPS_BOT_TOKEN')) {
       this.telegram = new TelegramBotTransport(config);
     }
     if (

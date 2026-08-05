@@ -178,9 +178,12 @@ export class OutboxService {
       payload: Prisma.JsonValue;
     },
   ): Promise<'sent' | 'cancelled' | 'skipped'> {
+    const botId = typeof message.payload === 'object' && message.payload !== null && !Array.isArray(message.payload)
+      ? String((message.payload as Record<string, unknown>).botId ?? 'legacy')
+      : 'legacy';
     return this.prisma.$transaction(async (tx) => {
       const initial = await tx.telegramAgentIdentity.findFirst({
-        where: { chatId: message.recipient },
+        where: { chatId: message.recipient, botId },
         select: { id: true, staffId: true, customerId: true },
       });
       if (initial?.staffId) {
@@ -215,7 +218,9 @@ export class OutboxService {
           ? identity.staff?.active && ['admin', 'owner'].includes(identity.staff.role)
           : identity.customer && !identity.customer.phone.startsWith('deleted:')),
       );
-      if (!active) {
+      const allowUnlinked = !initial && typeof message.payload === 'object' && message.payload !== null && !Array.isArray(message.payload)
+        && (message.payload as Record<string, unknown>).allowUnlinked === true;
+      if (!active && !allowUnlinked) {
         await tx.outboxMessage.updateMany({
           where: { id: message.id, status: 'pending' },
           data: {

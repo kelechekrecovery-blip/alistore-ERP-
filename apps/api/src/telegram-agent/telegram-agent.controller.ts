@@ -39,6 +39,16 @@ export class TelegramAgentController {
     return this.agent.createPairing(user.customerId, dto.totpToken);
   }
 
+  @Post('pairing-code/ops')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a one-time Ops/CEO Telegram pairing code' })
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('telegram_agent', 'link')
+  createOpsPairing(@CurrentUser() user: AuthPrincipal, @Body() dto: TelegramAgentStepUpDto) {
+    if (user.typ !== 'staff') throw new ForbiddenException('Требуется staff JWT');
+    return this.agent.createPairing(user.customerId, dto.totpToken, 'ops');
+  }
+
   @Delete('link')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Disable the current staff Telegram link' })
@@ -47,6 +57,16 @@ export class TelegramAgentController {
   disconnect(@CurrentUser() user: AuthPrincipal, @Body() dto: TelegramAgentStepUpDto) {
     if (user.typ !== 'staff') throw new ForbiddenException('Требуется staff JWT');
     return this.agent.disconnect(user.customerId, dto.totpToken);
+  }
+
+  @Delete('link/ops')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Disable the current staff Ops Telegram link' })
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('telegram_agent', 'link')
+  disconnectOps(@CurrentUser() user: AuthPrincipal, @Body() dto: TelegramAgentStepUpDto) {
+    if (user.typ !== 'staff') throw new ForbiddenException('Требуется staff JWT');
+    return this.agent.disconnect(user.customerId, dto.totpToken, 'ops');
   }
 
   @Post('webhook')
@@ -58,5 +78,19 @@ export class TelegramAgentController {
     @Body() update: unknown,
   ) {
     return this.agent.handleWebhook(secret, update);
+  }
+
+  @Post('webhook/support')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 600, ttl: 60_000 } })
+  supportWebhook(@Headers('x-telegram-bot-api-secret-token') secret: string | undefined, @Body() update: unknown) {
+    return this.agent.handleWebhookProfile('support', secret, update);
+  }
+
+  @Post('webhook/ops')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 600, ttl: 60_000 } })
+  opsWebhook(@Headers('x-telegram-bot-api-secret-token') secret: string | undefined, @Body() update: unknown) {
+    return this.agent.handleWebhookProfile('ops', secret, update);
   }
 }

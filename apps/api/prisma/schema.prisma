@@ -3434,12 +3434,13 @@ model SupportTicket {
 // customer or to one active staff account; the database CHECK enforces XOR.
 model TelegramAgentIdentity {
   id             String                 @id @default(cuid())
-  telegramUserId String                 @unique
+  botId          String                 @default("legacy")
+  telegramUserId String
   chatId         String
   kind           String // customer | staff
-  customerId     String?                @unique
+  customerId     String?
   customer       Customer?              @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  staffId        String?                @unique
+  staffId        String?
   staff          StaffUser?             @relation(fields: [staffId], references: [id], onDelete: Cascade)
   displayName    String?
   active         Boolean                @default(true)
@@ -3451,11 +3452,15 @@ model TelegramAgentIdentity {
   @@index([customerId, active])
   @@index([staffId, active])
   @@index([chatId, active])
+  @@unique([botId, telegramUserId])
+  @@unique([botId, customerId])
+  @@unique([botId, staffId])
 }
 
 // One-time staff pairing secret. Only its SHA-256 hash is persisted.
 model TelegramAgentPairing {
   id        String    @id @default(cuid())
+  botId     String    @default("legacy")
   codeHash  String    @unique
   staffId   String
   staff     StaffUser @relation(fields: [staffId], references: [id], onDelete: Cascade)
@@ -3471,7 +3476,8 @@ model TelegramAgentPairing {
 // and tool payloads are never stored here.
 model TelegramAgentMessage {
   id             String                 @id @default(cuid())
-  externalKey    String                 @unique
+  botId          String                 @default("legacy")
+  externalKey    String
   identityId     String?
   identity       TelegramAgentIdentity? @relation(fields: [identityId], references: [id], onDelete: SetNull)
   telegramUserId String
@@ -3490,6 +3496,7 @@ model TelegramAgentMessage {
   @@index([telegramUserId, createdAt])
   @@index([status, createdAt])
   @@index([expiresAt])
+  @@unique([botId, externalKey])
 }
 
 // Business buyer profile is customer-owned but intentionally stores customerId

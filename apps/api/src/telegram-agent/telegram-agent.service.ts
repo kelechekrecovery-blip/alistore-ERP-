@@ -44,6 +44,7 @@ const MAX_TOOL_CALLS_PER_MESSAGE = 4;
 const WRITE_APPROVAL_TTL_MS = 5 * 60_000;
 const TELEGRAM_WRITE_APPROVAL_ACTION = 'pii';
 const STAFF_ROLES = new Set(['admin', 'owner']);
+export type TelegramBotProfile = 'legacy' | 'support' | 'ops';
 const INJECTION_PATTERN =
   /\b(?:ignore|disregard|override)\b.{0,80}\b(?:instructions?|system|policy)\b|(?:вызови|запусти|используй|call|execute)\s+(?:tool|инструмент|sql|https?:\/\/)|<\s*\/?\s*(?:system|tool|assistant)\b|(?:system|developer)\s*prompt/isu;
 const READ_ONLY_TOOL_SCHEMA = {
@@ -94,6 +95,7 @@ export class TelegramAgentService implements OnModuleInit {
   private readonly customerAiEnabled: boolean;
   private readonly customerAiDataCertified: boolean;
   private readonly ownerKillSwitch: boolean;
+  private readonly botProfiles: Record<TelegramBotProfile, { token: string; secret: string; url: string }>;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -117,15 +119,25 @@ export class TelegramAgentService implements OnModuleInit {
     this.customerAiEnabled = envFlag(config.get<string>('TELEGRAM_AGENT_CUSTOMER_AI_ENABLED'));
     this.customerAiDataCertified = envFlag(config.get<string>('CUSTOMER_AI_DATA_CERTIFIED'));
     this.ownerKillSwitch = envFlag(config.get<string>('TELEGRAM_AGENT_KILL_SWITCH'));
+    this.botProfiles = {
+      legacy: { token: this.botToken, secret: this.webhookSecret, url: this.webhookUrl },
+      support: { token: config.get<string>('TELEGRAM_SUPPORT_BOT_TOKEN')?.trim() ?? '', secret: config.get<string>('TELEGRAM_SUPPORT_WEBHOOK_SECRET')?.trim() ?? '', url: config.get<string>('TELEGRAM_SUPPORT_WEBHOOK_URL')?.trim() ?? '' },
+      ops: { token: config.get<string>('TELEGRAM_OPS_BOT_TOKEN')?.trim() ?? '', secret: config.get<string>('TELEGRAM_OPS_WEBHOOK_SECRET')?.trim() ?? '', url: config.get<string>('TELEGRAM_OPS_WEBHOOK_URL')?.trim() ?? '' },
+    };
     this.client = resolveLlmClient();
   }
 
   onModuleInit(): void {
-    if (this.enabled) this.assertRuntimeConfiguration();
+    if (!this.enabled) return;
+    if (this.botToken) this.assertRuntimeConfiguration();
+    else if (!this.botProfiles.support.token && !this.botProfiles.ops.token) {
+      throw new Error('At least one Telegram bot profile must be configured');
+    }
   }
 
-  async createPairing(staffId: string, totpToken?: string) {
-    this.assertEnabled();
+  async createPairing(staffId: string, totpToken?: string, botId: TelegramBotProfile = 'legacy') {
+    if (!this.enabled || this.ownerKillSwitch) throw new ForbiddenException('Telegram AI Agent выключен');
+    this.assertProfileRuntimeConfiguration(botId);
     const code = randomBytes(18).toString('base64url');
     const expiresAt = new Date(Date.now() + PAIRING_TTL_MS);
     await this.prisma.$transaction(async (tx) => {
@@ -137,10 +149,10 @@ export class TelegramAgentService implements OnModuleInit {
         throw new ForbiddenException('Telegram AI Agent доступен только admin/owner');
       }
       await tx.telegramAgentPairing.deleteMany({
-        where: { staffId, usedAt: null },
+        where: { staffId, botId, usedAt: null },
       });
       await tx.telegramAgentPairing.create({
-        data: { staffId, codeHash: hashPairingCode(code), expiresAt },
+        data: { staffId, botId, codeHash: hashPairingCode(code), expiresAt },
       });
     });
     return {
@@ -151,13 +163,13 @@ export class TelegramAgentService implements OnModuleInit {
     };
   }
 
-  async disconnect(staffId: string, totpToken?: string) {
+  async disconnect(staffId: string, totpToken?: string, botId: TelegramBotProfile = 'legacy') {
     this.assertEnabled();
     return this.audit.transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "StaffUser" WHERE id = ${staffId} FOR UPDATE`;
       await this.staffAuth.verifyStepUpOnTx(tx, staffId, totpToken);
-      const identity = await tx.telegramAgentIdentity.findUnique({ where: { staffId } });
-      await tx.telegramAgentPairing.deleteMany({ where: { staffId, usedAt: null } });
+      const identity = await tx.telegramAgentIdentity.findFirst({ where: { staffId, botId } });
+      await tx.telegramAgentPairing.deleteMany({ where: { staffId, botId, usedAt: null } });
       if (identity) {
         await tx.telegramAgentIdentity.update({
           where: { id: identity.id },
@@ -177,35 +189,42 @@ export class TelegramAgentService implements OnModuleInit {
   }
 
   async handleWebhook(secret: string | undefined, rawUpdate: unknown): Promise<{ ok: true }> {
-    this.assertWebhookSecret(secret);
+    return this.handleWebhookProfile('legacy', secret, rawUpdate);
+  }
+
+  async handleWebhookProfile(profile: TelegramBotProfile, secret: string | undefined, rawUpdate: unknown): Promise<{ ok: true }> {
+    this.assertWebhookSecret(secret, profile);
     const update = parseTelegramUpdate(rawUpdate);
     if (!update) throw new ValidationError('telegram_update_invalid', 'Некорректный Telegram update');
     if (!update.message?.from || typeof update.message.text !== 'string') return { ok: true };
     if (update.message.chat.type !== 'private') {
       await this.outbox.enqueue({
-        dedupKey: `telegram-agent:group:${update.update_id}`,
+        dedupKey: `telegram-agent:group:${profile}:${update.update_id}`,
         channel: 'telegram',
         recipient: String(update.message.chat.id),
         template: 'telegram_agent_public_safety_reply',
-        payload: { message: 'Для безопасности используйте личный чат с ботом.' },
+        payload: { message: 'Для безопасности используйте личный чат с ботом.', botId: profile },
       });
       return { ok: true };
     }
-    await this.processMessage(update, update.message);
+    await this.processMessage(update, update.message, profile);
     return { ok: true };
   }
 
-  private async processMessage(update: TelegramUpdate, message: TelegramMessage): Promise<void> {
+  private async processMessage(update: TelegramUpdate, message: TelegramMessage, botId: TelegramBotProfile = 'legacy'): Promise<void> {
     const from = message.from!;
     const telegramUserId = String(from.id);
     const chatId = String(message.chat.id);
     const text = message.text!.trim().slice(0, MAX_INBOUND_TEXT);
-    const externalKey = `telegram:update:${update.update_id}`;
+    const externalKey = botId === 'legacy'
+      ? `telegram:update:${update.update_id}`
+      : `telegram:${botId}:update:${update.update_id}`;
     const claim = await this.claimInbound(
       externalKey,
       telegramUserId,
       chatId,
       redactInboundText(text),
+      botId,
     );
     if (claim === 'answered') return;
     if (claim === 'busy') {
@@ -215,6 +234,7 @@ export class TelegramAgentService implements OnModuleInit {
     try {
       const recent = await this.prisma.telegramAgentMessage.count({
         where: {
+          botId,
           telegramUserId,
           direction: 'inbound',
           createdAt: { gte: new Date(Date.now() - 60_000) },
@@ -222,38 +242,42 @@ export class TelegramAgentService implements OnModuleInit {
       });
       if (recent > 20) {
         await this.auditDecision('telegram_agent.deny', telegramUserId, externalKey, 'rate_limit', []);
-        await this.reply(externalKey, chatId, 'Слишком много запросов. Повторите через минуту.', 'rate_limited');
+        await this.reply(botId, externalKey, chatId, 'Слишком много запросов. Повторите через минуту.', 'rate_limited');
         return;
       }
       let identity = await this.prisma.telegramAgentIdentity.findUnique({
-        where: { telegramUserId },
+        where: { botId_telegramUserId: { botId, telegramUserId } },
       });
 
-      if (text.startsWith('/link ')) {
+      if (text.startsWith('/link ') && botId !== 'support') {
         const response = await this.consumePairing(text.slice('/link '.length), {
           telegramUserId,
           chatId,
           displayName: telegramDisplayName(from),
-        });
+        }, botId);
         const linked = await this.prisma.telegramAgentIdentity.findUnique({
-          where: { telegramUserId },
+          where: { botId_telegramUserId: { botId, telegramUserId } },
           select: { id: true },
         });
         if (linked) {
           await this.prisma.telegramAgentMessage.update({
-            where: { externalKey },
+            where: { botId_externalKey: { botId, externalKey } },
             data: { identityId: linked.id },
           });
         }
-        await this.reply(externalKey, chatId, response, 'staff_link');
+        await this.reply(botId, externalKey, chatId, response, 'staff_link');
         return;
       }
 
-      if (!identity) identity = await this.autoLinkCustomer(telegramUserId, chatId, telegramDisplayName(from));
+      if (!identity && botId !== 'ops') identity = await this.autoLinkCustomer(telegramUserId, chatId, telegramDisplayName(from), botId);
+      if (identity && ((botId === 'support' && identity.kind === 'staff') || (botId === 'ops' && identity.kind === 'customer'))) {
+        await this.reply(botId, externalKey, chatId, 'Этот бот предназначен для другого типа аккаунта.', 'profile_denied');
+        return;
+      }
       if (!identity?.active) {
         await this.auditDecision('telegram_agent.deny', telegramUserId, externalKey, 'identity_unlinked', []);
         const response = this.unlinkedMessage();
-        await this.reply(externalKey, chatId, response, 'unlinked');
+        await this.reply(botId, externalKey, chatId, response, 'unlinked');
         return;
       }
 
@@ -262,7 +286,7 @@ export class TelegramAgentService implements OnModuleInit {
         data: { chatId, displayName: telegramDisplayName(from), lastSeenAt: new Date() },
       });
       await this.prisma.telegramAgentMessage.update({
-        where: { externalKey },
+        where: { botId_externalKey: { botId, externalKey } },
         data: { identityId: identity.id },
       });
 
@@ -276,6 +300,7 @@ export class TelegramAgentService implements OnModuleInit {
           [identity.id],
         );
         await this.reply(
+          botId,
           externalKey,
           chatId,
           'Запрос отклонён: инструкции для запуска инструментов, SQL или обхода политики не принимаются.',
@@ -286,13 +311,13 @@ export class TelegramAgentService implements OnModuleInit {
       const response = identity.kind === 'staff'
         ? await this.answerStaff(identity, safeText, externalKey)
         : await this.answerCustomer(identity, safeText, externalKey);
-      await this.reply(externalKey, chatId, response.text, response.intent);
+      await this.reply(botId, externalKey, chatId, response.text, response.intent);
     } catch (error) {
       let failure = error;
       const rejection = userFacingTelegramError(error);
       if (rejection) {
         try {
-          await this.reply(externalKey, chatId, rejection, 'request_rejected');
+          await this.reply(botId, externalKey, chatId, rejection, 'request_rejected');
           return;
         } catch (replyError) {
           failure = replyError;
@@ -300,7 +325,7 @@ export class TelegramAgentService implements OnModuleInit {
       }
       this.logger.error(`Telegram update ${update.update_id} failed: ${String(failure)}`);
       await this.prisma.telegramAgentMessage.update({
-        where: { externalKey },
+        where: { botId_externalKey: { botId, externalKey } },
         data: { status: 'failed', leaseUntil: null },
       }).catch(() => undefined);
       throw failure;
@@ -312,11 +337,13 @@ export class TelegramAgentService implements OnModuleInit {
     telegramUserId: string,
     chatId: string,
     storedText: string,
+    botId: TelegramBotProfile = 'legacy',
   ): Promise<'claimed' | 'answered' | 'busy'> {
     const now = new Date();
     try {
       await this.prisma.telegramAgentMessage.create({
         data: {
+          botId,
           externalKey,
           telegramUserId,
           chatId,
@@ -349,7 +376,7 @@ export class TelegramAgentService implements OnModuleInit {
     });
     if (claimed.count === 1) return 'claimed';
     const existing = await this.prisma.telegramAgentMessage.findUnique({
-      where: { externalKey },
+      where: { botId_externalKey: { botId, externalKey } },
       select: { status: true },
     });
     return existing?.status === 'answered' ? 'answered' : 'busy';
@@ -358,6 +385,7 @@ export class TelegramAgentService implements OnModuleInit {
   private async consumePairing(
     code: string,
     telegram: { telegramUserId: string; chatId: string; displayName: string },
+    botId: TelegramBotProfile = 'legacy',
   ): Promise<string> {
     const normalized = code.trim();
     if (!normalized) throw new ValidationError('telegram_pairing_invalid', 'Код привязки пуст');
@@ -377,13 +405,13 @@ export class TelegramAgentService implements OnModuleInit {
         throw new ForbiddenException('Привязка сотрудника запрещена');
       }
       const existing = await tx.telegramAgentIdentity.findUnique({
-        where: { telegramUserId: telegram.telegramUserId },
+        where: { botId_telegramUserId: { botId, telegramUserId: telegram.telegramUserId } },
       });
       if (existing && (existing.kind !== 'staff' || existing.staffId !== pairing.staffId)) {
         throw new ConflictError('telegram_identity_already_linked', 'Telegram уже связан с другим аккаунтом');
       }
-      const staffIdentity = await tx.telegramAgentIdentity.findUnique({
-        where: { staffId: pairing.staffId },
+      const staffIdentity = await tx.telegramAgentIdentity.findFirst({
+        where: { staffId: pairing.staffId, botId },
       });
       if (staffIdentity && staffIdentity.telegramUserId !== telegram.telegramUserId) {
         throw new ConflictError('staff_telegram_already_linked', 'Сотрудник уже связан с другим Telegram');
@@ -395,6 +423,7 @@ export class TelegramAgentService implements OnModuleInit {
           })
         : await tx.telegramAgentIdentity.create({
             data: {
+              botId,
               telegramUserId: telegram.telegramUserId,
               chatId: telegram.chatId,
               displayName: telegram.displayName,
@@ -419,6 +448,7 @@ export class TelegramAgentService implements OnModuleInit {
     telegramUserId: string,
     chatId: string,
     displayName: string,
+    botId: TelegramBotProfile = 'legacy',
   ) {
     return this.prisma.$transaction(async (tx) => {
       const social = await tx.customerIdentity.findUnique({
@@ -436,16 +466,17 @@ export class TelegramAgentService implements OnModuleInit {
         }),
       ]);
       if (!customer || customer.phone.startsWith('deleted:') || !stillLinked) return null;
-      return tx.telegramAgentIdentity.upsert({
-        where: { customerId: social.customerId },
-        create: {
-          telegramUserId,
-          chatId,
-          displayName,
-          kind: 'customer',
-          customerId: social.customerId,
-        },
-        update: { telegramUserId, chatId, displayName, active: true, lastSeenAt: new Date() },
+      const existing = await tx.telegramAgentIdentity.findUnique({
+        where: { botId_customerId: { botId, customerId: social.customerId } },
+      });
+      if (existing) {
+        return tx.telegramAgentIdentity.update({
+          where: { id: existing.id },
+          data: { telegramUserId, chatId, displayName, active: true, lastSeenAt: new Date() },
+        });
+      }
+      return tx.telegramAgentIdentity.create({
+        data: { botId, telegramUserId, chatId, displayName, kind: 'customer', customerId: social.customerId },
       });
     });
   }
@@ -1119,12 +1150,12 @@ export class TelegramAgentService implements OnModuleInit {
     }));
   }
 
-  private async reply(externalKey: string, chatId: string, responseText: string, intent: string): Promise<void> {
+  private async reply(botId: TelegramBotProfile, externalKey: string, chatId: string, responseText: string, intent: string): Promise<void> {
     const safeResponse = redactInboundText(responseText).slice(0, 4096);
     await this.prisma.$transaction(async (tx) => {
-      if (!await this.replyIdentityIsActive(tx, externalKey)) {
+      if (!await this.replyIdentityIsActive(tx, botId, externalKey)) {
         await tx.telegramAgentMessage.updateMany({
-          where: { externalKey },
+          where: { botId, externalKey },
           data: {
             status: 'answered',
             leaseUntil: null,
@@ -1139,10 +1170,10 @@ export class TelegramAgentService implements OnModuleInit {
         channel: 'telegram',
         recipient: chatId,
         template: 'telegram_agent_reply',
-        payload: { message: safeResponse },
+        payload: { message: safeResponse, botId, ...(intent === 'unlinked' ? { allowUnlinked: true } : {}) },
       });
       await tx.telegramAgentMessage.update({
-        where: { externalKey },
+        where: { botId_externalKey: { botId, externalKey } },
         data: {
           status: 'answered',
           leaseUntil: null,
@@ -1155,10 +1186,11 @@ export class TelegramAgentService implements OnModuleInit {
 
   private async replyIdentityIsActive(
     tx: Prisma.TransactionClient,
+    botId: TelegramBotProfile,
     externalKey: string,
   ): Promise<boolean> {
     const inbox = await tx.telegramAgentMessage.findUnique({
-      where: { externalKey },
+      where: { botId_externalKey: { botId, externalKey } },
       select: {
         identity: {
           select: { id: true, staffId: true, customerId: true },
@@ -1196,10 +1228,32 @@ export class TelegramAgentService implements OnModuleInit {
     this.assertRuntimeConfiguration();
   }
 
-  private assertWebhookSecret(received: string | undefined): void {
-    this.assertEnabled();
-    if (!this.webhookSecret || !received || !safeEqual(received, this.webhookSecret)) {
+  private assertWebhookSecret(received: string | undefined, profile: TelegramBotProfile = 'legacy'): void {
+    if (!this.enabled || this.ownerKillSwitch) throw new ForbiddenException('Telegram AI Agent выключен');
+    const expected = this.botProfiles[profile]?.secret || this.webhookSecret;
+    this.assertProfileRuntimeConfiguration(profile);
+    if (!expected || !received || !safeEqual(received, expected)) {
       throw new UnauthorizedException('telegram_webhook_secret_invalid');
+    }
+  }
+
+  private assertProfileRuntimeConfiguration(profile: TelegramBotProfile): void {
+    if (profile === 'legacy') {
+      this.assertRuntimeConfiguration();
+      return;
+    }
+    const cfg = this.botProfiles[profile];
+    if (!/^\d{6,12}:[A-Za-z0-9_-]{30,}$/.test(cfg.token) || !/^[A-Za-z0-9_-]{32,256}$/.test(cfg.secret) || !isHttpsUrl(cfg.url)) {
+      throw new ServiceUnavailableException(`telegram_${profile}_bot_not_configured`);
+    }
+    if (this.nodeEnv === 'production') {
+      if (!this.certified) throw new Error('TELEGRAM_AGENT_CERTIFIED=true обязателен в production');
+      if (!envFlag(this.config.get<string>('OUTBOX_RELAY_ENABLED'))) {
+        throw new Error('OUTBOX_RELAY_ENABLED=true обязателен для Telegram AI Agent');
+      }
+      if (this.config.get<string>('NOTIFICATION_TRANSPORT')?.trim().toLowerCase() !== 'channels') {
+        throw new Error('NOTIFICATION_TRANSPORT=channels обязателен для Telegram AI Agent');
+      }
     }
   }
 
