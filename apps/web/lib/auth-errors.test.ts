@@ -16,6 +16,9 @@ describe('describeAuthError', () => {
     expect(describeAuthError(new ApiError(422, 'x', 'otp_locked'), 'резерв')).toBe('Слишком много попыток. Запросите новый код.');
     expect(describeAuthError(new ApiError(422, 'x', 'email_taken'), 'резерв')).toBe('Этот адрес уже привязан к другому аккаунту.');
     expect(describeAuthError(new ApiError(422, 'x', 'customer_not_found'), 'резерв')).toBe('Аккаунт с таким email не найден.');
+    expect(describeAuthError(new ApiError(503, 'x', 'sms_gateway_unreachable'), 'резерв')).toContain('SMS-шлюз недоступен');
+    expect(describeAuthError(new ApiError(503, 'x', 'sms_gateway_rejected'), 'резерв')).toContain('не принял отправку');
+    expect(describeAuthError(new ApiError(503, 'x', 'production_sms_provider_not_activated'), 'резерв')).toContain('SMS-вход временно недоступен');
   });
 
   it('falls back for unknown codes and non-ApiError values', () => {

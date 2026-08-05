@@ -10,8 +10,17 @@
  */
 export function safeLoginNext(path: string | null | undefined, fallback = '/'): string {
   if (typeof path !== 'string' || path.length === 0) return fallback;
-  if (!path.startsWith('/') || path.startsWith('//')) return fallback;
-  return path;
+  if (path.includes('\\')) return fallback;
+  try {
+    // URL parsing applies the same slash/backslash/control-character
+    // normalization as browser navigation. Comparing origins is safer than a
+    // growing deny-list of spellings for protocol-relative URLs.
+    const base = new URL('https://alistore.invalid/');
+    const resolved = new URL(path, base);
+    return resolved.origin === base.origin && path.startsWith('/') ? path : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 /** Готовая href на /login с безопасным next, для ссылки-кнопки «Войти». */

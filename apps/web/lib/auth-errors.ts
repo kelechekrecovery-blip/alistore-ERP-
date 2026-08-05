@@ -14,6 +14,9 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   email_taken: 'Этот адрес уже привязан к другому аккаунту.',
   customer_not_found: 'Аккаунт с таким email не найден.',
   email_transport_unavailable: 'Отправка писем временно недоступна, попробуйте позже.',
+  sms_gateway_unreachable: 'SMS-шлюз недоступен. Проверьте связь и попробуйте ещё раз.',
+  sms_gateway_rejected: 'SMS-шлюз не принял отправку. Попробуйте позже или войдите другим способом.',
+  production_sms_provider_not_activated: 'SMS-вход временно недоступен. Войдите другим способом или оформите заказ как гость.',
 };
 
 /** Human Russian copy for an auth error; `fallback` covers unknown codes and non-API failures. */
