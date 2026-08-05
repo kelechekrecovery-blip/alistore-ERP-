@@ -145,7 +145,6 @@ test('Google provider failure keeps its actionable server error', async ({ page 
   await page.getByRole('button', { name: /Continue with Google/i }).click();
   await expect(page.getByText('Этот способ входа временно недоступен.', { exact: true })).toBeVisible();
 });
-
 test('Google sign-in starts phone confirmation for a new account', async ({ page }) => {
   await page.addInitScript(() => {
     let callback: ((response: { credential: string }) => void) | undefined;

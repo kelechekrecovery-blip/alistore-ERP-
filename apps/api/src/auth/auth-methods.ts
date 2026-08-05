@@ -114,6 +114,19 @@ export function describeAuthMethods(env: AuthMethodsEnvReader): AuthMethodsView 
       : null,
   };
 
+  const googleTokenAudiences = googleAudiences(env);
+  const googleEnabled = googleTokenAudiences.length > 0;
+  const configuredGoogleWebClientId = env('GOOGLE_WEB_CLIENT_ID')?.trim() || null;
+  const google: GoogleMethodState = {
+    enabled: googleEnabled,
+    registers: googleEnabled && phoneEnabled,
+    // Не показываем кнопку, если выпущенный для неё token API заведомо
+    // отклонит по audience. Native client IDs при этом продолжают работать.
+    clientId: configuredGoogleWebClientId && googleTokenAudiences.includes(configuredGoogleWebClientId)
+      ? configuredGoogleWebClientId
+      : null,
+  };
+
   const recoveryConfigured = env('AUTH_RECOVERY_OTP_ENABLED')?.trim();
   const recoveryRolloutAllows = recoveryConfigured === 'true'
     || (!production && recoveryConfigured !== 'false');
