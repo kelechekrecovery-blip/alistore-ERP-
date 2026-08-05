@@ -56,6 +56,8 @@ describe('GET /auth/methods', () => {
       APPLE_CLIENT_ID: 'kg.alistore.web',
       APPLE_WEB_CLIENT_ID: 'kg.alistore.web',
       TELEGRAM_BOT_TOKEN: '123:login',
+      GOOGLE_CLIENT_ID: 'web.apps.googleusercontent.com',
+      GOOGLE_WEB_CLIENT_ID: 'web.apps.googleusercontent.com',
     });
 
     const response = await request(app.getHttpServer()).get('/auth/methods').expect(200);
@@ -63,6 +65,11 @@ describe('GET /auth/methods', () => {
     expect(response.body.phone).toEqual({ enabled: true, registers: true });
     expect(response.body.apple.clientId).toBe('kg.alistore.web');
     expect(response.body.telegram.enabled).toBe(true);
+    expect(response.body.google).toEqual({
+      enabled: true,
+      registers: true,
+      clientId: 'web.apps.googleusercontent.com',
+    });
     expect(response.body.registrationAvailable).toBe(true);
   });
 
@@ -110,10 +117,13 @@ describe('GET /auth/methods', () => {
       JWT_SECRET: 'super-secret-jwt',
       APPLE_CLIENT_ID: 'kg.alistore.web',
       APPLE_WEB_CLIENT_ID: 'kg.alistore.web',
+      GOOGLE_CLIENT_ID: 'google-public-client-id,super-secret-looking-but-public-client-id',
+      GOOGLE_WEB_CLIENT_ID: 'google-public-client-id',
     });
 
     const response = await request(app.getHttpServer()).get('/auth/methods').expect(200);
 
     expect(JSON.stringify(response.body)).not.toMatch(/super-secret/);
+    expect(response.body.google.clientId).toBe('google-public-client-id');
   });
 });

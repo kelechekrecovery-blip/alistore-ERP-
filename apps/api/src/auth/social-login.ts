@@ -6,9 +6,10 @@ import {
   verify as verifyCrypto,
 } from 'node:crypto';
 import type { JsonWebKey } from 'node:crypto';
+import { OAuth2Client } from 'google-auth-library';
 import { ValidationError } from '../common/errors';
 
-export type SocialProvider = 'telegram' | 'apple';
+export type SocialProvider = 'telegram' | 'apple' | 'google';
 export type TelegramAuthSource = 'mini_app' | 'login_widget';
 
 export interface SocialProfile {
@@ -42,6 +43,16 @@ export interface AppleLoginInput {
   name?: string;
   now?: Date;
 }
+
+export interface GoogleLoginInput {
+  identityToken: string;
+  clientId: string;
+  nonce: string;
+}
+
+// OAuth2Client кэширует публичные сертификаты Google по Cache-Control. Один
+// экземпляр на процесс не заставляет каждый вход повторно ходить к Google.
+const googleOAuthClient = new OAuth2Client();
 
 interface TelegramUser {
   id?: number | string;
@@ -179,6 +190,41 @@ export async function verifyAppleIdentityToken(
     email: claims.email,
     displayName: displayName([input.name, claims.email]),
   };
+}
+
+export async function verifyGoogleIdentityToken(
+  input: GoogleLoginInput,
+): Promise<SocialProfile> {
+  const audiences = input.clientId
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (audiences.length === 0) {
+    throw new ValidationError('social_provider_not_configured', 'Google login is not configured');
+  }
+  try {
+    const ticket = await googleOAuthClient.verifyIdToken({
+      idToken: input.identityToken,
+      audience: audiences,
+    });
+    const claims = ticket.getPayload();
+    if (!claims?.sub) {
+      throw new ValidationError('google_token_invalid', 'Google identity token subject is missing');
+    }
+    if (!input.nonce || claims.nonce !== input.nonce) {
+      throw new ValidationError('google_token_invalid', 'Google identity token nonce mismatch');
+    }
+    return {
+      provider: 'google',
+      subject: claims.sub,
+      email: claims.email_verified ? claims.email : undefined,
+      displayName: displayName([claims.name, claims.email_verified ? claims.email : undefined]),
+      avatarUrl: claims.picture,
+    };
+  } catch (error) {
+    if (error instanceof ValidationError) throw error;
+    throw new ValidationError('google_token_invalid', 'Google identity token is invalid');
+  }
 }
 
 function telegramDataCheckString(params: URLSearchParams): string {

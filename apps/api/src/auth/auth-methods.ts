@@ -17,6 +17,11 @@ export interface AppleMethodState extends AuthMethodState {
   clientId: string | null;
 }
 
+export interface GoogleMethodState extends AuthMethodState {
+  /** Public OAuth web client id consumed by Google Identity Services. */
+  clientId: string | null;
+}
+
 export interface TelegramMethodState extends AuthMethodState {
   /**
    * Имя бота для атрибута `data-telegram-login` в Login Widget. Нужно только
@@ -31,6 +36,7 @@ export interface AuthMethodsView {
   email: AuthMethodState;
   telegram: TelegramMethodState;
   apple: AppleMethodState;
+  google: GoogleMethodState;
   recovery: { enabled: boolean };
   anyLoginAvailable: boolean;
   registrationAvailable: boolean;
@@ -89,6 +95,19 @@ export function describeAuthMethods(env: AuthMethodsEnvReader): AuthMethodsView 
     clientId: appleWebClientId(env),
   };
 
+  const googleTokenAudiences = googleAudiences(env);
+  const googleEnabled = googleTokenAudiences.length > 0;
+  const configuredGoogleWebClientId = env('GOOGLE_WEB_CLIENT_ID')?.trim() || null;
+  const google: GoogleMethodState = {
+    enabled: googleEnabled,
+    registers: googleEnabled && phoneEnabled,
+    // Не показываем кнопку, если выпущенный для неё token API заведомо
+    // отклонит по audience. Native client IDs при этом продолжают работать.
+    clientId: configuredGoogleWebClientId && googleTokenAudiences.includes(configuredGoogleWebClientId)
+      ? configuredGoogleWebClientId
+      : null,
+  };
+
   const recoveryConfigured = env('AUTH_RECOVERY_OTP_ENABLED')?.trim();
   const recoveryRolloutAllows = recoveryConfigured === 'true'
     || (!production && recoveryConfigured !== 'false');
@@ -101,9 +120,17 @@ export function describeAuthMethods(env: AuthMethodsEnvReader): AuthMethodsView 
     // Восстановление ходит тем же SMS-каналом, что и обычный вход: без него
     // включённый флаг ничего не даёт, и показывать экран было бы обманом.
     recovery: { enabled: recoveryRolloutAllows && phoneEnabled },
-    anyLoginAvailable: phone.enabled || email.enabled || telegram.enabled || apple.enabled,
-    registrationAvailable: phone.registers || telegram.registers || apple.registers,
+    google,
+    anyLoginAvailable: phone.enabled || email.enabled || telegram.enabled || apple.enabled || google.enabled,
+    registrationAvailable: phone.registers || telegram.registers || apple.registers || google.registers,
   };
+}
+
+function googleAudiences(env: AuthMethodsEnvReader): string[] {
+  return (env('GOOGLE_CLIENT_ID') ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 /**

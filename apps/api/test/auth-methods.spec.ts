@@ -86,6 +86,39 @@ describe('describeAuthMethods: что реально пустит человек
   });
 
   describe('социальные входы', () => {
+    it('Google требует серверную аудиторию и явный web client id', () => {
+      const methods = describeAuthMethods(env({
+        NODE_ENV: 'production',
+        SMS_PROVIDER: 'android_gateway',
+        GOOGLE_CLIENT_ID: 'web.apps.googleusercontent.com,ios.apps.googleusercontent.com',
+        GOOGLE_WEB_CLIENT_ID: 'web.apps.googleusercontent.com',
+      }));
+      expect(methods.google).toEqual({
+        enabled: true,
+        registers: true,
+        clientId: 'web.apps.googleusercontent.com',
+      });
+    });
+
+    it('не выводит Google web client id из серверного списка аудиторий', () => {
+      const methods = describeAuthMethods(env({
+        NODE_ENV: 'production',
+        SMS_PROVIDER: 'disabled',
+        GOOGLE_CLIENT_ID: 'android.apps.googleusercontent.com',
+      }));
+      expect(methods.google).toEqual({ enabled: true, registers: false, clientId: null });
+    });
+
+    it('скрывает Google web client id, который API не принимает как audience', () => {
+      const methods = describeAuthMethods(env({
+        NODE_ENV: 'production',
+        SMS_PROVIDER: 'android_gateway',
+        GOOGLE_CLIENT_ID: 'ios.apps.googleusercontent.com',
+        GOOGLE_WEB_CLIENT_ID: 'web.apps.googleusercontent.com',
+      }));
+      expect(methods.google).toEqual({ enabled: true, registers: true, clientId: null });
+    });
+
     /**
      * Login Widget в обычном браузере требует ИМЯ бота в атрибуте
      * `data-telegram-login` — токен для этого не годится и наружу не выйдет

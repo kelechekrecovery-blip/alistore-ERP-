@@ -40,6 +40,7 @@ interface CheckDefinition {
   manualChecks?: string[];
   completionMarkerEnv?: string;
   blocking?: boolean;
+  validate?: (env: EnvReader) => boolean;
   note: string;
 }
 
@@ -178,6 +179,21 @@ const CHECKS: CheckDefinition[] = [
     ],
     blocking: true,
     note: 'Backend verifies Sign in with Apple identity tokens via JWKS; client setup still needs the Apple service/app id and callback configuration.',
+  },
+  {
+    id: 'google_social_login',
+    area: 'identity',
+    title: 'Google social login',
+    requiredEnv: ['GOOGLE_CLIENT_ID', 'GOOGLE_WEB_CLIENT_ID'],
+    blocking: true,
+    validate: (env) => {
+      const webClientId = env('GOOGLE_WEB_CLIENT_ID')?.trim();
+      return Boolean(webClientId && (env('GOOGLE_CLIENT_ID') ?? '')
+        .split(',')
+        .map((value) => value.trim())
+        .includes(webClientId));
+    },
+    note: 'Backend verifies Google ID tokens against the allowed client IDs; the web client ID and ali.kg JavaScript origins must be configured in Google Cloud.',
   },
   {
     id: 'telegram_social_login',
@@ -326,7 +342,7 @@ function evaluateCheck(definition: CheckDefinition, env: EnvReader, demoMode: bo
         ? 'optional'
         : 'missing';
   } else if (missingEnv.length === 0) {
-    status = 'ready';
+    status = definition.validate?.(env) === false ? 'missing' : 'ready';
   } else {
     status = !blocking ? 'optional' : 'missing';
   }
