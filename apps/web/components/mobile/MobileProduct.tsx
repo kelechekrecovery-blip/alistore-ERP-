@@ -146,6 +146,31 @@ export default function MobileProduct({
                 ))}
               </div>
               <div className="mt-2 text-[11px] text-muted">Оформляется в магазине при получении заказа.</div>
+              {/* Те же QR, что и на десктопе: их загружает владелец в ERP. */}
+              {product.installmentProviders && product.installmentProviders.length > 0 && (
+                <div className="mt-3 border-t border-surface-3 pt-3">
+                  <div className="text-[12px] font-semibold text-white">Где оформить</div>
+                  <div className="mt-2 flex flex-wrap gap-2.5">
+                    {product.installmentProviders.map((provider) => (
+                      <figure key={provider.id} className="w-[84px] text-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={provider.qrUrl}
+                          alt={`QR для оформления рассрочки ${provider.label}`}
+                          width={84}
+                          height={84}
+                          loading="lazy"
+                          className="h-[84px] w-[84px] rounded-[10px] bg-white object-contain p-1.5"
+                        />
+                        <figcaption className="mt-1 text-[11px] text-subtle">{provider.label}</figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                  <div className="mt-2 text-[11px] text-muted">
+                    Отсканируйте код нужного банка — заявку оформит продавец.
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {typeof product.bonusPoints === "number" && product.bonusPoints > 0 && (

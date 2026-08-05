@@ -8,18 +8,37 @@ import { ValidationError } from '../common/errors';
  * `source` field records where the constant lived, which makes the migration of
  * the remaining constants mechanical rather than archaeological.
  */
+export type SettingGroup =
+  | 'discounts'
+  | 'payroll'
+  | 'warranty'
+  | 'tradein'
+  | 'loyalty'
+  | 'credit';
+
 export interface SettingDefinition {
   key: string;
   label: string;
-  group: 'discounts' | 'payroll' | 'warranty' | 'tradein' | 'loyalty' | 'credit';
-  kind: 'int' | 'percent' | 'bps';
-  /** The literal this parameter replaces — the value in force before any edit. */
-  fallback: number;
+  group: SettingGroup;
+  kind: 'int' | 'percent' | 'bps' | 'url';
+  /**
+   * The literal this parameter replaces — the value in force before any edit.
+   *
+   * Число для расчётных параметров, строка для ссылочных (`kind: 'url'`).
+   * Пустая строка означает «владелец ещё не поставил»: витрина обязана молчать,
+   * а не подставлять что-то от себя.
+   */
+  fallback: number | string;
   min: number;
   max: number;
   unit: string;
   hint: string;
   source: string;
+}
+
+/** Ссылочный параметр (QR провайдера) — его значение строка, а не число. */
+export function isTextSetting(definition: SettingDefinition): boolean {
+  return definition.kind === 'url';
 }
 
 export const SETTINGS: readonly SettingDefinition[] = [
@@ -317,6 +336,58 @@ export const SETTINGS: readonly SettingDefinition[] = [
     hint: '0 — без ограничения.',
     source: 'договор магазина',
   },
+  // QR провайдеров рассрочки. Публичного API у Payda, O!Market, ZERO и M+ нет —
+  // рассрочку оформляют в магазине по QR, который банк выдал именно этой точке.
+  // Поэтому это не интеграция, а картинка: владелец загружает её в ERP, и она
+  // появляется в блоке «где оформить». Пусто — блок не показывается вовсе.
+  {
+    key: 'installment.payda.qr_url',
+    label: 'Payda · QR для оформления',
+    group: 'credit',
+    kind: 'url',
+    fallback: '',
+    min: 0,
+    max: 512,
+    unit: '',
+    hint: 'Загрузите QR из личного кабинета Payda. Пусто — не показывать.',
+    source: 'QR магазина от Optima Bank',
+  },
+  {
+    key: 'installment.omarket.qr_url',
+    label: 'O!Market · QR для оформления',
+    group: 'credit',
+    kind: 'url',
+    fallback: '',
+    min: 0,
+    max: 512,
+    unit: '',
+    hint: 'Загрузите QR из личного кабинета O!Market. Пусто — не показывать.',
+    source: 'QR магазина от O!Bank',
+  },
+  {
+    key: 'installment.zero.qr_url',
+    label: 'ZERO · QR для оформления',
+    group: 'credit',
+    kind: 'url',
+    fallback: '',
+    min: 0,
+    max: 512,
+    unit: '',
+    hint: 'Загрузите QR из личного кабинета ZERO. Пусто — не показывать.',
+    source: 'QR магазина от А Банка',
+  },
+  {
+    key: 'installment.mplus.qr_url',
+    label: 'M+ · QR для оформления',
+    group: 'credit',
+    kind: 'url',
+    fallback: '',
+    min: 0,
+    max: 512,
+    unit: '',
+    hint: 'В M+ магазин выбирают как продавца — QR нужен, если банк его выдал.',
+    source: 'QR магазина от M+',
+  },
   // Выкуп Б/У. Суммы вынесены сюда, потому что раньше они лежали в браузере:
   // страница считала выплату сама и присылала её серверу, а сервер записывал
   // это число в договор и в проводки. Значения по умолчанию повторяют прежнюю
@@ -465,8 +536,42 @@ export function settingDefinition(key: string): SettingDefinition {
   return definition;
 }
 
+/**
+ * Разобрать ссылочный параметр.
+ *
+ * Значение попадает в `src` картинки на публичной витрине, поэтому проверка
+ * здесь не косметическая: `javascript:` в этом месте — исполняемый код на
+ * странице покупателя, `data:` — способ положить мегабайты в строку настройки,
+ * `http://` на https-витрине просто не загрузится и оставит пустое место.
+ * Разрешаем только относительный путь загруженного файла и https-адрес.
+ */
+export function parseSettingText(definition: SettingDefinition, raw: string): string {
+  if (!isTextSetting(definition)) {
+    throw new ValidationError('invalid_setting_value', `${definition.label}: это числовой параметр`);
+  }
+  const value = raw.trim();
+  if (value === '') return '';
+  if (value.length > definition.max) {
+    throw new ValidationError(
+      'setting_out_of_range',
+      `${definition.label}: не длиннее ${definition.max} символов`,
+    );
+  }
+  const allowed = value.startsWith('/') || value.startsWith('https://');
+  if (!allowed) {
+    throw new ValidationError(
+      'invalid_setting_value',
+      `${definition.label}: нужен загруженный файл или https-ссылка`,
+    );
+  }
+  return value;
+}
+
 /** Parse and range-check a stored or submitted value against its definition. */
 export function parseSettingValue(definition: SettingDefinition, raw: string): number {
+  if (isTextSetting(definition)) {
+    throw new ValidationError('invalid_setting_value', `${definition.label}: это текстовый параметр`);
+  }
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
     throw new ValidationError('invalid_setting_value', `${definition.label}: нужно целое число`);

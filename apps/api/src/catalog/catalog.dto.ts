@@ -75,6 +75,12 @@ export class InstallmentOfferDto {
   @ApiProperty({ example: 24900, description: 'Итого к выплате: цена плюс наценка магазина.' }) totalSom!: number;
 }
 
+export class InstallmentProviderDto {
+  @ApiProperty({ example: 'omarket' }) id!: string;
+  @ApiProperty({ example: 'O!Market' }) label!: string;
+  @ApiProperty({ example: '/media/qr-omarket.png', description: 'QR магазина, загруженный владельцем в ERP.' }) qrUrl!: string;
+}
+
 export class CatalogProductDto {
   /**
    * Лучшая партнёрская рассрочка для этой цены — «от N сом/мес» на карточке.
@@ -92,6 +98,16 @@ export class CatalogProductDto {
    */
   @ApiPropertyOptional({ type: () => [InstallmentStepDto] })
   installmentSteps?: InstallmentStepDto[];
+
+  /**
+   * Где оформить рассрочку: провайдер и его QR из ERP.
+   *
+   * Публичного API у партнёров нет — рассрочку оформляют в магазине по QR,
+   * который банк выдал этой точке. Поле отсутствует, пока владелец не загрузил
+   * ни одного кода: показывать «оформите по QR» без самого QR бессмысленно.
+   */
+  @ApiPropertyOptional({ type: () => [InstallmentProviderDto] })
+  installmentProviders?: InstallmentProviderDto[];
 
   /**
    * Сколько бонусов начислит покупка этого товара.

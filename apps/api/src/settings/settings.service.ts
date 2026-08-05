@@ -1,3 +1,4 @@
+import { ValidationError } from '../common/errors';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -7,11 +8,18 @@ import {
   parseSettingValue,
   settingDefinition,
   type SettingDefinition,
+  isTextSetting,
+  parseSettingText,
 } from './settings.registry';
 
 export interface SettingView extends SettingDefinition {
-  /** Effective value: the stored one, or the constant that was in force before. */
-  value: number;
+  /**
+   * Effective value: the stored one, or the constant that was in force before.
+   *
+   * Строка у ссылочных параметров (`kind: 'url'`) — экран настроек рисует их
+   * загрузкой файла, а не полем ввода числа.
+   */
+  value: number | string;
   /** False while the parameter still runs on its original hardcoded default. */
   overridden: boolean;
   updatedBy: string | null;
@@ -33,28 +41,55 @@ export class SettingsService {
    */
   async value(key: string): Promise<number> {
     const definition = settingDefinition(key);
+    // Числовой контракт остаётся числовым: ссылочный параметр сюда попадать не
+    // должен, иначе расчёт молча получит NaN вместо внятной ошибки.
+    if (isTextSetting(definition)) {
+      throw new ValidationError('invalid_setting_value', `${definition.label}: читайте через text()`);
+    }
     const row = await this.prisma.setting.findUnique({ where: { key } });
-    if (!row) return definition.fallback;
+    if (!row) return Number(definition.fallback);
     try {
       return parseSettingValue(definition, row.value);
     } catch {
-      return definition.fallback;
+      return Number(definition.fallback);
+    }
+  }
+
+  /**
+   * Ссылочный параметр — QR провайдера рассрочки.
+   *
+   * Пустая строка честнее подстановки: она означает «владелец ещё не поставил»,
+   * и витрина по ней просто не показывает блок. Битое значение тоже даёт пустоту,
+   * а не роняет страницу товара.
+   */
+  async text(key: string): Promise<string> {
+    const definition = settingDefinition(key);
+    if (!isTextSetting(definition)) {
+      throw new ValidationError('invalid_setting_value', `${definition.label}: читайте через value()`);
+    }
+    const row = await this.prisma.setting.findUnique({ where: { key } });
+    if (!row) return String(definition.fallback);
+    try {
+      return parseSettingText(definition, row.value);
+    } catch {
+      return String(definition.fallback);
     }
   }
 
   /** Read a group of effective values in one query for request-time consumers. */
   async values(keys: readonly string[]): Promise<Record<string, number>> {
     if (keys.length === 0) return {};
-    const definitions = keys.map((key) => settingDefinition(key));
+    const definitions = keys.map((key) => settingDefinition(key)).filter((d) => !isTextSetting(d));
+    if (definitions.length === 0) return {};
     const rows = await this.prisma.setting.findMany({ where: { key: { in: [...keys] } } });
     const stored = new Map(rows.map((row) => [row.key, row.value]));
     return Object.fromEntries(definitions.map((definition) => {
       const raw = stored.get(definition.key);
-      if (raw === undefined) return [definition.key, definition.fallback];
+      if (raw === undefined) return [definition.key, Number(definition.fallback)];
       try {
         return [definition.key, parseSettingValue(definition, raw)];
       } catch {
-        return [definition.key, definition.fallback];
+        return [definition.key, Number(definition.fallback)];
       }
     }));
   }
@@ -65,10 +100,12 @@ export class SettingsService {
     const stored = new Map(rows.map((row) => [row.key, row]));
     return SETTINGS.map((definition) => {
       const row = stored.get(definition.key);
-      let value = definition.fallback;
+      let value: number | string = definition.fallback;
       if (row) {
         try {
-          value = parseSettingValue(definition, row.value);
+          value = isTextSetting(definition)
+            ? parseSettingText(definition, row.value)
+            : parseSettingValue(definition, row.value);
         } catch {
           value = definition.fallback;
         }
@@ -90,11 +127,15 @@ export class SettingsService {
    */
   async set(key: string, rawValue: string, actor: string): Promise<SettingView> {
     const definition = settingDefinition(key);
-    const next = parseSettingValue(definition, rawValue);
+    const next: number | string = isTextSetting(definition)
+      ? parseSettingText(definition, rawValue)
+      : parseSettingValue(definition, rawValue);
 
     return this.audit.transaction(async (tx) => {
       const existing = await tx.setting.findUnique({ where: { key } });
-      const previous = existing ? Number(existing.value) : definition.fallback;
+      const previous = existing
+        ? (isTextSetting(definition) ? existing.value : Number(existing.value))
+        : definition.fallback;
       const row = await tx.setting.upsert({
         where: { key },
         create: { key, value: String(next), updatedBy: actor },

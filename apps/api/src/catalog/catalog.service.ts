@@ -433,6 +433,25 @@ export class CatalogService {
    * Провайдер со сроком 0 выключен — так по умолчанию стоят те, чьи условия
    * не опубликованы: показывать срок, которого мы не знаем, нельзя.
    */
+  /**
+   * QR провайдеров — те же литеральные ключи по той же причине.
+   *
+   * Публичного API у партнёров нет: рассрочку оформляют в магазине по QR,
+   * который банк выдал этой точке. Пустая ссылка означает «владелец ещё не
+   * загрузил» — блок «где оформить» тогда просто не показывается.
+   */
+  private async installmentQrs(): Promise<Record<string, string>> {
+    const settings = this.settings;
+    if (!settings) return {};
+    const [payda, omarket, zero, mplus] = await Promise.all([
+      settings.text('installment.payda.qr_url'),
+      settings.text('installment.omarket.qr_url'),
+      settings.text('installment.zero.qr_url'),
+      settings.text('installment.mplus.qr_url'),
+    ]);
+    return { payda, omarket, zero, mplus };
+  }
+
   private async installmentPlans(): Promise<InstallmentPlan[]> {
     const settings = this.settings;
     if (!settings) return [];
@@ -463,18 +482,29 @@ export class CatalogService {
    */
   private async enrichOffers(items: CatalogProductDto[]): Promise<CatalogProductDto[]> {
     if (items.length === 0) return items;
-    const [plans, earnRateBps] = await Promise.all([
+    const [plans, qrs, earnRateBps] = await Promise.all([
       this.installmentPlans(),
+      this.installmentQrs(),
       this.settings ? this.settings.value('loyalty.earn_rate_bps') : Promise.resolve(undefined),
     ]);
     const anyPlan = plans.some((plan) => plan.maxMonths > 0);
     if (!anyPlan && earnRateBps === undefined) return items;
     return items.map((item) => {
       const steps = anyPlan ? installmentLadder(item.price, plans) : [];
+      // «Где оформить» показываем только для тех провайдеров, которые эту цену
+      // действительно тянут (их назвал `installmentLadder`), и только если QR
+      // загружен. Иначе покупатель придёт в магазин с кодом, по которому ему
+      // откажут, — а это хуже, чем отсутствие блока.
+      const offeredLabels = new Set(steps.flatMap((step) => step.providers));
+      const providers = plans
+        .filter((plan) => offeredLabels.has(plan.label))
+        .map((plan) => ({ id: plan.id, label: plan.label, qrUrl: qrs[plan.id] ?? '' }))
+        .filter((provider) => provider.qrUrl !== '');
       return {
         ...item,
         installment: anyPlan ? bestInstallmentOffer(item.price, plans) : null,
         installmentSteps: steps,
+        installmentProviders: providers.length > 0 ? providers : undefined,
         bonusPoints: earnRateBps === undefined ? undefined : loyaltyEarnAmount(item.price, earnRateBps),
       };
     });

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { fetchSettings, saveSetting, type BusinessSetting } from '@/lib/api/settings';
+import { uploadImage } from '@/lib/api/media';
 import { Card } from './Card';
 
 const GROUPS: { id: BusinessSetting['group']; title: string; note: string }[] = [
@@ -15,8 +16,10 @@ const GROUPS: { id: BusinessSetting['group']; title: string; note: string }[] = 
 
 /** Human form of a stored integer: bps read as percent, everything else as-is. */
 function display(setting: BusinessSetting): string {
-  if (setting.kind === 'bps') return `${(setting.value / 100).toFixed(2).replace(/\.?0+$/, '')}%`;
-  return `${setting.value.toLocaleString('ru-RU')} ${setting.unit}`;
+  if (setting.kind === 'url') return setting.value === '' ? 'не задан' : 'загружен';
+  const numeric = Number(setting.value);
+  if (setting.kind === 'bps') return `${(numeric / 100).toFixed(2).replace(/\.?0+$/, '')}%`;
+  return `${numeric.toLocaleString('ru-RU')} ${setting.unit}`;
 }
 
 export function SettingsView({ accessToken, canEdit }: { accessToken: string; canEdit: boolean }) {
@@ -38,6 +41,45 @@ export function SettingsView({ accessToken, canEdit }: { accessToken: string; ca
   }
 
   useEffect(() => { void load(); }, [accessToken]);
+
+  /**
+   * Загрузить QR провайдера: файл уходит в media, а в параметр пишется его URL.
+   *
+   * Два шага намеренно раздельны — если сохранение параметра не удастся, файл
+   * уже лежит и повтор не потребует выбирать его заново.
+   */
+  async function uploadQr(setting: BusinessSetting, file: File) {
+    setBusy(setting.key);
+    setError('');
+    try {
+      const uploaded = await uploadImage(file, accessToken);
+      await saveSetting(setting.key, uploaded.url, accessToken);
+      setToast(`${setting.label} — QR загружен`);
+      window.setTimeout(() => setToast(''), 2600);
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'QR не загрузился');
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function clearQr(setting: BusinessSetting) {
+    setBusy(setting.key);
+    setError('');
+    try {
+      // Пустая строка — это «снять QR», а не «сломанное значение»: блок «где
+      // оформить» на витрине после этого просто перестаёт показываться.
+      await saveSetting(setting.key, '', accessToken);
+      setToast(`${setting.label} — QR снят`);
+      window.setTimeout(() => setToast(''), 2600);
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'QR не снят');
+    } finally {
+      setBusy('');
+    }
+  }
 
   async function save(setting: BusinessSetting) {
     const draft = drafts[setting.key];
@@ -109,6 +151,47 @@ export function SettingsView({ accessToken, canEdit }: { accessToken: string; ca
                         </p>
                       )}
                     </div>
+                    {/* Ссылочный параметр — это картинка (QR провайдера), и
+                        просить владельца вписать сюда путь руками значило бы
+                        заставить его сначала где-то захостить файл. Даём
+                        загрузку и превью: видно, что именно уедет на витрину. */}
+                    {setting.kind === 'url' ? (
+                      <div className="flex items-center gap-2">
+                        {setting.value !== '' && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={String(setting.value)}
+                            alt={`QR ${setting.label}`}
+                            className="h-14 w-14 rounded-[7px] border border-surface-3 bg-white object-contain p-1"
+                          />
+                        )}
+                        <label className={`h-9 cursor-pointer rounded-[7px] border border-surface-3 px-3 text-xs font-bold leading-9 text-white ${!canEdit || busy === setting.key ? 'pointer-events-none opacity-50' : ''}`}>
+                          {busy === setting.key ? '…' : setting.value === '' ? 'Загрузить QR' : 'Заменить'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            aria-label={setting.label}
+                            disabled={!canEdit || busy === setting.key}
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              event.target.value = '';
+                              if (file) void uploadQr(setting, file);
+                            }}
+                          />
+                        </label>
+                        {setting.value !== '' && (
+                          <button
+                            type="button"
+                            disabled={!canEdit || busy === setting.key}
+                            onClick={() => void clearQr(setting)}
+                            className="h-9 rounded-[7px] border border-surface-3 px-3 text-xs font-semibold text-subtle disabled:opacity-50"
+                          >
+                            Убрать
+                          </button>
+                        )}
+                      </div>
+                    ) : (
                     <div className="flex items-center gap-2">
                       <input
                         aria-label={setting.label}
@@ -128,6 +211,7 @@ export function SettingsView({ accessToken, canEdit }: { accessToken: string; ca
                         {busy === setting.key ? '…' : 'Сохранить'}
                       </button>
                     </div>
+                    )}
                   </div>
                 );
               })}
