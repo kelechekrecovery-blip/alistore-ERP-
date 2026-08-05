@@ -2,6 +2,7 @@ import {
   clearWebSessionCookies,
   isWebSessionRequest,
   readWebCookie,
+  setStaffSessionCookies,
   setWebSessionCookies,
   webAuthResponse,
   WEB_ACCESS_COOKIE,
@@ -43,6 +44,38 @@ describe('Web cookie session contract', () => {
       expiresIn: '15m',
     });
     expect(webAuthResponse({ headers: {} }, tokens)).toEqual(tokens);
+  });
+
+  it('shares the non-secret session hint with storefront subdomains when configured', () => {
+    const previous = process.env.AUTH_COOKIE_DOMAIN;
+    process.env.AUTH_COOKIE_DOMAIN = '.ali.kg';
+    try {
+      const cookies: Array<[string, string, Record<string, unknown>]> = [];
+      const response = { cookie: (name: string, value: string, options: Record<string, unknown>) => cookies.push([name, value, options]) } as never;
+      setWebSessionCookies(response, tokens, true);
+      expect(cookies[0][2]).not.toHaveProperty('domain');
+      expect(cookies[2][2]).toMatchObject({ domain: '.ali.kg', path: '/', httpOnly: false });
+    } finally {
+      if (previous === undefined) delete process.env.AUTH_COOKIE_DOMAIN;
+      else process.env.AUTH_COOKIE_DOMAIN = previous;
+    }
+  });
+
+  it('shares the staff hint with the admin subdomain when configured', () => {
+    const previous = process.env.AUTH_COOKIE_DOMAIN;
+    process.env.AUTH_COOKIE_DOMAIN = '.ali.kg';
+    try {
+      const cookies: Array<[string, string, Record<string, unknown>]> = [];
+      const response = { cookie: (name: string, value: string, options: Record<string, unknown>) => cookies.push([name, value, options]) } as never;
+      setStaffSessionCookies(response, {
+        accessToken: 'staff-access',
+        refreshToken: 'staff-refresh',
+      }, true);
+      expect(cookies[2][2]).toMatchObject({ domain: '.ali.kg', path: '/', httpOnly: false });
+    } finally {
+      if (previous === undefined) delete process.env.AUTH_COOKIE_DOMAIN;
+      else process.env.AUTH_COOKIE_DOMAIN = previous;
+    }
   });
 
   it('clears both cookies with the same protected scope', () => {

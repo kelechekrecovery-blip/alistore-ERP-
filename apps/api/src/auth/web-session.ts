@@ -46,12 +46,16 @@ function cookieOptions(production: boolean, maxAge: number) {
 }
 
 function sessionHintOptions(production: boolean, maxAge: number) {
+  const configuredDomain = process.env.AUTH_COOKIE_DOMAIN?.trim();
   return {
     httpOnly: false,
     secure: production,
     sameSite: 'lax' as const,
     path: '/',
     maxAge,
+    // Credentials remain host-only on api.ali.kg. Only this non-secret hint is
+    // shared so ali.kg can discover the existing refresh cookie after reload.
+    ...(production && configuredDomain ? { domain: configuredDomain } : {}),
   };
 }
 

@@ -209,6 +209,11 @@ envVarGroups:
         value: "false"
       - key: AUTH_REFRESH_DERIVATION_SECRET
         sync: false
+      # Access/refresh cookies stay host-only on api.ali.kg. This domain is used
+      # only by the non-secret session hint so ali.kg can restore the API cookie
+      # session after a page reload.
+      - key: AUTH_COOKIE_DOMAIN
+        value: .ali.kg
       # Keep disabled until email OTP delivery moves to a durable encrypted job.
       - key: AUTH_EMAIL_LOGIN_ENABLED
         value: "false"
