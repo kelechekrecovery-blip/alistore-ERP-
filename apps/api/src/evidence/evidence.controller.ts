@@ -15,13 +15,18 @@ import {
 import { ValidationError } from '../common/errors';
 import { EvidenceImageDto } from './evidence.dto';
 import { EvidenceService } from './evidence.service';
-import { requireGuestCapability } from '../auth/guest-capability';
+import { requireActiveGuestCapability } from '../auth/guest-capability';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('evidence')
 @Controller('evidence')
 export class EvidenceController {
-  constructor(private readonly evidence: EvidenceService, private readonly staffAuth: StaffAuthService) {}
+  constructor(
+    private readonly evidence: EvidenceService,
+    private readonly staffAuth: StaffAuthService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @ApiOperation({ summary: 'Issue a short-lived authorized read URL for an Evidence Vault image' })
   @Get('images/:idempotencyKey')
@@ -53,7 +58,7 @@ export class EvidenceController {
     } else {
       const customerId = user?.typ === 'customer'
         ? user.customerId
-        : requireGuestCapability(capability, 'evidence:read').sub;
+        : (await requireActiveGuestCapability(this.prisma, capability, 'evidence:read')).sub;
       await this.evidence.assertCustomerOwnsEntity(customerId, upload.entityType as EvidenceImageDto['entityType'], upload.entityId);
       actor = user?.customerId ? `customer:${user.customerId}` : `guest:${customerId}`;
     }
@@ -113,7 +118,7 @@ export class EvidenceController {
       if (custodyEvidence || exchangeEvidence) throw new ForbiddenException('staff_evidence_only');
       guestCustomerId = user?.typ === 'customer'
         ? undefined
-        : requireGuestCapability(capability, 'evidence:write').sub;
+        : (await requireActiveGuestCapability(this.prisma, capability, 'evidence:write')).sub;
       const customerId = user?.customerId ?? guestCustomerId!;
       await this.evidence.assertCustomerOwnsEntity(customerId, dto.entityType, dto.entityId);
     }

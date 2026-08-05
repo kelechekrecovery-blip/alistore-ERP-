@@ -605,6 +605,9 @@ model Customer {
   orders                  Order[]
   tradeIns                TradeInDevice[]
   createdAt               DateTime                @default(now())
+  guestCreateKeyHash      String?                 @unique
+  guestCreateRequestHash  String?
+  guestCreateExpiresAt    DateTime?
   // SupportTicket ссылается на customerId строкой (как WarrantyCase/DebtPlan) —
   // без @relation, чтобы очистка в тестах не каскадила через FK.
 }

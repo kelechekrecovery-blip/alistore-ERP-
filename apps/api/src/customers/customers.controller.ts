@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   Get,
   Headers,
+  HttpCode,
   NotFoundException,
   Param,
   Patch,
@@ -32,6 +33,9 @@ import type { CustomerOverview } from './customer-overview';
 import { issueGuestCheckoutCapability } from '../auth/guest-capability';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { AuthzService } from '../authz/authz.service';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
+import { requireActiveStaff } from '../auth/staff-principal';
 
 @ApiTags('customers')
 @Controller('customers')
@@ -159,13 +163,25 @@ export class CustomersController {
   @Post()
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  async upsert(@Body() dto: UpsertCustomerDto) {
-    const customer = await this.customers.createGuest(dto);
+  async upsert(@Body() dto: UpsertCustomerDto, @Headers('idempotency-key') rawKey: string | undefined) {
+    const { customer, expiresAt } = await this.customers.createGuest(dto, rawKey ?? '');
+    const capabilityExpiresIn = Math.max(1, Math.ceil((expiresAt.getTime() - Date.now()) / 1000));
     return {
       id: customer.id,
-      guestCapability: issueGuestCheckoutCapability(customer.id),
-      capabilityExpiresIn: 1800,
+      guestCapability: issueGuestCheckoutCapability(customer.id, capabilityExpiresIn),
+      capabilityExpiresIn,
     };
+  }
+
+  @ApiOperation({ summary: 'Resolve a customer identity for authenticated staff intake' })
+  @Post('staff/resolve')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('tradeins', 'intake')
+  async resolveForStaff(@Body() dto: UpsertCustomerDto, @CurrentUser() user: AuthPrincipal) {
+    await requireActiveStaff(user, this.staffAuth);
+    const customer = await this.customers.resolveForStaff(dto);
+    return { id: customer.id, phone: customer.phone, name: customer.name };
   }
 
   @ApiOperation({ summary: 'Set marketing consent (Notification Preferences, customer.consent_changed)' })

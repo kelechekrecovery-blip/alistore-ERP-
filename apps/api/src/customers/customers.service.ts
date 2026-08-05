@@ -13,12 +13,12 @@ import { warrantyCoverage } from './warranty-coverage';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
 import { revokeTelegramAgentAccessOnTx } from '../telegram-agent/telegram-agent-revocation';
 import { normalizePhone } from '../auth/phone-normalization';
+import { createHash } from 'crypto';
 
 /**
- * Customers for storefront/guest checkout. Phone is the natural key (unique), so
- * find-or-create is idempotent — repeat checkouts from the same phone reuse the
- * customer instead of duplicating. PII (phone) is masked for junior roles at the
- * read layer; that lands with auth/roles.
+ * Customer identity boundary. Public guest creation is fail-closed and replays
+ * only with the original short-lived idempotency secret; authenticated internal
+ * resolvers may canonicalize or adopt legacy phone aliases under a lock.
  */
 @Injectable()
 export class CustomersService {
@@ -224,8 +224,54 @@ export class CustomersService {
    * Guest checkout may create a new customer, but must never identify an
    * existing customer by phone. Existing customers must authenticate first.
    */
-  async createGuest(dto: UpsertCustomerDto) {
+  async createGuest(dto: UpsertCustomerDto, rawKey: string) {
     const phone = normalizePhone(dto.phone);
+    const name = dto.name?.trim() || 'Клиент';
+    const key = rawKey.trim();
+    // Temporary expand/contract compatibility for already-installed clients.
+    // They may create once without replay protection; malformed supplied keys
+    // still fail closed. Remove only after client adoption is proven.
+    if (!key) return this.createGuestLegacy(phone, name);
+    if (!GUEST_CUSTOMER_KEY_PATTERN.test(key)) {
+      throw new ValidationError('idempotency_key_invalid', 'Требуется криптографически случайный UUIDv4 Idempotency-Key');
+    }
+    const keyHash = sha256(key);
+    const requestHash = sha256(JSON.stringify({ phone, name }));
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'guest-customer-key:' + keyHash}))::text AS locked`;
+        const replay = await tx.customer.findUnique({ where: { guestCreateKeyHash: keyHash } });
+        if (replay) return replayGuestCustomer(replay, requestHash);
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'customer-phone:' + phone}))::text AS locked`;
+        const existing = await tx.customer.findFirst({
+          where: { phone: { in: [phone, phone.slice(1)] } },
+          select: { id: true },
+        });
+        if (existing) throw guestCustomerRequiresAuth();
+        const expiresAt = new Date(Date.now() + GUEST_CUSTOMER_REPLAY_TTL_MS);
+        const customer = await tx.customer.create({
+          data: {
+            phone,
+            name,
+            guestCreateKeyHash: keyHash,
+            guestCreateRequestHash: requestHash,
+            guestCreateExpiresAt: expiresAt,
+          },
+        });
+        return { customer, expiresAt };
+      });
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
+        const replay = await this.prisma.customer.findUnique({ where: { guestCreateKeyHash: keyHash } });
+        if (replay) return replayGuestCustomer(replay, requestHash);
+        // A concurrent checkout can win the unique phone race after the lookup.
+        throw guestCustomerRequiresAuth();
+      }
+      throw error;
+    }
+  }
+
+  private async createGuestLegacy(phone: string, name: string) {
     try {
       return await this.prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'customer-phone:' + phone}))::text AS locked`;
@@ -234,16 +280,42 @@ export class CustomersService {
           select: { id: true },
         });
         if (existing) throw guestCustomerRequiresAuth();
-        return tx.customer.create({
-          data: { phone, name: dto.name ?? 'Клиент' },
-        });
+        const customer = await tx.customer.create({ data: { phone, name } });
+        return { customer, expiresAt: new Date(Date.now() + GUEST_CUSTOMER_REPLAY_TTL_MS) };
       });
     } catch (error) {
-      // A concurrent checkout can win the unique phone race after the lookup.
-      if (isUniqueConstraintViolation(error)) {
-        throw guestCustomerRequiresAuth();
-      }
+      if (isUniqueConstraintViolation(error)) throw guestCustomerRequiresAuth();
       throw error;
+    }
+  }
+
+  /** Staff intake may resolve an existing identity, but never overwrite its profile name. */
+  async resolveForStaff(dto: UpsertCustomerDto) {
+    const phone = normalizePhone(dto.phone);
+    const suppliedName = dto.name?.trim() || 'Клиент';
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'customer-phone:' + phone}))::text AS locked`;
+        const canonical = await tx.customer.findUnique({ where: { phone } });
+        if (canonical) {
+          return canonical.name.trim()
+            ? canonical
+            : tx.customer.update({ where: { id: canonical.id }, data: { name: suppliedName } });
+        }
+        const legacy = await tx.customer.findUnique({ where: { phone: phone.slice(1) } });
+        if (legacy) {
+          return tx.customer.update({
+            where: { id: legacy.id },
+            data: { phone, ...(!legacy.name.trim() ? { name: suppliedName } : {}) },
+          });
+        }
+        return tx.customer.create({ data: { phone, name: suppliedName } });
+      });
+    } catch (error) {
+      if (!isUniqueConstraintViolation(error)) throw error;
+      const winner = await this.prisma.customer.findUnique({ where: { phone } });
+      if (!winner) throw error;
+      return winner;
     }
   }
 
@@ -353,6 +425,9 @@ export class CustomersService {
         data: {
           name: DELETED_CUSTOMER_NAME,
           phone: deletedPhone(customerId),
+          guestCreateKeyHash: null,
+          guestCreateRequestHash: null,
+          guestCreateExpiresAt: null,
           email: null,
           consent: false,
         },
@@ -473,6 +548,25 @@ function requiredText(value: string, label: string): string {
 
 const DELETED_CUSTOMER_NAME = 'Удалённый пользователь';
 const DELETED_PHONE_PREFIX = 'deleted:';
+const GUEST_CUSTOMER_REPLAY_TTL_MS = 30 * 60 * 1000;
+const GUEST_CUSTOMER_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function replayGuestCustomer(
+  customer: Customer & { guestCreateRequestHash: string | null; guestCreateExpiresAt: Date | null },
+  requestHash: string,
+) {
+  if (customer.guestCreateRequestHash !== requestHash) {
+    throw new ConflictError('idempotency_key_reused', 'Idempotency-Key уже использован с другим guest checkout');
+  }
+  if (!customer.guestCreateExpiresAt || customer.guestCreateExpiresAt.getTime() <= Date.now()) {
+    throw new ConflictError('guest_customer_replay_expired', 'Срок безопасного повтора истёк; войдите в аккаунт');
+  }
+  return { customer, expiresAt: customer.guestCreateExpiresAt };
+}
 
 /** Unique non-reversible phone placeholder; frees the real phone for re-registration. */
 function deletedPhone(customerId: string): string {

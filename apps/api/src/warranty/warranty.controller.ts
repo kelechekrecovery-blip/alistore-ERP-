@@ -32,7 +32,8 @@ import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
-import { requireGuestCapability } from '../auth/guest-capability';
+import { requireActiveGuestCapability } from '../auth/guest-capability';
+import { PrismaService } from '../prisma/prisma.service';
 
 const SYSTEM_ACTOR = 'system';
 
@@ -42,6 +43,7 @@ export class WarrantyController {
   constructor(
     private readonly warranty: WarrantyService,
     private readonly authz: AuthzService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @ApiOperation({ summary: 'List warranty cases by customer / imei / status' })
@@ -89,7 +91,7 @@ export class WarrantyController {
       throw new ForbiddenException('Нельзя открыть гарантию от имени другого клиента');
     }
     const customerId = user?.typ === 'customer' ? user.customerId : dto.customerId;
-    if (!user) requireGuestCapability(capability, 'warranty:create', customerId);
+    if (!user) await requireActiveGuestCapability(this.prisma, capability, 'warranty:create', customerId);
     // Здесь стоял безусловный отказ сотруднику со ссылкой на staff warranty
     // workflow, которого не существует: этот маршрут — единственный способ
     // завести заявку. Клиент тоже не мог (вход по SMS отключён), поэтому приём

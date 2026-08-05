@@ -31,6 +31,7 @@ import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
 import { guestOrderLink, saveGuestOrderAccess } from '@/lib/guest-order-access';
 import { resolveCheckoutPaymentOptions } from '@/lib/checkout-payment-options';
+import { guestCustomerAttempt, type GuestCustomerAttempt } from '@/lib/guest-customer-idempotency';
 import { summarizePaymentSchedule } from '@/lib/to-order';
 import { fetchPaymentMethods, type ServerPaymentMethods } from '@/lib/api/payments';
 import { Banknote, CalendarClock, CreditCard, QrCode, Smartphone, Store, Truck, Zap } from 'lucide-react';
@@ -152,6 +153,7 @@ export default function CheckoutPage() {
   // с его номером и ссылкой на статус, а не с голым «Не удалось оформить».
   const [strandedOrder, setStrandedOrder] = useState<CreatedOrder | null>(null);
   const checkoutAttempt = useRef<number | null>(null);
+  const guestCustomerReplay = useRef<GuestCustomerAttempt | null>(null);
 
   function currentCheckoutAttempt() {
     if (checkoutAttempt.current !== null) return checkoutAttempt.current;
@@ -370,7 +372,9 @@ export default function CheckoutPage() {
       if (user) {
         order = await authed((token) => createMyOrder(orderInput, token, orderKey));
       } else {
-        const customer = await createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
+        const guestInput = { phone: phone.trim(), name: name.trim() || undefined };
+        guestCustomerReplay.current = guestCustomerAttempt(guestCustomerReplay.current, guestInput);
+        const customer = await createCustomer(guestInput, guestCustomerReplay.current.key);
         guestCapability = customer.guestCapability;
         order = await createOrder({ ...orderInput, customerId: customer.id }, guestCapability, orderKey);
         if (order.guestAccess) saveGuestOrderAccess(order.id, order.guestAccess.capability, order.guestAccess.expiresIn);
@@ -387,6 +391,7 @@ export default function CheckoutPage() {
           },
         });
         clear();
+        guestCustomerReplay.current = null;
         rotateCheckoutAttempt();
         return;
       }
@@ -409,12 +414,14 @@ export default function CheckoutPage() {
       if (serverDue === 0) {
         setDone({ order: currentOrder, paid: currentOrder.status === 'paid' });
         clear();
+        guestCustomerReplay.current = null;
         rotateCheckoutAttempt();
         return;
       }
       if (payment === 'cash') {
         setDone({ order: currentOrder });
         clear();
+        guestCustomerReplay.current = null;
         rotateCheckoutAttempt();
         return;
       }
@@ -446,6 +453,7 @@ export default function CheckoutPage() {
       });
       setDone({ ...done, order: { ...done.order, status: res.order?.status ?? 'paid' }, paid: true });
       clear();
+      guestCustomerReplay.current = null;
       rotateCheckoutAttempt();
     } catch {
       setError('Платёж не подтверждён. Попробуйте ещё раз.');

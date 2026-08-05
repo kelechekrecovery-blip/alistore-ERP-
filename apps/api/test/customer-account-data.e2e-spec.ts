@@ -47,6 +47,58 @@ describe('Customer-owned loyalty, addresses and settings', () => {
     return jwt.sign({ sub: value.id, typ: 'customer', phone: value.phone });
   }
 
+  it('replays guest customer creation only within the original capability window', async () => {
+    const phone = `+9966${run.slice(-7)}01`;
+    const compatibilityPhone = `+9966${run.slice(-7)}00`;
+    const key = '88888888-8888-4888-8888-888888888888';
+    await request(app.getHttpServer())
+      .post('/customers')
+      .send({ phone: compatibilityPhone, name: 'Legacy Guest' })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/customers')
+      .send({ phone: compatibilityPhone, name: 'Legacy Guest' })
+      .expect(409);
+    const first = await request(app.getHttpServer())
+      .post('/customers')
+      .set('Idempotency-Key', key)
+      .send({ phone, name: 'Guest Replay' })
+      .expect(201);
+    expect(first.body.capabilityExpiresIn).toBeGreaterThan(1700);
+    expect(jwt.verify(first.body.guestCapability, {
+      issuer: 'alistore-api',
+      audience: 'alistore-guest-checkout',
+    })).toMatchObject({ sub: first.body.id, typ: 'guest_capability' });
+
+    await prisma.customer.update({
+      where: { id: first.body.id },
+      data: { guestCreateExpiresAt: new Date(Date.now() + 60_000) },
+    });
+    const replay = await request(app.getHttpServer())
+      .post('/customers')
+      .set('Idempotency-Key', key)
+      .send({ phone: phone.slice(1), name: 'Guest Replay' })
+      .expect(201);
+    expect(replay.body.id).toBe(first.body.id);
+    expect(replay.body.capabilityExpiresIn).toBeLessThanOrEqual(60);
+    await request(app.getHttpServer())
+      .post('/customers')
+      .set('Idempotency-Key', key)
+      .send({ phone, name: 'Changed Name' })
+      .expect(409);
+
+    await prisma.customer.update({
+      where: { id: first.body.id },
+      data: { guestCreateExpiresAt: new Date(Date.now() - 1) },
+    });
+    await request(app.getHttpServer())
+      .post('/customers')
+      .set('Idempotency-Key', key)
+      .send({ phone, name: 'Guest Replay' })
+      .expect(409);
+    await prisma.customer.delete({ where: { id: first.body.id } });
+  });
+
   it('returns only the signed-in customer loyalty balance, level, coupons and history', async () => {
     const owner = await customer('01', 420_000);
     const other = await customer('02');

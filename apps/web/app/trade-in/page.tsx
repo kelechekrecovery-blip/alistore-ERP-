@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { EvidencePicker } from '@/components/EvidencePicker';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
 import { createCustomer, createTradeIn, uploadEvidenceImages, type TradeIn, type TradeInGrade } from '@/lib/api';
 import { som } from '@/lib/format';
+import { guestCustomerAttempt, type GuestCustomerAttempt } from '@/lib/guest-customer-idempotency';
+import { ApiError } from '@/lib/api/http';
 
 const grades: { id: TradeInGrade; label: string; desc: string; factor: number }[] = [
   { id: 'A', label: 'Отличное', desc: 'без царапин, как новый', factor: 1 },
@@ -50,6 +52,8 @@ export default function TradeInPage() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ tradeIn: TradeIn; evidenceCount: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const guestCustomerReplay = useRef<GuestCustomerAttempt | null>(null);
+  const tradeInAttempt = useRef<{ fingerprint: string; key: string; evidencePrefix: string } | null>(null);
 
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user?.phone]);
 
@@ -62,16 +66,31 @@ export default function TradeInPage() {
     setBusy(true);
     setError(null);
     try {
-      const guest = user ? null : await createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
+      const guestInput = { phone: phone.trim(), name: name.trim() || undefined };
+      if (!user) guestCustomerReplay.current = guestCustomerAttempt(guestCustomerReplay.current, guestInput);
+      const guest = user ? null : await createCustomer(guestInput, guestCustomerReplay.current!.key);
       const customerId = user?.customerId ?? guest!.id;
-      const create = (accessToken?: string) => createTradeIn({
+      const tradeInInput = {
         ...(user ? {} : { customerId }),
         model: note.trim() ? `${model.trim()} (${note.trim()})` : model.trim(),
         imei: imei.trim() || undefined,
         grade,
         price,
         sellerPassport: passport.trim(),
-      }, { accessToken, guestCapability: guest?.guestCapability });
+      };
+      const fingerprint = JSON.stringify(tradeInInput);
+      if (tradeInAttempt.current?.fingerprint !== fingerprint) {
+        tradeInAttempt.current = {
+          fingerprint,
+          key: crypto.randomUUID(),
+          evidencePrefix: `tradein-evidence:${crypto.randomUUID()}`,
+        };
+      }
+      const create = (accessToken?: string) => createTradeIn(tradeInInput, {
+        accessToken,
+        guestCapability: guest?.guestCapability,
+        idempotencyKey: tradeInAttempt.current!.key,
+      });
       const tradeIn = user ? await authed(create) : await create();
       const evidence = files.length
         ? await uploadEvidenceImages({
@@ -80,14 +99,22 @@ export default function TradeInPage() {
             entityId: tradeIn.id,
             label: 'device_photo',
             actor: 'customer_app',
+            idempotencyKeyPrefix: tradeInAttempt.current!.evidencePrefix,
             ...(user
               ? { accessToken: await authed(async (token) => token) }
               : { guestCapability: guest!.guestCapability }),
           })
         : [];
       setDone({ tradeIn, evidenceCount: evidence.length });
-    } catch {
-      setError('Не удалось оформить trade-in или загрузить фото. Проверьте данные и попробуйте ещё раз.');
+      guestCustomerReplay.current = null;
+      tradeInAttempt.current = null;
+    } catch (cause) {
+      if (cause instanceof ApiError && ['guest_customer_replay_expired', 'guest_customer_requires_auth'].includes(cause.code ?? '')) {
+        guestCustomerReplay.current = null;
+        setError(cause.message);
+      } else {
+        setError(cause instanceof Error ? cause.message : 'Не удалось оформить trade-in или загрузить фото. Проверьте данные и попробуйте ещё раз.');
+      }
     } finally {
       setBusy(false);
     }

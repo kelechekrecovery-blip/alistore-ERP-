@@ -11,6 +11,7 @@ import { StaffAuthController } from '../staff-auth/staff-auth.controller';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { AuthzService } from '../authz/authz.service';
 import { issueGuestCheckoutCapability, issueGuestOrderCapability } from '../auth/guest-capability';
+import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * GAP-PAY-GUARD-001 / GAP-STAFF-AUTH-RL-001 regression spec.
@@ -38,6 +39,7 @@ describe('POST /payments guest guard (GAP-PAY-GUARD-001)', () => {
       providers: [
         { provide: PaymentsService, useValue: paymentsService },
         { provide: PaymentIntentsService, useValue: {} },
+        { provide: PrismaService, useValue: { customer: { findUnique: async () => ({ phone: '+996700000001' }) } } },
         { provide: ConfigService, useValue: { get: jest.fn() } },
         { provide: StaffAuthService, useValue: {} },
         // Контроллер отдаёт GET /payments/methods по фактическому провайдеру.

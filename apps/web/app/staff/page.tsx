@@ -7,7 +7,7 @@ import type { ChangeEvent, FormEvent, HTMLAttributes } from 'react';
 import { closeShift, currentShift, openShift, type Shift } from '@/lib/staff';
 import { ShiftHandoverPanel } from '@/components/staff/ShiftHandoverPanel';
 import {
-  createCustomer,
+  resolveCustomerForStaff,
   createTradeIn,
   downloadOrderInvoice,
   downloadTradeInContract,
@@ -70,6 +70,7 @@ function mondayIso() {
 function clock(value: string) { return new Date(value).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Bishkek' }); }
 
 export default function StaffPage() {
+  const buybackAttempt = useRef<{ fingerprint: string; idempotencyKey: string } | null>(null);
   const [tab, setTab] = useState<Tab>('home');
   const [shift, setShift] = useState<Shift | null | undefined>(undefined);
   const [orders, setOrders] = useState<QueueOrder[] | null>(null);
@@ -487,21 +488,31 @@ export default function StaffPage() {
     if (!session) return;
     setBusy('buyback');
     try {
-      const customer = await createCustomer({
+      const customer = await resolveCustomerForStaff({
         phone: buybackForm.phone.trim(),
         name: buybackForm.name.trim() || 'Клиент скупки',
-      });
-      const result = await createTradeIn({
+      }, session.accessToken);
+      const tradeInInput = {
         customerId: customer.id,
         model: buybackForm.model.trim(),
         imei: buybackForm.imei.trim() || undefined,
         grade: buybackForm.grade,
         price: Number(buybackForm.price),
         sellerPassport: buybackForm.passport.trim(),
-      }, { accessToken: session.accessToken, staffIntake: true });
+      };
+      const fingerprint = JSON.stringify(tradeInInput);
+      if (buybackAttempt.current?.fingerprint !== fingerprint) {
+        buybackAttempt.current = { fingerprint, idempotencyKey: crypto.randomUUID() };
+      }
+      const result = await createTradeIn(tradeInInput, {
+        accessToken: session.accessToken,
+        staffIntake: true,
+        idempotencyKey: buybackAttempt.current.idempotencyKey,
+      });
       setTradeIn(result);
       setBuyback(BUYBACK.map(() => true));
       flash('Договор оформлен');
+      buybackAttempt.current = null;
     } catch (e) {
       flash(e instanceof Error ? e.message : 'Ошибка скупки');
     } finally {

@@ -28,8 +28,14 @@ describe('checkout surfaces the API error message, not the raw status', () => {
       message: 'Для этого номера войдите в аккаунт перед оформлением заказа',
     });
 
-    await expect(createCustomer({ phone: '+996700123456' }))
+    await expect(createCustomer(
+      { phone: '+996700123456' },
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    ))
       .rejects.toThrow('Для этого номера войдите в аккаунт перед оформлением заказа');
+    const init = vi.mocked(fetch).mock.calls[0]?.[1] as RequestInit;
+    expect((init.headers as Record<string, string>)['idempotency-key'])
+      .toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
   });
 
   it('createOrder rethrows the API message instead of "orders responded <status>"', async () => {
@@ -44,6 +50,9 @@ describe('checkout surfaces the API error message, not the raw status', () => {
 
   it('still fails loudly when the API sends no message body', async () => {
     stubFetch(500, {});
-    await expect(createCustomer({ phone: '+996700000000' })).rejects.toThrow(/500/);
+    await expect(createCustomer(
+      { phone: '+996700000000' },
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    )).rejects.toThrow(/500/);
   });
 });

@@ -34,7 +34,8 @@ import { requireActiveStaff } from '../auth/staff-principal';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { AuthzService } from '../authz/authz.service';
-import { guestOrderCapabilityTtlSeconds, issueGuestOrderCapability, requireGuestCapability } from '../auth/guest-capability';
+import { guestOrderCapabilityTtlSeconds, issueGuestOrderCapability, requireActiveGuestCapability } from '../auth/guest-capability';
+import { PrismaService } from '../prisma/prisma.service';
 import { ReceiptsService } from '../receipts/receipts.service';
 import { OrderCancellationsService } from './order-cancellations.service';
 import { CreateOrderCancellationDto } from './order-cancellations.dto';
@@ -56,6 +57,7 @@ export class OrdersController {
     private readonly cancellationResolutions: OrderCancellationResolutionService,
     private readonly itemHandovers: OrderItemHandoverService,
     private readonly itemReservations: OrderItemReservationService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post(':id/items/:itemId/reserve')
@@ -317,7 +319,7 @@ export class OrdersController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   async guestOrder(@Headers('x-guest-capability') capability: string | undefined, @Param('id') id: string) {
-    const claims = requireGuestCapability(capability, 'orders:read', undefined, { type: 'order', id });
+    const claims = await requireActiveGuestCapability(this.prisma, capability, 'orders:read', undefined, { type: 'order', id });
     const order = await this.orders.getGuest(id);
     if (!order || order.customerId !== claims.sub) throw new NotFoundException(`Заказ ${id} не найден`);
     const ledger = await this.orders.ledger(id);
@@ -334,7 +336,7 @@ export class OrdersController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   async guestReceipt(@Headers('x-guest-capability') capability: string | undefined, @Param('id') id: string) {
-    const claims = requireGuestCapability(capability, 'receipts:read', undefined, { type: 'order', id });
+    const claims = await requireActiveGuestCapability(this.prisma, capability, 'receipts:read', undefined, { type: 'order', id });
     const order = await this.orders.get(id);
     if (!order || order.customerId !== claims.sub) throw new NotFoundException(`Заказ ${id} не найден`);
     const paid = order.payments.some((payment) => payment.amount > 0 && ['received', 'reconciled'].includes(payment.status));
@@ -356,7 +358,7 @@ export class OrdersController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: CreateOrderDto,
   ) {
-    const guest = requireGuestCapability(capability, 'orders:create', dto.customerId);
+    const guest = await requireActiveGuestCapability(this.prisma, capability, 'orders:create', dto.customerId);
     const order = await this.orders.createFromCatalog(dto, `guest:${guest.sub}`, idempotencyKey, false);
     const expiresIn = guestOrderCapabilityTtlSeconds();
     return {

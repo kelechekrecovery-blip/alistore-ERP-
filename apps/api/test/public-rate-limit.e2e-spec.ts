@@ -21,6 +21,7 @@ import { SupportController } from '../src/support/support.controller';
 import { SupportService } from '../src/support/support.service';
 import { AuthzService } from '../src/authz/authz.service';
 import { issueGuestCheckoutCapability } from '../src/auth/guest-capability';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 /**
  * Abuse guardrails for public write endpoints: checkout path and support tickets
@@ -34,9 +35,18 @@ describe('public endpoint rate limits', () => {
       imports: [ConfigModule.forRoot({ isGlobal: true }), RateLimitModule],
       controllers: [CustomersController, OrdersController, PaymentsController, SupportController],
       providers: [
+        { provide: PrismaService, useValue: { customer: { findUnique: async () => ({ phone: '+996700111222' }) } } },
         // GET /payments/methods отвечает по фактическому провайдеру шлюза.
         { provide: PAYMENT_GATEWAY_PROVIDER, useValue: { name: 'none' } },
-        { provide: CustomersService, useValue: { createGuest: async () => ({ id: 'customer-1' }) } },
+        {
+          provide: CustomersService,
+          useValue: {
+            createGuest: async () => ({
+              customer: { id: 'customer-1' },
+              expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+            }),
+          },
+        },
         { provide: OrdersService, useValue: { createFromCatalog: async () => ({ id: 'order-1' }) } },
         {
           provide: OrderCancellationsService,
@@ -84,7 +94,13 @@ describe('public endpoint rate limits', () => {
   }
 
   it('rate-limits checkout customer creation', async () => {
-    await exhaust('/customers', { phone: '+996700111222', name: 'Checkout' }, 30, 201);
+    await exhaust(
+      '/customers',
+      { phone: '+996700111222', name: 'Checkout' },
+      30,
+      201,
+      { 'idempotency-key': '77777777-7777-4777-8777-777777777777' },
+    );
   });
 
   it('rate-limits checkout order creation', async () => {

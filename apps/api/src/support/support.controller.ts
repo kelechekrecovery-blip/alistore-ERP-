@@ -20,7 +20,8 @@ import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { AuthzService } from '../authz/authz.service';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
-import { issueGuestSupportCapability, requireGuestCapability } from '../auth/guest-capability';
+import { issueGuestSupportCapability, requireActiveGuestCapability } from '../auth/guest-capability';
+import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('support')
 @Controller('support/tickets')
@@ -29,6 +30,7 @@ export class SupportController {
     private readonly support: SupportService,
     private readonly staffAuth: StaffAuthService,
     private readonly authz: AuthzService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @ApiOperation({ summary: 'Open an idempotent ticket for the authenticated customer' })
@@ -85,7 +87,7 @@ export class SupportController {
   @Post()
   @UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  open(
+  async open(
     @Body() dto: OpenTicketDto,
     @CurrentUser() user?: AuthPrincipal,
     @Headers('x-guest-capability') capability?: string,
@@ -94,7 +96,7 @@ export class SupportController {
       throw new ForbiddenException('Нельзя открыть тикет от имени другого клиента');
     }
     const customerId = user?.typ === 'customer' ? user.customerId : dto.customerId;
-    if (!user) requireGuestCapability(capability, 'support:create', customerId);
+    if (!user) await requireActiveGuestCapability(this.prisma, capability, 'support:create', customerId);
     if (user?.typ === 'staff') throw new ForbiddenException('Используйте staff support workflow');
     return this.support.open({ ...dto, customerId }, customerId);
   }

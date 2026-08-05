@@ -37,7 +37,8 @@ const AUDIENCE = 'alistore-guest-checkout';
  */
 const secret = resolveJwtSecretFromEnv;
 
-export function issueGuestCheckoutCapability(customerId: string): string {
+export function issueGuestCheckoutCapability(customerId: string, expiresInSeconds = 1800): string {
+  const ttl = Math.max(1, Math.min(1800, Math.floor(expiresInSeconds)));
   return sign(
     {
       sub: customerId,
@@ -54,7 +55,7 @@ export function issueGuestCheckoutCapability(customerId: string): string {
       ],
     } satisfies Omit<GuestCapabilityClaims, 'iat' | 'exp'>,
     secret(),
-    { issuer: ISSUER, audience: AUDIENCE, expiresIn: '30m' },
+    { issuer: ISSUER, audience: AUDIENCE, expiresIn: ttl },
   );
 }
 
@@ -112,6 +113,21 @@ export function requireGuestCapability(
   }
   if (entity && (claims.entity?.type !== entity.type || claims.entity.id !== entity.id)) {
     throw new ForbiddenException('guest_capability_entity_mismatch');
+  }
+  return claims;
+}
+
+export async function requireActiveGuestCapability(
+  prisma: { customer: { findUnique(args: { where: { id: string }; select: { phone: true } }): Promise<{ phone: string } | null> } },
+  token: string | undefined,
+  scope: GuestCapabilityScope,
+  customerId?: string,
+  entity?: { type: 'order'; id: string },
+): Promise<GuestCapabilityClaims> {
+  const claims = requireGuestCapability(token, scope, customerId, entity);
+  const customer = await prisma.customer.findUnique({ where: { id: claims.sub }, select: { phone: true } });
+  if (!customer || customer.phone.startsWith('deleted:')) {
+    throw new UnauthorizedException('guest_capability_revoked');
   }
   return claims;
 }

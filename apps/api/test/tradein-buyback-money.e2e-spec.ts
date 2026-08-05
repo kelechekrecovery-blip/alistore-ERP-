@@ -12,6 +12,7 @@ import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 import { TradeInsModule } from '../src/tradeins/tradeins.module';
 import { issueGuestCheckoutCapability } from '../src/auth/guest-capability';
 import { JwtStrategy } from '../src/auth/jwt.strategy';
+import { CustomersModule } from '../src/customers/customers.module';
 
 /**
  * Выкуп Б/У устройства у прилавка — единственная операция, где наличные
@@ -45,6 +46,7 @@ describe('Trade-in buyback money trail (accounting + cash drawer)', () => {
         AuditModule,
         StaffAuthModule,
         TradeInsModule,
+        CustomersModule,
       ],
       providers: [JwtStrategy],
     }).compile();
@@ -192,5 +194,25 @@ describe('Trade-in buyback money trail (accounting + cash drawer)', () => {
       _sum: { amount: true },
     });
     expect(paidOut._sum.amount).toBe(-PRICE);
+  });
+
+  it('staff resolver adopts aliases without overwriting an existing customer name', async () => {
+    seq += 1;
+    const digits = `996708${RUN}${seq}`;
+    const legacy = await prisma.customer.create({ data: { phone: digits, name: 'Existing profile name' } });
+    createdCustomerIds.push(legacy.id);
+
+    await request(app.getHttpServer())
+      .post('/customers/staff/resolve')
+      .send({ phone: `+${digits}`, name: 'Buyback form override' })
+      .expect(401);
+    const resolved = await request(app.getHttpServer())
+      .post('/customers/staff/resolve')
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({ phone: `+${digits}`, name: 'Buyback form override' })
+      .expect(200);
+
+    expect(resolved.body).toMatchObject({ id: legacy.id, phone: `+${digits}`, name: 'Existing profile name' });
+    expect(await prisma.customer.count({ where: { phone: { in: [digits, `+${digits}`] } } })).toBe(1);
   });
 });

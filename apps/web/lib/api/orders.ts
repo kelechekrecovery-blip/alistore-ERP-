@@ -77,8 +77,22 @@ export interface CustomerOrderItem {
  * ("войдите в аккаунт перед оформлением заказа"), which is actionable — the raw
  * `customers responded 409` this used to throw was not.
  */
-export async function createCustomer(input: { phone: string; name?: string }): Promise<{ id: string; guestCapability: string; capabilityExpiresIn: number }> {
-  return postJson<{ id: string; guestCapability: string; capabilityExpiresIn: number }>('/customers', input);
+export async function createCustomer(
+  input: { phone: string; name?: string },
+  idempotencyKey: string,
+): Promise<{ id: string; guestCapability: string; capabilityExpiresIn: number }> {
+  return postJson<{ id: string; guestCapability: string; capabilityExpiresIn: number }>(
+    '/customers',
+    input,
+    { 'idempotency-key': idempotencyKey },
+  );
+}
+
+export async function resolveCustomerForStaff(
+  input: { phone: string; name?: string },
+  accessToken: string,
+): Promise<{ id: string; phone: string; name: string }> {
+  return postAuthJson('/customers/staff/resolve', input, accessToken);
 }
 
 /** Create an order from the storefront cart. Throws on API error. */

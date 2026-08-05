@@ -15,7 +15,8 @@ describe('EvidenceController authorized reads', () => {
       issueRead: jest.fn().mockResolvedValue({ asset: { key: 'evidence/support/ticket-1/photo.webp' } }),
     };
     const staffAuth = { me: jest.fn().mockResolvedValue({ id: 'staff-1' }) };
-    return { controller: new EvidenceController(evidence as never, staffAuth as never), evidence, staffAuth };
+    const prisma = { customer: { findUnique: jest.fn(async () => ({ phone: '+996700000001' })) } };
+    return { controller: new EvidenceController(evidence as never, staffAuth as never, prisma as never), evidence, staffAuth };
   }
 
   it('uses the active staff identity and role for private Evidence reads', async () => {

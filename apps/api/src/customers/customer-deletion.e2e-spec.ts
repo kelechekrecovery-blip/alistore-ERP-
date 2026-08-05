@@ -13,6 +13,7 @@ import { OTP_SENDER } from '../auth/otp-sender';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { CustomersModule } from './customers.module';
+import { issueGuestCheckoutCapability, requireActiveGuestCapability } from '../auth/guest-capability';
 
 /**
  * GAP-ACCOUNT-DELETE-001 — self-service account deletion and data export.
@@ -62,6 +63,7 @@ describe('Customer account deletion and export', () => {
 
   it('anonymizes PII, erases addresses/identities and revokes every session', async () => {
     const owner = await customer('11', true);
+    const preDeletionGuestCapability = issueGuestCheckoutCapability(owner.id);
     await prisma.customerAddress.create({
       data: { customerId: owner.id, title: 'Дом', text: 'Бишкек, Чуй 1' },
     });
@@ -140,6 +142,10 @@ describe('Customer account deletion and export', () => {
     expect(await prisma.auditEvent.count({ where: { type: 'customer.deleted', refs: { has: owner.id } } })).toBe(1);
     // consent flipped true → false, so campaigns see the withdrawal event
     expect(await prisma.auditEvent.count({ where: { type: 'customer.consent_changed', refs: { has: owner.id } } })).toBe(1);
+    for (const scope of ['orders:create', 'payments:intent', 'payments:gift_card', 'support:create', 'warranty:create', 'tradeins:create', 'evidence:write', 'evidence:read'] as const) {
+      await expect(requireActiveGuestCapability(prisma, preDeletionGuestCapability, scope, owner.id))
+        .rejects.toThrow('guest_capability_revoked');
+    }
 
     // repeat deletion is an idempotent no-op (no second ledger event)
     await request(app.getHttpServer())

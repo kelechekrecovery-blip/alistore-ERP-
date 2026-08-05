@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createCustomer,
   createMyOrder,
@@ -21,6 +21,8 @@ import { useAuth } from '@/lib/auth';
 import { LoadFailure } from '@/components/LoadFailure';
 import { som, conditionLabel } from '@/lib/format';
 import { guestOrderLink, saveGuestOrderAccess } from '@/lib/guest-order-access';
+import { stableIdempotencyAttempt } from '@/lib/guest-customer-idempotency';
+import { ApiError } from '@/lib/api/http';
 
 type TgUser = {
   first_name?: string;
@@ -73,6 +75,18 @@ function productIcon(category: string): string {
 }
 
 export default function TelegramMiniAppPage() {
+  const guestCustomerAttempt = useRef<{
+    fingerprint: string;
+    key: string;
+  } | null>(null);
+  const orderAttempt = useRef<{
+    fingerprint: string;
+    key: string;
+  } | null>(null);
+  const paymentAttempt = useRef<{
+    fingerprint: string;
+    key: string;
+  } | null>(null);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -208,7 +222,19 @@ export default function TelegramMiniAppPage() {
         total: subtotal,
         items: cart.map((line) => ({ sku: line.sku, qty: line.qty, price: line.price })),
       };
-      const orderKey = crypto.randomUUID();
+      const guestInput = {
+        phone: normalizePhone(phone),
+        name: name.trim() || 'Telegram customer',
+      };
+      const customerFingerprint = JSON.stringify(guestInput);
+      if (!user && guestCustomerAttempt.current?.fingerprint !== customerFingerprint) {
+        guestCustomerAttempt.current = stableIdempotencyAttempt(null, guestInput);
+      }
+      orderAttempt.current = stableIdempotencyAttempt(orderAttempt.current, {
+        customer: user?.customerId ?? customerFingerprint,
+        orderInput,
+      });
+      const orderKey = orderAttempt.current.key;
       // Вошедший через Telegram оформляет заказ своей сессией — тогда он видит
       // его в кабинете на любом устройстве, а не только по гостевой ссылке в
       // этом браузере. Гостевая ветка остаётся для всех остальных случаев.
@@ -217,10 +243,7 @@ export default function TelegramMiniAppPage() {
       if (user) {
         order = await authed((token) => createMyOrder(orderInput, token, orderKey));
       } else {
-        const customer = await createCustomer({
-          phone: phone.trim(),
-          name: name.trim() || 'Telegram customer',
-        });
+        const customer = await createCustomer(guestInput, guestCustomerAttempt.current!.key);
         guestCapability = customer.guestCapability;
         order = await createOrder({ ...orderInput, customerId: customer.id }, guestCapability, orderKey);
         if (order.guestAccess) saveGuestOrderAccess(order.id, order.guestAccess.capability, order.guestAccess.expiresIn);
@@ -228,17 +251,29 @@ export default function TelegramMiniAppPage() {
       if (payment === 'cash') {
         setDone({ order });
         setCart([]);
+        guestCustomerAttempt.current = null;
+        orderAttempt.current = null;
+        paymentAttempt.current = null;
         return;
       }
-      const intentKey = crypto.randomUUID();
       const intentInput = { orderId: order.id, method: payment, amount: subtotal };
+      paymentAttempt.current = stableIdempotencyAttempt(paymentAttempt.current, intentInput);
+      const intentKey = paymentAttempt.current.key;
       const intent = user
         ? await authed((token) => createMyPaymentIntent(intentInput, token, intentKey))
         : await createPaymentIntent({ ...intentInput, actor: 'telegram_mini_app' }, guestCapability!, intentKey);
       setDone({ order: { ...order, status: intent.orderStatus }, intent });
       setCart([]);
-    } catch {
-      setError('Не удалось оформить заказ. Попробуйте ещё раз.');
+      guestCustomerAttempt.current = null;
+      orderAttempt.current = null;
+      paymentAttempt.current = null;
+    } catch (cause) {
+      if (cause instanceof ApiError && ['guest_customer_replay_expired', 'guest_customer_requires_auth'].includes(cause.code ?? '')) {
+        guestCustomerAttempt.current = null;
+        setError(cause.message);
+      } else {
+        setError(cause instanceof Error ? cause.message : 'Не удалось оформить заказ. Попробуйте ещё раз.');
+      }
     } finally {
       setBusy(false);
     }

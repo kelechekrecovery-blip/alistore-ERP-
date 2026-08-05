@@ -91,9 +91,10 @@ export const api = {
     );
   },
 
-  createCustomer(input: { phone: string; name?: string }) {
-    return requestJson<{ id: string }>('/customers', {
+  createCustomer(input: { phone: string; name?: string }, idempotencyKey: string) {
+    return requestJson<{ id: string; guestCapability: string; capabilityExpiresIn: number }>('/customers', {
       method: 'POST',
+      headers: { 'idempotency-key': idempotencyKey },
       body: JSON.stringify(input),
     });
   },
@@ -183,7 +184,7 @@ export const api = {
     });
   },
 
-  createOrder(input: {
+  createGuestOrder(input: {
     customerId: string;
     channel: 'mobile' | 'staff_mobile';
     fulfillmentType?: 'pickup' | 'courier' | 'express' | 'store';
@@ -192,36 +193,67 @@ export const api = {
     deliverySlot?: string;
     total: number;
     items: Array<{ sku: string; qty: number; price: number }>;
-  }) {
+  }, guestCapability: string, idempotencyKey: string) {
     return requestJson<CreatedOrder>('/orders', {
       method: 'POST',
+      headers: { 'x-guest-capability': guestCapability, 'idempotency-key': idempotencyKey },
       body: JSON.stringify(input),
     });
   },
 
-  createPaymentIntent(input: {
+  createMyOrder(input: {
+    channel: 'mobile' | 'staff_mobile';
+    fulfillmentType?: 'pickup' | 'courier' | 'express' | 'store';
+    pickupPoint?: string;
+    deliveryAddress?: string;
+    deliverySlot?: string;
+    total: number;
+    items: Array<{ sku: string; qty: number; price: number }>;
+  }, token: string, idempotencyKey: string) {
+    return requestJson<CreatedOrder>('/orders/mine', {
+      method: 'POST',
+      token,
+      headers: { 'idempotency-key': idempotencyKey },
+      body: JSON.stringify(input),
+    });
+  },
+
+  createGuestPaymentIntent(input: {
     orderId: string;
     method: OnlinePaymentMethod;
     amount: number;
     actor?: string;
     returnUrl?: string;
-  }) {
+  }, guestCapability: string, idempotencyKey: string) {
     return requestJson<PaymentIntent>('/payments/intents', {
       method: 'POST',
+      headers: { 'x-guest-capability': guestCapability, 'idempotency-key': idempotencyKey },
       body: JSON.stringify(input),
     });
   },
 
-  confirmSandboxPayment(input: {
+  createMyPaymentIntent(input: {
     orderId: string;
     method: OnlinePaymentMethod;
     amount: number;
-    txnId: string;
-  }) {
-    return requestJson<PaymentConfirmResult>('/payments/webhooks/sandbox', {
+    returnUrl?: string;
+  }, token: string, idempotencyKey: string) {
+    return requestJson<PaymentIntent>('/payments/intents/mine', {
       method: 'POST',
-      body: JSON.stringify({ ...input, status: 'succeeded', actor: 'mobile_sandbox' }),
+      token,
+      headers: { 'idempotency-key': idempotencyKey },
+      body: JSON.stringify(input),
     });
+  },
+
+  confirmSandboxPayment(input: { provider: string; intentId: string }) {
+    return requestJson<PaymentConfirmResult>(
+      `/sandbox/payments/${encodeURIComponent(input.provider)}/${encodeURIComponent(input.intentId)}/confirm-json`,
+      {
+      method: 'POST',
+      body: JSON.stringify({}),
+      },
+    );
   },
 
   staffLogin(username: string, password: string) {

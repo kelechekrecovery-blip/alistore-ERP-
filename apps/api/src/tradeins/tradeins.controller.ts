@@ -29,13 +29,14 @@ import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
-import { requireGuestCapability } from '../auth/guest-capability';
+import { requireActiveGuestCapability } from '../auth/guest-capability';
+import { PrismaService } from '../prisma/prisma.service';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 
 @ApiTags('tradeins')
 @Controller('tradeins')
 export class TradeInsController {
-  constructor(private readonly tradeIns: TradeInsService) {}
+  constructor(private readonly tradeIns: TradeInsService, private readonly prisma: PrismaService) {}
 
   @ApiOperation({
     summary: 'Assess and contract a used-device buyback (trade-in)',
@@ -47,7 +48,7 @@ export class TradeInsController {
   @Post()
   @UseGuards(OptionalJwtAuthGuard, ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } }) // anti-abuse: public KYC/passport endpoint
-  create(
+  async create(
     @Body() dto: CreateTradeInDto,
     @CurrentUser() user?: AuthPrincipal,
     @Headers('x-guest-capability') capability?: string,
@@ -59,7 +60,7 @@ export class TradeInsController {
       return this.tradeIns.create({ ...dto, customerId: user.customerId }, user.customerId, key);
     }
     const customerId = requiredCustomerId(dto.customerId);
-    if (!user) requireGuestCapability(capability, 'tradeins:create', customerId);
+    if (!user) await requireActiveGuestCapability(this.prisma, capability, 'tradeins:create', customerId);
     return this.tradeIns.create({ ...dto, customerId }, customerId, key);
   }
 

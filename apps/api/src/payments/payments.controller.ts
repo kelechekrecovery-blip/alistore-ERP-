@@ -27,7 +27,8 @@ import { resolveCustomerPaymentMethods } from './payment-methods-availability';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthPrincipal } from '../auth/jwt.strategy';
-import { requireGuestCapability } from '../auth/guest-capability';
+import { requireActiveGuestCapability } from '../auth/guest-capability';
+import { PrismaService } from '../prisma/prisma.service';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { requireActiveStaff } from '../auth/staff-principal';
 import { RefundsService } from '../refunds/refunds.service';
@@ -38,6 +39,7 @@ export class PaymentsController {
   constructor(
     private readonly payments: PaymentsService,
     private readonly intents: PaymentIntentsService,
+    private readonly prisma: PrismaService,
     private readonly staffAuth: StaffAuthService,
     private readonly config: ConfigService,
     @Inject(PAYMENT_GATEWAY_PROVIDER) private readonly gateway: PaymentGatewayProvider,
@@ -112,7 +114,7 @@ export class PaymentsController {
       const staffId = await requireActiveStaff(user, this.staffAuth);
       return this.payments.pay(dto, `staff:${staffId}`, { staffId, idempotencyKey });
     }
-    const guest = requireGuestCapability(capability, 'payments:gift_card');
+    const guest = await requireActiveGuestCapability(this.prisma, capability, 'payments:gift_card');
     return this.payments.payForCustomer(guest.sub, dto, `guest:${guest.sub}`);
   }
 
@@ -146,12 +148,12 @@ export class PaymentsController {
   @Post('intents')
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  intent(
+  async intent(
     @Headers('x-guest-capability') capability: string | undefined,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: CreatePaymentIntentDto,
   ) {
-    const guest = requireGuestCapability(capability, 'payments:intent');
+    const guest = await requireActiveGuestCapability(this.prisma, capability, 'payments:intent');
     return this.intents.createForCustomer(guest.sub, dto, idempotencyKey);
   }
 

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import {
   ActivityIndicator,
   Pressable,
@@ -13,6 +14,7 @@ import {
 
 import { ApiError, api } from '@mobile/api-client';
 import { formatSom, shortId } from '@mobile/format';
+import { stableIdempotencyAttempt } from '@mobile/idempotency-attempt';
 import { clearCustomerSession, getStoredCustomerSession, saveCustomerSession } from '@mobile/secure-session';
 import { radius, theme } from '@mobile/theme';
 import { EmptyState, Field, GhostButton, MetricCard, Pill, PrimaryButton, ProductPoster, SectionTitle } from '@mobile/ui';
@@ -111,6 +113,18 @@ export function ClientScreen({
   const [returnBusy, setReturnBusy] = useState(false);
   const [returnError, setReturnError] = useState<string | null>(null);
   const [returnResult, setReturnResult] = useState<{ id: string; status: string } | null>(null);
+  const guestCustomerAttempt = useRef<{
+    fingerprint: string;
+    key: string;
+  } | null>(null);
+  const orderAttempt = useRef<{
+    fingerprint: string;
+    key: string;
+  } | null>(null);
+  const paymentAttempt = useRef<{
+    fingerprint: string;
+    key: string;
+  } | null>(null);
 
   const categories = useMemo(() => ['Все', ...Array.from(new Set(products.map((product) => product.category))).slice(0, 10)], [products]);
   const cartLines = useMemo(() => {
@@ -520,34 +534,77 @@ export function ClientScreen({
     setBusy(true);
     setError(null);
     try {
-      const customerId = customerSession?.customerId
-        ?? (await api.createCustomer({ phone: checkoutPhone, name: name.trim() || undefined })).id;
-      const order = await api.createOrder({
-        customerId,
+      const orderInput = {
         channel: 'mobile',
         fulfillmentType: 'pickup',
         pickupPoint: 'alistore-center',
         deliverySlot: 'AliStore Центр · сегодня',
         total,
         items: cartLines.map((line) => ({ sku: line.product.sku, qty: line.qty, price: line.product.price })),
-      });
+      } as const;
+      const guestInput = {
+        phone: checkoutPhone,
+        name: name.trim() || undefined,
+      };
+      const customerIdentity = {
+        phone: checkoutPhone,
+        name: name.trim() || 'Клиент',
+      };
+      const customerFingerprint = JSON.stringify(customerIdentity);
+      if (!customerSession && guestCustomerAttempt.current?.fingerprint !== customerFingerprint) {
+        guestCustomerAttempt.current = stableIdempotencyAttempt(null, customerIdentity, uuidv4);
+      }
+      orderAttempt.current = stableIdempotencyAttempt(orderAttempt.current, {
+        customer: customerSession?.customerId ?? customerFingerprint,
+        orderInput,
+      }, uuidv4);
+      const orderKey = orderAttempt.current.key;
+      let guestCapability: string | null = null;
+      const order = customerSession
+        ? await api.createMyOrder(orderInput, customerSession.accessToken, orderKey)
+        : await (async () => {
+            const guest = await api.createCustomer(
+              guestInput,
+              guestCustomerAttempt.current!.key,
+            );
+            guestCapability = guest.guestCapability;
+            return api.createGuestOrder(
+              { ...orderInput, customerId: guest.id },
+              guest.guestCapability,
+              orderKey,
+            );
+          })();
 
       if (payment === 'cash') {
         setCheckoutResult({ order });
         setCart({});
+        guestCustomerAttempt.current = null;
+        orderAttempt.current = null;
+        paymentAttempt.current = null;
         if (customerSession) void loadCustomerOrders(customerSession);
         setTab('account');
         return;
       }
 
-      const intent = await api.createPaymentIntent({
+      const intentInput = {
         orderId: order.id,
         method: payment,
         amount: total,
-        actor: 'mobile_checkout',
-      });
+      };
+      paymentAttempt.current = stableIdempotencyAttempt(paymentAttempt.current, intentInput, uuidv4);
+      const intentKey = paymentAttempt.current.key;
+      const intent = customerSession
+        ? await api.createMyPaymentIntent(intentInput, customerSession.accessToken, intentKey)
+        : await api.createGuestPaymentIntent(
+            { ...intentInput, actor: 'mobile_checkout' },
+            guestCapability!,
+            intentKey,
+          );
       setCheckoutResult({ order: { ...order, status: intent.orderStatus }, intent });
       setCart({});
+      guestCustomerAttempt.current = null;
+      orderAttempt.current = null;
+      paymentAttempt.current = null;
       if (customerSession) void loadCustomerOrders(customerSession);
       setTab('account');
     } catch (cause) {
@@ -563,10 +620,8 @@ export function ClientScreen({
     setError(null);
     try {
       const confirmed = await api.confirmSandboxPayment({
-        orderId: checkoutResult.intent.orderId,
-        method: checkoutResult.intent.method,
-        amount: checkoutResult.intent.amount,
-        txnId: checkoutResult.intent.txnId,
+        provider: checkoutResult.intent.provider,
+        intentId: checkoutResult.intent.intentId,
       });
       setCheckoutResult({
         ...checkoutResult,
@@ -1635,7 +1690,7 @@ function TotalRow({ label, value, strong, accent }: { label: string; value: stri
 function normalizePhone(input: string): string {
   const trimmed = input.trim();
   const digits = trimmed.replace(/\D/g, '');
-  return trimmed.startsWith('+') ? `+${digits}` : digits;
+  return digits.length >= 9 && digits.length <= 15 ? `+${digits}` : trimmed;
 }
 
 function phoneDigitCount(input: string): number {

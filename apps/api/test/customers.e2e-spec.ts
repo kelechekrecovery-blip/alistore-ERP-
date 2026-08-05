@@ -40,7 +40,7 @@ describe('Customers find-or-create (integration)', () => {
   it('does not issue a guest capability for an existing customer', async () => {
     await customers.upsert({ phone: '+996700111333', name: 'Закрытый профиль' });
 
-    await expect(customers.createGuest({ phone: '996700111333', name: 'Подмена' }))
+    await expect(customers.createGuest({ phone: '996700111333', name: 'Подмена' }, '11111111-1111-4111-8111-111111111111'))
       .rejects.toMatchObject({
         status: 409,
         response: expect.objectContaining({ code: 'guest_customer_requires_auth' }),
@@ -63,14 +63,61 @@ describe('Customers find-or-create (integration)', () => {
 
   it('serializes concurrent guest creation across plus and no-plus aliases', async () => {
     const results = await Promise.allSettled([
-      customers.createGuest({ phone: '+996700111555', name: 'First' }),
-      customers.createGuest({ phone: '996700111555', name: 'Second' }),
+      customers.createGuest({ phone: '+996700111555', name: 'First' }, '22222222-2222-4222-8222-222222222222'),
+      customers.createGuest({ phone: '996700111555', name: 'Second' }, '33333333-3333-4333-8333-333333333333'),
     ]);
 
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
     expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
     expect(await prisma.customer.count({ where: { phone: '+996700111555' } })).toBe(1);
     expect(await prisma.customer.count({ where: { phone: '996700111555' } })).toBe(0);
+  });
+
+  it('replays a lost guest-create response by key without exposing another account', async () => {
+    const key = '44444444-4444-4444-8444-444444444444';
+    const first = await customers.createGuest({ phone: '996700111556', name: 'Replay Guest' }, key);
+    const replay = await customers.createGuest({ phone: '+996700111556', name: 'Replay Guest' }, key);
+
+    expect(replay.customer.id).toBe(first.customer.id);
+    expect(replay.expiresAt).toEqual(first.expiresAt);
+    expect(await prisma.customer.count({ where: { phone: '+996700111556' } })).toBe(1);
+    await expect(customers.createGuest({ phone: '+996700111557', name: 'Other' }, key))
+      .rejects.toMatchObject({ status: 409, response: expect.objectContaining({ code: 'idempotency_key_reused' }) });
+  });
+
+  it('serializes concurrent retries of the same guest command', async () => {
+    const results = await Promise.all([
+      customers.createGuest({ phone: '+996700111558', name: 'Concurrent Replay' }, '55555555-5555-4555-8555-555555555555'),
+      customers.createGuest({ phone: '996700111558', name: 'Concurrent Replay' }, '55555555-5555-4555-8555-555555555555'),
+    ]);
+    expect(new Set(results.map((result) => result.customer.id))).toHaveProperty('size', 1);
+    expect(await prisma.customer.count({ where: { phone: '+996700111558' } })).toBe(1);
+  });
+
+  it('refuses guest command replay after its capability window expires', async () => {
+    const key = '66666666-6666-4666-8666-666666666666';
+    const created = await customers.createGuest({ phone: '+996700111559', name: 'Expired Guest' }, key);
+    await prisma.customer.update({
+      where: { id: created.customer.id },
+      data: { guestCreateExpiresAt: new Date(Date.now() - 1) },
+    });
+    await expect(customers.createGuest({ phone: '996700111559', name: 'Expired Guest' }, key))
+      .rejects.toMatchObject({ status: 409, response: expect.objectContaining({ code: 'guest_customer_replay_expired' }) });
+  });
+
+  it('temporarily accepts a missing key once for installed-client compatibility', async () => {
+    const created = await customers.createGuest({ phone: '+996700111560', name: 'Legacy Client' }, '');
+    expect(created.customer).toMatchObject({ phone: '+996700111560', guestCreateKeyHash: null });
+    await expect(customers.createGuest({ phone: '996700111560', name: 'Legacy Client' }, ''))
+      .rejects.toMatchObject({ status: 409, response: expect.objectContaining({ code: 'guest_customer_requires_auth' }) });
+  });
+
+  it('rejects predictable supplied replay keys before writing', async () => {
+    for (const key of ['1', 'guest-123', '77777777-7777-1777-8777-777777777777']) {
+      await expect(customers.createGuest({ phone: '+996700111560', name: 'Weak Key' }, key))
+        .rejects.toMatchObject({ status: 422, response: expect.objectContaining({ code: 'idempotency_key_invalid' }) });
+    }
+    expect(await prisma.customer.count({ where: { name: 'Weak Key' } })).toBe(0);
   });
 
   it('recovers the canonical winner when another phone writer wins the unique race', async () => {
@@ -82,6 +129,19 @@ describe('Customers find-or-create (integration)', () => {
     expect(recovered.id).toBe(winner.id);
     expect(recovered.name).toBe('POS update');
     expect(await prisma.customer.count({ where: { phone: '+996700111666' } })).toBe(1);
+  });
+
+  it('resolves staff intake aliases without overwriting an established profile', async () => {
+    const existing = await prisma.customer.create({ data: { phone: '996700111667', name: 'Account Owner' } });
+    const adopted = await customers.resolveForStaff({ phone: '+996700111667', name: 'Intake Override' });
+    expect(adopted).toMatchObject({ id: existing.id, phone: '+996700111667', name: 'Account Owner' });
+
+    const [first, second] = await Promise.all([
+      customers.resolveForStaff({ phone: '+996700111668', name: 'First Intake' }),
+      customers.resolveForStaff({ phone: '996700111668', name: 'Second Intake' }),
+    ]);
+    expect(first.id).toBe(second.id);
+    expect(await prisma.customer.count({ where: { phone: { in: ['+996700111668', '996700111668'] } } })).toBe(1);
   });
 
   it('defaults the name when none is given', async () => {
