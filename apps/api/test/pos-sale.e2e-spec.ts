@@ -5,7 +5,6 @@ import { UnitsService } from '../src/units/units.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { PaymentsService } from '../src/payments/payments.service';
 import { ShiftsService } from '../src/shifts/shifts.service';
-import { CustomersService } from '../src/customers/customers.service';
 import { ApprovalsService } from '../src/approvals/approvals.service';
 import { PosService } from '../src/pos/pos.service';
 import { ConflictError, ForbiddenError, ValidationError } from '../src/common/errors';
@@ -33,7 +32,6 @@ describe('POS sale (integration)', () => {
     shifts = new ShiftsService(prisma, audit);
     pos = new PosService(
       prisma,
-      new CustomersService(prisma, audit, new SettingsService(prisma, audit)),
       shifts,
       units,
       new OrdersService(prisma, audit, units),
@@ -119,6 +117,40 @@ describe('POS sale (integration)', () => {
     expect(types).toEqual(
       expect.arrayContaining(['shift.opened', 'order.created', 'order.reserved', 'payment.received', 'unit.sold', 'order.paid']),
     );
+  });
+
+  it('creates and reuses one internal walk-in customer for unbound sales', async () => {
+    const product = await seedProduct(2);
+    await openShift('staff_pos_walkin');
+
+    const first = expectCompleted(await pos.sale({
+      staffId: 'staff_pos_walkin',
+      point: 'BISHKEK-1',
+      method: 'cash',
+      clientSaleId: `walkin-first-${RUN}`,
+      lines: [{ productId: product.id, sku: product.sku, price: product.price, qty: 1 }],
+    }));
+    const second = expectCompleted(await pos.sale({
+      staffId: 'staff_pos_walkin',
+      point: 'BISHKEK-1',
+      method: 'cash',
+      clientSaleId: `walkin-second-${RUN}`,
+      lines: [{ productId: product.id, sku: product.sku, price: product.price, qty: 1 }],
+    }));
+
+    const walkInCustomers = await prisma.customer.findMany({
+      where: { phone: '+000000000000' },
+      select: { id: true, name: true },
+    });
+    const orders = await prisma.order.findMany({
+      where: { id: { in: [first.orderId, second.orderId] } },
+      select: { customerId: true },
+    });
+    expect(walkInCustomers).toEqual([
+      expect.objectContaining({ name: 'Розничный покупатель' }),
+    ]);
+    expect(orders).toHaveLength(2);
+    expect(orders.every((order) => order.customerId === walkInCustomers[0]?.id)).toBe(true);
   });
 
   it('binds a counter sale to a selected existing customer and rejects a missing customer', async () => {

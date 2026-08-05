@@ -5,7 +5,6 @@ import { UnitsService } from '../src/units/units.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { PaymentsService } from '../src/payments/payments.service';
 import { ShiftsService } from '../src/shifts/shifts.service';
-import { CustomersService } from '../src/customers/customers.service';
 import { ApprovalsService } from '../src/approvals/approvals.service';
 import { PosService } from '../src/pos/pos.service';
 import { ForbiddenError } from '../src/common/errors';
@@ -41,7 +40,6 @@ describe('POS discount approval is single-use (money-loss guard)', () => {
     shifts = new ShiftsService(prisma, audit);
     pos = new PosService(
       prisma,
-      new CustomersService(prisma, audit, new SettingsService(prisma, audit)),
       shifts,
       units,
       new OrdersService(prisma, audit, units),

@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Payment } from '@prisma/client';
 import { createHash } from 'crypto';
-import { CustomersService } from '../customers/customers.service';
 import { ShiftsService } from '../shifts/shifts.service';
 import { UnitsService } from '../units/units.service';
 import { OrdersService } from '../orders/orders.service';
@@ -58,7 +57,6 @@ interface NormalizedPosPayment {
 export class PosService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly customers: CustomersService,
     private readonly shifts: ShiftsService,
     private readonly units: UnitsService,
     private readonly orders: OrdersService,
@@ -249,10 +247,7 @@ export class PosService {
 
     const customer = boundCustomerId
       ? await this.prisma.customer.findUnique({ where: { id: boundCustomerId } })
-      : await this.customers.upsert({
-          phone: WALKIN_PHONE,
-          name: 'Розничный покупатель',
-        });
+      : await this.walkInCustomer();
     if (!customer) {
       throw new ValidationError('pos_customer_not_found', 'Выбранный клиент не найден');
     }
@@ -349,6 +344,19 @@ export class PosService {
   private deriveTxnId(dto: PosSaleDto, customerId?: string): string {
     if (dto.clientSaleId) return `pos:${dto.clientSaleId}`;
     return `pos:auto:${this.saleFingerprint(dto, customerId)}`;
+  }
+
+  /**
+   * The walk-in identity is an internal sentinel, not an authenticatable phone number.
+   * Keep it outside customer phone normalization and create it atomically through the
+   * unique phone key so concurrent anonymous sales always converge on one customer.
+   */
+  private walkInCustomer() {
+    return this.prisma.customer.upsert({
+      where: { phone: WALKIN_PHONE },
+      create: { phone: WALKIN_PHONE, name: 'Розничный покупатель' },
+      update: {},
+    });
   }
 
   /**

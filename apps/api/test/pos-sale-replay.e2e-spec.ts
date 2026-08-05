@@ -5,7 +5,6 @@ import { UnitsService } from '../src/units/units.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { PaymentsService } from '../src/payments/payments.service';
 import { ShiftsService } from '../src/shifts/shifts.service';
-import { CustomersService } from '../src/customers/customers.service';
 import { ApprovalsService } from '../src/approvals/approvals.service';
 import { PosService } from '../src/pos/pos.service';
 import { ConflictError } from '../src/common/errors';
@@ -32,7 +31,6 @@ describe('POS sale replay (integration)', () => {
     shifts = new ShiftsService(prisma, audit);
     pos = new PosService(
       prisma,
-      new CustomersService(prisma, audit, new SettingsService(prisma, audit)),
       shifts,
       units,
       new OrdersService(prisma, audit, units),

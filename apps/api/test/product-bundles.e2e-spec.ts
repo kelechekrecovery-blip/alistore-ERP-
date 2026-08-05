@@ -6,7 +6,6 @@ import { ApprovalsService } from '../src/approvals/approvals.service';
 import { UnitsService } from '../src/units/units.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { PaymentsService } from '../src/payments/payments.service';
-import { CustomersService } from '../src/customers/customers.service';
 import { ShiftsService } from '../src/shifts/shifts.service';
 import { PosService } from '../src/pos/pos.service';
 import { ReservationsService } from '../src/reservations/reservations.service';
@@ -44,7 +43,6 @@ describe('Product bundles (integration)', () => {
     shifts = new ShiftsService(prisma, audit);
     pos = new PosService(
       prisma,
-      new CustomersService(prisma, audit, new SettingsService(prisma, audit)),
       shifts,
       units,
       orders,
