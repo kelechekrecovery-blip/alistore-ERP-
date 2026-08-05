@@ -1,7 +1,7 @@
 # AliStore AI Executive OS — Phase 0 Baseline
 
 Дата снимка: 2026-08-05
-Git SHA: `c632b36e`
+Git SHA evidence through: `e18781ca`
 Статус решения: **REVISE — переход к production rollout запрещён до закрытия P0**.
 
 ## Scope
@@ -18,11 +18,12 @@ AI не получают права менять деньги, остатки, �
 Status: REVISE
 
 Summary: локальная программная основа AliStore сильная и собирается, но система не
-доказана как production-ready. Core API/Web builds и 192 targeted теста прошли,
-однако остаются security/privacy defects, внешняя сертификация платежей,
-фискализации, каналов, камер и устройств, а App Store evidence в репозитории
-противоречиво. Следующая работа должна закрывать P0 reliability/security slices,
-каждый отдельным проверяемым коммитом.
+доказана как production-ready. Auth/account, support retry, AI image SSRF и
+production dependency HIGH закрыты проверяемыми slices. Остаются camera/Event
+Ledger/approval security gaps, paid-repair identity races, guest-order response-loss
+и mobile/staff checkout contract defects, а также внешняя сертификация платежей,
+фискализации, каналов, камер и физических устройств. Все четыре App Store
+submission ожидают review.
 
 ## Confidence
 
@@ -41,7 +42,16 @@ reviews. Live production credentials, реальные провайдеры, к�
 - VERIFIED: `npm run build -w @alistore/web` — PASS, 45 Next.js routes generated; storefront `no-store` fetch корректно оставил `/` dynamic.
 - VERIFIED: isolated auth/preflight/RBAC/outbox run — 4 suites, 179/179 tests PASS.
 - VERIFIED: isolated authz/AI/camera run — 3 suites, 13/13 tests PASS.
-- VERIFIED: production dependency audit — 5 high, 0 critical (`ajv`, `brace-expansion`, `fast-uri`, `minimatch`, `socket.io-parser`).
+- VERIFIED: auth/account release gate — 5 suites, 55/55 tests PASS (OTP,
+  recovery, refresh replay/theft, social enrollment, staff sessions, export/delete).
+- VERIFIED: customer/support canonical identity and concurrency — 2 suites,
+  13/13 tests PASS on isolated PostgreSQL.
+- VERIFIED: anonymous POS walk-in identity regression closed with a DB-atomic
+  internal sentinel; POS/inventory/ledger/bundle gate — 7 suites, 58/58 PASS.
+- VERIFIED: production dependency audit — 0 vulnerabilities after compatible
+  per-consumer resolution; legacy glob/coverage and Socket.IO runtime tests PASS.
+- VERIFIED: iOS unit/contract 164/164 and UI E2E 47/47 PASS across Client,
+  Staff, Courier and POS; all four App Store versions read back WAITING_FOR_REVIEW.
 - VERIFIED: worktree был dirty до Phase 0 docs; изменения iOS/Web/visual snapshots и незавершённый outbox slice не входят в этот documentation slice.
 - UNKNOWN: полный API, полный Playwright, XCUITest/Android connected tests и live provider/device scenarios на этом SHA не запускались.
 
@@ -51,52 +61,60 @@ reviews. Live production credentials, реальные провайдеры, к�
 
 | Область | Статус | Доказательство | Риск | Следующий шаг |
 |---|---|---|---|---|
-| Auth | PARTIAL | OTP/email/social/refresh/logout endpoints: `apps/api/src/auth/auth.controller.ts`; fail-closed method discovery: `apps/api/test/auth-methods.spec.ts`; targeted tests PASS | Боевой SMS/Apple/Telegram зависит от внешних credentials; customer auth события не нормализованы | Сертифицировать один production login path; добавить `auth.login` failure/success taxonomy и live clean-session E2E |
-| Registration | PARTIAL | OTP создаёт/находит customer; social enrollment v2 существует; `auth-methods.spec.ts` доказывает, когда регистрация недоступна | В production без SMS social login не регистрирует нового клиента; `auth.signup` отсутствует | Выбрать authoritative signup path, добавить consent/version capture и E2E registration→logout→login |
-| RBAC | PARTIAL | Casbin guard и серверная approval matrix; isolated RBAC/authz tests PASS | Требуемые AI-роли и canonical `manager` не существуют; один consent endpoint не rechecks active staff | Спроектировать AI capability roles; закрыть active-staff gap; прогнать deny matrix по всем опасным endpoints |
-| Orders | PARTIAL | Transactional order creation/reservation/state machine, idempotency и ledger; Web checkout E2E specs существуют | Полный reconciled all-role E2E на текущем SHA не прогнан | Прогнать create→reserve→pay/COD→fulfill→return на isolated DB и cross-browser |
+| Auth | PARTIAL | 55/55 isolated auth/account tests PASS; canonical phone identity, OTP/recovery, refresh replay/theft, social enrollment, logout and account deletion are fail-closed | Боевой SMS/Apple/Telegram и fresh-device SIWA зависят от external credentials/device; customer auth events ещё не нормализованы | Physical iPad fresh enrollment and production SMS clean-session E2E; normalize auth event taxonomy |
+| Registration | PARTIAL | OTP and social enrollment converge on canonical customer identity; plus/no-plus/legacy/concurrency tests PASS | Production signup still depends on SMS; consent/version capture at signup is incomplete | Physical registration→logout→login test; persist consent/policy versions |
+| RBAC | PARTIAL | Casbin guard и серверная approval matrix; isolated RBAC/authz tests PASS | Требуемые AI-роли и canonical `manager` не существуют; approval lifecycle не имеет claim/expiry/cancel ownership; один consent endpoint не rechecks active staff | Спроектировать AI capability roles; добавить claim/expiry/cancel и concurrency tests; закрыть active-staff gap; прогнать deny matrix |
+| Orders | PARTIAL | Transactional order creation/reservation/state machine, idempotency и ledger; Web checkout E2E specs существуют | Guest customer command не имеет response-loss replay; React Native теряет guest capability и использует неверный order contract; staff buyback вызывает guest-only endpoint | Сначала idempotent guest command и mobile/staff contract fix; затем create→reserve→pay/COD→fulfill→return E2E |
 | Payments | BLOCKED_EXTERNAL | Provider-neutral ports, refund approvals, webhook/idempotency tests; `production-payment-gateway.provider.ts` fail-closed | Production gateway намеренно не активирован; фискальный чек отсутствует | Выбрать cash/COD pilot или сертифицированный provider; live signed webhook/refund reconciliation; OFD/KKM |
-| Inventory | PARTIAL | IMEI/quantity locks, reservation, valuation, quarantine and ledger paths in API; inventory E2E specs существуют | Scanner/physical store flow и полный supply release gate не сертифицированы | Прогнать exact-once procurement→receipt→sale→return; physical scanner and stock-count UAT |
+| Inventory | PARTIAL | IMEI/quantity locks, reservation, valuation, quarantine and ledger paths in API; 58/58 focused POS/inventory/ledger tests PASS | Paid-repair intake остаётся raw phone writer с alias/race risk; scanner/physical store flow не сертифицирован | Canonicalize service-center identity with concurrency tests; exact-once procurement→receipt→sale→return; physical UAT |
 | Delivery | BLOCKED_EXTERNAL | Courier assignment, evidence, COD handover and offline queues implemented; courier E2E specs существуют | Live push/maps/camera/network and physical COD handover не сертифицированы | Physical-device run with offline restart, evidence upload, failure→redispatch and cash reconciliation |
-| Support | PARTIAL | Customer/staff scoped support API and audited transitions; AI triage produces approval-backed draft | Web retry path может создать duplicate ticket; live WhatsApp/Telegram delivery external | Stable idempotency key for support create; channel certification; SLA and escalation E2E |
-| AI | PARTIAL | Allowlisted read tools, owner/admin guard, kill switch, durable runs/steps/decisions and approval-backed triage; isolated AI tests PASS | `confidence=1` hard-coded; sourceRefs недостаточны; image URL resolver имеет SSRF risk; нет eval gate | Сначала SSRF fix; затем typed Executive response, real evidence refs, confidence policy and offline evals |
+| Support | PARTIAL | Auth and guest create are atomic/idempotent; evidence keys are content-stable; canonical/legacy ownership, concurrent replay and expiry tests PASS | Live WhatsApp/Telegram delivery remains external | Channel certification plus SLA/escalation/failure E2E |
+| AI | PARTIAL | Allowlisted read tools, owner/admin guard, kill switch, durable runs/steps/decisions, approval-backed triage and hardened image URL resolver | `confidence=1` hard-coded; sourceRefs insufficient; no complete eval gate | Typed Executive response, real evidence refs, confidence policy and offline evals |
 | Telegram | BLOCKED_EXTERNAL | Pairing/TOTP, webhook secret, idempotent inbox, revocation, retention and approvals implemented | Отдельный AI tool registry может дрейфовать от Control Plane; data processor/privacy approval и bot credentials отсутствуют | Перевести на shared orchestrator; data-minimization review; live webhook/pair/revoke E2E |
 | Cameras | PARTIAL | Edge enrollment, hashed secrets, idempotent metadata ingest, global kill switch and retention purge; isolated camera tests PASS | `value` — arbitrary JSON; privacy label caller-controlled; нет EZVIZ/ONVIF/RTSP adapter, per-camera kill switch и legal decision | Typed per-event schemas, server-derived TTL/privacy, local gateway adapter and physical privacy UAT; face recognition запрещено |
-| iOS | PARTIAL | 4 SwiftUI targets; build number `1.0.0 (6)`; store scripts/signing contracts tracked | Current worktree lacks ASC/signing env and physical test evidence | Re-run four builds/tests/UI, physical device smoke and strict live ASC readback on clean SHA |
+| iOS | PARTIAL | 4 SwiftUI targets at repository build 6; unit/contract 164/164, UI 47/47 and strict signing/metadata preflight PASS | Pending ASC submissions use build 5; fresh physical-device SIWA is unverified | Do not replace build 5 while under review; physical-device auth smoke and post-review readback |
 | Web | PARTIAL | Production build PASS, 45 routes; 30 unit test files and 45 Playwright specs exist | Worktree contains unrelated uncommitted UI changes; full E2E not rerun | Separate/commit UI work, then full route audit, a11y, cross-browser and visual regression |
-| E2E | PARTIAL | 192 targeted API tests PASS on isolated databases; comprehensive Playwright journeys exist | Targeted checks do not prove whole ecosystem; no repeated flake run on current SHA | Run full isolated API twice, full Playwright, reconciled ecosystem, native UI and failure injection |
-| Security | FAILED | Fail-closed JWT/OTP/storage guards and secret scan controls exist | HIGH: AI image SSRF, incomplete PII export/delete, 5 high runtime dependency findings, camera metadata bypass; Event Ledger not DB-immutable | Close each HIGH as separate P0 slice with adversarial tests and independent security review |
-| App Store | BLOCKED_EXTERNAL | Project at build 6; store/runbook scripts exist; repository documents older WAITING_FOR_REVIEW and newer rejection remediation | Repository evidence is stale/conflicting; Apple review, Unlisted distribution and reviewer login are external | Live ASC readback, reconcile status doc, clean-session reviewer login for all four apps; manual release only |
+| E2E | PARTIAL | Auth/account 55/55, customer/support 13/13 and POS/inventory/ledger 58/58 isolated gates PASS; comprehensive Playwright journeys exist | Targeted checks do not prove whole ecosystem; no repeated full-suite flake run on current SHA | Run full isolated API twice, full Playwright, reconciled ecosystem, native UI and failure injection |
+| Security | PARTIAL | JWT/OTP/storage guards, hardened image resolver, exhaustive account deletion tests and production audit 0; independent reviews APPROVE completed slices | Camera metadata policy, DB-enforced Event Ledger immutability, approval ownership and cross-writer phone consistency remain open; phone-existence response is an accepted rate-limited privacy risk | Close camera schema/retention, AuditEvent immutability, approval lifecycle and phone-writer consistency; full secret/container/IDOR scan |
+| App Store | BLOCKED_EXTERNAL | All four `1.0.0` build-5 versions verified WAITING_FOR_REVIEW; strict signing/metadata preflight and reviewer logins PASS; iOS UI 47/47 | Apple review, Unlisted distribution and fresh physical-iPad SIWA remain external | Do not replace build 5; monitor review; physical SIWA smoke and distribution decision |
 
 ## Blockers
 
-- VERIFIED: AI photo grading can fetch caller-controlled HTTP(S) URLs without a private/link-local/redirect allowlist (`apps/api/src/ai/llm/image-resolver.ts`).
-- VERIFIED: account export/delete does not exhaustively cover retained free-text, social, Telegram and Evidence PII (`apps/api/src/customers/customers.service.ts`).
-- VERIFIED: production npm audit reports 5 high vulnerabilities; Socket.IO parser is runtime reachable.
 - VERIFIED: camera payload privacy relies on caller-provided arbitrary JSON and a keyword heuristic (`apps/api/src/camera-gateway/camera-gateway.dto.ts`).
 - VERIFIED: `AuditEvent` is described as append-only but the database role can update/delete it; immutability is convention, not DB enforcement.
+- VERIFIED: approval status has only requested/approved/rejected; no atomic claim,
+  expiry or cancellation ownership protects concurrent execution.
+- VERIFIED: paid-repair intake normalizes neither phone aliases nor the shared
+  writer lock, while guest customer creation lacks response-loss idempotency.
+- VERIFIED: React Native checkout drops guest capability and posts guest and
+  authenticated orders through the same incompatible contract; staff buyback calls
+  the guest-only customer endpoint.
 - UNKNOWN: certified payment/fiscal providers, SMS/social credentials, object storage, alerts, camera/legal approval, physical devices/POS hardware and App Store review.
 
 ## Dissent
 
 - INFERRED: Product can safely continue read-only catalog/support/owner insight experiments behind flags while P0 is being closed.
-- INFERRED: Red Team opposes enabling any external AI/camera rollout until SSRF, PII retention, typed camera payloads and processor/legal approval are resolved.
+- INFERRED: Red Team opposes enabling any external AI/camera rollout until typed
+  camera payloads, server-derived retention/privacy and processor/legal approval are resolved.
 
 ## Risks
 
-- VERIFIED: documentation counts and App Store status files are stale or mutually inconsistent, so documentation alone cannot certify release state.
+- VERIFIED: historical release documents contain mixed build/status snapshots, so
+  the recorded live ASC readback remains authoritative over prose documentation.
 - VERIFIED: current dirty worktree can contaminate evidence unless each slice stages only owned files.
 - INFERRED: separate Telegram and ERP AI registries will drift in tool policy, source attribution and spend limits.
 
 ## Action Plan
 
-### Action: Close security P0
+### Action: Close remaining security P0
 - Owner: Security + Backend
 - Priority: P0
 - Dependencies: None
-- Acceptance: SSRF/private-network tests pass; production audit has 0 high/critical; PII export/delete fixtures are exhaustive; camera payloads are typed.
-- Rollback: keep AI image grading, camera ingest and affected export/delete flows disabled behind kill switches.
-- Kill criterion: any private IP fetch, untracked PII retention or high runtime CVE remains.
+- Acceptance: camera payloads/retention are server-derived and typed; Event Ledger
+  is DB-immutable; approvals have atomic ownership/expiry/cancel; all customer writers
+  converge on canonical identity; production audit remains 0 high/critical.
+- Rollback: keep camera ingest and approval-backed automation disabled behind kill switches.
+- Kill criterion: metadata policy bypass, ledger rewrite, double execution or identity split remains.
 
 ### Action: Prove a clean release baseline
 - Owner: QA + SRE + Release
@@ -105,6 +123,19 @@ reviews. Live production credentials, реальные провайдеры, к�
 - Acceptance: two identical full gates on one SHA; strict readiness and live ASC readback recorded; no unclassified dirty files.
 - Rollback: do not promote; retain current approved production images/builds.
 - Kill criterion: flake, reconciliation mismatch, reviewer login failure or missing rollback evidence.
+
+### Action: Repair customer and order contracts
+- Owner: Backend + Mobile + Web
+- Priority: P0
+- Dependencies: shared canonical phone identity and idempotency design
+- Acceptance: paid-repair alias/concurrency cases converge on one customer; guest
+  creation replays safely after response loss; React Native sends guest capability or
+  authenticated token to the correct order endpoint; staff buyback uses an authenticated
+  resolver; isolated API and role-specific E2E pass.
+- Rollback: disable affected repair intake, mobile checkout and staff buyback entry points;
+  retain the verified Web/iOS paths without broadening guest capabilities.
+- Kill criterion: any alias split, stranded retry, unauthenticated order, capability leak
+  or guest endpoint use from staff remains.
 
 ### Action: Enforce business truth boundaries
 - Owner: Architecture + Database
@@ -117,7 +148,8 @@ reviews. Live production credentials, реальные провайдеры, к�
 ## Verification
 
 - VERIFIED: API and Web production builds passed on 2026-08-05.
-- VERIFIED: 192 targeted tests passed on isolated PostgreSQL databases.
+- VERIFIED: isolated gates passed for auth/account 55/55, customer/support 13/13,
+  POS/inventory/ledger 58/58, auth/preflight/RBAC/outbox 179/179 and authz/AI/camera 13/13.
 - VERIFIED: `git diff --check` passed before documentation edits.
 - UNKNOWN: full ecosystem, native physical and live external gates remain required.
 
