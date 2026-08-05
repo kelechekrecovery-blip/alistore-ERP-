@@ -6,7 +6,7 @@ describe('RealtimeNotificationTransport (outbox → socket.io)', () => {
     const gateway = new RealtimeGateway();
     const spy = jest
       .spyOn(gateway, 'emitOrderStatus')
-      .mockImplementation(() => undefined);
+      .mockImplementation((() => Promise.resolve()) as never);
     const transport = new RealtimeNotificationTransport(gateway);
 
     await transport.deliver({
@@ -19,7 +19,7 @@ describe('RealtimeNotificationTransport (outbox → socket.io)', () => {
     expect(spy).toHaveBeenCalledWith('order-1', 'paid', { total: 100000 });
   });
 
-  it('is a no-op-safe when the gateway has no bound server', async () => {
+  it('fails closed when the gateway has no bound server', async () => {
     const gateway = new RealtimeGateway(); // no socket server attached
     const transport = new RealtimeNotificationTransport(gateway);
     await expect(
@@ -29,7 +29,7 @@ describe('RealtimeNotificationTransport (outbox → socket.io)', () => {
         template: 'packed',
         payload: {},
       }),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow('realtime_server_unavailable');
   });
 
   it('requires an access token before a socket can subscribe', async () => {

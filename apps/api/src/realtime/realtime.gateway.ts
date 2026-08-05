@@ -13,6 +13,7 @@ import { AuthService } from '../auth/auth.service';
 import { AuthzService } from '../authz/authz.service';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { isActiveCustomerPhone } from '../auth/customer-session-state';
 
 type RealtimeSocket = Socket & { data: { principal?: AuthPrincipal } };
 
@@ -71,21 +72,73 @@ export class RealtimeGateway {
     if (principal.typ === 'customer' && order.customerId !== principal.customerId) {
       throw new WsException('order_not_found');
     }
-    if (principal.typ === 'staff') await this.assertStaffQueueAccess(principal);
-    client.join(`order:${orderId}`);
+    if (principal.typ === 'customer') {
+      await this.withActiveCustomerFence(principal.customerId, async () => {
+        await client.join([
+          `customer:${principal.customerId}`,
+          `order:${orderId}:customer:${principal.customerId}`,
+        ]);
+      });
+    } else {
+      await this.assertStaffQueueAccess(principal);
+      await client.join(`order:${orderId}:staff`);
+    }
     return { subscribed: orderId };
   }
 
   /** Push an order status change to its subscribers. */
-  emitOrderStatus(
+  async emitOrderStatus(
     orderId: string,
     status: string,
     payload: Record<string, unknown> = {},
-  ): void {
-    if (!this.server) return; // no adapter bound (e.g. unit tests) → no-op
-    this.server
-      .to(`order:${orderId}`)
-      .emit('order:status', { orderId, status, ...payload });
+  ): Promise<void> {
+    if (!this.server) throw new Error('realtime_server_unavailable');
+    if (!this.prisma) throw new Error('realtime_authorization_unavailable');
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { customerId: true },
+    });
+    if (!order) throw new Error('realtime_order_not_found');
+    const message = { orderId, status, ...payload };
+
+    // Customer publication linearizes with deletion. An event that wins this
+    // fence is emitted before deletion can commit; after deletion commits the
+    // tombstone suppresses delivery. Staff delivery uses a separate room.
+    const customerActive = await this.withActiveCustomerFence(
+      order.customerId,
+      async () => {
+        this.server
+          .to(`order:${orderId}:customer:${order.customerId}`)
+          .emit('order:status', message);
+      },
+      false,
+    );
+    if (!customerActive) {
+      await this.server.in(`customer:${order.customerId}`).disconnectSockets(true);
+    }
+    this.server.to(`order:${orderId}:staff`).emit('order:status', message);
+  }
+
+  private async withActiveCustomerFence<T>(
+    customerId: string,
+    work: () => T | Promise<T>,
+    rejectRevoked = true,
+  ): Promise<T | false> {
+    if (!this.prisma) throw new WsException('authorization_unavailable');
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT pg_advisory_xact_lock(hashtext(${'customer-delete:' + customerId}))::text AS locked
+      `;
+      const customer = await tx.customer.findUnique({
+        where: { id: customerId },
+        select: { phone: true },
+      });
+      if (!customer || !isActiveCustomerPhone(customer.phone)) {
+        if (rejectRevoked) throw new WsException('customer_session_revoked');
+        return false;
+      }
+      return work();
+    });
   }
 
   private readToken(client: Socket): string | undefined {

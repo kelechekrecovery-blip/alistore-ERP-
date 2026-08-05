@@ -16,6 +16,7 @@ import { normalizePhone } from '../auth/phone-normalization';
 import {
   deletedCustomerPhone,
   isActiveCustomerPhone,
+  lockActiveCustomerOnTx,
 } from '../auth/customer-session-state';
 import { createHash } from 'crypto';
 
@@ -65,9 +66,8 @@ export class CustomersService {
 
   async createAddress(customerId: string, dto: CreateCustomerAddressDto, idempotencyKey: string) {
     const normalized = normalizeAddress(dto);
-    const existing = await this.prisma.customerAddress.findUnique({ where: { idempotencyKey } });
-    if (existing) return replayAddress(existing, customerId, normalized);
     return this.audit.transaction(async (tx) => {
+      await lockActiveCustomerOnTx(tx, customerId);
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'customer-address:' + customerId}))::text AS locked`;
       const replay = await tx.customerAddress.findUnique({ where: { idempotencyKey } });
       if (replay) return { result: replayAddress(replay, customerId, normalized), events: [] };
@@ -86,6 +86,7 @@ export class CustomersService {
 
   async updateAddress(customerId: string, addressId: string, dto: UpdateCustomerAddressDto) {
     return this.audit.transaction(async (tx) => {
+      await lockActiveCustomerOnTx(tx, customerId);
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'customer-address:' + customerId}))::text AS locked`;
       const current = await tx.customerAddress.findFirst({ where: { id: addressId, customerId } });
       if (!current) throw new ValidationError('address_not_found', 'Адрес не найден');
@@ -107,6 +108,7 @@ export class CustomersService {
 
   async deleteAddress(customerId: string, addressId: string) {
     return this.audit.transaction(async (tx) => {
+      await lockActiveCustomerOnTx(tx, customerId);
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'customer-address:' + customerId}))::text AS locked`;
       const current = await tx.customerAddress.findFirst({ where: { id: addressId, customerId } });
       if (!current) throw new ValidationError('address_not_found', 'Адрес не найден');
@@ -141,8 +143,7 @@ export class CustomersService {
 
   async updateSettings(customerId: string, dto: UpdateCustomerSettingsDto) {
     return this.audit.transaction(async (tx) => {
-      const customer = await tx.customer.findUnique({ where: { id: customerId } });
-      if (!customer) throw new ValidationError('customer_not_found', `Клиент ${customerId} не найден`);
+      const customer = await lockActiveCustomerOnTx(tx, customerId);
       const currentPreferences = await tx.customerPreferences.findUnique({ where: { customerId } });
       const prefs = preferenceValues(currentPreferences);
       const preferencePatch = pickPreferences(dto);
@@ -168,11 +169,8 @@ export class CustomersService {
    * audit trail records real consent decisions (withdrawal must stop all campaigns).
    */
   async setConsent(customerId: string, consent: boolean, actor: string) {
-    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
-    if (!customer) {
-      throw new ValidationError('customer_not_found', `Клиент ${customerId} не найден`);
-    }
     return this.audit.transaction(async (tx) => {
+      const customer = await lockActiveCustomerOnTx(tx, customerId);
       const updated = await tx.customer.update({ where: { id: customerId }, data: { consent } });
       const events =
         customer.consent === consent

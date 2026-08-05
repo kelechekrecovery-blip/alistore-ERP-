@@ -375,6 +375,131 @@ describe('Customer account deletion and export', () => {
     }
   });
 
+  it('rejects customer PII mutations that reach services after deletion commits', async () => {
+    const owner = await customer('17');
+    await expect(customers.deleteAccount(owner.id)).resolves.toEqual({ id: owner.id, deleted: true });
+
+    const attempts = await Promise.allSettled([
+      customers.createAddress(
+        owner.id,
+        { title: 'Дом', text: 'Бишкек, адрес после удаления', isPrimary: true },
+        `post-delete-address-${run}`,
+      ),
+      customers.updateSettings(owner.id, {
+        name: 'Восстановленные ПДн',
+        consent: true,
+        promos: true,
+      }),
+    ]);
+    expect(attempts).toHaveLength(2);
+    for (const attempt of attempts) {
+      expect(attempt).toMatchObject({
+        status: 'rejected',
+        reason: { code: 'customer_session_revoked' },
+      });
+    }
+    expect(await prisma.customerAddress.count({ where: { customerId: owner.id } })).toBe(0);
+    expect(await prisma.customer.findUniqueOrThrow({ where: { id: owner.id } })).toMatchObject({
+      name: 'Удалённый пользователь',
+      consent: false,
+    });
+  });
+
+  it('rejects an address write after its JWT passed but deletion commits first', async () => {
+    const owner = await customer('18');
+    const accessToken = token(owner);
+    const enteredService = deferred();
+    const resumeService = deferred();
+    const original = customers.createAddress.bind(customers);
+    const createAddress = jest.spyOn(customers, 'createAddress').mockImplementationOnce(
+      async (customerId, dto, idempotencyKey) => {
+        enteredService.resolve();
+        await resumeService.promise;
+        return original(customerId, dto, idempotencyKey);
+      },
+    );
+
+    try {
+      const mutation = request(app.getHttpServer())
+        .post('/customers/me/addresses')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .set('Idempotency-Key', `delete-race-address-${run}`)
+        .send({ title: 'Дом', text: 'Секретный адрес', isPrimary: true });
+      const mutationResult = mutation.then((response) => response);
+      await Promise.race([
+        enteredService.promise,
+        mutationResult.then(() => Promise.reject(new Error('address mutation passed the gate early'))),
+      ]);
+
+      await request(app.getHttpServer())
+        .delete('/customers/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+      resumeService.resolve();
+
+      const response = await mutationResult;
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        message: 'customer_session_revoked',
+      });
+      expect(await prisma.customerAddress.count({ where: { customerId: owner.id } })).toBe(0);
+      expect(await prisma.auditEvent.count({
+        where: { type: 'customer.address_created', refs: { has: owner.id } },
+      })).toBe(0);
+    } finally {
+      resumeService.resolve();
+      createAddress.mockRestore();
+    }
+  });
+
+  it('rejects a settings write after its JWT passed but deletion commits first', async () => {
+    const owner = await customer('19');
+    const accessToken = token(owner);
+    const enteredService = deferred();
+    const resumeService = deferred();
+    const original = customers.updateSettings.bind(customers);
+    const updateSettings = jest.spyOn(customers, 'updateSettings').mockImplementationOnce(
+      async (customerId, dto) => {
+        enteredService.resolve();
+        await resumeService.promise;
+        return original(customerId, dto);
+      },
+    );
+
+    try {
+      const mutation = request(app.getHttpServer())
+        .patch('/customers/me/settings')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ name: 'Возвращённые ПДн', consent: true, push: true, promos: true });
+      const mutationResult = mutation.then((response) => response);
+      await Promise.race([
+        enteredService.promise,
+        mutationResult.then(() => Promise.reject(new Error('settings mutation passed the gate early'))),
+      ]);
+
+      await request(app.getHttpServer())
+        .delete('/customers/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+      resumeService.resolve();
+
+      const response = await mutationResult;
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        message: 'customer_session_revoked',
+      });
+      expect(await prisma.customer.findUniqueOrThrow({ where: { id: owner.id } })).toMatchObject({
+        name: 'Удалённый пользователь',
+        consent: false,
+      });
+    } finally {
+      resumeService.resolve();
+      updateSettings.mockRestore();
+    }
+  });
+
   it('revokes the rotated child when refresh wins a race with account deletion', async () => {
     const owner = await customer('14');
     const challenge = await auth.requestOtp(owner.phone);

@@ -28,7 +28,7 @@ import {
 import type { AuthPrincipal, JwtPayload } from './jwt.strategy';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
 import { normalizePhone } from './phone-normalization';
-import { isActiveCustomerPhone } from './customer-session-state';
+import { isActiveCustomerPhone, lockActiveCustomerOnTx } from './customer-session-state';
 
 export interface AuthTokens {
   accessToken: string;
@@ -584,10 +584,10 @@ export class AuthService implements OnModuleInit {
     const challenge = await this.claimPhoneOtp(phone, code, 'login', challengeId);
     return this.prisma.$transaction(async (tx) => {
       let customer = existingBeforeClaim
-        ? await this.lockActiveCustomerSessionOnTx(tx, existingBeforeClaim.id)
+        ? await lockActiveCustomerOnTx(tx, existingBeforeClaim.id)
         : await this.customerByCanonicalPhoneOnTx(tx, phone, true);
       if (!existingBeforeClaim) {
-        customer = await this.lockActiveCustomerSessionOnTx(tx, customer.id);
+        customer = await lockActiveCustomerOnTx(tx, customer.id);
       } else if (customer.phone !== phone) {
         customer = await tx.customer.update({
           where: { id: customer.id },
@@ -769,7 +769,7 @@ export class AuthService implements OnModuleInit {
       if (!customer) {
         throw new ValidationError('customer_not_found', 'Аккаунт не найден');
       }
-      await this.lockActiveCustomerSessionOnTx(tx, customer.id);
+      await lockActiveCustomerOnTx(tx, customer.id);
       await this.consumeClaimOnTx(tx, challenge.id);
       await tx.refreshToken.updateMany({
         where: { customerId: customer.id, revokedAt: null },
@@ -949,7 +949,7 @@ export class AuthService implements OnModuleInit {
           where: { phone: { in: [phone, legacyPhone] } },
         });
         if (existingCustomer) {
-          await this.lockActiveCustomerSessionOnTx(tx, existingCustomer.id);
+          await lockActiveCustomerOnTx(tx, existingCustomer.id);
         }
 
         const pinnedId = dto.challengeId ?? null;
@@ -1261,7 +1261,7 @@ export class AuthService implements OnModuleInit {
       throw new ValidationError('refresh_invalid', 'Refresh-токен недействителен');
     }
     const outcome = await this.prisma.$transaction(async (tx) => {
-      const customer = await this.lockActiveCustomerSessionOnTx(
+      const customer = await lockActiveCustomerOnTx(
         tx,
         candidate.customerId,
         'refresh_invalid',
@@ -1426,7 +1426,7 @@ export class AuthService implements OnModuleInit {
     if (!tx) {
       return this.prisma.$transaction((inner) => this.issueTokens(customerId, _phone, inner));
     }
-    const customer = await this.lockActiveCustomerSessionOnTx(tx, customerId);
+    const customer = await lockActiveCustomerOnTx(tx, customerId);
     const accessToken = await this.jwt.signAsync(
       { sub: customerId, phone: customer.phone, typ: 'customer' },
       { expiresIn: ACCESS_TTL },
@@ -1440,24 +1440,6 @@ export class AuthService implements OnModuleInit {
       },
     });
     return { accessToken, refreshToken, tokenType: 'Bearer', expiresIn: ACCESS_TTL };
-  }
-
-  /**
-   * Serializes every customer credential issuance with account deletion. If
-   * issuance wins, deletion waits and revokes the new refresh row; if deletion
-   * wins, issuance wakes up to a tombstone and fails closed.
-   */
-  private async lockActiveCustomerSessionOnTx(
-    tx: Prisma.TransactionClient,
-    customerId: string,
-    errorCode = 'customer_session_revoked',
-  ): Promise<Customer> {
-    await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${customerId} FOR UPDATE`;
-    const customer = await tx.customer.findUnique({ where: { id: customerId } });
-    if (!customer || !isActiveCustomerPhone(customer.phone)) {
-      throw new ValidationError(errorCode, 'Сессия клиента отозвана');
-    }
-    return customer;
   }
 
   private async issueDerivedRefreshTokens(

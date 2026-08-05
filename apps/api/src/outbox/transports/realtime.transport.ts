@@ -16,6 +16,6 @@ export class RealtimeNotificationTransport implements NotificationTransport {
       message.payload && typeof message.payload === 'object'
         ? (message.payload as Record<string, unknown>)
         : {};
-    this.gateway.emitOrderStatus(message.recipient, message.template, payload);
+    await this.gateway.emitOrderStatus(message.recipient, message.template, payload);
   }
 }
