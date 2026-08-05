@@ -19,3 +19,5 @@ Outbox/Telegram/provider gate: **4 suites / 39 tests passed**. Coverage includes
 ## Camera/edge control plane
 
 Camera gateway and ledger coverage: **2 suites / 7 tests passed**. Edge devices use hashed one-time secrets, timestamped HMAC signatures, store-point binding, metadata privacy limits, idempotent ingestion, kill-switch behavior, retention deadlines and ledger events. Raw frames/audio/face/document payloads are rejected; EZVIZ integration remains an external adapter task, not an implicit trust boundary.
+
+Native gate: `npm run android:test` completed successfully for app, staff, courier, POS and shared core modules (unit tests + lint).
