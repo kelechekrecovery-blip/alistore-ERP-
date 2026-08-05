@@ -96,10 +96,12 @@ jobs:
           API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
           WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
           WORKER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WORKER }}
+          DATABASE_RUNTIME_URL: ${{ secrets.STAGING_DATABASE_RUNTIME_URL }}
         run: |
           set -euo pipefail
           test -n "$RENDER_API_KEY" || { echo '::error::RENDER_API_KEY is not configured'; exit 1; }
           test -n "$API_HOOK" && test -n "$WEB_HOOK" && test -n "$WORKER_HOOK" || { echo '::error::All staging deploy hooks are required'; exit 1; }
+          test -n "$DATABASE_RUNTIME_URL" || { echo '::error::STAGING_DATABASE_RUNTIME_URL is required'; exit 1; }
 
   migrate-staging:
     needs: [migration-rehearsal, release-preflight]
@@ -146,10 +148,12 @@ jobs:
           node-version: 22
       - name: Deploy the exact tested commit and wait for all services
         env:
+          DEPLOY_ENVIRONMENT: staging
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_DEPLOY_HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
           RENDER_DEPLOY_HOOK_WEB: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
           RENDER_DEPLOY_HOOK_WORKER: ${{ secrets.RENDER_DEPLOY_HOOK_WORKER }}
+          DATABASE_RUNTIME_URL: ${{ secrets.STAGING_DATABASE_RUNTIME_URL }}
         run: node scripts/render-deploy.mjs
 
   health-check:
