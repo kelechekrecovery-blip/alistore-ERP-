@@ -1,17 +1,16 @@
 import { IsEmail, IsIn, IsOptional, IsString, Length, Matches } from 'class-validator';
 import type { TelegramAuthSource } from './social-login';
-
-const PHONE = /^\+?\d{9,15}$/;
+import { PHONE_INPUT_PATTERN } from './phone-normalization';
 
 export class RequestOtpDto {
   @IsString()
-  @Matches(PHONE, { message: 'phone must be 9-15 digits, optional leading +' })
+  @Matches(PHONE_INPUT_PATTERN, { message: 'phone must be 9–15 digits, optional +, no leading zero' })
   phone!: string;
 }
 
 export class VerifyOtpDto {
   @IsString()
-  @Matches(PHONE)
+  @Matches(PHONE_INPUT_PATTERN)
   phone!: string;
 
   @IsString()

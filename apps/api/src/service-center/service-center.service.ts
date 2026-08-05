@@ -17,6 +17,7 @@ import {
 } from './service-command';
 import { paymentAccountCode, postPaymentEntryOnTx } from '../finance/accounting-journal';
 import { cumulativeTaxDelta, includedTax, outputTaxMetadata } from '../finance/sales-tax';
+import { normalizePhone } from '../auth/phone-normalization';
 
 const ACTIVE_SERVICE_STATUSES: WarrantyStatus[] = ['created', 'received', 'diagnostics', 'waiting_supplier', 'approved', 'repairing', 'repaired', 'replaced'];
 const PAID_REPAIR_SLA_MS = 3 * 24 * 60 * 60 * 1000;
@@ -342,95 +343,115 @@ export class ServiceCenterService {
 
   async createPaidRepair(dto: CreatePaidRepairDto, actor: string, rawKey?: string) {
     const key = requiredServiceKey(rawKey);
-    const request: ServiceCommandInput = {
-      phone: dto.phone.trim(),
+    const request = {
+      phone: normalizePhone(dto.phone),
       customerName: dto.customerName.trim(),
       deviceName: dto.deviceName.trim(),
       serial: dto.serial.trim().toUpperCase(),
       problem: dto.problem.trim(),
       technicianId: dto.technicianId?.trim() || null,
-    };
+    } satisfies ServiceCommandInput;
     const existing = await this.prisma.serviceWorkOrderCommand.findUnique({ where: { idempotencyKey: key } });
     if (existing) return replayServiceCommand(existing, 'create_paid', request);
 
-    try {
-      return await this.audit.transaction<unknown>(async (tx) => {
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'service-paid:' + request.serial}))::text AS locked`;
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'service-customer:' + request.phone}))::text AS locked`;
-        const raced = await tx.serviceWorkOrderCommand.findUnique({ where: { idempotencyKey: key } });
-        if (raced) return { result: replayServiceCommand(raced, 'create_paid', request), events: [] };
-        const active = await tx.warrantyCase.findFirst({
-          where: { imei: request.serial as string, serviceType: 'paid', status: { in: ACTIVE_SERVICE_STATUSES } },
-        });
-        if (active) throw new ConflictError('paid_repair_already_open', 'По устройству уже открыт платный ремонт');
-        const point = await resolveStaffPoint(tx, actor);
-        await assertActiveTechnician(tx, dto.technicianId, point);
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await this.audit.transaction<unknown>(async (tx) => {
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'service-paid:' + request.serial}))::text AS locked`;
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'customer-phone:' + request.phone}))::text AS locked`;
+          const raced = await tx.serviceWorkOrderCommand.findUnique({ where: { idempotencyKey: key } });
+          if (raced) return { result: replayServiceCommand(raced, 'create_paid', request), events: [] };
+          const active = await tx.warrantyCase.findFirst({
+            where: { imei: request.serial, serviceType: 'paid', status: { in: ACTIVE_SERVICE_STATUSES } },
+          });
+          if (active) throw new ConflictError('paid_repair_already_open', 'По устройству уже открыт платный ремонт');
+          const point = await resolveStaffPoint(tx, actor);
+          await assertActiveTechnician(tx, dto.technicianId, point);
 
-        let customer = await tx.customer.findUnique({ where: { phone: request.phone as string } });
-        if (!customer) {
-          customer = await tx.customer.create({ data: { phone: request.phone as string, name: request.customerName as string } });
-        } else if (!customer.name.trim()) {
-          customer = await tx.customer.update({ where: { id: customer.id }, data: { name: request.customerName as string } });
-        }
-        const warrantyCase = await tx.warrantyCase.create({
-          data: {
-            imei: request.serial as string,
-            customerId: customer.id,
-            problem: request.problem as string,
-            status: 'received',
-            serviceType: 'paid',
-            deviceName: request.deviceName as string,
-            sla: new Date(Date.now() + PAID_REPAIR_SLA_MS),
-            assignee: dto.technicianId?.trim() || null,
-          },
-        });
-        const workOrder = await tx.serviceWorkOrder.create({
-          data: {
-            warrantyCaseId: warrantyCase.id,
-            technicianId: dto.technicianId?.trim() || null,
-            createdBy: actor,
-            point,
-          },
-        });
-        const result = await tx.serviceWorkOrder.findUniqueOrThrow({
-          where: { id: workOrder.id },
-          include: { warrantyCase: true, payments: true },
-        });
-        await tx.serviceWorkOrderCommand.create({
-          data: { idempotencyKey: key, workOrderId: workOrder.id, action: 'create_paid', request, response: serviceJson(result) },
-        });
-        return {
-          result,
-          events: [
-            {
-              type: EventType.ServicePaidRepairReceived,
-              actor,
-              payload: {
-                workOrderId: workOrder.id,
-                serviceCaseId: warrantyCase.id,
-                customerId: customer.id,
-                deviceName: warrantyCase.deviceName,
-                serial: warrantyCase.imei,
-                technicianId: workOrder.technicianId,
+          const phone = request.phone;
+          let customer = await tx.customer.findUnique({ where: { phone } });
+          if (!customer) {
+            const legacy = await tx.customer.findUnique({ where: { phone: phone.slice(1) } });
+            if (legacy) {
+              customer = await tx.customer.update({
+                where: { id: legacy.id },
+                data: { phone, ...(!legacy.name.trim() ? { name: request.customerName } : {}) },
+              });
+            }
+          }
+          if (!customer) {
+            customer = await tx.customer.create({ data: { phone, name: request.customerName } });
+          } else if (!customer.name.trim()) {
+            customer = await tx.customer.update({ where: { id: customer.id }, data: { name: request.customerName } });
+          }
+          const warrantyCase = await tx.warrantyCase.create({
+            data: {
+              imei: request.serial,
+              customerId: customer.id,
+              problem: request.problem,
+              status: 'received',
+              serviceType: 'paid',
+              deviceName: request.deviceName,
+              sla: new Date(Date.now() + PAID_REPAIR_SLA_MS),
+              assignee: dto.technicianId?.trim() || null,
+            },
+          });
+          const workOrder = await tx.serviceWorkOrder.create({
+            data: {
+              warrantyCaseId: warrantyCase.id,
+              technicianId: dto.technicianId?.trim() || null,
+              createdBy: actor,
+              point,
+            },
+          });
+          const result = await tx.serviceWorkOrder.findUniqueOrThrow({
+            where: { id: workOrder.id },
+            include: { warrantyCase: true, payments: true },
+          });
+          await tx.serviceWorkOrderCommand.create({
+            data: { idempotencyKey: key, workOrderId: workOrder.id, action: 'create_paid', request, response: serviceJson(result) },
+          });
+          return {
+            result,
+            events: [
+              {
+                type: EventType.ServicePaidRepairReceived,
+                actor,
+                payload: {
+                  workOrderId: workOrder.id,
+                  serviceCaseId: warrantyCase.id,
+                  customerId: customer.id,
+                  deviceName: warrantyCase.deviceName,
+                  serial: warrantyCase.imei,
+                  technicianId: workOrder.technicianId,
+                },
+                refs: [workOrder.id, warrantyCase.id, customer.id, warrantyCase.imei],
               },
-              refs: [workOrder.id, warrantyCase.id, customer.id, warrantyCase.imei],
-            },
-            {
-              type: EventType.ServiceWorkOrderCreated,
-              actor,
-              payload: { workOrderId: workOrder.id, warrantyId: warrantyCase.id, serviceType: 'paid' },
-              refs: [workOrder.id, warrantyCase.id, customer.id, warrantyCase.imei],
-            },
-          ],
-        };
-      });
-    } catch (error) {
-      if (isServiceCommandUniqueViolation(error)) {
-        const command = await this.prisma.serviceWorkOrderCommand.findUnique({ where: { idempotencyKey: key } });
-        if (command) return replayServiceCommand(command, 'create_paid', request);
+              {
+                type: EventType.ServiceWorkOrderCreated,
+                actor,
+                payload: { workOrderId: workOrder.id, warrantyId: warrantyCase.id, serviceType: 'paid' },
+                refs: [workOrder.id, warrantyCase.id, customer.id, warrantyCase.imei],
+              },
+            ],
+          };
+        });
+      } catch (error) {
+        if (isServiceCommandUniqueViolation(error)) {
+          const command = await this.prisma.serviceWorkOrderCommand.findUnique({ where: { idempotencyKey: key } });
+          if (command) return replayServiceCommand(command, 'create_paid', request);
+          // An auth/support writer from an older node can win without our advisory
+          // lock. The failed transaction rolled back cleanly; retry once against its
+          // canonical winner instead of surfacing a cross-writer P2002 as a 500.
+          if (attempt === 0 && await this.prisma.customer.findUnique({
+            where: { phone: request.phone },
+            select: { id: true },
+          })) continue;
+        }
+        throw error;
       }
-      throw error;
     }
+    throw new ConflictError('paid_repair_identity_race', 'Не удалось подтвердить клиента; повторите запрос');
   }
 
   async diagnose(id: string, dto: DiagnoseServiceWorkOrderDto, actor: string, rawKey?: string) {

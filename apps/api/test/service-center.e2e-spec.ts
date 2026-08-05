@@ -4,9 +4,11 @@ import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AuditModule } from '../src/audit/audit.module';
+import { AuditService } from '../src/audit/audit.service';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ServiceCenterModule } from '../src/service-center/service-center.module';
+import { ServiceCenterService } from '../src/service-center/service-center.service';
 import { ServiceSlaService } from '../src/service-center/service-sla.service';
 import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
@@ -25,6 +27,8 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
   let technicianId: string;
   let foreignTechnicianToken: string;
   let serviceSla: ServiceSlaService;
+  let serviceCenter: ServiceCenterService;
+  let audit: AuditService;
   const run = Math.floor(Math.random() * 1_000_000);
 
   beforeAll(async () => {
@@ -45,6 +49,8 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
     jwt = moduleRef.get(JwtService);
     const auth = moduleRef.get(StaffAuthService);
     serviceSla = moduleRef.get(ServiceSlaService);
+    serviceCenter = moduleRef.get(ServiceCenterService);
+    audit = moduleRef.get(AuditService);
     const owner = await auth.createStaff(`owner-service-${run}`, 'pass', 'owner');
     ownerId = owner.id;
     await prisma.staffUser.update({ where: { id: owner.id }, data: { point: 'BISHKEK-2' } });
@@ -417,6 +423,125 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
     expect(await prisma.deviceUnit.findUniqueOrThrow({ where: { imei } })).toMatchObject({ status: 'in_repair', orderId: order.id });
     expect(await prisma.auditEvent.count({ where: { type: 'service.device_replaced', refs: { has: created.body.id } } })).toBe(1);
     await request(app.getHttpServer()).post(`/service-center/work-orders/${created.body.id}/close`).set('Authorization', `Bearer ${technicianToken}`).set('Idempotency-Key', `service-replace-close-${run}`).expect(201);
+  });
+
+  it('canonicalizes paid-repair phones, adopts legacy identity and serializes aliases', async () => {
+    const legacyDigits = `99677${run}1000`;
+    const legacy = await prisma.customer.create({
+      data: { phone: legacyDigits, name: 'Legacy Repair Customer' },
+    });
+    const legacyPayload = {
+      phone: `+${legacyDigits}`,
+      customerName: 'Different Intake Name',
+      deviceName: 'Legacy Phone',
+      serial: `paid-${run}-legacy-alias`,
+      problem: 'Не включается',
+    };
+    const key = `paid-legacy-alias-${run}`;
+    const adopted = await request(app.getHttpServer())
+      .post('/service-center/paid-repairs')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .set('Idempotency-Key', key)
+      .send(legacyPayload)
+      .expect(201);
+    const replay = await request(app.getHttpServer())
+      .post('/service-center/paid-repairs')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .set('Idempotency-Key', key)
+      .send({ ...legacyPayload, phone: legacyDigits })
+      .expect(201);
+    expect(replay.body.id).toBe(adopted.body.id);
+    expect(await prisma.customer.findUniqueOrThrow({ where: { id: legacy.id } }))
+      .toMatchObject({ phone: `+${legacyDigits}`, name: 'Legacy Repair Customer' });
+
+    const racedDigits = `99677${run}1001`;
+    const base = {
+      customerName: 'Concurrent Repair Customer',
+      deviceName: 'Concurrent Phone',
+      problem: 'Разбит экран',
+    };
+    const [plus, noPlus] = await Promise.all([
+      request(app.getHttpServer())
+        .post('/service-center/paid-repairs')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('Idempotency-Key', `paid-alias-plus-${run}`)
+        .send({ ...base, phone: `+${racedDigits}`, serial: `paid-${run}-alias-plus` }),
+      request(app.getHttpServer())
+        .post('/service-center/paid-repairs')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('Idempotency-Key', `paid-alias-no-plus-${run}`)
+        .send({ ...base, phone: racedDigits, serial: `paid-${run}-alias-no-plus` }),
+    ]);
+    expect([plus.status, noPlus.status]).toEqual([201, 201]);
+    const canonicalCustomers = await prisma.customer.findMany({
+      where: { phone: { in: [`+${racedDigits}`, racedDigits] } },
+      select: { id: true },
+    });
+    expect(canonicalCustomers).toHaveLength(1);
+    expect([plus.body, noPlus.body].every((body) => body.warrantyCase.customerId === canonicalCustomers[0]?.id)).toBe(true);
+
+    const invalidPhone = `0${racedDigits.slice(1)}`;
+    await request(app.getHttpServer())
+      .post('/service-center/paid-repairs')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .set('Idempotency-Key', `paid-invalid-phone-${run}`)
+      .send({ ...base, phone: invalidPhone, serial: `paid-${run}-invalid-phone` })
+      .expect(400);
+    expect(await prisma.customer.count({ where: { phone: invalidPhone } })).toBe(0);
+    expect(await prisma.warrantyCase.count({ where: { imei: `PAID-${run}-INVALID-PHONE` } })).toBe(0);
+    expect(await prisma.serviceWorkOrderCommand.count({ where: { idempotencyKey: `paid-invalid-phone-${run}` } })).toBe(0);
+  });
+
+  it('recovers one cross-writer customer P2002 and otherwise fails closed', async () => {
+    const winnerPhone = `+99677${run}2000`;
+    const winner = await prisma.customer.create({
+      data: { phone: winnerPhone, name: 'Cross-writer winner' },
+    });
+    const key = `paid-p2002-recovery-${run}`;
+    const payload = {
+      phone: winnerPhone.slice(1),
+      customerName: 'Must not overwrite winner',
+      deviceName: 'Recovery Phone',
+      serial: `paid-${run}-p2002-recovery`,
+      problem: 'Не загружается',
+    };
+    const injectedRace = Object.assign(new Error('injected customer unique race'), { code: 'P2002' });
+    const recoveredSpy = jest.spyOn(audit, 'transaction').mockRejectedValueOnce(injectedRace);
+    const recovered = await serviceCenter.createPaidRepair(payload, ownerId, key) as {
+      id: string;
+      warrantyCaseId: string;
+      warrantyCase: { customerId: string };
+    };
+    recoveredSpy.mockRestore();
+
+    expect(recovered.warrantyCase.customerId).toBe(winner.id);
+    expect(await prisma.customer.findUniqueOrThrow({ where: { id: winner.id } }))
+      .toMatchObject({ phone: winnerPhone, name: 'Cross-writer winner' });
+    expect(await prisma.warrantyCase.count({ where: { id: recovered.warrantyCaseId } })).toBe(1);
+    expect(await prisma.serviceWorkOrder.count({ where: { id: recovered.id } })).toBe(1);
+    expect(await prisma.serviceWorkOrderCommand.count({ where: { idempotencyKey: key } })).toBe(1);
+    expect(await prisma.auditEvent.count({
+      where: {
+        refs: { has: recovered.id },
+        type: { in: ['service.paid_repair_received', 'service.work_order_created'] },
+      },
+    })).toBe(2);
+
+    const missingPhone = `+99677${run}2001`;
+    const noWinnerRace = Object.assign(new Error('injected unique race without winner'), { code: 'P2002' });
+    const failedSpy = jest.spyOn(audit, 'transaction').mockRejectedValueOnce(noWinnerRace);
+    await expect(serviceCenter.createPaidRepair({
+      ...payload,
+      phone: missingPhone,
+      serial: `paid-${run}-p2002-no-winner`,
+    }, ownerId, `paid-p2002-no-winner-${run}`)).rejects.toBe(noWinnerRace);
+    expect(failedSpy).toHaveBeenCalledTimes(1);
+    failedSpy.mockRestore();
+    expect(await prisma.customer.count({ where: { phone: missingPhone } })).toBe(0);
+    expect(await prisma.warrantyCase.count({ where: { imei: `PAID-${run}-P2002-NO-WINNER` } })).toBe(0);
+    expect(await prisma.serviceWorkOrderCommand.count({
+      where: { idempotencyKey: `paid-p2002-no-winner-${run}` },
+    })).toBe(0);
   });
 
   it('accepts a third-party device without adding sellable inventory and reuses customer approval', async () => {

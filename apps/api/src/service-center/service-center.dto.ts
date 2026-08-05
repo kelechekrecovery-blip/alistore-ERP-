@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaymentMethod } from '@prisma/client';
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsDateString, IsEnum, IsIn, IsInt, IsOptional, IsString, Matches, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { PHONE_INPUT_PATTERN } from '../auth/phone-normalization';
 
 export class CreateServiceWorkOrderDto {
   @ApiProperty()
@@ -36,7 +37,7 @@ export class DiagnoseServiceWorkOrderDto {
 export class CreatePaidRepairDto {
   @ApiProperty({ example: '+996700000001' })
   @IsString()
-  @Matches(/^\+?[0-9]{9,15}$/, { message: 'phone must be 9-15 digits, optional leading +' })
+  @Matches(PHONE_INPUT_PATTERN, { message: 'phone must be 9–15 digits, optional +, no leading zero' })
   phone!: string;
 
   @ApiProperty({ example: 'Айбек' })
