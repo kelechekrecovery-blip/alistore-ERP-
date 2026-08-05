@@ -1,17 +1,19 @@
 import { AuditService } from '../src/audit/audit.service';
-import { ConflictError, ValidationError } from '../src/common/errors';
+import { ConflictError } from '../src/common/errors';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { TradeInsService } from '../src/tradeins/tradeins.service';
 
 describe('Trade-ins (integration)', () => {
   let prisma: PrismaService;
   let tradeIns: TradeInsService;
+  let audit: AuditService;
   let seq = 0;
 
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
-    tradeIns = new TradeInsService(prisma, new AuditService(prisma));
+    audit = new AuditService(prisma);
+    tradeIns = new TradeInsService(prisma, audit);
   });
 
   afterAll(async () => {
@@ -49,6 +51,12 @@ describe('Trade-ins (integration)', () => {
     return prisma.customer.create({
       data: { phone: `+9967099${seq.toString().padStart(4, '0')}`, name: 'Trade Seller' },
     });
+  }
+
+  function deferred() {
+    let resolve!: () => void;
+    const promise = new Promise<void>((done) => { resolve = done; });
+    return { promise, resolve };
   }
 
   it('creates a trade-in contract, masks passport in response, and writes ledger events', async () => {
@@ -89,8 +97,7 @@ describe('Trade-ins (integration)', () => {
       }, 'missing-actor', 'tradein-missing-customer')
       .catch((e) => e);
 
-    expect(err).toBeInstanceOf(ValidationError);
-    expect(err.code).toBe('customer_not_found');
+    expect(err.code).toBe('customer_session_revoked');
     expect(await prisma.tradeInDevice.count()).toBe(0);
     expect(await prisma.auditEvent.count()).toBe(0);
   });
@@ -116,6 +123,82 @@ describe('Trade-ins (integration)', () => {
       .catch((error) => error);
     expect(reused).toBeInstanceOf(ConflictError);
     expect(reused.code).toBe('idempotency_key_reused');
+  });
+
+  it('rejects replaying a self-service key as a staff cash payout', async () => {
+    const seller = await customer();
+    const input = {
+      customerId: seller.id,
+      model: 'iPhone cross-mode replay',
+      grade: 'B' as const,
+      price: 22000,
+      sellerPassport: 'ID-CROSS-MODE',
+    };
+    const first = await tradeIns.create(input, seller.id, 'tradein-cross-mode', false);
+
+    await expect(tradeIns.create(input, 'staff-intake', 'tradein-cross-mode', true))
+      .rejects.toMatchObject({ code: 'idempotency_key_reused' });
+    expect(await prisma.accountingJournalEntry.count({
+      where: { sourceType: 'tradein.buyback', sourceRef: first.id },
+    })).toBe(0);
+    expect(await prisma.cashDrawerMovement.count({
+      where: { sourceType: 'tradein.buyback', sourceRef: first.id },
+    })).toBe(0);
+  });
+
+  it('does not restore passport PII when deletion commits before trade-in writes', async () => {
+    const seller = await customer();
+    const atTransaction = deferred();
+    const resumeTransaction = deferred();
+    const originalTransaction = audit.transaction.bind(audit);
+    const transaction = jest.spyOn(audit, 'transaction').mockImplementationOnce(async (fn) => {
+      atTransaction.resolve();
+      await resumeTransaction.promise;
+      return originalTransaction(fn);
+    });
+
+    try {
+      const creation = tradeIns.create({
+        customerId: seller.id,
+        model: 'iPhone deletion race',
+        grade: 'B',
+        price: 25000,
+        sellerPassport: 'ID-DO-NOT-RESTORE',
+      }, seller.id, 'tradein-delete-race');
+      await atTransaction.promise;
+      await prisma.customer.update({
+        where: { id: seller.id },
+        data: { phone: `deleted:${seller.id}`, name: 'Удалённый пользователь' },
+      });
+      resumeTransaction.resolve();
+
+      await expect(creation).rejects.toMatchObject({ code: 'customer_session_revoked' });
+      expect(await prisma.tradeInDevice.count({ where: { idempotencyKey: 'tradein-delete-race' } }))
+        .toBe(0);
+      expect(await prisma.auditEvent.count({ where: { actor: seller.id } })).toBe(0);
+    } finally {
+      resumeTransaction.resolve();
+      transaction.mockRestore();
+    }
+  });
+
+  it('does not expose an idempotent trade-in replay after account deletion', async () => {
+    const seller = await customer();
+    const input = {
+      customerId: seller.id,
+      model: 'iPhone replay deletion',
+      grade: 'C' as const,
+      price: 10000,
+      sellerPassport: 'ID-REPLAY-DELETE',
+    };
+    await tradeIns.create(input, seller.id, 'tradein-delete-replay');
+    await prisma.customer.update({
+      where: { id: seller.id },
+      data: { phone: `deleted:${seller.id}`, name: 'Удалённый пользователь' },
+    });
+
+    await expect(tradeIns.create(input, seller.id, 'tradein-delete-replay'))
+      .rejects.toMatchObject({ code: 'customer_session_revoked' });
   });
 
   it('keeps customer records owner-scoped', async () => {

@@ -12,6 +12,7 @@ import { INVENTORY_ASSET_ACCOUNT } from '../inventory/inventory-valuation';
 import { recordCashDrawerMovementOnTx } from '../shifts/cash-drawer';
 import { CreateTradeInDto, TradeInViewDto } from './tradeins.dto';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
+import { lockActiveCustomerOnTx } from '../auth/customer-session-state';
 
 type TradeInCreateInput = Omit<CreateTradeInDto, 'customerId'> & { customerId: string };
 
@@ -60,20 +61,30 @@ export class TradeInsService {
     if (!model || !sellerPassport) {
       throw new ValidationError('invalid_tradein_payload', 'Модель и паспорт продавца обязательны');
     }
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: dto.customerId },
-      select: { id: true },
-    });
-    if (!customer) {
-      throw new ValidationError('customer_not_found', `Клиент ${dto.customerId} не найден`);
-    }
     const imei = this.cleanOptional(dto.imei);
-    const input = { customerId: dto.customerId, model, imei, grade: dto.grade, price: dto.price, sellerPassport };
-    const existing = await this.prisma.tradeInDevice.findUnique({ where: { idempotencyKey: key } });
+    const input = {
+      customerId: dto.customerId,
+      model,
+      imei,
+      grade: dto.grade,
+      price: dto.price,
+      sellerPassport,
+      payout,
+    };
+    const customerErrorCode = payout
+      ? 'tradein_customer_unavailable'
+      : 'customer_session_revoked';
+    const existing = await this.prisma.$transaction(async (tx) => {
+      await lockActiveCustomerOnTx(tx, dto.customerId, customerErrorCode);
+      return tx.tradeInDevice.findUnique({ where: { idempotencyKey: key } });
+    });
     if (existing) return this.replay(existing, input);
 
     try {
       return await this.audit.transaction(async (tx) => {
+        // Customer lifecycle is the first lock. Passport, cash, accounting,
+        // notification and ledger effects either all precede deletion or none do.
+        await lockActiveCustomerOnTx(tx, input.customerId, customerErrorCode);
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`tradein:${key}`}))::text AS locked`;
         const replay = await tx.tradeInDevice.findUnique({ where: { idempotencyKey: key } });
         if (replay) return { result: this.replay(replay, input), events: [] };
@@ -86,6 +97,7 @@ export class TradeInsService {
             grade: input.grade,
             price: input.price,
             sellerPassport: input.sellerPassport,
+            payout: input.payout,
             contractId: this.contractId(),
             idempotencyKey: key,
           },
@@ -165,7 +177,10 @@ export class TradeInsService {
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
-        const raced = await this.prisma.tradeInDevice.findUniqueOrThrow({ where: { idempotencyKey: key } });
+        const raced = await this.prisma.$transaction(async (tx) => {
+          await lockActiveCustomerOnTx(tx, input.customerId, customerErrorCode);
+          return tx.tradeInDevice.findUniqueOrThrow({ where: { idempotencyKey: key } });
+        });
         return this.replay(raced, input);
       }
       throw error;
@@ -174,7 +189,15 @@ export class TradeInsService {
 
   private replay(
     tradeIn: TradeInDevice,
-    input: { customerId: string; model: string; imei: string | null; grade: TradeInDevice['grade']; price: number; sellerPassport: string },
+    input: {
+      customerId: string;
+      model: string;
+      imei: string | null;
+      grade: TradeInDevice['grade'];
+      price: number;
+      sellerPassport: string;
+      payout: boolean;
+    },
   ): TradeInViewDto {
     const matches =
       tradeIn.customerId === input.customerId &&
@@ -182,7 +205,8 @@ export class TradeInsService {
       tradeIn.imei === input.imei &&
       tradeIn.grade === input.grade &&
       tradeIn.price === input.price &&
-      tradeIn.sellerPassport === input.sellerPassport;
+      tradeIn.sellerPassport === input.sellerPassport &&
+      tradeIn.payout === input.payout;
     if (!matches) throw new ConflictError('idempotency_key_reused', 'Idempotency key уже использован с другим trade-in');
     return this.view(tradeIn);
   }
