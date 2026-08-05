@@ -218,7 +218,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               <h1 className="mt-5 font-display text-3xl font-bold leading-tight text-white sm:text-4xl">
                 {product.name}
               </h1>
-              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-white/45">
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-white/48">
                 <span className="flex items-center gap-1 text-[#ff9a6e]">
                   <Star size={16} fill="currentColor" /> {reviewLabel}
                 </span>
@@ -244,13 +244,13 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                         className="rounded-[10px] border border-white/10 bg-white/[.04] px-3 py-2"
                       >
                         <div className="font-display text-[15px] font-bold text-[#c6ff3d]">
-                          {som(step.monthlySom)}<span className="text-[11px] font-medium text-white/45">/мес</span>
+                          {som(step.monthlySom)}<span className="text-[11px] font-medium text-white/48">/мес</span>
                         </div>
-                        <div className="mt-0.5 text-[11px] text-white/45">{step.months} мес · {step.providers.join(', ')}</div>
+                        <div className="mt-0.5 text-[11px] text-white/48">{step.months} мес · {step.providers.join(', ')}</div>
                       </div>
                     ))}
                   </div>
-                  <div className="mt-2.5 text-[11px] text-white/45">
+                  <div className="mt-2.5 text-[11px] text-white/48">
                     Оформляется в магазине при получении заказа.
                   </div>
                   {/* QR загружает владелец в ERP. Показываем только провайдеров,
@@ -276,7 +276,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                           </figure>
                         ))}
                       </div>
-                      <div className="mt-2 text-[11px] text-white/45">
+                      <div className="mt-2 text-[11px] text-white/48">
                         Отсканируйте код нужного банка — заявку оформит продавец.
                       </div>
                     </div>
@@ -468,7 +468,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                     </article>
                   ))
                 ) : (
-                  <div className="rounded-[18px] border border-white/10 bg-white/[.04] p-7 text-white/45">
+                  <div className="rounded-[18px] border border-white/10 bg-white/[.04] p-7 text-white/48">
                     Будьте первым, кто оставит отзыв об этом товаре.
                   </div>
                 )}
@@ -586,7 +586,7 @@ function ProductLoadingSkeleton() {
 }
 function StoreMessage({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#0b0a08] text-white/45">
+    <div className="min-h-screen bg-[#0b0a08] text-white/48">
       <SiteHeader variant="design3" />
       <div className="grid min-h-[70vh] place-items-center">{children}</div>
     </div>

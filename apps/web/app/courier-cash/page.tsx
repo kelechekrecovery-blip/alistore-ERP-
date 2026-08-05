@@ -132,7 +132,7 @@ export default function CourierCashPage() {
         <section className="mt-8">
           <p className="text-xs font-semibold uppercase text-[#ff7657]">Двухсторонняя сверка</p>
           <h1 className="mt-1 font-display text-3xl font-black">Приёмка COD</h1>
-          <p className="mt-2 text-sm leading-6 text-white/45">Пересчитайте наличные и подтвердите сумму от своего имени.</p>
+          <p className="mt-2 text-sm leading-6 text-white/48">Пересчитайте наличные и подтвердите сумму от своего имени.</p>
         </section>
 
         <form

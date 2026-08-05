@@ -121,7 +121,7 @@ export default function HomePage({ initialStorefront = null, initialBlocks = [],
               <div><p className="text-xs font-bold uppercase text-[#ff9a6e]">Подборка магазина</p><h2 className="mt-1 text-[28px] font-extrabold text-white">{storefront?.content.featuredTitle ?? 'Популярное'}</h2></div>
               <Link href="/catalog" className="flex items-center gap-2 text-sm font-bold text-[#ff9a6e] hover:text-white">Весь каталог <ArrowRight size={17} /></Link>
             </div>
-            {loadError !== '' ? <LoadFailure what="товары" detail={loadError} onRetry={() => { setLoadError(''); setReloadToken((value) => value + 1); }} /> : products === null ? <CatalogSkeleton /> : products.length > 0 ? <div className="grid grid-cols-4 gap-4">{products.slice(0, 8).map((product) => <ProductCard key={product.id} product={product} variant="design3" />)}</div> : <div className="rounded-[12px] border border-white/10 bg-white/[.04] px-6 py-12 text-center text-white/45">Каталог обновляется. <Link href="/catalog" className="font-bold text-[#ff9a6e]">Открыть каталог</Link></div>}
+            {loadError !== '' ? <LoadFailure what="товары" detail={loadError} onRetry={() => { setLoadError(''); setReloadToken((value) => value + 1); }} /> : products === null ? <CatalogSkeleton /> : products.length > 0 ? <div className="grid grid-cols-4 gap-4">{products.slice(0, 8).map((product) => <ProductCard key={product.id} product={product} variant="design3" />)}</div> : <div className="rounded-[12px] border border-white/10 bg-white/[.04] px-6 py-12 text-center text-white/48">Каталог обновляется. <Link href="/catalog" className="font-bold text-[#ff9a6e]">Открыть каталог</Link></div>}
           </section>}
         </main>
         <SiteFooter />
@@ -134,8 +134,8 @@ function ManagedDesktopBlocks({ blocks }: { blocks: StorefrontBlock[] }) {
   return <section className="grid gap-4" aria-label="Предложения AliStore" data-testid="managed-storefront-blocks">
     {blocks.map((block) => block.type === 'collection'
       ? <div key={block.id} className="py-8" data-storefront-block={block.id}>
-          <div className="mb-5 flex items-end justify-between"><div>{block.eyebrow && <p className="text-xs font-bold uppercase text-[#ff9a6e]">{block.eyebrow}</p>}<h2 className="mt-1 text-[28px] font-extrabold text-white">{block.title}</h2>{block.body && <p className="mt-1 text-sm text-white/45">{block.body}</p>}</div>{block.ctaHref && <Link href={block.ctaHref} className="flex items-center gap-2 text-sm font-bold text-[#ff9a6e]">{block.ctaLabel ?? 'Смотреть все'} <ArrowRight size={17} /></Link>}</div>
-          {block.products?.length ? <div className="grid grid-cols-4 gap-4">{block.products.slice(0, 8).map((product) => <ProductCard key={product.id} product={product} variant="design3" />)}</div> : <div className="rounded-[12px] border border-white/10 bg-white/[.04] px-6 py-10 text-center text-white/45">Подборка временно недоступна</div>}
+          <div className="mb-5 flex items-end justify-between"><div>{block.eyebrow && <p className="text-xs font-bold uppercase text-[#ff9a6e]">{block.eyebrow}</p>}<h2 className="mt-1 text-[28px] font-extrabold text-white">{block.title}</h2>{block.body && <p className="mt-1 text-sm text-white/48">{block.body}</p>}</div>{block.ctaHref && <Link href={block.ctaHref} className="flex items-center gap-2 text-sm font-bold text-[#ff9a6e]">{block.ctaLabel ?? 'Смотреть все'} <ArrowRight size={17} /></Link>}</div>
+          {block.products?.length ? <div className="grid grid-cols-4 gap-4">{block.products.slice(0, 8).map((product) => <ProductCard key={product.id} product={product} variant="design3" />)}</div> : <div className="rounded-[12px] border border-white/10 bg-white/[.04] px-6 py-10 text-center text-white/48">Подборка временно недоступна</div>}
         </div>
       : <ManagedBanner key={block.id} block={block} />)}
   </section>;
@@ -183,7 +183,7 @@ function desktopTone(tone: StorefrontBlock['tone']) {
 }
 
 function Benefit({ icon, title, text, dark = false }: { icon: ReactNode; title: string; text: string; dark?: boolean }) {
-  return <div className="flex items-center justify-center gap-3 px-5"><span className="text-[#ff7a4d] [&_svg]:h-6 [&_svg]:w-6">{icon}</span><span><strong className={`block text-[13px] font-bold ${dark ? 'text-white' : ''}`}>{title}</strong><small className={`mt-0.5 block text-[11px] ${dark ? 'text-white/45' : 'text-faint'}`}>{text}</small></span></div>;
+  return <div className="flex items-center justify-center gap-3 px-5"><span className="text-[#ff7a4d] [&_svg]:h-6 [&_svg]:w-6">{icon}</span><span><strong className={`block text-[13px] font-bold ${dark ? 'text-white' : ''}`}>{title}</strong><small className={`mt-0.5 block text-[11px] ${dark ? 'text-white/48' : 'text-faint'}`}>{text}</small></span></div>;
 }
 
 function CatalogSkeleton() {
