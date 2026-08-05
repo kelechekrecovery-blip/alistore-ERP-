@@ -8,9 +8,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.withContext
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -32,6 +34,14 @@ interface AuthGateway {
   suspend fun refresh(refreshToken: String): AuthTokens
   suspend fun me(accessToken: String): AuthUser
   suspend fun logout(refreshToken: String)
+  suspend fun googleLogin(identityToken: String, nonce: String): SocialAuthResult =
+    throw UnsupportedOperationException("Google Sign-In is unavailable")
+  suspend fun completeSocialEnrollment(
+    enrollmentToken: String,
+    phone: String,
+    code: String,
+    challengeId: String?,
+  ): AuthTokens = throw UnsupportedOperationException("Social enrollment is unavailable")
 }
 
 interface SessionStore {
@@ -45,12 +55,15 @@ sealed interface AuthState {
   data object Restoring : AuthState
   data object Guest : AuthState
   data class SignedIn(val user: AuthUser, val tokens: AuthTokens) : AuthState
+  data class SocialEnrollment(val provider: SocialProvider, val expiresAtMillis: Long) : AuthState
   data class Failed(val message: String) : AuthState
 }
 
 class AuthSessionManager(
   private val api: AuthGateway,
   private val store: SessionStore,
+  private val googleSignInProvider: GoogleSignInProvider? = null,
+  private val nowMillis: () -> Long = System::currentTimeMillis,
 ) {
   private data class RefreshFlight(
     val refreshToken: String,
@@ -64,6 +77,10 @@ class AuthSessionManager(
   private var phoneChallengeId: String? = null
   private var emailChallengeId: String? = null
   private var emailAttachChallengeId: String? = null
+  private var socialEnrollmentToken: String? = null
+  private var socialEnrollmentPhone: String? = null
+  private var socialEnrollmentChallengeId: String? = null
+  private var socialEnrollmentExpiresAtMillis: Long? = null
 
   // Compose-observable, see StaffSessionManager.requiresQuickUnlock for the rationale:
   // a plain var is not tracked by the snapshot system, so AliStoreApp's overlay check
@@ -114,10 +131,102 @@ class AuthSessionManager(
       emailAttachChallengeId = null
     }
 
-  suspend fun logout(state: AuthState.SignedIn): AuthState {
-    invalidateAndClear()
-    runCatching { api.logout(state.tokens.refreshToken) }
+  suspend fun loginWithGoogle(credential: GoogleIdentityCredential): AuthState = try {
+    require(credential.identityToken.isNotBlank()) { "Google не вернул токен аккаунта" }
+    require(credential.nonce.isNotBlank()) { "Google nonce отсутствует" }
+    when (val result = api.googleLogin(credential.identityToken, credential.nonce)) {
+      is SocialAuthResult.Authenticated -> {
+        clearSocialEnrollment()
+        requiresQuickUnlock = false
+        signedIn(result.tokens)
+      }
+      is SocialAuthResult.EnrollmentRequired -> {
+        require(result.enrollmentToken.isNotBlank()) { "Сервер не вернул подтверждение регистрации" }
+        socialEnrollmentToken = result.enrollmentToken
+        socialEnrollmentPhone = null
+        socialEnrollmentChallengeId = null
+        socialEnrollmentExpiresAtMillis = nowMillis() + result.expiresInSeconds.coerceAtLeast(1) * 1_000L
+        AuthState.SocialEnrollment(SocialProvider.GOOGLE, socialEnrollmentExpiresAtMillis!!)
+      }
+    }
+  } catch (cancelled: CancellationException) {
+    throw cancelled
+  } catch (error: Throwable) {
+    AuthState.Failed(error.userMessage())
+  }
+
+  suspend fun requestSocialEnrollmentOtp(phone: String): OtpChallenge {
+    checkNotNull(socialEnrollmentToken) { "Регистрация через Google уже отменена. Начните вход заново" }
+    checkSocialEnrollmentFresh()
+    val normalized = phone.normalizedPhone()
+    return api.requestOtp(normalized).also {
+      socialEnrollmentPhone = normalized
+      socialEnrollmentChallengeId = it.challengeId
+    }
+  }
+
+  suspend fun completeSocialEnrollment(phone: String, code: String): AuthState {
+    val token = socialEnrollmentToken
+      ?: return AuthState.Failed("Регистрация через Google уже отменена. Начните вход заново")
+    val normalized = phone.normalizedPhone()
+    if (socialEnrollmentPhone != normalized) {
+      return AuthState.Failed("Сначала запросите код для этого номера")
+    }
+    return try {
+      checkSocialEnrollmentFresh()
+      val tokens = api.completeSocialEnrollment(
+        token,
+        normalized,
+        code.trim(),
+        socialEnrollmentChallengeId,
+      )
+      val state = signedIn(tokens)
+      clearSocialEnrollment()
+      requiresQuickUnlock = false
+      state
+    } catch (cancelled: CancellationException) {
+      throw cancelled
+    } catch (error: Throwable) {
+      AuthState.Failed(error.userMessage())
+    }
+  }
+
+  fun cancelSocialEnrollment(): AuthState {
+    clearSocialEnrollment()
     return AuthState.Guest
+  }
+
+  suspend fun logout(state: AuthState.SignedIn): AuthState {
+    val guest = beginLogout()
+    finishLogout(state)
+    return guest
+  }
+
+  fun beginLogout(): AuthState {
+    invalidateAndClear()
+    return AuthState.Guest
+  }
+
+  suspend fun finishLogout(state: AuthState.SignedIn) {
+    var cancellation: CancellationException? = null
+    try {
+      api.logout(state.tokens.refreshToken)
+    } catch (cancelled: CancellationException) {
+      cancellation = cancelled
+    } catch (_: Throwable) {
+      // Local logout is authoritative; remote revoke is best effort.
+    } finally {
+      withContext(NonCancellable) {
+      try {
+        googleSignInProvider?.clearCredentialState()
+      } catch (cancelled: CancellationException) {
+        if (cancellation == null) cancellation = cancelled
+      } catch (_: Throwable) {
+        // Credential state cleanup must not resurrect the local session.
+      }
+      }
+    }
+    cancellation?.let { throw it }
   }
 
   fun unlock() { requiresQuickUnlock = false }
@@ -218,6 +327,23 @@ class AuthSessionManager(
       refreshFlight = null
       store.clear()
       requiresQuickUnlock = false
+      clearSocialEnrollment()
+    }
+  }
+
+  private fun clearSocialEnrollment() {
+    socialEnrollmentToken = null
+    socialEnrollmentPhone = null
+    socialEnrollmentChallengeId = null
+    socialEnrollmentExpiresAtMillis = null
+  }
+
+  private fun checkSocialEnrollmentFresh() {
+    val expiresAt = socialEnrollmentExpiresAtMillis
+      ?: throw IllegalStateException("Регистрация через Google уже отменена. Начните вход заново")
+    if (nowMillis() >= expiresAt) {
+      clearSocialEnrollment()
+      throw IllegalStateException("Срок подтверждения Google истёк. Начните вход заново")
     }
   }
 }

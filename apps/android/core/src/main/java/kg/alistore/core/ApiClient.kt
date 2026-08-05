@@ -95,6 +95,20 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     request("auth/logout", "POST", JSONObject().put("refreshToken", refreshToken), allowEmpty = true)
   }
 
+  override suspend fun googleLogin(identityToken: String, nonce: String): SocialAuthResult =
+    request("auth/v2/social/google", "POST", googleLoginPayload(identityToken, nonce)).socialAuthResult()
+
+  override suspend fun completeSocialEnrollment(
+    enrollmentToken: String,
+    phone: String,
+    code: String,
+    challengeId: String?,
+  ): AuthTokens = request(
+    "auth/v2/social/enrollment/complete",
+    "POST",
+    socialEnrollmentPayload(enrollmentToken, phone, code, challengeId),
+  ).tokens()
+
   override suspend fun createOrder(request: CreateOrderRequest, token: String, idempotencyKey: String): CustomerOrder =
     request("orders/mine", "POST", request.toJson(), token, idempotencyKey = idempotencyKey).order()
 
@@ -744,11 +758,34 @@ internal fun JSONObject.promotionQuote() = PromotionQuote(
 
 private fun JSONObject.tokens() = AuthTokens(getString("accessToken"), getString("refreshToken"))
 
+private fun JSONObject.socialAuthResult(): SocialAuthResult = when (getString("status")) {
+  "authenticated" -> SocialAuthResult.Authenticated(tokens())
+  "enrollment_required" -> SocialAuthResult.EnrollmentRequired(
+    enrollmentToken = getString("enrollmentToken"),
+    expiresInSeconds = getInt("expiresIn"),
+  )
+  else -> throw IllegalArgumentException("Неизвестный ответ Google Sign-In")
+}
+
 private fun JSONObject.putOptional(key: String, value: String?): JSONObject =
   apply { value?.let { put(key, it) } }
 
 internal fun otpVerificationPayload(phone: String, code: String, challengeId: String?): JSONObject =
   JSONObject().put("phone", phone).put("code", code).putOptional("challengeId", challengeId)
+
+internal fun googleLoginPayload(identityToken: String, nonce: String): JSONObject =
+  JSONObject().put("identityToken", identityToken).put("nonce", nonce)
+
+internal fun socialEnrollmentPayload(
+  enrollmentToken: String,
+  phone: String,
+  code: String,
+  challengeId: String?,
+): JSONObject = JSONObject()
+  .put("enrollmentToken", enrollmentToken)
+  .put("phone", phone)
+  .put("code", code)
+  .putOptional("challengeId", challengeId)
 
 internal fun emailOtpVerificationPayload(email: String, code: String, challengeId: String?): JSONObject =
   JSONObject().put("email", email).put("code", code).putOptional("challengeId", challengeId)

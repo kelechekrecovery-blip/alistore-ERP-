@@ -28,4 +28,22 @@ class ApiClientTest {
 
     assertFalse(payload.has("challengeId"))
   }
+
+  @Test
+  fun googleLoginPayloadCarriesTokenAndRawNonce() {
+    val payload = googleLoginPayload("google-id-token", "raw-nonce")
+
+    assertEquals("google-id-token", payload.getString("identityToken"))
+    assertEquals("raw-nonce", payload.getString("nonce"))
+  }
+
+  @Test
+  fun socialEnrollmentPayloadCarriesMemoryTicketAndOtpChallenge() {
+    val payload = socialEnrollmentPayload("enrollment-ticket", "+996700123456", "123456", "challenge-1")
+
+    assertEquals("enrollment-ticket", payload.getString("enrollmentToken"))
+    assertEquals("+996700123456", payload.getString("phone"))
+    assertEquals("123456", payload.getString("code"))
+    assertEquals("challenge-1", payload.getString("challengeId"))
+  }
 }

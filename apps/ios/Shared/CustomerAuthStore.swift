@@ -19,8 +19,19 @@ public final class CustomerAuthStore {
     public private(set) var phoneChallengeId: String?
     public private(set) var emailChallengeId: String?
     public private(set) var emailAttachChallengeId: String?
-    public private(set) var requiresApplePhoneEnrollment = false
-    public private(set) var appleEnrollmentExpiresAt: Date?
+    public private(set) var socialEnrollmentProvider: CustomerSocialProvider?
+    public private(set) var socialEnrollmentExpiresAt: Date?
+    public var requiresSocialPhoneEnrollment: Bool { socialEnrollmentProvider != nil }
+    /// Compatibility for the existing Apple-only UI while it migrates to the
+    /// provider-neutral enrollment state.
+    public var requiresApplePhoneEnrollment: Bool { socialEnrollmentProvider == .apple }
+    public var appleEnrollmentExpiresAt: Date? {
+        socialEnrollmentProvider == .apple ? socialEnrollmentExpiresAt : nil
+    }
+    public var requiresGooglePhoneEnrollment: Bool { socialEnrollmentProvider == .google }
+    public var googleEnrollmentExpiresAt: Date? {
+        socialEnrollmentProvider == .google ? socialEnrollmentExpiresAt : nil
+    }
     public private(set) var requiresQuickUnlock = false
     public let quickUnlockService: String
 
@@ -30,7 +41,7 @@ public final class CustomerAuthStore {
     private var refreshFlight: RefreshFlight?
     private var sessionGeneration: UInt64 = 0
     /// Opaque, short-lived bearer secret. Intentionally never encoded or persisted.
-    private var appleEnrollmentToken: String?
+    private var socialEnrollmentToken: String?
     /// См. `StaffAuthStore.isPinConfigured` — та же причина инъекции.
     private let isPinConfigured: () -> Bool
 
@@ -97,14 +108,13 @@ public final class CustomerAuthStore {
     /// токена, а сервер сравнивает их напрямую. Любое преобразование здесь даёт
     /// «nonce mismatch», который на устройстве выглядит как молчаливый отказ входа.
     public func signInWithApple(identityToken: String, nonce: String, name: String?) async {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-        guard !nonce.isEmpty else {
+        guard validSocialCredentials(identityToken: identityToken, nonce: nonce) else {
             errorMessage = "Не удалось подтвердить безопасный вход Apple. Попробуйте ещё раз."
             return
         }
-        clearAppleEnrollment()
+        beginSocialRequest()
+        defer { isLoading = false }
+        clearSocialEnrollment()
         do {
             let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
             let result: CustomerSocialAuthResult = try await api.post(
@@ -116,16 +126,28 @@ public final class CustomerAuthStore {
                     name: (trimmedName?.isEmpty ?? true) ? nil : trimmedName
                 )
             )
-            switch result {
-            case .authenticated(let auth):
-                try await finishAuthentication(auth, fallbackPhone: "")
-            case .enrollmentRequired(let enrollmentToken, let expiresIn):
-                appleEnrollmentToken = enrollmentToken
-                appleEnrollmentExpiresAt = Date().addingTimeInterval(TimeInterval(expiresIn))
-                requiresApplePhoneEnrollment = true
-                phoneChallengeId = nil
-                devCode = nil
-            }
+            try await handleSocialAuthResult(result, provider: .apple)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Вход через Google. `nonce` — исходная одноразовая строка, переданная
+    /// Google SDK при выпуске ID token; сервер сравнивает её с claim токена.
+    public func signInWithGoogle(identityToken: String, nonce: String) async {
+        guard validSocialCredentials(identityToken: identityToken, nonce: nonce) else {
+            errorMessage = "Не удалось подтвердить безопасный вход Google. Попробуйте ещё раз."
+            return
+        }
+        beginSocialRequest()
+        defer { isLoading = false }
+        clearSocialEnrollment()
+        do {
+            let result: CustomerSocialAuthResult = try await api.post(
+                "auth/v2/social/google",
+                body: GoogleSocialLogin(identityToken: identityToken, nonce: nonce)
+            )
+            try await handleSocialAuthResult(result, provider: .google)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -133,9 +155,10 @@ public final class CustomerAuthStore {
 
     /// Completes an unknown Apple identity by proving the canonical customer phone.
     /// The enrollment token remains memory-only and survives retryable OTP errors.
-    public func completeAppleEnrollment(phone: String, code: String) async {
-        guard let enrollmentToken = appleEnrollmentToken else {
-            errorMessage = "Сессия регистрации Apple истекла. Начните вход заново."
+    public func completeSocialEnrollment(phone: String, code: String) async {
+        guard let enrollmentToken = socialEnrollmentToken,
+              socialEnrollmentProvider != nil else {
+            errorMessage = "Сессия регистрации истекла. Начните вход заново."
             return
         }
         isLoading = true
@@ -160,9 +183,18 @@ public final class CustomerAuthStore {
         }
     }
 
-    public func cancelAppleEnrollment() {
-        clearAppleEnrollment()
+    public func cancelSocialEnrollment() {
+        clearSocialEnrollment()
         errorMessage = nil
+    }
+
+    /// Compatibility wrappers for existing Apple enrollment screens/tests.
+    public func completeAppleEnrollment(phone: String, code: String) async {
+        await completeSocialEnrollment(phone: phone, code: code)
+    }
+
+    public func cancelAppleEnrollment() {
+        cancelSocialEnrollment()
     }
 
     /// Запрашивает код входа на email.
@@ -303,7 +335,7 @@ public final class CustomerAuthStore {
         phoneChallengeId = nil
         emailChallengeId = nil
         emailAttachChallengeId = nil
-        clearAppleEnrollment()
+        clearSocialEnrollment()
         if let refreshToken {
             try? await api.postNoContent("auth/logout", body: RefreshRequest(refreshToken: refreshToken))
         }
@@ -420,10 +452,14 @@ public final class CustomerAuthStore {
     }
 
     public func useUITestAppleEnrollment() {
-        clearAppleEnrollment()
-        appleEnrollmentToken = String(repeating: "u", count: 48)
-        appleEnrollmentExpiresAt = Date().addingTimeInterval(600)
-        requiresApplePhoneEnrollment = true
+        useUITestSocialEnrollment(provider: .apple)
+    }
+
+    public func useUITestSocialEnrollment(provider: CustomerSocialProvider) {
+        clearSocialEnrollment()
+        socialEnrollmentToken = String(repeating: "u", count: 48)
+        socialEnrollmentExpiresAt = Date().addingTimeInterval(600)
+        socialEnrollmentProvider = provider
         isRestoring = false
         errorMessage = nil
     }
@@ -450,7 +486,7 @@ public final class CustomerAuthStore {
         if persists ?? restoresStoredSession { try save(next) }
         session = next
         self.requiresQuickUnlock = requiresQuickUnlock
-        clearAppleEnrollment()
+        clearSocialEnrollment()
     }
 
     private func finishAuthentication(_ auth: CustomerAuthTokens, fallbackPhone: String) async throws {
@@ -465,10 +501,36 @@ public final class CustomerAuthStore {
         devCode = nil
     }
 
-    private func clearAppleEnrollment() {
-        appleEnrollmentToken = nil
-        appleEnrollmentExpiresAt = nil
-        requiresApplePhoneEnrollment = false
+    private func beginSocialRequest() {
+        isLoading = true
+        errorMessage = nil
+    }
+
+    private func validSocialCredentials(identityToken: String, nonce: String) -> Bool {
+        !identityToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !nonce.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func handleSocialAuthResult(
+        _ result: CustomerSocialAuthResult,
+        provider: CustomerSocialProvider
+    ) async throws {
+        switch result {
+        case .authenticated(let auth):
+            try await finishAuthentication(auth, fallbackPhone: "")
+        case .enrollmentRequired(let enrollmentToken, let expiresIn):
+            socialEnrollmentToken = enrollmentToken
+            socialEnrollmentExpiresAt = Date().addingTimeInterval(TimeInterval(expiresIn))
+            socialEnrollmentProvider = provider
+            phoneChallengeId = nil
+            devCode = nil
+        }
+    }
+
+    private func clearSocialEnrollment() {
+        socialEnrollmentToken = nil
+        socialEnrollmentExpiresAt = nil
+        socialEnrollmentProvider = nil
         phoneChallengeId = nil
         devCode = nil
     }

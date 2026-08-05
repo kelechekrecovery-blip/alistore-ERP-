@@ -42,6 +42,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
@@ -52,6 +53,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 private val Ink = Design3.screen
 private val Surface = Design3.surface
@@ -71,9 +73,10 @@ fun AliStoreApp(
   staffPushRegistrar: StaffPushRegistrar? = null,
   clientPushRegistrar: ClientPushRegistrar? = null,
   paymentReturnBaseUrl: String = "alistore://payment-return",
+  googleSignInProvider: GoogleSignInProvider? = null,
 ) {
   if (role == AppRole.CLIENT) {
-    ClientApp(apiBaseUrl, deepLinkUrl, deepLinkRevision, clientPushRegistrar, paymentReturnBaseUrl)
+    ClientApp(apiBaseUrl, deepLinkUrl, deepLinkRevision, clientPushRegistrar, paymentReturnBaseUrl, googleSignInProvider)
     return
   }
   if (role == AppRole.STAFF) {
@@ -98,6 +101,7 @@ private fun ClientApp(
   deepLinkRevision: Long,
   clientPushRegistrar: ClientPushRegistrar?,
   paymentReturnBaseUrl: String,
+  googleSignInProvider: GoogleSignInProvider?,
 ) {
   val context = LocalContext.current.applicationContext
   val localStateStore = remember { ClientLocalStateStore(context, "client") }
@@ -114,10 +118,15 @@ private fun ClientApp(
   var paymentReturn by remember { mutableStateOf<PaymentReturnRoute?>(null) }
   var orderRefreshRevision by remember { mutableStateOf(0) }
   val authManager = remember(apiBaseUrl) {
-    AuthSessionManager(ApiClient(apiBaseUrl), SecureTokenStore(context, "alistore-session"))
+    AuthSessionManager(ApiClient(apiBaseUrl), SecureTokenStore(context, "alistore-session"), googleSignInProvider)
   }
   val quickUnlock = remember { QuickUnlockStore(context, "client") }
-  val logout: () -> Unit = { quickUnlock.clear(); authState = authManager.forceLogout() }
+  val authScope = rememberCoroutineScope()
+  val logout: (AuthState.SignedIn) -> Unit = { signedIn ->
+    quickUnlock.clear()
+    authState = authManager.beginLogout()
+    authScope.launch { authManager.finishLogout(signedIn) }
+  }
   fun persistLocalState(nextFavorites: Set<String> = favorites, nextCart: Map<String, Int> = cart) {
     localStateStore.write(ClientLocalState(nextFavorites, nextCart))
   }
@@ -244,6 +253,7 @@ private fun ClientApp(
           { authState = it },
           favorites.size,
           cart.values.sum(),
+          logout,
           Modifier.padding(padding),
           apiBaseUrl = apiBaseUrl,
           route = accountRoute,
@@ -251,11 +261,18 @@ private fun ClientApp(
           orderRefreshRevision = orderRefreshRevision,
           paymentReturn = paymentReturn,
           paymentReturnBaseUrl = paymentReturnBaseUrl,
+          googleSignInProvider = googleSignInProvider,
         )
       }
     }
     if (authManager.requiresQuickUnlock && authState is AuthState.SignedIn) {
-      QuickUnlockGate("AliStore", (authState as AuthState.SignedIn).user.phone ?: "Клиент", quickUnlock, authManager::unlock, logout) {}
+      QuickUnlockGate(
+        "AliStore",
+        (authState as AuthState.SignedIn).user.phone ?: "Клиент",
+        quickUnlock,
+        authManager::unlock,
+        { (authState as? AuthState.SignedIn)?.let(logout) },
+      ) {}
     }
     }
   }

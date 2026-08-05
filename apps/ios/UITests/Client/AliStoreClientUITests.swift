@@ -78,10 +78,10 @@ final class AliStoreClientUITests: XCTestCase {
         XCTAssertTrue(app.textFields["client-phone"].exists)
         XCTAssertFalse(app.buttons["client-channel-email"].exists)
         XCTAssertFalse(app.buttons["client-apple-signin"].exists)
-        XCTAssertTrue(app.buttons["client-apple-enrollment-cancel"].exists)
+        XCTAssertTrue(app.buttons["client-social-enrollment-cancel"].exists)
         XCTAssertTrue(app.buttons["Продолжить как гость →"].exists)
 
-        app.buttons["client-apple-enrollment-cancel"].tap()
+        app.buttons["client-social-enrollment-cancel"].tap()
         XCTAssertTrue(app.staticTexts["Войти или создать аккаунт"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["client-apple-signin"].exists)
     }
