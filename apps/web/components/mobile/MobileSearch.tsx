@@ -2,44 +2,72 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Search, SearchX } from 'lucide-react';
 import { LoadFailure } from '@/components/LoadFailure';
 import { MobileFrame } from '@/components/mobile/MobileFrame';
 import { MobileProductCard } from '@/components/mobile/MobileProductCard';
 import { fetchCatalog, isCatalogUnavailable, type CatalogProduct } from '@/lib/api';
+import { searchSummary } from '@/lib/search-summary';
 
 const POPULAR = ['iPhone', 'Samsung', 'AirPods', 'MacBook', 'iPad', 'Часы'];
+/** Сколько карточек показываем; сервер сообщает, сколько нашлось всего. */
+const PAGE_SIZE = 20;
+/** Пауза после последнего нажатия — чтобы набор слова не бил в API посимвольно. */
+const TYPING_PAUSE_MS = 250;
 
 export default function MobileSearch() {
   const router = useRouter();
-  const [products, setProducts] = useState<CatalogProduct[] | null>(null);
+  const [results, setResults] = useState<CatalogProduct[] | null>(null);
+  const [total, setTotal] = useState<number | undefined>(undefined);
   const [loadError, setLoadError] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
   const [q, setQ] = useState('');
 
   useEffect(() => {
     setQ(new URLSearchParams(window.location.search).get('q') ?? '');
-    fetchCatalog({ limit: 100 })
-      .then((response) => { if (isCatalogUnavailable(response)) throw new Error('Каталог не ответил'); return response; })
-      .then((response) => setProducts(response.items))
-      .catch((cause: unknown) => {
-      // Пустой список и упавший запрос — разные экраны. Раньше сбой показывал
-      // покупателю то же, что видит владелец пустого магазина.
-      setProducts(null);
-      setLoadError(cause instanceof Error && cause.message ? cause.message : ' ');
-    });
-  }, [reloadToken]);
+  }, []);
 
-  const results = useMemo(() => {
-    const query = q.trim().toLocaleLowerCase('ru');
-    if (!query) return [];
-    return (products ?? []).filter((p) =>
-      `${p.name} ${p.sku} ${p.category}`.toLocaleLowerCase('ru').includes(query),
-    );
-  }, [products, q]);
-
+  // Порядковый номер запроса: ответы приходят вразнобой, и медленный ответ по
+  // «iPh» не должен затереть быстрый по «iPhone». Сравниваем номер перед тем,
+  // как что-то записать в состояние.
+  const requestSeq = useRef(0);
   const trimmed = q.trim();
+
+  useEffect(() => {
+    if (!trimmed) {
+      setResults(null);
+      setTotal(undefined);
+      setLoadError('');
+      return;
+    }
+    const seq = ++requestSeq.current;
+    const timer = window.setTimeout(() => {
+      // Ищет сервер по всему каталогу. Раньше страница тянула первые сто
+      // товаров и фильтровала их в браузере: товар со сто первой позиции
+      // «не существовал», а подпись «Найдено» считала по этой же сотне.
+      void fetchCatalog({ q: trimmed, limit: PAGE_SIZE })
+        .then((response) => {
+          if (isCatalogUnavailable(response)) throw new Error('Каталог не ответил');
+          return response;
+        })
+        .then((response) => {
+          if (seq !== requestSeq.current) return;
+          setResults(response.items);
+          setTotal(response.total);
+          setLoadError('');
+        })
+        .catch((cause: unknown) => {
+          if (seq !== requestSeq.current) return;
+          // Пустой список и упавший запрос — разные экраны. Раньше сбой показывал
+          // покупателю то же, что видит владелец пустого магазина.
+          setResults(null);
+          setTotal(undefined);
+          setLoadError(cause instanceof Error && cause.message ? cause.message : ' ');
+        });
+    }, TYPING_PAUSE_MS);
+    return () => window.clearTimeout(timer);
+  }, [trimmed, reloadToken]);
 
   return (
     <MobileFrame active="catalog" header={false}>
@@ -82,16 +110,26 @@ export default function MobileSearch() {
               ))}
             </div>
           </>
-        ) : results.length > 0 ? (
+        ) : results && results.length > 0 ? (
           <>
-            <div className="mb-2.5 text-[13px] text-subtle">Найдено: {results.length}</div>
+            <div className="mb-2.5 text-[13px] text-subtle">{searchSummary({ total, shown: results.length })}</div>
             <div className="grid grid-cols-2 gap-3">
-              {results.slice(0, 20).map((p, i) => (
+              {results.map((p, i) => (
                 <MobileProductCard key={p.id} product={p} priority={i === 0} />
               ))}
             </div>
+            {/* Найдено больше, чем поместилось: уводим в каталог с тем же
+                запросом, а не оставляем покупателя гадать, где остальное. */}
+            {typeof total === 'number' && total > results.length && (
+              <Link
+                href={`/catalog?q=${encodeURIComponent(trimmed)}`}
+                className="mt-4 block rounded-[11px] border border-surface-3 bg-surface-2 py-3 text-center text-[13px] font-semibold text-white"
+              >
+                Показать все {total.toLocaleString('ru-RU')}
+              </Link>
+            )}
           </>
-        ) : loadError !== '' ? <LoadFailure what="товары" detail={loadError.trim()} onRetry={() => { setLoadError(''); setReloadToken((value) => value + 1); }} /> : products === null ? (
+        ) : loadError !== '' ? <LoadFailure what="товары" detail={loadError.trim()} onRetry={() => { setLoadError(''); setReloadToken((value) => value + 1); }} /> : results === null ? (
           <div className="py-10 text-center text-sm text-subtle">Поиск…</div>
         ) : (
           <div className="py-12 text-center">

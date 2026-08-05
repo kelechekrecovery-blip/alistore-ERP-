@@ -12,6 +12,8 @@ import { INVENTORY_ASSET_ACCOUNT } from '../inventory/inventory-valuation';
 import { recordCashDrawerMovementOnTx } from '../shifts/cash-drawer';
 import { CreateTradeInDto, TradeInViewDto } from './tradeins.dto';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
+import { SettingsService } from '../settings/settings.service';
+import { tradeInEstimate, type TradeInGrade, type TradeInValuation } from './valuation';
 
 type TradeInCreateInput = Omit<CreateTradeInDto, 'customerId'> & { customerId: string };
 
@@ -21,7 +23,51 @@ export class TradeInsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     @Optional() private readonly outbox?: OutboxService,
+    @Optional() private readonly settings?: SettingsService,
   ) {}
+
+  /**
+   * Прайс выкупа из настроек. Ключи literal-ами намеренно: гейт
+   * `settings-wired` проверяет, что объявленный параметр кто-то читает, и
+   * шаблонные строки его обманывают.
+   */
+  private async valuation(): Promise<TradeInValuation> {
+    const read = async (key: string): Promise<number | undefined> =>
+      this.settings ? this.settings.value(key) : undefined;
+    const [i15, i14, i13, i12, mac, ipad, pods, other, gradeB, gradeC, round] = await Promise.all([
+      read('tradein.base.iphone_15_som'),
+      read('tradein.base.iphone_14_som'),
+      read('tradein.base.iphone_13_som'),
+      read('tradein.base.iphone_12_som'),
+      read('tradein.base.macbook_som'),
+      read('tradein.base.ipad_som'),
+      read('tradein.base.airpods_som'),
+      read('tradein.base.default_som'),
+      read('tradein.grade_b_bps'),
+      read('tradein.grade_c_bps'),
+      read('tradein.round_som'),
+    ]);
+    return {
+      // Порядок значим: «iphone 15» обязан проверяться раньше «iphone 1».
+      tiers: [
+        { match: 'iphone 15', baseSom: i15 ?? 65_000 },
+        { match: 'iphone 14', baseSom: i14 ?? 52_000 },
+        { match: 'iphone 13', baseSom: i13 ?? 38_000 },
+        { match: 'iphone 12', baseSom: i12 ?? 28_000 },
+        { match: 'macbook', baseSom: mac ?? 70_000 },
+        { match: 'ipad', baseSom: ipad ?? 32_000 },
+        { match: 'airpods', baseSom: pods ?? 8_000 },
+      ],
+      defaultBaseSom: other ?? 30_000,
+      gradeFactorsBps: { A: 10_000, B: gradeB ?? 8_200, C: gradeC ?? 6_200 },
+      roundToSom: round ?? 500,
+    };
+  }
+
+  /** Предварительная оценка для витрины — та же функция, что назначит выплату. */
+  async estimate(model: string, grade: TradeInGrade): Promise<number> {
+    return tradeInEstimate(model, grade, await this.valuation());
+  }
 
   async get(id: string): Promise<TradeInViewDto | null> {
     const tradeIn = await this.prisma.tradeInDevice.findUnique({ where: { id } });
@@ -68,15 +114,38 @@ export class TradeInsService {
       throw new ValidationError('customer_not_found', `Клиент ${dto.customerId} не найден`);
     }
     const imei = this.cleanOptional(dto.imei);
-    const input = { customerId: dto.customerId, model, imei, grade: dto.grade, price: dto.price, sellerPassport };
+    // Кто назначает сумму, зависит от пути, и разница здесь принципиальная.
+    //
+    // Приёмка у прилавка (`payout`): цену ставит мастер после осмотра аппарата.
+    // Он аутентифицирован, у него право `tradeins:intake`, и он видит вещь
+    // руками — подменять его оценку табличной значило бы сломать саму работу.
+    //
+    // Самообслуживание: эндпоинт публичный, и присланному числу верить нельзя —
+    // иначе выплату себе назначает тот, кто её получит. Раньше сумму считал
+    // браузер по таблице моделей, зашитой в страницу, и сервер записывал её в
+    // договор как есть. Теперь считает сервер той же функцией, что и показывает
+    // витрине в предварительной оценке.
+    if (payout && (!Number.isInteger(dto.price) || (dto.price ?? 0) <= 0)) {
+      throw new ValidationError('invalid_tradein_price', 'Для приёмки сотрудником укажите положительную цену');
+    }
+    const price = payout
+      ? dto.price!
+      : await this.estimate(model, dto.grade as TradeInGrade);
+    if (!payout && price <= 0) {
+      throw new ValidationError(
+        'tradein_not_valued',
+        'Эту модель нельзя оценить онлайн — оформите выкуп в магазине, оценку сделает мастер.',
+      );
+    }
+    const input = { customerId: dto.customerId, model, imei, grade: dto.grade, price, sellerPassport };
     const existing = await this.prisma.tradeInDevice.findUnique({ where: { idempotencyKey: key } });
-    if (existing) return this.replay(existing, input);
+    if (existing) return this.replay(existing, input, payout);
 
     try {
       return await this.audit.transaction(async (tx) => {
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`tradein:${key}`}))::text AS locked`;
         const replay = await tx.tradeInDevice.findUnique({ where: { idempotencyKey: key } });
-        if (replay) return { result: this.replay(replay, input), events: [] };
+        if (replay) return { result: this.replay(replay, input, payout), events: [] };
 
         const tradeIn = await tx.tradeInDevice.create({
           data: {
@@ -166,7 +235,7 @@ export class TradeInsService {
     } catch (error) {
       if (isUniqueViolation(error)) {
         const raced = await this.prisma.tradeInDevice.findUniqueOrThrow({ where: { idempotencyKey: key } });
-        return this.replay(raced, input);
+        return this.replay(raced, input, payout);
       }
       throw error;
     }
@@ -175,13 +244,14 @@ export class TradeInsService {
   private replay(
     tradeIn: TradeInDevice,
     input: { customerId: string; model: string; imei: string | null; grade: TradeInDevice['grade']; price: number; sellerPassport: string },
+    comparePrice: boolean,
   ): TradeInViewDto {
     const matches =
       tradeIn.customerId === input.customerId &&
       tradeIn.model === input.model &&
       tradeIn.imei === input.imei &&
       tradeIn.grade === input.grade &&
-      tradeIn.price === input.price &&
+      (!comparePrice || tradeIn.price === input.price) &&
       tradeIn.sellerPassport === input.sellerPassport;
     if (!matches) throw new ConflictError('idempotency_key_reused', 'Idempotency key уже использован с другим trade-in');
     return this.view(tradeIn);

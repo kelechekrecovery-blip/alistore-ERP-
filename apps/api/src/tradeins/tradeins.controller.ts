@@ -8,6 +8,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
@@ -23,6 +24,8 @@ import {
 } from '@nestjs/swagger';
 import { CreateTradeInDto, TradeInViewDto } from './tradeins.dto';
 import { TradeInsService } from './tradeins.service';
+import { TRADE_IN_GRADES, type TradeInGrade } from './valuation';
+import { ValidationError } from '../common/errors';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { PermissionGuard } from '../authz/permission.guard';
@@ -36,6 +39,31 @@ import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 @Controller('tradeins')
 export class TradeInsController {
   constructor(private readonly tradeIns: TradeInsService) {}
+
+  /**
+   * Предварительная оценка для витрины.
+   *
+   * Нужен именно эндпоинт, а не таблица во фронте: страница обязана показывать
+   * ровно ту сумму, которую сервер потом запишет в договор. Пока таблица жила
+   * в браузере, показанное и записанное могли разойтись — и расходились.
+   */
+  @ApiOperation({ summary: 'Предварительная оценка выкупа Б/У — считает сервер' })
+  @ApiOkResponse({ description: '{ model, grade, priceSom } — 0, если модель онлайн не оцениваем.' })
+  @Get('estimate')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async estimate(@Query('model') model?: string, @Query('grade') grade?: string) {
+    const cleanModel = (model ?? '').trim();
+    const cleanGrade = (grade ?? 'A').trim().toUpperCase();
+    if (!TRADE_IN_GRADES.includes(cleanGrade as TradeInGrade)) {
+      throw new ValidationError('invalid_grade', 'Состояние должно быть A, B или C');
+    }
+    return {
+      model: cleanModel,
+      grade: cleanGrade,
+      priceSom: cleanModel ? await this.tradeIns.estimate(cleanModel, cleanGrade as TradeInGrade) : 0,
+    };
+  }
 
   @ApiOperation({
     summary: 'Assess and contract a used-device buyback (trade-in)',

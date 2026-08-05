@@ -262,9 +262,16 @@ export default function CheckoutPage() {
   const selectedDeliveryZone = deliveryZones.find((zone) => zone.id === deliveryZoneId);
   const selectedDeliverySlot = selectedDeliveryZone?.slots.find((slot) => slot.id === deliverySlotId);
   const managedCourierDelivery = delivery === 'courier' && deliveryZones.length > 0;
-  const deliveryFee = delivery === 'courier' && selectedDeliveryZone
-    ? selectedDeliveryZone.fee
-    : DELIVERY.find((d) => d.id === delivery)?.fee ?? 0;
+  // Цена доставки по способам — один источник и для подписи на плитке, и для
+  // суммы к оплате. Раньше плитка курьера показывала константу «200 с», а
+  // списывалась зона с сервера: покупатель соглашался на одну цену, платил
+  // другую. Считаем один раз и берём отсюда оба раза, чтобы они не разошлись.
+  const deliveryFees: Record<string, number> = {
+    pickup: 0,
+    courier: selectedDeliveryZone?.fee ?? DELIVERY.find((d) => d.id === 'courier')?.fee ?? 0,
+    express: DELIVERY.find((d) => d.id === 'express')?.fee ?? 0,
+  };
+  const deliveryFee = deliveryFees[delivery] ?? 0;
   const selectedPickupPoint = pickupPoints.find((point) => point.id === pickupPoint);
   // Подписи получения: сервер — источник правды о том, какая точка/зона
   // реально обслуживает покупателя (магазин физически не в Бишкеке). Пока
@@ -282,6 +289,15 @@ export default function CheckoutPage() {
     pickup: pickupMeta,
     courier: courierMeta,
     express: 'в течение часа',
+  };
+  // Пока зоны грузятся, цену курьера называть нечем — молчим, а не называем
+  // ту, которую потом не спишем.
+  const deliveryPrice: Record<string, string> = {
+    pickup: 'бесплатно',
+    courier: deliveryCapacityLoading && !selectedDeliveryZone
+      ? 'уточняем'
+      : `${deliveryFees.courier.toLocaleString('ru-RU')} с`,
+    express: `${deliveryFees.express.toLocaleString('ru-RU')} с`,
   };
   const payable = total + deliveryFee;
   const giftAmount = giftCard?.redeemable ? Math.min(giftCard.balance, payable) : 0;
@@ -563,7 +579,7 @@ export default function CheckoutPage() {
               <button key={d.id} type="button" disabled={!hydrated || deliveryCapacityLoading} aria-pressed={delivery === d.id} onClick={() => setDelivery(d.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-surface-2 p-3.5 text-left disabled:cursor-wait disabled:opacity-60 ${delivery === d.id ? 'border-lime' : 'border-surface-3'}`}>
                 <d.icon size={22} className="text-ink" />
                 <div className="flex-1"><div className="text-sm font-semibold">{d.name}</div><div className="text-xs text-muted">{deliveryMeta[d.id]}</div></div>
-                <span className="text-[13px] text-bright">{d.price}</span>
+                <span className="text-[13px] text-bright">{deliveryPrice[d.id] ?? d.price}</span>
               </button>
             ))}
             {delivery === 'pickup' && (
