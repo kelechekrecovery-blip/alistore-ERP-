@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import {
   AppleSocialLoginDto,
   CompleteSocialEnrollmentDto,
+  GoogleSocialLoginDto,
   RefreshDto,
   RequestEmailOtpDto,
   RequestOtpDto,
@@ -145,6 +146,17 @@ export class AuthController {
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   async appleSocialLoginV2(@Body() dto: AppleSocialLoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     const result = await this.auth.loginWithAppleV2(dto);
+    if (result.status === 'authenticated' && isWebSessionRequest(request)) {
+      setWebSessionCookies(response, result, process.env.NODE_ENV === 'production');
+      return webAuthResponse(request, result);
+    }
+    return result;
+  }
+
+  @Post('v2/social/google')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async googleSocialLoginV2(@Body() dto: GoogleSocialLoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const result = await this.auth.loginWithGoogleV2(dto);
     if (result.status === 'authenticated' && isWebSessionRequest(request)) {
       setWebSessionCookies(response, result, process.env.NODE_ENV === 'production');
       return webAuthResponse(request, result);

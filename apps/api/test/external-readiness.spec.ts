@@ -55,6 +55,8 @@ describe('External readiness report', () => {
       APPLE_TEAM_ID: 'set',
       APPLE_KEY_ID: 'set',
       APPLE_PRIVATE_KEY: 'set',
+      GOOGLE_CLIENT_ID: 'web-client.apps.googleusercontent.com',
+      GOOGLE_WEB_CLIENT_ID: 'web-client.apps.googleusercontent.com',
       NOTIFICATION_TRANSPORT: 'channels',
       NOVU_API_KEY: 'set',
       FCM_SERVICE_ACCOUNT_JSON: '{"project_id":"test"}',
@@ -72,6 +74,40 @@ describe('External readiness report', () => {
     expect(report.status).toBe('ready');
     expect(report.summary.blockingRemaining).toBe(0);
     expect(report.nextActions).toEqual([]);
+  });
+
+  it('requires both Google token audiences and an explicit web client ID', () => {
+    const missingWebClient = buildExternalReadinessReport(
+      (name) => ({ GOOGLE_CLIENT_ID: 'ios-client.apps.googleusercontent.com' })[name],
+    );
+    expect(
+      missingWebClient.checks.find((check) => check.id === 'google_social_login'),
+    ).toMatchObject({
+      status: 'missing',
+      missingEnv: ['GOOGLE_WEB_CLIENT_ID'],
+    });
+
+    const configured = buildExternalReadinessReport(
+      (name) =>
+        ({
+          GOOGLE_CLIENT_ID: 'web-client.apps.googleusercontent.com,ios-client.apps.googleusercontent.com',
+          GOOGLE_WEB_CLIENT_ID: 'web-client.apps.googleusercontent.com',
+        })[name],
+    );
+    expect(
+      configured.checks.find((check) => check.id === 'google_social_login'),
+    ).toMatchObject({ status: 'ready', missingEnv: [] });
+
+    const mismatched = buildExternalReadinessReport(
+      (name) =>
+        ({
+          GOOGLE_CLIENT_ID: 'ios-client.apps.googleusercontent.com',
+          GOOGLE_WEB_CLIENT_ID: 'web-client.apps.googleusercontent.com',
+        })[name],
+    );
+    expect(
+      mismatched.checks.find((check) => check.id === 'google_social_login'),
+    ).toMatchObject({ status: 'missing' });
   });
 
   /**

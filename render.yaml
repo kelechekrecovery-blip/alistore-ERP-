@@ -286,6 +286,13 @@ envVarGroups:
         sync: false
       - key: APPLE_WEB_CLIENT_ID
         sync: false
+      # Google server verifier accepts a comma-separated audience list for web,
+      # iOS and Android ID tokens. The explicit web id is public and is returned
+      # to Google Identity Services on /login.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_WEB_CLIENT_ID
+        sync: false
       # Вход через Telegram. Это НЕ ALERT_TELEGRAM_BOT_TOKEN выше: тот канал
       # дежурного, этим проверяется подпись initData.
       - key: TELEGRAM_BOT_TOKEN

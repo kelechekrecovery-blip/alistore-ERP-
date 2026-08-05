@@ -28,6 +28,7 @@ export interface AuthMethodsView {
   email: AuthMethodState;
   telegram: AuthMethodState & { botUsername: string | null };
   apple: AuthMethodState & { clientId: string | null };
+  google: AuthMethodState & { clientId: string | null };
   recovery: { enabled: boolean };
   anyLoginAvailable: boolean;
   registrationAvailable: boolean;
@@ -154,6 +155,18 @@ export function authAppleLogin(
   options: { nonce: string; name?: string },
 ): Promise<SocialAuthResult> {
   return postJson('/auth/v2/social/apple', { identityToken, ...options }, { 'x-alistore-web': '1' }, true);
+}
+
+export function authGoogleLogin(
+  identityToken: string,
+  nonce: string,
+): Promise<SocialAuthResult> {
+  return postJson(
+    '/auth/v2/social/google',
+    { identityToken, nonce },
+    { 'x-alistore-web': '1' },
+    true,
+  );
 }
 
 export function authRefresh(refreshToken?: string): Promise<AuthTokens> {
