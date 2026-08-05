@@ -586,7 +586,13 @@ describe('Notification coverage NOTIF-003 (integration)', () => {
     );
 
     const message = await expectCustomerNotice('tradein_decision', buyer.id, buyer.phone);
-    expect(message.payload).toMatchObject({ tradeInId: created.id, price: 15000 });
+    // Цену публичного trade-in считает сервер (451e033a «move valuation to
+    // server»), а `price` во входных данных он игнорирует. Магическое 15000
+    // здесь означало «клиент назначил цену сам» — этого больше нет.
+    // Проверяем то, что действительно важно: клиенту сообщили ровно ту сумму,
+    // которая записана в заявке, а не какую-то другую.
+    expect(message.payload).toMatchObject({ tradeInId: created.id, price: created.price });
+    expect(created.price).toBeGreaterThan(0);
   });
 
   it('notifies the customer when support resolves the ticket (ticket_resolved)', async () => {
