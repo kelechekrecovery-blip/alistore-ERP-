@@ -33,7 +33,7 @@ export interface FcmSendResult {
 }
 
 export interface FcmSender {
-  send(message: FcmMessage): Promise<FcmSendResult>;
+  send(message: FcmMessage, signal?: AbortSignal): Promise<FcmSendResult>;
 }
 
 export class FcmPushTransport implements NotificationTransport {
@@ -54,10 +54,15 @@ export class FcmPushTransport implements NotificationTransport {
     }
 
     const payload = jsonObject(message.payload);
-    const results = await Promise.all(tokens.map(async (token) => ({
-      token,
-      result: await this.sender.send(this.toMessage(token, message, payload)),
-    })));
+    const results = await Promise.all(tokens.map(async (token) => {
+      const notification = this.toMessage(token, message, payload);
+      return {
+        token,
+        result: message.signal
+          ? await this.sender.send(notification, message.signal)
+          : await this.sender.send(notification),
+      };
+    }));
     const dead = results.filter(({ result }) => !result.ok && DEAD_TOKEN_CODES.has(result.code ?? ''))
       .map(({ token }) => token);
     if (dead.length > 0) {
@@ -109,14 +114,15 @@ class FcmHttpV1Sender implements FcmSender {
 
   constructor(private readonly account: ServiceAccount) {}
 
-  async send(message: FcmMessage): Promise<FcmSendResult> {
-    const accessToken = await this.getAccessToken();
+  async send(message: FcmMessage, signal?: AbortSignal): Promise<FcmSendResult> {
+    const accessToken = await this.getAccessToken(signal);
     const response = await fetch(
       `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(this.account.project_id)}/messages:send`,
       {
         method: 'POST',
         headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
         body: JSON.stringify({ message }),
+        signal,
       },
     );
     if (response.ok) return { ok: true, status: response.status };
@@ -124,7 +130,7 @@ class FcmHttpV1Sender implements FcmSender {
     return { ok: false, status: response.status, code: fcmErrorCode(body) };
   }
 
-  private async getAccessToken(): Promise<string> {
+  private async getAccessToken(signal?: AbortSignal): Promise<string> {
     const now = Date.now();
     if (this.accessToken && this.accessToken.expiresAt > now + 60_000) return this.accessToken.value;
 
@@ -137,6 +143,7 @@ class FcmHttpV1Sender implements FcmSender {
         grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
         assertion,
       }),
+      signal,
     });
     const body = await responseJson(response);
     const value = stringField(body, 'access_token');

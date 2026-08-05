@@ -27,6 +27,7 @@ describe('OutboxService retry policy', () => {
   it('does not claim a push message sent when the recipient has no device', async () => {
     const transport = { deliver: jest.fn().mockRejectedValue(new Error('push_recipient_unavailable')) };
     const update = jest.fn().mockResolvedValue(undefined);
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
     const prisma = {
       outboxMessage: {
         findMany: jest.fn().mockResolvedValue([
@@ -42,22 +43,24 @@ describe('OutboxService retry policy', () => {
           },
         ]),
         update,
+        updateMany,
       },
     };
     const service = new OutboxService(prisma as never, transport as never);
 
     await expect(service.relayPending()).resolves.toEqual({ sent: 0, failed: 0 });
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'outbox-1' },
+    expect(updateMany).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: 'outbox-1' }),
       data: expect.objectContaining({ status: 'pending', attempts: 1 }),
     }));
-    const retry = update.mock.calls[0][0].data.nextAttemptAt as Date;
+    const retry = updateMany.mock.calls[1][0].data.nextAttemptAt as Date;
     expect(retry.getTime()).toBeGreaterThan(Date.now());
   });
 
   it('parks the fifth failure and clears the retry schedule', async () => {
     const transport = { deliver: jest.fn().mockRejectedValue(new Error('provider_down')) };
     const update = jest.fn().mockResolvedValue(undefined);
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
     const prisma = {
       outboxMessage: {
         findMany: jest.fn().mockResolvedValue([
@@ -73,12 +76,13 @@ describe('OutboxService retry policy', () => {
           },
         ]),
         update,
+        updateMany,
       },
     };
     const service = new OutboxService(prisma as never, transport as never);
 
     await expect(service.relayPending()).resolves.toEqual({ sent: 0, failed: 1 });
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+    expect(updateMany).toHaveBeenLastCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: 'failed', attempts: 5, nextAttemptAt: null }),
     }));
   });
@@ -86,6 +90,7 @@ describe('OutboxService retry policy', () => {
   it('clears the retry schedule after a successful delivery', async () => {
     const transport = { deliver: jest.fn().mockResolvedValue(undefined) };
     const update = jest.fn().mockResolvedValue(undefined);
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
     const prisma = {
       outboxMessage: {
         findMany: jest.fn().mockResolvedValue([
@@ -101,13 +106,138 @@ describe('OutboxService retry policy', () => {
           },
         ]),
         update,
+        updateMany,
       },
     };
     const service = new OutboxService(prisma as never, transport as never);
 
     await expect(service.relayPending()).resolves.toEqual({ sent: 1, failed: 0 });
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+    expect(updateMany).toHaveBeenLastCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: 'sent', sentAt: expect.any(Date), nextAttemptAt: null }),
     }));
+    expect(transport.deliver).toHaveBeenCalledWith(expect.objectContaining({
+      idempotencyKey: 'outbox-3',
+    }));
+  });
+
+  it('claims a pending row once when two relays race', async () => {
+    let state: { status: 'pending' | 'processing' | 'sent'; token: string | null } = {
+      status: 'pending',
+      token: null,
+    };
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const message = {
+      id: 'outbox-race',
+      channel: 'push',
+      recipient: 'staff-race',
+      template: 'task_assigned',
+      payload: {},
+      status: 'pending',
+      attempts: 0,
+      nextAttemptAt: new Date(Date.now() - 1_000),
+    };
+    const findMany = jest.fn().mockReturnValue([message]);
+    const updateMany = jest.fn(async ({ where, data }: {
+      where: { id: string; processingToken?: string };
+      data: { status: 'processing' | 'sent'; processingToken?: string };
+    }) => {
+      if (where.id !== message.id) return { count: 0 };
+      if (data.status === 'processing') {
+        if (state.status !== 'pending') return { count: 0 };
+        state = { status: 'processing', token: data.processingToken ?? null };
+        return { count: 1 };
+      }
+      if (state.status !== 'processing' || where.processingToken !== state.token) {
+        return { count: 0 };
+      }
+      state = { status: 'sent', token: null };
+      return { count: 1 };
+    });
+    const transport = {
+      deliver: jest.fn(async () => gate),
+    };
+    const prisma = { outboxMessage: { findMany, updateMany } };
+    const first = new OutboxService(prisma as never, transport as never).relayPending();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(transport.deliver).toHaveBeenCalledTimes(1);
+    const second = new OutboxService(prisma as never, transport as never).relayPending();
+    await expect(second).resolves.toEqual({ sent: 0, failed: 0 });
+    release();
+    await expect(first).resolves.toEqual({ sent: 1, failed: 0 });
+    expect(transport.deliver).toHaveBeenCalledTimes(1);
+    expect(state.status).toBe('sent');
+  });
+
+  it('reclaims a processing row after its lease expires', async () => {
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const update = jest.fn().mockResolvedValue(undefined);
+    const transport = { deliver: jest.fn().mockResolvedValue(undefined) };
+    const prisma = {
+      outboxMessage: {
+        findMany: jest.fn().mockReturnValue([{
+          id: 'outbox-stale',
+          channel: 'email',
+          recipient: 'owner@example.test',
+          template: 'daily_briefing',
+          payload: {},
+          status: 'processing',
+          attempts: 1,
+          nextAttemptAt: new Date(Date.now() - 1_000),
+        }]),
+        updateMany,
+        update,
+      },
+    };
+    const service = new OutboxService(prisma as never, transport as never);
+
+    await expect(service.relayPending()).resolves.toEqual({ sent: 1, failed: 0 });
+    expect(transport.deliver).toHaveBeenCalledTimes(1);
+    expect(updateMany.mock.calls[0][0]).toEqual(expect.objectContaining({
+      where: expect.objectContaining({ id: 'outbox-stale' }),
+      data: expect.objectContaining({ status: 'processing', nextAttemptAt: expect.any(Date) }),
+    }));
+  });
+
+  it('aborts a provider call before the processing lease can expire', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-08-05T00:00:00.000Z'));
+    try {
+      const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+      const transport = {
+        deliver: jest.fn(({ signal }: { signal?: AbortSignal }) => new Promise<void>((_resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(new Error('provider_aborted')), { once: true });
+        })),
+      };
+      const prisma = {
+        outboxMessage: {
+          findMany: jest.fn().mockResolvedValue([{
+            id: 'outbox-timeout',
+            channel: 'email',
+            recipient: 'owner@example.test',
+            template: 'timeout_probe',
+            payload: {},
+            status: 'pending',
+            attempts: 0,
+            nextAttemptAt: new Date(Date.now() - 1_000),
+          }]),
+          updateMany,
+        },
+      };
+      const run = new OutboxService(prisma as never, transport as never).relayPending();
+      await Promise.resolve();
+      await jest.advanceTimersByTimeAsync(60_000);
+
+      await expect(run).resolves.toEqual({ sent: 0, failed: 0 });
+      expect(transport.deliver.mock.calls[0][0].signal?.aborted).toBe(true);
+      expect(updateMany).toHaveBeenLastCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'pending',
+          lastError: 'notification_delivery_timeout',
+        }),
+      }));
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

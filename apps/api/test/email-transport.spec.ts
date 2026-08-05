@@ -8,6 +8,7 @@ describe('EmailNotificationTransport (nodemailer)', () => {
 
   it('builds a mail with recipient, subject and payload', () => {
     const mail = transport.buildMail({
+      idempotencyKey: 'outbox-message-1',
       channel: 'email',
       recipient: 'buyer@a.kg',
       template: 'order_paid',
@@ -17,6 +18,7 @@ describe('EmailNotificationTransport (nodemailer)', () => {
     expect(mail.subject).toContain('order_paid');
     expect(mail.text).toContain('o1');
     expect(mail.from.toLowerCase()).toContain('alistore');
+    expect(mail.messageId).toBe('<outbox-message-1@outbox.ali.kg>');
   });
 
   it('dispatches via jsonTransport without a configured SMTP host', async () => {

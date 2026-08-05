@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -8,12 +8,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   NOTIFICATION_TRANSPORT,
   NotificationTransport,
+  NotificationDeliveryError,
   OutboxInput,
 } from './outbox.types';
 
 const MAX_ATTEMPTS = 5;
 const RETRY_BASE_MS = 5_000;
 const RETRY_MAX_MS = 60 * 60 * 1_000;
+const CLAIM_LEASE_MS = 5 * 60 * 1_000;
+const DELIVERY_TIMEOUT_MS = 60_000;
 
 /**
  * Transactional outbox. Producers enqueue a message in the SAME transaction as
@@ -66,14 +69,24 @@ export class OutboxService {
   }
 
   /**
-   * Delivery pass: pick pending messages and deliver each via the transport.
+   * Delivery pass: claim due messages and deliver each via the transport.
    * Per-message isolation — one failure never blocks the rest; a failing message
-   * is retried up to MAX_ATTEMPTS, then parked as `failed`. Idempotent: only
-   * `pending` rows are considered, so an already-sent message is never re-sent.
+   * is retried up to MAX_ATTEMPTS, then parked as `failed`. Delivery is
+   * at-least-once: claim fencing prevents concurrent finalization, but a worker
+   * crash after the provider accepts a message can still cause a retry. Provider
+   * idempotency or a stable provider message ID is required where supported.
    */
   async relayPending(limit = 50): Promise<{ sent: number; failed: number }> {
+    const now = new Date();
     const pending = await this.prisma.outboxMessage.findMany({
-      where: { status: 'pending', attempts: { lt: MAX_ATTEMPTS }, nextAttemptAt: { lte: new Date() } },
+      where: {
+        OR: [
+          { status: 'pending', attempts: { lt: MAX_ATTEMPTS }, nextAttemptAt: { lte: now } },
+          // A crashed worker leaves a processing row behind. Its lease is
+          // eligible for one new claimant after the deadline.
+          { status: 'processing', nextAttemptAt: { lte: now } },
+        ],
+      },
       orderBy: { createdAt: 'asc' },
       take: limit,
     });
@@ -81,42 +94,98 @@ export class OutboxService {
     let sent = 0;
     let failed = 0;
     for (const message of pending) {
+      // A claim consumes an attempt. If the worker died on the final attempt,
+      // park the expired claim instead of reclaiming it forever.
+      if (message.status === 'processing' && message.attempts >= MAX_ATTEMPTS) {
+        const parked = await this.prisma.outboxMessage.updateMany({
+          where: {
+            id: message.id,
+            status: 'processing',
+            processingToken: message.processingToken,
+            attempts: { gte: MAX_ATTEMPTS },
+            nextAttemptAt: { lte: now },
+          },
+          data: {
+            status: 'failed',
+            processingToken: null,
+            nextAttemptAt: null,
+            lastError: 'delivery_claim_expired_after_attempt_cap',
+          },
+        });
+        failed += parked.count;
+        continue;
+      }
+      // Multiple API/worker processes can read the same pending snapshot. Claim
+      // the row before calling an external provider so only one relay owns the
+      // delivery attempt. Telegram replies use their identity/subject lock in
+      // deliverTelegramAgentReply and remain pending until that transaction.
+      const isTelegramAgentReply = message.channel === 'telegram' && message.template === 'telegram_agent_reply';
+      const processingToken = isTelegramAgentReply ? null : randomUUID();
+      const claimed = isTelegramAgentReply
+        ? { count: 1 }
+        : await this.prisma.outboxMessage.updateMany({
+            where: {
+              id: message.id,
+              attempts: { lt: MAX_ATTEMPTS },
+              OR: [
+                { status: 'pending', nextAttemptAt: { lte: now } },
+                { status: 'processing', nextAttemptAt: { lte: now } },
+              ],
+            },
+            data: {
+              status: 'processing',
+              processingToken,
+              attempts: { increment: 1 },
+              nextAttemptAt: new Date(Date.now() + CLAIM_LEASE_MS),
+            },
+          });
+      if (claimed.count !== 1) continue;
+      const deliveryWhere = isTelegramAgentReply
+        ? { id: message.id, status: 'pending' as const }
+        : { id: message.id, status: 'processing' as const, processingToken };
       try {
         if (message.channel === 'telegram' && message.template === 'telegram_agent_reply') {
           const outcome = await this.deliverTelegramAgentReply(message);
           if (outcome === 'sent') sent += 1;
           continue;
         }
-        await this.transport.deliver({
+        await this.deliverWithDeadline({
+          idempotencyKey: message.id,
           channel: message.channel,
           recipient: message.recipient,
           template: message.template,
           payload: message.payload,
         });
-        await this.prisma.outboxMessage.update({
-          where: { id: message.id },
-          data: { status: 'sent', sentAt: new Date(), nextAttemptAt: null },
+        const finalized = await this.prisma.outboxMessage.updateMany({
+          where: deliveryWhere,
+          data: { status: 'sent', processingToken: null, sentAt: new Date(), nextAttemptAt: null },
         });
+        if (finalized.count !== 1) {
+          this.logger.warn(`Outbox claim lost before finalization (${message.channel} ${message.id})`);
+          continue;
+        }
         sent += 1;
       } catch (err) {
-        const attempts = message.attempts + 1;
+        const retryable = !(err instanceof NotificationDeliveryError) || err.retryable;
+        const attempts = retryable ? message.attempts + 1 : MAX_ATTEMPTS;
         const capped = attempts >= MAX_ATTEMPTS;
         const delayMs = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1));
         const data = {
           attempts,
           lastError: err instanceof Error ? err.message : 'unknown error',
           status: capped ? 'failed' as const : 'pending' as const,
+          processingToken: null,
           nextAttemptAt: capped ? null : new Date(Date.now() + delayMs),
         };
-        const updated = message.channel === 'telegram' && message.template === 'telegram_agent_reply'
+        const updated = isTelegramAgentReply
           ? await this.prisma.outboxMessage.updateMany({
-              where: { id: message.id, status: 'pending' },
+              where: deliveryWhere,
               data,
             })
-          : await this.prisma.outboxMessage.update({
-              where: { id: message.id },
+          : await this.prisma.outboxMessage.updateMany({
+              where: deliveryWhere,
               data,
-            }).then(() => ({ count: 1 }));
+            });
         if (capped && updated.count === 1) failed += 1;
         this.logger.warn(
           `Outbox delivery failed (${message.channel} ${message.id}), attempt ${attempts}`,
@@ -191,7 +260,8 @@ export class OutboxService {
         return 'cancelled';
       }
 
-      await this.transport.deliver({
+      await this.deliverWithDeadline({
+        idempotencyKey: message.id,
         channel: message.channel,
         recipient: message.recipient,
         template: message.template,
@@ -206,6 +276,21 @@ export class OutboxService {
       maxWait: 2_000,
       timeout: 8_000,
     });
+  }
+
+  private async deliverWithDeadline(message: Parameters<NotificationTransport['deliver']>[0]): Promise<void> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
+    try {
+      await this.transport.deliver({ ...message, signal: controller.signal });
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw new NotificationDeliveryError('notification_delivery_timeout', true);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /**

@@ -1,6 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DeliverableMessage, NotificationTransport } from '../outbox.types';
+import {
+  DeliverableMessage,
+  NotificationDeliveryError,
+  NotificationTransport,
+} from '../outbox.types';
+
+const TERMINAL_STATUSES = new Set([
+  'trigger_not_active',
+  'no_workflow_active_steps_defined',
+  'no_workflow_steps_defined',
+  'invalid_recipients',
+]);
 
 /**
  * Delivers outbox messages through Novu's REST trigger API
@@ -28,19 +39,51 @@ export class NovuHttpTransport implements NotificationTransport {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `ApiKey ${this.apiKey}`,
+        ...(message.idempotencyKey
+          ? { 'idempotency-key': message.idempotencyKey }
+          : {}),
       },
       body: JSON.stringify({
         name: message.template,
         to: { subscriberId: message.recipient, phone: message.recipient },
         payload: message.payload ?? {},
+        ...(message.idempotencyKey
+          ? { transactionId: message.idempotencyKey }
+          : {}),
       }),
+      signal: message.signal,
     });
 
+    const text = await response.text().catch(() => '');
     if (!response.ok) {
-      const body = await response.text().catch(() => '');
       throw new Error(
-        `Novu trigger failed: ${response.status} ${body}`.trim(),
+        `Novu trigger failed: ${response.status} ${text}`.trim(),
       );
     }
+    const body = parseNovuResponse(text);
+    const result = isRecord(body.data) ? body.data : body;
+    const acknowledged = result.acknowledged;
+    const status = typeof result.status === 'string' ? result.status : undefined;
+    if (acknowledged === true && (!status || status === 'processed')) return;
+
+    const label = status ?? 'invalid_response';
+    throw new NotificationDeliveryError(
+      `Novu trigger rejected: ${label}`,
+      !TERMINAL_STATUSES.has(label),
+    );
   }
+}
+
+function parseNovuResponse(text: string): Record<string, unknown> {
+  if (!text) return {};
+  try {
+    const value = JSON.parse(text) as unknown;
+    return isRecord(value) ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }

@@ -34,6 +34,7 @@ export class WhatsAppCloudTransport implements NotificationTransport {
           type: 'text',
           text: { body: notificationText(message) },
         }),
+        signal: message.signal,
       },
     );
 

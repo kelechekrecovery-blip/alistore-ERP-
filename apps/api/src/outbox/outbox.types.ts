@@ -26,6 +26,10 @@ export interface OutboxInput {
 }
 
 export interface DeliverableMessage {
+  /** Stable outbox row ID for provider-side idempotency where supported. */
+  idempotencyKey?: string;
+  /** Provider adapters must abort network work when this signal fires. */
+  signal?: AbortSignal;
   channel: string;
   recipient: string;
   template: string;
@@ -35,6 +39,13 @@ export interface DeliverableMessage {
 /** Pluggable delivery port — swap LogNotificationTransport for Novu/SMS later. */
 export interface NotificationTransport {
   deliver(message: DeliverableMessage): Promise<void>;
+}
+
+export class NotificationDeliveryError extends Error {
+  constructor(message: string, readonly retryable: boolean) {
+    super(message);
+    this.name = 'NotificationDeliveryError';
+  }
 }
 
 export const NOTIFICATION_TRANSPORT = Symbol('NOTIFICATION_TRANSPORT');

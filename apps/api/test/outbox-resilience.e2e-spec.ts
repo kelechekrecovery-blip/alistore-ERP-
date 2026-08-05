@@ -1,4 +1,6 @@
 import { INestApplication } from '@nestjs/common';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -103,6 +105,177 @@ describe('Outbox resilience (integration)', () => {
     const delay3 = row.nextAttemptAt!.getTime() - before;
     expect(delay3).toBeGreaterThan(delay2);
     expect(delay3).toBeGreaterThanOrEqual(16_000);
+  });
+
+  it('claims a generic notification once across concurrent relay workers', async () => {
+    await prisma.outboxMessage.create({
+      data: {
+        id: 'outbox-generic-concurrent',
+        channel: 'email',
+        recipient: 'owner@example.test',
+        template: 'concurrent_probe',
+        payload: {},
+      },
+    });
+
+    let entered!: () => void;
+    let release!: () => void;
+    const deliveryEntered = new Promise<void>((resolve) => { entered = resolve; });
+    const deliveryRelease = new Promise<void>((resolve) => { release = resolve; });
+    const deliver = jest.fn(async () => {
+      entered();
+      await deliveryRelease;
+    });
+    const relayA = new OutboxService(prisma, { deliver });
+    const relayB = new OutboxService(prisma, { deliver });
+
+    const first = relayA.relayPending();
+    await deliveryEntered;
+    await expect(relayB.relayPending()).resolves.toEqual({ sent: 0, failed: 0 });
+    release();
+    await expect(first).resolves.toEqual({ sent: 1, failed: 0 });
+
+    expect(deliver).toHaveBeenCalledTimes(1);
+    expect(deliver).toHaveBeenCalledWith(expect.objectContaining({
+      idempotencyKey: 'outbox-generic-concurrent',
+    }));
+  });
+
+  it('fences a stale claimant after a newer token finalizes', async () => {
+    await prisma.outboxMessage.create({
+      data: {
+        id: 'outbox-stale-fence',
+        channel: 'email',
+        recipient: 'owner@example.test',
+        template: 'stale_fence_probe',
+        payload: {},
+      },
+    });
+
+    let firstEntered!: () => void;
+    let releaseFirst!: () => void;
+    const entered = new Promise<void>((resolve) => { firstEntered = resolve; });
+    const blocked = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    let calls = 0;
+    const deliver = jest.fn(async () => {
+      calls += 1;
+      if (calls === 1) {
+        firstEntered();
+        await blocked;
+      }
+    });
+    const relayA = new OutboxService(prisma, { deliver });
+    const relayB = new OutboxService(prisma, { deliver });
+
+    const staleRun = relayA.relayPending();
+    await entered;
+    const firstClaim = await prisma.outboxMessage.findUniqueOrThrow({
+      where: { id: 'outbox-stale-fence' },
+    });
+    expect(firstClaim.status).toBe('processing');
+    expect(firstClaim.processingToken).toBeTruthy();
+    await prisma.outboxMessage.update({
+      where: { id: firstClaim.id },
+      data: { nextAttemptAt: new Date(0) },
+    });
+
+    await expect(relayB.relayPending()).resolves.toEqual({ sent: 1, failed: 0 });
+    const newerClaim = await prisma.outboxMessage.findUniqueOrThrow({
+      where: { id: firstClaim.id },
+    });
+    expect(newerClaim.status).toBe('sent');
+    expect(newerClaim.processingToken).toBeNull();
+
+    releaseFirst();
+    await expect(staleRun).resolves.toEqual({ sent: 0, failed: 0 });
+    expect(deliver).toHaveBeenCalledTimes(2);
+    expect(await prisma.outboxMessage.findUniqueOrThrow({
+      where: { id: firstClaim.id },
+    })).toMatchObject({ status: 'sent', processingToken: null });
+  });
+
+  it('parks an expired final claim instead of retrying forever', async () => {
+    await prisma.outboxMessage.create({
+      data: {
+        id: 'outbox-expired-final-claim',
+        channel: 'email',
+        recipient: 'owner@example.test',
+        template: 'expired_claim_probe',
+        payload: {},
+        status: 'processing',
+        processingToken: 'expired-final-token',
+        attempts: 5,
+        nextAttemptAt: new Date(0),
+      },
+    });
+    const transport = new RecordingTransport();
+    const outbox = new OutboxService(prisma, transport);
+
+    await expect(outbox.relayPending()).resolves.toEqual({ sent: 0, failed: 1 });
+    expect(transport.calls).toHaveLength(0);
+    expect(await prisma.outboxMessage.findUniqueOrThrow({
+      where: { id: 'outbox-expired-final-claim' },
+    })).toMatchObject({
+      status: 'failed',
+      processingToken: null,
+      nextAttemptAt: null,
+      lastError: 'delivery_claim_expired_after_attempt_cap',
+    });
+  });
+
+  it('runs the rollback SQL only after shutdown and leaves no processing rows', async () => {
+    await prisma.outboxMessage.createMany({
+      data: [
+        {
+          id: 'outbox-rollback-retry',
+          channel: 'email',
+          recipient: 'owner@example.test',
+          template: 'rollback_retry_probe',
+          payload: {},
+          status: 'processing',
+          processingToken: 'rollback-retry-token',
+          attempts: 2,
+          nextAttemptAt: new Date(Date.now() + 60_000),
+        },
+        {
+          id: 'outbox-rollback-park',
+          channel: 'email',
+          recipient: 'owner@example.test',
+          template: 'rollback_park_probe',
+          payload: {},
+          status: 'processing',
+          processingToken: 'rollback-park-token',
+          attempts: 5,
+          nextAttemptAt: new Date(Date.now() + 60_000),
+        },
+      ],
+    });
+    const rollbackSql = readFileSync(
+      resolve(__dirname, '../prisma/outbox-processing-rollback.sql'),
+      'utf8',
+    );
+
+    await prisma.$executeRawUnsafe(rollbackSql);
+
+    expect(await prisma.outboxMessage.count({ where: { status: 'processing' } })).toBe(0);
+    expect(await prisma.outboxMessage.findUniqueOrThrow({
+      where: { id: 'outbox-rollback-retry' },
+    })).toMatchObject({
+      status: 'pending',
+      processingToken: null,
+      lastError: 'rollback_reset_processing_claim',
+    });
+    expect((await prisma.outboxMessage.findUniqueOrThrow({
+      where: { id: 'outbox-rollback-retry' },
+    })).nextAttemptAt!.getTime()).toBeLessThanOrEqual(Date.now());
+    expect(await prisma.outboxMessage.findUniqueOrThrow({
+      where: { id: 'outbox-rollback-park' },
+    })).toMatchObject({
+      status: 'failed',
+      processingToken: null,
+      nextAttemptAt: null,
+      lastError: 'rollback_parked_ambiguous_final_claim',
+    });
   });
 
   it('re-drive returns a failed message to the queue with a ledger event', async () => {

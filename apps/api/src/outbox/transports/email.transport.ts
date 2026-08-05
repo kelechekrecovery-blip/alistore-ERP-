@@ -22,6 +22,9 @@ export class EmailNotificationTransport implements NotificationTransport {
           host,
           port: Number(config.get<string>('SMTP_PORT') ?? 587),
           secure: config.get<string>('SMTP_SECURE') === 'true',
+          connectionTimeout: 10_000,
+          greetingTimeout: 10_000,
+          socketTimeout: 45_000,
           auth: config.get<string>('SMTP_USER')
             ? {
                 user: config.get<string>('SMTP_USER') as string,
@@ -38,11 +41,15 @@ export class EmailNotificationTransport implements NotificationTransport {
     to: string;
     subject: string;
     text: string;
+    messageId?: string;
   } {
     return {
       from: this.from,
       to: message.recipient,
       subject: `AliStore — ${message.template}`,
+      ...(message.idempotencyKey
+        ? { messageId: `<${message.idempotencyKey}@outbox.ali.kg>` }
+        : {}),
       text: `Событие: ${message.template}\n${JSON.stringify(
         message.payload ?? {},
         null,

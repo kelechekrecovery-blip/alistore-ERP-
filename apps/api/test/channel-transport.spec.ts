@@ -13,7 +13,12 @@ describe('Channel notification transports', () => {
   it('routes channel messages to Telegram, WhatsApp, and Novu providers', async () => {
     const fetchMock = jest
       .fn()
-      .mockResolvedValue({ ok: true, text: async () => '' });
+      .mockResolvedValueOnce({ ok: true, text: async () => '' })
+      .mockResolvedValueOnce({ ok: true, text: async () => '' })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ acknowledged: true, status: 'processed' }),
+      });
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const transport = new ChannelNotificationTransport(

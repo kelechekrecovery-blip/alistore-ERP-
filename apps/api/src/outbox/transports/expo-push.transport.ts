@@ -46,6 +46,7 @@ export class ExpoPushTransport implements NotificationTransport {
         ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {}),
       },
       body: JSON.stringify(tokens.map((token) => this.toExpoMessage(token, message, payload))),
+      signal: message.signal,
     });
 
     const body = await readExpoResponse(response);

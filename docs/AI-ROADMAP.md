@@ -16,11 +16,23 @@ Goal: make the current retail core safe, reproducible and honestly releasable.
 | P0.4 PII lifecycle | Privacy/Backend | legal retention matrix | exhaustive export/delete fixtures for email/social/support/evidence/Telegram/free text | disable self-service “complete deletion” claim if retained data is unclassified |
 | P0.5 Camera payload safety | Vision/Security | event schemas | typed allowlists, server-derived privacy/TTL, evidence retention binding, timestamp skew test | `EDGE_CAMERA_KILL_SWITCH=true` on any bypass |
 | P0.6 Event Ledger immutability | Database/Architecture | runtime/test DB roles | runtime role cannot update/delete `AuditEvent`; migration/restore rehearsal passes | roll back role/trigger compatibly, never delete ledger rows |
-| P0.7 Outbox exactly-once claim | Backend/SRE | processing lease/fencing migration | concurrent workers call transport once; stale claimant cannot finalize; dead-letter visible | stop worker and preserve pending rows on duplicate delivery |
+| P0.7 Outbox claim/fencing | Backend/SRE | processing lease/fencing migration | concurrent workers deliver once before lease expiry; stale claimant cannot finalize; provider idempotency covers the crash window where supported; dead-letter visible | stop worker and preserve pending rows on unexplained duplicate delivery |
 | P0.8 Auth/RBAC hardening | Security/Backend | role matrix | active-role recheck on all privileged routes; full deny matrix; login/signup events | disable affected endpoint on stale-token privilege success |
 | P0.9 Approval lifecycle | Backend/Security | backward-compatible schema/API design | claim/expiry/cancel transitions, concurrent claim, stale approval and replay tests pass; current clients remain compatible | keep current requested/approved/rejected flow and disable new transitions on migration or concurrency failure |
 | P0.10 Production providers | Owner/Finance/SRE | contracts/credentials | fiscal QR reconciles with tax cabinet; chosen payment/COD model and refunds reconcile | stop sale when fiscal/payment/COD truth diverges |
 | P0.11 App Store truth | iOS/Release | live ASC + reviewer accounts | four clean-session logins, physical smoke, live status doc, manual release decision | hold release on rejection/login/device/distribution mismatch |
+
+P0.7 rollout is not compatible with mixed relay versions: drain and stop legacy
+relays, apply both additive migrations, deploy one homogeneous worker version,
+then enable relay scheduling. Rollback first stops all relays and resets expired
+and non-expired claims using
+`apps/api/prisma/outbox-processing-rollback.sql` before starting legacy code; it
+never runs old and new relay code concurrently. Claims below the attempt cap
+become due, while an ambiguous final claim is parked for reconciliation.
+Delivery remains at-least-once for providers without idempotency support; the
+stable outbox ID is supplied to adapters. Novu consumes it as an idempotency key
+and transaction ID; SMTP uses it only as a correlation `Message-ID`, not as a
+duplicate-delivery guarantee.
 
 P0 exit gate:
 
