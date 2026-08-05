@@ -33,7 +33,9 @@ export async function resetDb() {
   await prisma.b2BQuote.deleteMany();
   await prisma.businessBuyerProfile.deleteMany();
   await prisma.outboxMessage.deleteMany();
-  await prisma.auditEvent.deleteMany();
+  // AuditEvent is append-only in every migrated database, including E2E.
+  // Scenarios use unique fixture identifiers and must not weaken that invariant
+  // just to reset mutable domain tables.
   await clearImmutableFinanceAggregates();
   await prisma.giftCard.deleteMany();
   await prisma.productReview.deleteMany();

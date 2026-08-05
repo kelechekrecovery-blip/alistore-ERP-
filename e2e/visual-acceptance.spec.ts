@@ -97,6 +97,7 @@ test('ERP desktop visual baseline', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/erp');
   await expect(page.getByText('AliStore ERP', { exact: true })).toBeVisible();
+  await expect(page.getByText('Загрузка данных…', { exact: true })).toHaveCount(0, { timeout: 15_000 });
   await settlePage(page);
   await expect(page).toHaveScreenshot('erp-desktop.png', {
     animations: 'disabled',
