@@ -103,7 +103,11 @@ final class AliStoreStaffUITests: XCTestCase {
 
         // Экран пересчёта: товар, точка, количество и кнопка записи.
         XCTAssertTrue(app.navigationBars["Инвентаризация"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.textFields["staff-inventory-location"].exists)
+        // Навбар появляется сразу, а форма — только после `loadCatalog()`: до этого
+        // на экране ProgressView (`StaffInventoryView.swift:69`). Мгновенный `.exists`
+        // здесь был гонкой и падал на холодном симуляторе, где загрузка медленнее.
+        // Ожидание не ослабляет проверку: если форма не отрисуется вовсе, тест упадёт.
+        XCTAssertTrue(app.textFields["staff-inventory-location"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.textFields["staff-inventory-counted"].exists)
         XCTAssertTrue(app.buttons["staff-inventory-submit"].exists)
         // Без выбранного товара и количества запись недоступна.
