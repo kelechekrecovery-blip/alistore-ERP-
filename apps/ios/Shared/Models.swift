@@ -1989,3 +1989,53 @@ public struct POSExchangeResult: Decodable, Sendable {
     public let expiresAt: String
     public let idempotent: Bool
 }
+
+// MARK: - Скупка Б/У у прилавка
+
+/// Клиент, найденный по телефону (`GET /customers/lookup`).
+///
+/// Только идентификация: скупке нужен `customerId`, а всё остальное о клиенте
+/// живёт за Customer 360 со своей проверкой прав.
+public struct CustomerLookupResult: Decodable, Sendable {
+    public let id: String
+    public let name: String
+    public let phone: String
+}
+
+/// Оценка выкупа с сервера (`GET /tradeins/estimate`).
+///
+/// Цену считает сервер по модели и состоянию. Клиент её только показывает —
+/// в договор уходит та же цифра, что вернулась отсюда.
+public struct TradeInEstimate: Decodable, Sendable {
+    public let model: String
+    public let grade: String
+    public let priceSom: Int
+}
+
+public struct CreateTradeInRequest: Encodable, Sendable {
+    public let customerId: String
+    public let model: String
+    public let imei: String?
+    public let grade: String
+    public let price: Int
+    public let sellerPassport: String
+
+    public init(customerId: String, model: String, imei: String?, grade: String, price: Int, sellerPassport: String) {
+        self.customerId = customerId
+        self.model = model
+        self.imei = imei
+        self.grade = grade
+        self.price = price
+        self.sellerPassport = sellerPassport
+    }
+}
+
+/// Созданная заявка. `id` — то, к чему потом крепятся фото в Evidence Vault.
+public struct TradeInView: Decodable, Sendable {
+    public let id: String
+    public let customerId: String
+    public let model: String
+    public let grade: String
+    public let price: Int
+    public let contractId: String?
+}

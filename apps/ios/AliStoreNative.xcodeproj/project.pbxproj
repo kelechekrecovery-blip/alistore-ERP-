@@ -66,6 +66,7 @@
 		8A993354587D621FEB1A1B2B /* AliStorePOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D066758EACE85A38D074A58 /* AliStorePOSApp.swift */; };
 		8C5A4F7C9419670E633A9668 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9EBC4D5C06A5630E3B7D69D /* Models.swift */; };
 		8C95574EF1FF9DCBBE23895A /* StaffInventoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FFDF7F662EF941D9F666C6E /* StaffInventoryView.swift */; };
+		B1A2C3D4E5F60718293A4B5C /* StaffBuybackIntakeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F405162738495A6B7C /* StaffBuybackIntakeView.swift */; };
 		8DD0417F646F1BEC0FF7830A /* AliStoreCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3397795D183792BD78015F89 /* AliStoreCore.framework */; };
 		8E922FEB132920BF2ABED19D /* AliStorePOSUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7DA82D99B1EEA4943E5783E /* AliStorePOSUITests.swift */; };
 		8EB1B61A796F080906F9324C /* OFL-GolosText.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2DB79FB18FA1D1C4C93EED5C /* OFL-GolosText.txt */; };
@@ -255,6 +256,7 @@
 		04AAB6220384C05861A21153 /* NativeShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeShell.swift; sourceTree = "<group>"; };
 		0D52D0200FC74225D8DA7907 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0FFDF7F662EF941D9F666C6E /* StaffInventoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffInventoryView.swift; sourceTree = "<group>"; };
+		C1D2E3F405162738495A6B7C /* StaffBuybackIntakeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffBuybackIntakeView.swift; sourceTree = "<group>"; };
 		11EBD420D0E26E3A14076911 /* OfflineCourierOwnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineCourierOwnerTests.swift; sourceTree = "<group>"; };
 		11F23ACBE05CF3A0E1499E0B /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		13A9A1766E34065A9DE2EE32 /* Courier.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Courier.entitlements; sourceTree = "<group>"; };
@@ -463,6 +465,7 @@
 				AE157FE93CD516D1CBF400CF /* PrivacyInfo.xcprivacy */,
 				AC23CE2CEBF8FDAB7934A8FE /* Staff.entitlements */,
 				0FFDF7F662EF941D9F666C6E /* StaffInventoryView.swift */,
+				C1D2E3F405162738495A6B7C /* StaffBuybackIntakeView.swift */,
 				3DDD9376D59012178E0570F2 /* StaffScannerView.swift */,
 				7596CAED282254008F7309B8 /* StaffWorkView.swift */,
 			);
@@ -1026,6 +1029,7 @@
 			files = (
 				252697FC24CD3C493D79A848 /* AliStoreStaffApp.swift in Sources */,
 				8C95574EF1FF9DCBBE23895A /* StaffInventoryView.swift in Sources */,
+				B1A2C3D4E5F60718293A4B5C /* StaffBuybackIntakeView.swift in Sources */,
 				A80FCD2AA45BA0E8B994C5C6 /* StaffScannerView.swift in Sources */,
 				652FDF2063F51338694979A9 /* StaffWorkView.swift in Sources */,
 			);
@@ -1340,7 +1344,7 @@
 		5BA03919C44C1429936ED28F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				API_BASE_URL = "http://127.0.0.1:4000/api";
+				API_BASE_URL = "http://127.0.0.1:4010/api";
 				APS_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Courier/Courier.entitlements;
@@ -1502,7 +1506,7 @@
 		790AFFF250A82A4EBD1CFED2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				API_BASE_URL = "http://127.0.0.1:4000/api";
+				API_BASE_URL = "http://127.0.0.1:4010/api";
 				APS_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Staff/Staff.entitlements;
@@ -1561,7 +1565,7 @@
 		A4E62A5DA36EE4DCC2752338 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				API_BASE_URL = "http://127.0.0.1:4000/api";
+				API_BASE_URL = "http://127.0.0.1:4010/api";
 				APS_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = POS/POS.entitlements;
@@ -1706,7 +1710,7 @@
 		EA264166879AF3811BD43088 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				API_BASE_URL = "http://127.0.0.1:4000/api";
+				API_BASE_URL = "http://127.0.0.1:4010/api";
 				APS_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Client/Client.entitlements;

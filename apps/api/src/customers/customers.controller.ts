@@ -10,6 +10,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -22,6 +23,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { ValidationError } from '../common/errors';
 import { CustomersService } from './customers.service';
 import { CreateCustomerAddressDto, SetConsentDto, UpdateCustomerAddressDto, UpdateCustomerSettingsDto, UpsertCustomerDto } from './customers.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -128,6 +130,32 @@ export class CustomersController {
   myDevices(@CurrentUser() user: AuthPrincipal) {
     this.assertCustomer(user);
     return this.customers.devices(user.customerId);
+  }
+
+  @ApiOperation({
+    summary: 'Найти клиента по телефону (приёмка у прилавка)',
+    description:
+      'Скупка Б/У требует customerId, а у оператора на руках только телефон продавца. '
+      + 'POST /customers для этого не годится — он отказывает на существующем номере.',
+  })
+  @ApiOkResponse({ description: '{ id, name, phone }' })
+  @ApiNotFoundResponse({ description: 'Клиента с таким номером нет.' })
+  // Маршрут объявлен ДО `:id` намеренно: иначе Nest примет «lookup» за
+  // идентификатор клиента и сюда никогда не дойдёт.
+  @Get('lookup')
+  @UseGuards(JwtAuthGuard)
+  async lookup(@Query('phone') phone: string, @CurrentUser() user: AuthPrincipal) {
+    // Телефон — персональные данные, и перебор номеров с клиентского токена
+    // собрал бы базу целиком. Поэтому здесь только сотрудник с `customers:read`,
+    // тот же порог, что у Customer 360.
+    if (user.typ !== 'staff') {
+      throw new ForbiddenException('Поиск по телефону доступен только сотруднику');
+    }
+    await this.assertCanReadCustomer(user, '');
+    const normalized = normalizeLookupPhone(phone ?? '');
+    const customer = await this.customers.findByPhone(normalized);
+    if (!customer) throw new NotFoundException(`Клиент с номером ${normalized} не найден`);
+    return { id: customer.id, name: customer.name, phone: customer.phone };
   }
 
   @ApiOperation({ summary: 'Customer 360 — orders, spend, debts, warranties, tickets (CRM read)' })
@@ -243,4 +271,20 @@ function requireIdempotencyKey(value: string | undefined): string {
   if (!key) throw new BadRequestException('Idempotency-Key обязателен');
   if (key.length > 128) throw new BadRequestException('Idempotency-Key слишком длинный');
   return key;
+}
+
+/**
+ * Номер из поля оператора: отделители убираем, потом проверяем.
+ *
+ * Авторизационный `normalizePhone` намеренно строг — там номер это удостоверение
+ * личности, и «почти правильный» вход недопустим. Здесь другое: оператор
+ * набирает так, как видит на бумажке, с пробелами и дефисом. Убрать разделители
+ * и проверить результат — не послабление: в базу уходит та же каноническая форма.
+ */
+function normalizeLookupPhone(raw: string): string {
+  const stripped = raw.replace(/[\s()-]/g, '').trim();
+  if (!/^\+?[1-9]\d{8,14}$/.test(stripped)) {
+    throw new ValidationError('phone_invalid', 'Некорректный номер телефона');
+  }
+  return stripped.startsWith('+') ? stripped : `+${stripped}`;
 }

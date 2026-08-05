@@ -197,6 +197,20 @@ export class CustomersService {
    * Guest checkout may create a new customer, but must never identify an
    * existing customer by phone. Existing customers must authenticate first.
    */
+  /**
+   * Клиент по каноническому номеру — для приёмки у прилавка.
+   *
+   * Отдаёт только идентификацию: имя и телефон. Всё остальное о клиенте живёт
+   * за Customer 360 со своей проверкой прав — поиск не должен становиться
+   * обходным путём к профилю.
+   */
+  async findByPhone(phone: string) {
+    return this.prisma.customer.findUnique({
+      where: { phone },
+      select: { id: true, name: true, phone: true },
+    });
+  }
+
   async createGuest(dto: UpsertCustomerDto) {
     const existing = await this.prisma.customer.findUnique({
       where: { phone: dto.phone },
