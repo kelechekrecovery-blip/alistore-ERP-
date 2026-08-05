@@ -24,7 +24,7 @@ export function MobileTabBar({ active }: { active: Tab }) {
       {TABS.map((t) => {
         const badge = t.id === 'cart' ? (hydrated ? count : 0) : t.id === 'favorites' ? favCount : 0;
         return (
-          <Link key={t.id} href={t.href} className="relative flex-1 text-center">
+          <Link key={t.id} href={t.href} className="relative flex min-h-[44px] flex-1 flex-col items-center justify-center text-center">
             <t.Icon
               size={22}
               strokeWidth={active === t.id ? 2.4 : 1.8}

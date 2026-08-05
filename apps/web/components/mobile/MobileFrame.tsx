@@ -40,32 +40,37 @@ export function MobileFrame({ active, children, header = true, city = 'Бишк�
                 {city}
                 <ChevronDown size={13} aria-hidden />
               </span>
-              <div className="ml-auto flex items-center gap-3.5">
+              <div className="ml-auto flex items-center gap-1">
                 {showLogin && (
                   <Link
                     href={loginHref(pathname)}
-                    className="rounded-full border border-lime/40 bg-lime/10 px-2.5 py-1 text-[11px] font-bold text-lime"
+                    className="tap-target"
                   >
-                    Войти
+                    {/* Зона нажатия растёт до 44 на самой ссылке, а пилюля
+                        остаётся прежней: если залить фоном всю зону, кнопка
+                        превращается в лаймовый овал во всю высоту шапки. */}
+                    <span className="rounded-full border border-lime/40 bg-lime/10 px-2.5 py-1 text-[11px] font-bold text-lime">
+                      Войти
+                    </span>
                   </Link>
                 )}
-                <Link href="/compare" className="relative" aria-label="Сравнение">
+                <Link href="/compare" className="tap-target relative" aria-label="Сравнение">
                   <ArrowLeftRight size={18} aria-hidden />
                   {compareCount > 0 && (
-                    <span className="absolute -right-2 -top-1.5 rounded-full bg-lime px-1 text-[9px] font-bold text-lime-ink">
+                    <span className="absolute right-1.5 top-1.5 rounded-full bg-lime px-1 text-[9px] font-bold text-lime-ink">
                       {compareCount}
                     </span>
                   )}
                 </Link>
-                <Link href="/account/notifications" className="relative" aria-label="Уведомления">
+                <Link href="/account/notifications" className="tap-target relative" aria-label="Уведомления">
                   <Bell size={18} aria-hidden />
-                  <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-coral" />
+                  <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-coral" />
                 </Link>
               </div>
             </div>
             <Link
               href="/search"
-              className="flex items-center gap-2.5 rounded-[13px] border border-surface-3 bg-surface-2 px-3.5 py-2.5"
+              className="flex min-h-[44px] items-center gap-2.5 rounded-[13px] border border-surface-3 bg-surface-2 px-3.5 py-2.5"
             >
               <Search size={16} className="text-faint" aria-hidden />
               <span className="text-sm text-faint">Поиск техники, брендов…</span>

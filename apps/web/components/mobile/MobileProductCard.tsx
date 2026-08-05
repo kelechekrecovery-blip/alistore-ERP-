@@ -61,13 +61,15 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
       whileHover={{ y: -3 }}
       transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
     >
-      <Link href={href} className="relative block h-[120px] bg-gradient-to-br from-surface-3 to-ink-dark">
-        {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill sizes="200px" priority={priority} className="object-contain p-3" /> : <span className="flex h-full flex-col items-center justify-center gap-1 text-[10px] text-subtle"><ImageOff size={24} /><span>Фото готовится</span></span>}
-        {badge && (
-          <span className="absolute left-2 top-2 rounded-[6px] bg-coral px-1.5 py-[3px] text-[10px] font-bold text-white">
-            {badge}
-          </span>
-        )}
+      <div className="relative h-[120px] bg-gradient-to-br from-surface-3 to-ink-dark">
+        <Link href={href} className="block h-full">
+          {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill sizes="200px" priority={priority} className="object-contain p-3" /> : <span className="flex h-full flex-col items-center justify-center gap-1 text-[10px] text-subtle"><ImageOff size={24} /><span>Фото готовится</span></span>}
+          {badge && (
+            <span className="absolute left-2 top-2 rounded-[6px] bg-coral px-1.5 py-[3px] text-[10px] font-bold text-white">
+              {badge}
+            </span>
+          )}
+        </Link>
         <button
           type="button"
           onClick={(e) => {
@@ -75,7 +77,9 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
             toggle(product.id);
           }}
           aria-label={has(product.id) ? 'Убрать из избранного' : 'В избранное'}
-          className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-lime-ink/60 text-sm"
+          // Кружок остаётся 28px, а нажимается 44: вынести сердце в отдельную
+          // видимую кнопку 44×44 значило бы закрыть ею четверть фото товара.
+          className="tap-target absolute right-0 top-0 rounded-full text-sm before:absolute before:h-7 before:w-7 before:rounded-full before:bg-lime-ink/60 before:content-['']"
         >
           <Heart
             size={15}
@@ -83,7 +87,7 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
             className={has(product.id) ? 'fill-coral text-coral' : 'text-white'}
           />
         </button>
-      </Link>
+      </div>
       <div className="px-[11px] pb-3 pt-2.5">
         <Link href={href} className="block min-h-[34px] text-[13px] font-semibold leading-[1.3] text-white">
           {product.name}

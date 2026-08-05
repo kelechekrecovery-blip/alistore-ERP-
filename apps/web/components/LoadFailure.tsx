@@ -35,7 +35,7 @@ export function LoadFailure({ what, detail, onRetry, className = '' }: Props) {
       <button
         type="button"
         onClick={onRetry}
-        className="mt-4 inline-flex items-center gap-1.5 rounded-[10px] bg-[#ff9a6e] px-4 py-2 text-[13px] font-bold text-[#1a1206] transition hover:brightness-110"
+        className="mt-4 inline-flex min-h-[44px] items-center gap-1.5 rounded-[10px] bg-[#ff9a6e] px-4 py-2 text-[13px] font-bold text-[#1a1206] transition hover:brightness-110"
       >
         <RefreshCw size={14} /> Повторить
       </button>

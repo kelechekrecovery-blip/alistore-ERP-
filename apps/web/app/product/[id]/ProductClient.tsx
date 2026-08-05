@@ -175,7 +175,13 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           </nav>
           <section className="grid gap-8 lg:grid-cols-[1.05fr_.95fr] lg:gap-14">
             <div>
-              <div className="relative aspect-square max-h-[610px] overflow-hidden rounded-[22px] border border-white/10 bg-gradient-to-br from-[#ede6dc] to-[#d8cfc6] shadow-[0_16px_40px_rgba(0,0,0,.4)]">
+              {/* Светлая подложка оправдана под фотографией — товары снимают на
+                  светлом фоне. Но когда фото нет, она превращалась в бежевый
+                  квадрат 610×610 на странице #0b0a08: самый крупный и самый
+                  светлый элемент экрана указывал на пустоту. Скелетон загрузки
+                  строкой ~507 уже держит тёмную поверхность — пустое состояние
+                  теперь ведёт себя так же. */}
+              <div className={`relative aspect-square max-h-[610px] overflow-hidden rounded-[22px] border border-white/10 shadow-[0_16px_40px_rgba(0,0,0,.4)] ${productImage(product) ? 'bg-gradient-to-br from-[#ede6dc] to-[#d8cfc6]' : 'bg-white/[.04]'}`}>
                 {productImage(product) ? <Image src={(productImages(product)[activeImage] ?? productImage(product))!} alt={product.name} fill priority sizes="(max-width: 1024px) 92vw, 560px" className="object-contain p-10 sm:p-16" /> : <span className="flex h-full flex-col items-center justify-center gap-3 text-subtle"><ImageOff size={42} /><span>Фото готовится</span></span>}
                 <span className="absolute left-5 top-5 rounded-full border border-coral/25 bg-tint px-3 py-1.5 text-xs font-semibold text-deep">
                   {condition}

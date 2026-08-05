@@ -83,7 +83,11 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
 
   return (
     <article className={`store-card-enter group relative flex min-w-0 flex-col rounded-[16px] p-3 transition duration-200 hover:-translate-y-0.5 active:scale-[0.99] ${design3 ? 'border border-white/10 bg-gradient-to-br from-white/[.075] to-white/[.02] shadow-[0_10px_26px_rgba(0,0,0,.32)] backdrop-blur-xl hover:border-[#ff7a4d]/40 hover:shadow-[0_16px_34px_rgba(0,0,0,.44)]' : 'rounded-[10px] border border-linen bg-white hover:border-linen hover:shadow-[0_8px_24px_rgba(0,0,0,.07)]'}`}>
-      <div className={`relative aspect-square overflow-hidden rounded-[11px] ${design3 ? 'bg-gradient-to-br from-[#ede6dc] to-[#d8cfc6]' : 'bg-white'}`}>
+      {/* Светлая подложка — под фотографию (товары сняты на светлом). Без фото
+          она давала ряд бежевых квадратов во всю сетку каталога: самые светлые
+          пятна страницы приходились на карточки без снимка. Пустое состояние
+          держим на той же тёмной поверхности, что и скелетоны. */}
+      <div className={`relative aspect-square overflow-hidden rounded-[11px] ${design3 ? (productImage(product) ? 'bg-gradient-to-br from-[#ede6dc] to-[#d8cfc6]' : 'bg-white/[.04]') : 'bg-white'}`}>
         <Link href={href} className="absolute inset-0" aria-label={product.name}>
           {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill sizes="(max-width: 700px) 50vw, 260px" className="object-contain p-3 transition duration-300 group-hover:scale-[1.04]" /> : <span className="flex h-full flex-col items-center justify-center gap-2 text-xs text-faint"><ImageOff size={28} /><span>Фото готовится</span></span>}
         </Link>
@@ -93,10 +97,16 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
         </button>
       </div>
       <div className="flex flex-1 flex-col pt-2">
-        <div className={`flex min-h-4 items-center gap-1 text-[11px] ${design3 ? 'text-white/45' : 'text-faint'}`}>
+        {/* Название — первым. Рейтинг стоял выше него, и на каталоге без отзывов
+            каждая карточка начиналась со строки «Отзывов пока нет»: покупатель
+            читал отрицание раньше, чем товар. На карточке товара порядок всегда
+            был обратный (заголовок → рейтинг) — теперь совпадают.
+            `min-h-4` на строке рейтинга оставлен: он держит одинаковую высоту
+            карточек в сетке независимо от наличия отзывов. */}
+        <Link href={href} className={`min-h-[38px] text-[13px] font-medium leading-[1.4] transition hover:text-coral ${design3 ? 'text-white' : 'text-ink'}`}>{product.name}</Link>
+        <div className={`mt-1.5 flex min-h-4 items-center gap-1 text-[11px] ${design3 ? 'text-white/45' : 'text-faint'}`}>
           {product.reviewCount > 0 && product.avgRating !== null ? <><Star size={12} className="text-warn" fill="currentColor" /><span>{product.avgRating.toFixed(1)}</span><span>·</span><span>{product.reviewCount} отзывов</span></> : <span>Отзывов пока нет</span>}
         </div>
-        <Link href={href} className={`mt-1.5 min-h-[38px] text-[13px] font-medium leading-[1.4] transition hover:text-coral ${design3 ? 'text-white' : 'text-ink'}`}>{product.name}</Link>
         <div className="mt-2 flex flex-wrap gap-1">{productSpecEntries(product).slice(0, 3).map(([key, value]) => <span key={key} className={`rounded-[4px] px-2 py-1 text-[10px] ${design3 ? 'bg-white/[.06] text-white/50' : 'bg-sand text-faint'}`}>{String(value)}</span>)}</div>
         <div className={`mt-2 flex items-center gap-1 text-[11px] ${inStock ? 'text-[#c6ff3d]' : design3 ? 'text-white/45' : 'text-faint'}`}>
           {inStock ? (<><span className="text-[8px]">●</span>{availabilityLabel(availability, product.availableUnits)}</>) : toOrder ? (<StatusPill status="info">{availabilityLabel(availability, product.availableUnits)}</StatusPill>) : (<><span className="text-[8px]">●</span>{availabilityLabel(availability, product.availableUnits)}</>)}
