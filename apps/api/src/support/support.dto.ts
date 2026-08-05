@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 const CHANNELS = ['web', 'app', 'whatsapp', 'telegram', 'call', 'store'] as const;
@@ -36,6 +36,19 @@ export class OpenMineTicketDto {
 
   @ApiPropertyOptional({ enum: ['normal', 'high', 'urgent'], example: 'normal' })
   @IsOptional() @IsIn(['normal', 'high', 'urgent']) priority?: string;
+}
+
+export class OpenGuestTicketDto extends OpenMineTicketDto {
+  @ApiProperty({ example: '+996700123456', description: 'Phone in E.164 (KG)' })
+  @IsString()
+  @Matches(/^\+?[1-9][0-9]{8,14}$/, { message: 'phone must be 9–15 digits, optional +, no leading zero' })
+  phone!: string;
+
+  @ApiPropertyOptional({ example: 'Айбек' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  name?: string;
 }
 
 export class TicketTransitionDto {

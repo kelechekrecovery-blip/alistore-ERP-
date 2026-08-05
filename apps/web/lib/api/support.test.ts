@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchSupportTickets, openSupportTicket } from './support';
+import { fetchSupportTickets, openGuestSupportTicket, openSupportTicket } from './support';
 
 function stubFetch(responseBody: unknown) {
   const calls: { url: string; init: RequestInit }[] = [];
@@ -47,14 +47,21 @@ describe('openSupportTicket', () => {
     });
   });
 
-  it('keeps the capability-scoped guest endpoint', async () => {
-    const calls = stubFetch({ id: 'ticket-2' });
+  it('uses the atomic idempotent guest endpoint without authorization', async () => {
+    const calls = stubFetch({ ticket: { id: 'ticket-2' }, guestCapability: 'capability-1', capabilityExpiresIn: 1800 });
 
-    await openSupportTicket(input, { guestCapability: 'guest-capability-1' });
+    await openGuestSupportTicket({
+      phone: '+996700123456',
+      name: 'Guest',
+      channel: input.channel,
+      subject: input.subject,
+      body: input.body,
+      priority: input.priority,
+    }, 'guest-attempt-1');
 
-    expect(calls[0].url).toMatch(/\/support\/tickets$/);
+    expect(calls[0].url).toMatch(/\/support\/tickets\/guest$/);
     const headers = calls[0].init.headers as Record<string, string>;
-    expect(headers['x-guest-capability']).toBe('guest-capability-1');
+    expect(headers['idempotency-key']).toBe('guest-attempt-1');
     expect(headers.authorization).toBeUndefined();
   });
 });

@@ -1,12 +1,15 @@
-import { Injectable, Optional } from '@nestjs/common';
-import { SupportTicket, TicketStatus } from '@prisma/client';
+import { ConflictException, Injectable, Optional } from '@nestjs/common';
+import { Customer, SupportTicket, TicketStatus } from '@prisma/client';
+import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
 import { OutboxService } from '../outbox/outbox.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
-import { OpenTicketDto, TicketTransitionDto } from './support.dto';
+import { OpenGuestTicketDto, OpenTicketDto, TicketTransitionDto } from './support.dto';
+import { isUniqueConstraintViolation } from '../common/prisma-errors';
+import { normalizePhone } from '../auth/phone-normalization';
 import {
   assertTicketTransition,
   escalatedPriority,
@@ -86,6 +89,66 @@ export class SupportService {
         ],
       };
     });
+  }
+
+  async openGuest(dto: OpenGuestTicketDto, idempotencyKey: string) {
+    const phone = normalizePhone(dto.phone);
+    const name = dto.name?.trim() || 'Клиент';
+    const priority = normalizePriority(dto.priority);
+    const persistedKey = `guest-support:${createHash('sha256').update(idempotencyKey).digest('hex')}`;
+    const ticketDto: OpenTicketDto = {
+      customerId: '',
+      channel: dto.channel,
+      subject: dto.subject,
+      body: dto.body,
+      priority: dto.priority,
+    };
+
+    try {
+      return await this.audit.transaction(async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'support:' + persistedKey}))::text AS locked`;
+        const replay = await tx.supportTicket.findUnique({ where: { idempotencyKey: persistedKey } });
+        if (replay) {
+          const customer = await tx.customer.findUnique({ where: { id: replay.customerId } });
+          if (!customer) throw new ConflictError('guest_support_customer_missing', 'Клиент обращения не найден');
+          assertGuestReplay(replay, customer, { ...ticketDto, customerId: customer.id }, phone, name, priority);
+          return { result: { ticket: replay, customerId: customer.id }, events: [] };
+        }
+
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'guest-customer:' + phone}))::text AS locked`;
+        const existingCustomer = await tx.customer.findUnique({ where: { phone } });
+        if (existingCustomer) throw guestCustomerRequiresAuth();
+        const customer = await tx.customer.create({ data: { phone, name } });
+        const sla = slaFor(priority, Date.now());
+        const ticket = await tx.supportTicket.create({
+          data: {
+            customerId: customer.id,
+            channel: dto.channel,
+            subject: dto.subject,
+            body: dto.body ?? null,
+            priority,
+            sla,
+            status: 'new',
+            idempotencyKey: persistedKey,
+          },
+        });
+        return {
+          result: { ticket, customerId: customer.id },
+          events: [{
+            type: EventType.TicketCreated,
+            actor: customer.id,
+            payload: { ticketId: ticket.id, channel: dto.channel, priority, sla: sla.toISOString() },
+            refs: [ticket.id, customer.id],
+          }],
+        };
+      });
+    } catch (error) {
+      // Other guest-entry points do not share this advisory lock. A concurrent
+      // customer creation can therefore win after our lookup; map the database
+      // uniqueness race to the same fail-closed authentication response.
+      if (isUniqueConstraintViolation(error)) throw guestCustomerRequiresAuth();
+      throw error;
+    }
   }
 
   /** Advance a ticket through its guarded status machine. */
@@ -185,6 +248,13 @@ export class SupportService {
   }
 }
 
+function guestCustomerRequiresAuth() {
+  return new ConflictException({
+    code: 'guest_customer_requires_auth',
+    message: 'Для этого номера войдите в аккаунт перед созданием обращения',
+  });
+}
+
 function replayTicket(
   ticket: SupportTicket,
   dto: OpenTicketDto,
@@ -194,4 +264,21 @@ function replayTicket(
     ticket.subject === dto.subject && ticket.body === (dto.body ?? null) && ticket.priority === priority;
   if (!same) throw new ConflictError('idempotency_key_reused', 'Idempotency key уже использован с другим обращением');
   return ticket;
+}
+
+function assertGuestReplay(
+  ticket: SupportTicket,
+  customer: Customer,
+  dto: OpenTicketDto,
+  phone: string,
+  name: string,
+  priority: string,
+) {
+  if (Date.now() - ticket.createdAt.getTime() > 30 * 60 * 1000) {
+    throw new ConflictError('guest_support_replay_expired', 'Повтор гостевого обращения истёк; войдите в аккаунт');
+  }
+  if (customer.phone !== phone || customer.name !== name) {
+    throw new ConflictError('idempotency_key_reused', 'Idempotency key уже использован с другим обращением');
+  }
+  replayTicket(ticket, dto, priority);
 }

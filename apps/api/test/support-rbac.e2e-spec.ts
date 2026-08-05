@@ -9,13 +9,15 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 import { SupportModule } from '../src/support/support.module';
-import { issueGuestCheckoutCapability } from '../src/auth/guest-capability';
+import { SupportController } from '../src/support/support.controller';
+import { issueGuestCheckoutCapability, requireGuestCapability } from '../src/auth/guest-capability';
 
 describe('Support CRM RBAC split', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let staffAuth: StaffAuthService;
   let jwt: JwtService;
+  let supportController: SupportController;
   let adminToken: string;
   let adminId: string;
   let sellerToken: string;
@@ -39,6 +41,7 @@ describe('Support CRM RBAC split', () => {
     prisma = moduleRef.get(PrismaService);
     staffAuth = moduleRef.get(StaffAuthService);
     jwt = moduleRef.get(JwtService);
+    supportController = moduleRef.get(SupportController);
 
     const createSession = async (role: 'admin' | 'seller') => {
       const username = `${role}-support-${RUN}`;
@@ -198,5 +201,101 @@ describe('Support CRM RBAC split', () => {
       .expect(200);
     expect(otherMine.body).toEqual([]);
     expect(await prisma.auditEvent.count({ where: { type: 'ticket.created' } })).toBe(1);
+  });
+
+  it('atomically creates and exactly replays a guest customer support attempt', async () => {
+    const canonicalPhone = `+996707${RUN}`;
+    const phone = canonicalPhone.slice(1);
+    const payload = {
+      phone,
+      name: 'Guest Support',
+      channel: 'web',
+      subject: 'Нужна консультация',
+      body: 'Не получается оформить заказ',
+      priority: 'normal',
+    };
+
+    await request(app.getHttpServer())
+      .post('/support/tickets/guest')
+      .send(payload)
+      .expect(400);
+
+    const calls = await Promise.all([
+      request(app.getHttpServer()).post('/support/tickets/guest')
+        .set('Idempotency-Key', `guest-support-${RUN}`).send(payload),
+      request(app.getHttpServer()).post('/support/tickets/guest')
+        .set('Idempotency-Key', `guest-support-${RUN}`).send(payload),
+    ]);
+    expect(calls.map((call) => call.status)).toEqual([201, 201]);
+    expect(calls[0].body.ticket.id).toBe(calls[1].body.ticket.id);
+    expect(calls[0].body.ticket.customerId).toBe(calls[1].body.ticket.customerId);
+    expect(calls[0].body.capabilityExpiresIn).toBeGreaterThan(0);
+    expect(calls[0].body.capabilityExpiresIn).toBeLessThanOrEqual(1800);
+    expect(requireGuestCapability(calls[0].body.guestCapability, 'support:create').sub)
+      .toBe(calls[0].body.ticket.customerId);
+    expect(requireGuestCapability(calls[1].body.guestCapability, 'evidence:write').sub)
+      .toBe(calls[0].body.ticket.customerId);
+    expect(() => requireGuestCapability(calls[0].body.guestCapability, 'orders:create')).toThrow();
+
+    await request(app.getHttpServer())
+      .post('/support/tickets/guest')
+      .set('Idempotency-Key', `guest-support-${RUN}`)
+      .send({ ...payload, subject: 'Другой вопрос' })
+      .expect(409);
+
+    expect(await prisma.customer.count({ where: { phone: canonicalPhone } })).toBe(1);
+    expect(await prisma.customer.count({ where: { phone } })).toBe(0);
+    expect(await prisma.supportTicket.count({ where: { customerId: calls[0].body.ticket.customerId } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { type: 'ticket.created' } })).toBe(1);
+
+    expect(await prisma.supportTicket.count({ where: { customerId: calls[0].body.ticket.customerId } })).toBe(1);
+  });
+
+  it('rejects a no-plus guest alias for an existing canonical customer', async () => {
+    const canonicalPhone = `+996708${RUN}`;
+    await prisma.customer.create({ data: { phone: canonicalPhone, name: 'Existing Customer' } });
+    const payload = { channel: 'web', subject: 'Alias attempt', body: 'Must authenticate' };
+
+    await request(app.getHttpServer())
+      .post('/support/tickets/guest')
+      .set('Idempotency-Key', `guest-alias-${RUN}`)
+      .send({ ...payload, phone: canonicalPhone.slice(1) })
+      .expect(409);
+
+    expect(await prisma.customer.count()).toBe(1);
+    expect(await prisma.supportTicket.count()).toBe(0);
+  });
+
+  it('caps replay capability to the remaining window and rejects an expired replay', async () => {
+    const key = `guest-window-${RUN}`;
+    const payload = {
+      phone: `996709${RUN}`,
+      name: 'Replay Window',
+      channel: 'web' as const,
+      subject: 'Проверка окна',
+      body: 'Не продлевать capability',
+      priority: 'normal',
+    };
+    const created = await supportController.openGuest(key, payload);
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    await prisma.supportTicket.update({
+      where: { id: created.ticket.id },
+      data: { createdAt: tenMinutesAgo },
+    });
+
+    const replay = await supportController.openGuest(key, payload);
+    expect(replay.ticket.id).toBe(created.ticket.id);
+    expect(replay.capabilityExpiresIn).toBeGreaterThanOrEqual(19 * 60);
+    expect(replay.capabilityExpiresIn).toBeLessThanOrEqual(20 * 60);
+    const claims = requireGuestCapability(replay.guestCapability, 'evidence:read');
+    expect((claims.exp ?? 0) - Math.floor(Date.now() / 1000)).toBeLessThanOrEqual(20 * 60);
+
+    await prisma.supportTicket.update({
+      where: { id: created.ticket.id },
+      data: { createdAt: new Date(Date.now() - 31 * 60 * 1000) },
+    });
+    await expect(supportController.openGuest(key, payload)).rejects.toMatchObject({
+      code: 'guest_support_replay_expired',
+    });
   });
 });

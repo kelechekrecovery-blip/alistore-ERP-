@@ -23,20 +23,31 @@ type SupportTicketInput = {
 };
 
 type SupportCredential =
-  | { accessToken: string; idempotencyKey: string }
-  | { guestCapability: string };
+  { accessToken: string; idempotencyKey: string };
+
+export interface GuestSupportTicketResponse {
+  ticket: SupportTicket;
+  guestCapability: string;
+  capabilityExpiresIn: number;
+}
 
 export function openSupportTicket(input: SupportTicketInput, credential: SupportCredential): Promise<SupportTicket> {
-  if ('accessToken' in credential) {
-    const { customerId: _customerId, actor: _actor, ...ownedInput } = input;
-    return postJson('/support/tickets/mine', ownedInput, {
-      authorization: `Bearer ${credential.accessToken}`,
-      'idempotency-key': credential.idempotencyKey,
-    });
-  }
-  return postJson('/support/tickets', input, {
-    'x-guest-capability': credential.guestCapability,
+  const { customerId: _customerId, actor: _actor, ...ownedInput } = input;
+  return postJson('/support/tickets/mine', ownedInput, {
+    authorization: `Bearer ${credential.accessToken}`,
+    'idempotency-key': credential.idempotencyKey,
   });
+}
+
+export function openGuestSupportTicket(input: {
+  phone: string;
+  name?: string;
+  channel: SupportTicketInput['channel'];
+  subject: string;
+  body?: string;
+  priority?: SupportTicketInput['priority'];
+}, idempotencyKey: string): Promise<GuestSupportTicketResponse> {
+  return postJson('/support/tickets/guest', input, { 'idempotency-key': idempotencyKey });
 }
 
 export async function fetchSupportTickets(accessToken: string): Promise<SupportTicket[]> {

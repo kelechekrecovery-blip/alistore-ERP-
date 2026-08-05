@@ -27,6 +27,7 @@ import {
 } from './email-otp.sender';
 import type { AuthPrincipal, JwtPayload } from './jwt.strategy';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
+import { normalizePhone } from './phone-normalization';
 
 export interface AuthTokens {
   accessToken: string;
@@ -1436,15 +1437,6 @@ function normalizeEmail(rawEmail: string): string {
     throw new ValidationError('email_invalid', 'Некорректный email');
   }
   return email;
-}
-
-/** Canonical storage and lookup form for every inbound phone identity. */
-function normalizePhone(rawPhone: string): string {
-  const phone = rawPhone.trim();
-  if (!/^\+?[1-9]\d{8,14}$/.test(phone)) {
-    throw new ValidationError('phone_invalid', 'Некорректный номер телефона');
-  }
-  return phone.startsWith('+') ? phone : `+${phone}`;
 }
 
 function isUniqueViolation(error: unknown): boolean {

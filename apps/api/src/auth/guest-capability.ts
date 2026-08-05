@@ -58,6 +58,19 @@ export function issueGuestCheckoutCapability(customerId: string): string {
   );
 }
 
+export function issueGuestSupportCapability(customerId: string, expiresInSeconds: number): string {
+  const ttl = Math.max(1, Math.min(1800, Math.floor(expiresInSeconds)));
+  return sign(
+    {
+      sub: customerId,
+      typ: 'guest_capability',
+      scopes: ['support:create', 'evidence:write', 'evidence:read'],
+    } satisfies Omit<GuestCapabilityClaims, 'iat' | 'exp'>,
+    secret(),
+    { issuer: ISSUER, audience: AUDIENCE, expiresIn: ttl },
+  );
+}
+
 export function issueGuestOrderCapability(customerId: string, orderId: string, expiresInSeconds = guestOrderCapabilityTtlSeconds()): string {
   return sign(
     {

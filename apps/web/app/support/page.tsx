@@ -5,7 +5,7 @@ import { MessageCircle, Phone, Send, type LucideIcon } from 'lucide-react';
 import { EvidencePicker } from '@/components/EvidencePicker';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
-import { createCustomer, fetchStorefrontContent, fetchSupportTickets, openSupportTicket, uploadEvidenceImages, type StorefrontPayload, type SupportTicket } from '@/lib/api';
+import { fetchStorefrontContent, fetchSupportTickets, openGuestSupportTicket, openSupportTicket, uploadEvidenceImages, type StorefrontPayload, type SupportTicket } from '@/lib/api';
 
 const faq = ['Как отследить заказ?', 'Условия возврата и обмена', 'Как работает рассрочка?', 'Гарантия на Б/У технику'];
 const channels: readonly {
@@ -33,7 +33,7 @@ export default function SupportPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storefront, setStorefront] = useState<StorefrontPayload | null>(null);
-  const authenticatedAttempt = useRef<{ fingerprint: string; idempotencyKey: string } | null>(null);
+  const ticketAttempt = useRef<{ fingerprint: string; idempotencyKey: string } | null>(null);
 
   // «Телефон не указан» и «не смогли загрузить контакты» — разные вещи. Первое
   // клиент читает как «звонить некуда» и уходит; второе означает лишь, что
@@ -62,28 +62,41 @@ export default function SupportPage() {
     setBusy(true);
     setError(null);
     try {
-      const guest = user ? null : await createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
-      const customerId = user?.customerId ?? guest!.id;
-      const ticketInput = {
-        customerId,
+      const priority = subject.toLowerCase().includes('возврат') || subject.toLowerCase().includes('гарант') ? 'high' : 'normal';
+      const ownedInput = {
         channel,
         subject: subject.trim(),
         body: body.trim(),
-        priority: subject.toLowerCase().includes('возврат') || subject.toLowerCase().includes('гарант') ? 'high' : 'normal',
-        actor: 'customer_app',
+        priority,
       } as const;
+      const fingerprint = JSON.stringify(user
+        ? { mode: 'customer', customerId: user.customerId, ...ownedInput }
+        : { mode: 'guest', phone: phone.trim(), name: name.trim(), ...ownedInput });
+      if (ticketAttempt.current?.fingerprint !== fingerprint) {
+        ticketAttempt.current = { fingerprint, idempotencyKey: crypto.randomUUID() };
+      }
+      const idempotencyKey = ticketAttempt.current.idempotencyKey;
+
       let ticket: SupportTicket;
-      let authenticatedIdempotencyKey: string | undefined;
+      let customerId: string;
+      let guestCapability: string | undefined;
       if (user) {
-        const fingerprint = JSON.stringify(ticketInput);
-        if (authenticatedAttempt.current?.fingerprint !== fingerprint) {
-          authenticatedAttempt.current = { fingerprint, idempotencyKey: crypto.randomUUID() };
-        }
-        const idempotencyKey = authenticatedAttempt.current.idempotencyKey;
-        authenticatedIdempotencyKey = idempotencyKey;
+        customerId = user.customerId;
+        const ticketInput = {
+          customerId,
+          ...ownedInput,
+          actor: 'customer_app',
+        } as const;
         ticket = await authed((accessToken) => openSupportTicket(ticketInput, { accessToken, idempotencyKey }));
       } else {
-        ticket = await openSupportTicket(ticketInput, { guestCapability: guest!.guestCapability });
+        const result = await openGuestSupportTicket({
+          phone: phone.trim(),
+          name: name.trim() || undefined,
+          ...ownedInput,
+        }, idempotencyKey);
+        ticket = result.ticket;
+        customerId = ticket.customerId;
+        guestCapability = result.guestCapability;
       }
       const evidence = files.length
         ? await uploadEvidenceImages({
@@ -92,16 +105,14 @@ export default function SupportPage() {
             entityId: ticket.id,
             label: 'support_attachment',
             actor: customerId,
-            ...(authenticatedIdempotencyKey
-              ? { idempotencyKeyPrefix: `support:${authenticatedIdempotencyKey}` }
-              : {}),
+            idempotencyKeyPrefix: `support:${idempotencyKey}`,
             ...(user
               ? { accessToken: await authed(async (token) => token) }
-              : { guestCapability: guest!.guestCapability }),
+              : { guestCapability: guestCapability! }),
           })
         : [];
       setDone({ ticket, evidenceCount: evidence.length });
-      authenticatedAttempt.current = null;
+      ticketAttempt.current = null;
       setBody('');
       setFiles([]);
     } catch {

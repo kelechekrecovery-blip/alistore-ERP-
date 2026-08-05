@@ -10,7 +10,7 @@ import {
 } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { SupportService } from './support.service';
-import { EscalateTicketDto, OpenMineTicketDto, OpenTicketDto, TicketTransitionDto } from './support.dto';
+import { EscalateTicketDto, OpenGuestTicketDto, OpenMineTicketDto, OpenTicketDto, TicketTransitionDto } from './support.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
@@ -20,7 +20,7 @@ import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
 import { AuthzService } from '../authz/authz.service';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
-import { requireGuestCapability } from '../auth/guest-capability';
+import { issueGuestSupportCapability, requireGuestCapability } from '../auth/guest-capability';
 
 @ApiTags('support')
 @Controller('support/tickets')
@@ -45,6 +45,28 @@ export class SupportController {
     if (user.typ !== 'customer') throw new ForbiddenException('Требуется customer JWT');
     const key = requireIdempotencyKey(idempotencyKey);
     return this.support.open({ ...dto, customerId: user.customerId }, user.customerId, key);
+  }
+
+  @ApiOperation({ summary: 'Atomically open an idempotent ticket for a new guest customer' })
+  @ApiCreatedResponse({ description: 'Guest customer and ticket created atomically, or safely replayed.' })
+  @Post('guest')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async openGuest(
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: OpenGuestTicketDto,
+  ) {
+    const key = requireIdempotencyKey(idempotencyKey);
+    const result = await this.support.openGuest(dto, key);
+    const capabilityExpiresIn = Math.max(
+      1,
+      Math.min(1800, Math.floor((result.ticket.createdAt.getTime() + 30 * 60 * 1000 - Date.now()) / 1000)),
+    );
+    return {
+      ticket: result.ticket,
+      guestCapability: issueGuestSupportCapability(result.customerId, capabilityExpiresIn),
+      capabilityExpiresIn,
+    };
   }
 
   @ApiOperation({ summary: 'List tickets of the authenticated customer' })
