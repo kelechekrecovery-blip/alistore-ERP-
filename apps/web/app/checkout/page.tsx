@@ -786,9 +786,12 @@ export default function CheckoutPage() {
                     <Link href="/privacy" target="_blank" rel="noreferrer" className="text-lime underline">обработкой персональных данных</Link>
                   </>
                 ) : (
+                  // Формулировку начинаем так же — «Согласен с условиями»: у
+                  // политики обработки данных условия тоже есть, и она реально
+                  // опубликована. Меняется только то, на что ведёт ссылка.
                   <>
-                    Согласен с{' '}
-                    <Link href="/privacy" target="_blank" rel="noreferrer" className="text-lime underline">обработкой персональных данных</Link>
+                    Согласен с условиями{' '}
+                    <Link href="/privacy" target="_blank" rel="noreferrer" className="text-lime underline">обработки персональных данных</Link>
                   </>
                 )}
               </span>

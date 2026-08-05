@@ -16,8 +16,42 @@ async function reachConfirmationStep(page: import('@playwright/test').Page, prod
   await page.getByRole('button', { name: 'К подтверждению' }).click();
 }
 
+/**
+ * Оферта опубликована — на неё можно ссылаться в согласии.
+ *
+ * Текст документа живёт в настройке `legal.offer_text` и заполняется владельцем.
+ * Пока он пуст, оферты не существует, и утверждать, будто покупатель с ней
+ * согласился, нельзя — это проверяет отдельный тест ниже.
+ */
+async function publishOffer(): Promise<void> {
+  await prisma.setting.upsert({
+    where: { key: 'legal.offer_text' },
+    create: { key: 'legal.offer_text', value: '1. Общие положения\n\nПродавец: ОсОО «Тест».', updatedBy: 'e2e' },
+    update: { value: '1. Общие положения\n\nПродавец: ОсОО «Тест».' },
+  });
+}
+
+test('без опубликованной оферты согласие ссылается только на политику данных', async ({ page }) => {
+  // Ссылаться на договор, которого нет, — значит собирать юридически пустое
+  // согласие. Галочка остаётся обязательной: обработка данных опубликована.
+  await resetDb();
+  const { product } = await seedProduct('CONSENT-NO-OFFER');
+  await reachConfirmationStep(page, product);
+
+  const consent = page.getByLabel(/Согласен с условиями/);
+  await expect(consent).not.toBeChecked();
+  await expect(page.getByRole('link', { name: 'обработки персональных данных' })).toHaveAttribute('href', '/privacy');
+  await expect(page.getByRole('link', { name: 'публичной оферты' })).toHaveCount(0);
+
+  const submit = page.getByRole('button', { name: /Подтвердить заказ/ });
+  await expect(submit).toBeDisabled();
+  await consent.check();
+  await expect(submit).toBeEnabled();
+});
+
 test('checkout blocks order submission until the legal consent checkbox is ticked', async ({ page }) => {
   await resetDb();
+  await publishOffer();
   const { product } = await seedProduct('CONSENT-BLOCKED');
   await reachConfirmationStep(page, product);
 
@@ -37,6 +71,7 @@ test('checkout blocks order submission until the legal consent checkbox is ticke
 
 test('checkout with consent creates an order stamped with piiConsentAt', async ({ page }) => {
   await resetDb();
+  await publishOffer();
   const { product } = await seedProduct('CONSENT-GRANTED');
   await reachConfirmationStep(page, product);
 
