@@ -101,6 +101,10 @@ export function ProcurementView({ accessToken }: { accessToken: string }) {
 
   async function submitOrder() {
     const items = form.items.map((line) => ({ productId: line.productId, qty: Number(line.qty), unitCost: Number(line.unitCost) }));
+    if (!form.location.trim()) {
+      setError('Выберите склад назначения');
+      return;
+    }
     if (!form.supplierId || items.some((item) => !item.productId || item.qty < 1 || item.unitCost < 0)) {
       setError('Заполните поставщика и все строки PO');
       return;
@@ -220,7 +224,7 @@ export function ProcurementView({ accessToken }: { accessToken: string }) {
           <button type="button" onClick={() => setForm((current) => ({ ...current, items: [...current.items, emptyLine()] }))} className="inline-flex h-9 items-center gap-2 rounded-[8px] border border-surface-3 px-3 text-xs font-semibold text-bright">
             <Plus size={14} /> Строка
           </button>
-          <button type="button" disabled={busy === 'create'} onClick={submitOrder} className="ml-auto inline-flex h-9 items-center gap-2 rounded-[8px] bg-lime px-4 text-xs font-bold text-coal disabled:opacity-50">
+          <button type="button" disabled={busy === 'create' || !form.location.trim()} onClick={submitOrder} className="ml-auto inline-flex h-9 items-center gap-2 rounded-[8px] bg-lime px-4 text-xs font-bold text-coal disabled:opacity-50">
             <Check size={14} /> Создать PO
           </button>
         </div>
