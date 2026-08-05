@@ -155,9 +155,12 @@ inside the same PostgreSQL transaction. Required envelope:
 - PII-minimized payload; secrets and raw prompts are prohibited;
 - projections may be rebuilt from domain state + ledger facts.
 
-Current gap: append-only is a convention. P0 must add a runtime DB role/trigger
-policy that rejects `UPDATE` and `DELETE` on `AuditEvent`, while tests use a
-separate privileged cleanup role.
+Implemented boundary: a statement trigger rejects `UPDATE`, `DELETE` and
+`TRUNCATE`; production API/worker startup requires a non-owner runtime role with
+`SELECT/INSERT` only on `AuditEvent`, and the backup cron independently requires
+a read-only credential. Owner migrations run before ACL verification and an exact-SHA Render
+deploy. Live Render credential rotation, private runners and a restore drill are
+still external P0 gates; new-event authenticity/hash anchoring remains separate work.
 
 ## Approval Center
 

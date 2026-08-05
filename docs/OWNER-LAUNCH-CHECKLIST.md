@@ -102,6 +102,10 @@ Blueprint `infra/render.staging.yaml` (регион Frankfurt). Общий ко�
       `S3_ENDPOINT`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` — из Cloudflare R2;
       `SENTRY_DSN` — из Sentry. Полную расшифровку каждой переменной и «где
       взять» даёт `apps/api/.env.production.example`.
+- [ ] Немедленно rotate `JWT_SECRET` staging и инвалидировать ранее выданные
+      staging sessions: старое значение было сохранено в истории git. Blueprint
+      теперь использует `generateValue: true`, но это не доказывает ротацию уже
+      развёрнутого environment.
 - [ ] На Key Value `alistore-redis-staging` включить **Internal Authentication**
       и сделать Resync Blueprint — иначе `REDIS_URL` без пароля не пройдёт
       production-preflight API.
@@ -111,8 +115,29 @@ Blueprint `infra/render.staging.yaml` (регион Frankfurt). Общий ко�
 - [ ] Deploy hooks: каждый из трёх сервисов → Settings → **Deploy Hook** →
       скопировать URL → вставить в GitHub Secrets из пункта 1
       (`RENDER_DEPLOY_HOOK_API` / `_WEB` / `_WORKER` соответственно).
-- [ ] Дождаться первого деплоя. Миграции применятся сами: у api в Blueprint
-      стоит `preDeployCommand: npm run db:deploy -w @alistore/api`.
+- [ ] Создать GitHub Environments `staging` и `production`; production требует
+      manual approval. Сохранить в них `RENDER_API_KEY`, deploy hooks и DB URLs.
+- [ ] Зарегистрировать одноразовые/изолированные self-hosted runners внутри
+      Render Frankfurt private network с labels `alistore-render-db-staging` и
+      `alistore-render-db-production`. Не запускать на них посторонние jobs.
+- [ ] DB credentials: сначала сохранить текущий owner URL. Для production
+      создать backup credential, затем runtime credential последним (Render
+      делает newest credential default). Для staging создать runtime. Не делать
+      Blueprint sync: сначала запустить ACL gate через explicit internal URLs.
+      GitHub secrets: `STAGING_DATABASE_OWNER_URL`, `STAGING_DATABASE_RUNTIME_URL`,
+      `PROD_DATABASE_OWNER_URL`, `PROD_DATABASE_RUNTIME_URL` (direct для worker/backup),
+      `PROD_DATABASE_RUNTIME_POOL_URL` (PgBouncer для API),
+      `PROD_DATABASE_BACKUP_URL`; production also requires
+      `RENDER_DEPLOY_HOOK_BACKUP_PROD` for the backup cron.
+- [ ] Запустить `CD — Staging`: rehearsal → owner migration → ACL probes →
+      проверка точных Render service name/type для каждого hook до чтения секретов →
+      явное переключение API/worker `DATABASE_URL` через Render API →
+      commit-bound deploy → health/smoke. Workflow не полагается на Blueprint
+      sync для переключения credential. После зелёного staging можно безопасно
+      синхронизировать его Blueprint (newest/default уже runtime), затем тем же
+      порядком выполнить production ACL → API/worker/backup switch → deploy.
+- [ ] Выполнить настоящий restore drill из свежего backup в отдельную БД и
+      повторить runtime/ledger probes. Image rollback не откатывает миграции.
 - [ ] Проверка с локальной машины:
 
   ```bash

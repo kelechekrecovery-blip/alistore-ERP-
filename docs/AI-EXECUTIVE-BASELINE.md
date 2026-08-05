@@ -66,6 +66,18 @@ reviews. Live production credentials, реальные провайдеры, к�
 - VERIFIED: fresh-schema migration probe, direct migrated-DB tamper probes and
   ledger/invariant/POS/reports regression 33/33 PASS; architecture, database and
   adversarial security reviews APPROVE the bounded trigger slice.
+- VERIFIED: commit `49da1956` separates owner/migrator, runtime and backup DB
+  credentials in code; API/worker startup rejects owner/elevated roles and any
+  role that can mutate `AuditEvent`, backup independently requires SELECT-only
+  access, and migrations run before a commit-bound Render deploy with
+  environment-scoped secrets.
+- VERIFIED: disposable PostgreSQL 16 rehearsal applied all 159 migrations,
+  removed seeded broad grants, enforced SQLSTATE 55000 owner tamper probes,
+  proved fail-closed future runtime defaults and completed a read-only custom
+  `pg_dump`; ACL/Render unit 12/12, focused guards/backup 32/32, API build and YAML PASS.
+- VERIFIED: commit `ea5be1c9` switches only identity-verified Render services to
+  the intended API pool, worker direct and backup read-only URLs before an
+  exact-SHA deploy; wrong/swapped hooks and partial credential updates fail closed.
 - VERIFIED: production dependency audit — 0 vulnerabilities after compatible
   per-consumer resolution; legacy glob/coverage and Socket.IO runtime tests PASS.
 - VERIFIED: iOS unit/contract 164/164 and UI E2E 47/47 PASS across Client,
@@ -93,15 +105,19 @@ reviews. Live production credentials, реальные провайдеры, к�
 | iOS | PARTIAL | 4 SwiftUI targets at repository build 6; unit/contract 164/164, UI 47/47 and strict signing/metadata preflight PASS | Pending ASC submissions use build 5; fresh physical-device SIWA is unverified | Do not replace build 5 while under review; physical-device auth smoke and post-review readback |
 | Web | PARTIAL | Production build PASS, 45 routes; guest checkout/TG/trade-in terminal errors and retry attempts have 5/5 focused contract tests; 45 Playwright specs exist | Worktree contains unrelated uncommitted UI changes; full E2E not rerun | Separate/commit UI work, then full route audit, a11y, cross-browser and visual regression |
 | E2E | PARTIAL | Auth/account 55/55, customer/support 13/13, guest identity/RBAC/deletion 55/55, POS/inventory/ledger 58/58 and service/auth 33/33 isolated gates PASS; Web/mobile retry contracts 6/6 PASS | Targeted checks do not prove whole ecosystem; no repeated full-suite flake run on current SHA | Run full isolated API twice, full Playwright, reconciled ecosystem, native UI and failure injection |
-| Security | PARTIAL | JWT/OTP/storage guards, hardened image resolver, exhaustive account deletion tests, production audit 0; PostgreSQL rejects AuditEvent UPDATE/DELETE/TRUNCATE with 55000; independent reviews APPROVE completed slices | Runtime/migrator/backup still share owner-level Render DB identity, so owner can disable the trigger; forged/missing events, camera policy, approval ownership and cross-writer phone consistency remain open | Split DB roles and add live ACL/postdeploy/restore probes; then close camera schema, approval lifecycle and phone-writer consistency |
+| Security | PARTIAL | JWT/OTP/storage guards, production audit 0; PostgreSQL trigger + startup/cron guards separate owner/runtime/backup capabilities; 159-migration ACL/pg_dump rehearsal and independent database/security/code reviews APPROVE | Role split is not yet applied in live Render; private runners/protected environments, staging JWT rotation and restore drill lack live evidence; forged/missing events and approval/camera risks remain | Provision credentials/runners in safe order, rotate staging JWT, run staging→production CD and restore drill; then close authenticity, camera and approval lifecycle |
 | App Store | BLOCKED_EXTERNAL | All four `1.0.0` build-5 versions verified WAITING_FOR_REVIEW; strict signing/metadata preflight and reviewer logins PASS; iOS UI 47/47 | Apple review, Unlisted distribution and fresh physical-iPad SIWA remain external | Do not replace build 5; monitor review; physical SIWA smoke and distribution decision |
 
 ## Blockers
 
 - VERIFIED: camera payload privacy relies on caller-provided arbitrary JSON and a keyword heuristic (`apps/api/src/camera-gateway/camera-gateway.dto.ts`).
-- VERIFIED: `AuditEvent` destructive DML is now blocked by a DB trigger, but the
-  current Render runtime identity is also the table owner and can disable/drop it;
-  credential-level immutability and restore evidence remain open.
+- VERIFIED: code now rejects an owner/elevated Render runtime and enforces a
+  separate SELECT-only backup identity; the currently deployed credentials have
+  not been rotated, so live credential isolation and restore evidence remain open.
+- BLOCKED_EXTERNAL: protected runners `alistore-render-db-staging` and
+  `alistore-render-db-production`, GitHub environments/secrets, safe Render
+  credential switchover and invalidation of sessions signed by the previously
+  tracked staging JWT must be completed by the owner.
 - VERIFIED: approval status has only requested/approved/rejected; no atomic claim,
   expiry or cancellation ownership protects concurrent execution.
 - VERIFIED: the temporary absent-key compatibility path intentionally preserves
@@ -170,6 +186,9 @@ reviews. Live production credentials, реальные провайдеры, к�
   production dependency audit passed.
 - VERIFIED: Event Ledger trigger migration/tamper probe passed; focused
   ledger/invariant/POS/reports gate passed 4/4 suites and 33/33 tests.
+- VERIFIED: credential-split gate passed 159 migrations on disposable PostgreSQL
+  16, exact runtime/backup ACL probes, future-default probes and read-only
+  `pg_dump`; Node 12/12, focused Jest 32/32, API build and YAML parse passed.
 - VERIFIED: isolated gates passed for auth/account 55/55, customer/support 13/13,
   POS/inventory/ledger 58/58, service/auth 33/33, auth/preflight/RBAC/outbox
   179/179 and authz/AI/camera 13/13.
