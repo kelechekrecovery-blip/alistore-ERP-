@@ -86,11 +86,16 @@ export class ReturnsController {
   @Post()
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  create(@CurrentUser() user: AuthPrincipal, @Body() dto: CreateReturnDto) {
+  create(
+    @CurrentUser() user: AuthPrincipal,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: CreateReturnDto,
+  ) {
     if (user.typ !== 'customer') {
       throw new ForbiddenException('Требуется customer JWT');
     }
-    return this.returns.request(dto.orderId, dto.reason, user.customerId, user.customerId, undefined, dto.items);
+    const key = requireIdempotencyKey(idempotencyKey);
+    return this.returns.request(dto.orderId, dto.reason, user.customerId, user.customerId, key, dto.items);
   }
 
   @ApiOperation({ summary: 'Advance a return through its status machine' })

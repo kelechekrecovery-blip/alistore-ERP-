@@ -13,6 +13,7 @@ import { SandboxPaymentGatewayProvider } from '../src/payments/sandbox-payment-g
 
 describe('Refund-bound return reconciliation (integration)', () => {
   let prisma: PrismaService;
+  let audit: AuditService;
   let approvals: ApprovalsService;
   let payments: PaymentsService;
   let returns: ReturnsService;
@@ -23,7 +24,7 @@ describe('Refund-bound return reconciliation (integration)', () => {
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
-    const audit = new AuditService(prisma);
+    audit = new AuditService(prisma);
     approvals = new ApprovalsService(prisma, audit);
     payments = new PaymentsService(prisma, audit, new UnitsService(prisma), approvals);
     returns = new ReturnsService(prisma, audit);
@@ -74,6 +75,114 @@ describe('Refund-bound return reconciliation (integration)', () => {
     await prisma.tradeInDevice.deleteMany();
     await prisma.customer.deleteMany();
   }
+
+  function deferred() {
+    let resolve!: () => void;
+    const promise = new Promise<void>((done) => { resolve = done; });
+    return { promise, resolve };
+  }
+
+  async function returnOrder(label: string) {
+    const suffix = `${Date.now()}-${++seq}`;
+    const customer = await prisma.customer.create({
+      data: { phone: `+996709${suffix.slice(-6)}`, name: `${label} customer` },
+    });
+    const order = await prisma.order.create({
+      data: {
+        customerId: customer.id,
+        channel: 'web',
+        status: 'paid',
+        subtotal: 1_000,
+        total: 1_000,
+        items: { create: { sku: `RETURN-FENCE-${suffix}`, qty: 1, price: 1_000 } },
+      },
+    });
+    return { customer, order, suffix };
+  }
+
+  it('does not create a self-service return when deletion commits before the return transaction', async () => {
+    const { customer, order } = await returnOrder('Deletion race');
+    const atTransaction = deferred();
+    const resumeTransaction = deferred();
+    const originalTransaction = audit.transaction.bind(audit);
+    const transaction = jest.spyOn(audit, 'transaction').mockImplementationOnce(async (fn) => {
+      atTransaction.resolve();
+      await resumeTransaction.promise;
+      return originalTransaction(fn);
+    });
+
+    try {
+      const request = returns.request(order.id, 'deleted customer return', customer.id, customer.id);
+      await atTransaction.promise;
+      await prisma.customer.update({
+        where: { id: customer.id },
+        data: { phone: `deleted:${customer.id}`, name: 'Удалённый пользователь' },
+      });
+      resumeTransaction.resolve();
+
+      await expect(request).rejects.toMatchObject({ code: 'customer_session_revoked' });
+      expect(await prisma.return.count({ where: { orderId: order.id } })).toBe(0);
+      expect(await prisma.auditEvent.count({
+        where: { type: EventType.ReturnRequested, refs: { has: order.id } },
+      })).toBe(0);
+    } finally {
+      resumeTransaction.resolve();
+      transaction.mockRestore();
+    }
+  });
+
+  it('does not replay a self-service return after account deletion', async () => {
+    const { customer, order, suffix } = await returnOrder('Deleted replay');
+    const key = `return-deleted-replay-${suffix}`;
+    const created = await returns.request(
+      order.id,
+      'same return',
+      customer.id,
+      customer.id,
+      key,
+    );
+    await prisma.customer.update({
+      where: { id: customer.id },
+      data: { phone: `deleted:${customer.id}`, name: 'Удалённый пользователь' },
+    });
+
+    await expect(returns.request(
+      order.id,
+      'same return',
+      customer.id,
+      customer.id,
+      key,
+    )).rejects.toMatchObject({ code: 'customer_session_revoked' });
+    expect(await prisma.return.count({ where: { id: created.id } })).toBe(1);
+    expect(await prisma.auditEvent.count({
+      where: { type: EventType.ReturnRequested, refs: { has: order.id } },
+    })).toBe(1);
+
+    await expect(returns.transition(created.id, 'under_review', 'staff:returns'))
+      .resolves.toMatchObject({ id: created.id, status: 'under_review' });
+  });
+
+  it('fails closed for a historical keyed return without reconstructible request shape', async () => {
+    const { customer, order, suffix } = await returnOrder('Legacy replay');
+    const key = `return-legacy-replay-${suffix}`;
+    await prisma.return.create({
+      data: {
+        orderId: order.id,
+        reason: ' historical reason ',
+        idempotencyKey: key,
+        requestHash: `legacy-unreplayable:${suffix}`,
+      },
+    });
+
+    await expect(returns.request(
+      order.id,
+      ' historical reason ',
+      customer.id,
+      customer.id,
+      key,
+    )).rejects.toMatchObject({ code: 'idempotency_key_reused' });
+    expect(await prisma.return.count({ where: { idempotencyKey: key } })).toBe(1);
+  });
 
   it('reverses serialized COGS exactly once and records accounting evidence', async () => {
     const suffix = `${Date.now()}-${++seq}`;
@@ -284,6 +393,13 @@ describe('Refund-bound return reconciliation (integration)', () => {
       [{ orderItemId: order.items[0].id, qty: 1 }],
     );
     expect(first).toMatchObject({ refundAmount: 866, isFullOrder: false });
+    await expect(returns.request(
+      order.id,
+      'one item',
+      customer.id,
+      customer.id,
+      `partial-1-${suffix}`,
+    )).rejects.toMatchObject({ code: 'idempotency_key_reused' });
     await moveToProcessing(first.id);
     await expect(payments.refund(payment.id, 867, 'wrong quote', 'staff:returns', first.id)).rejects.toMatchObject({
       code: 'refund_return_amount_mismatch',
@@ -300,9 +416,15 @@ describe('Refund-bound return reconciliation (integration)', () => {
       customer.id,
       customer.id,
       `partial-2-${suffix}`,
-      [{ orderItemId: order.items[0].id, qty: 2 }],
     );
     expect(second).toMatchObject({ refundAmount: 2034, isFullOrder: false });
+    await expect(returns.request(
+      order.id,
+      'remaining items',
+      customer.id,
+      customer.id,
+      `partial-2-${suffix}`,
+    )).resolves.toEqual(second);
     await moveToProcessing(second.id);
     await refundReturn(second.id, payment.id, 2034);
     await returns.transition(second.id, 'reconciled', 'staff:warehouse', 'RETURNS');

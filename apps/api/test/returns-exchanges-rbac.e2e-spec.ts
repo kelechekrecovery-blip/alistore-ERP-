@@ -153,12 +153,20 @@ describe('Returns and exchanges RBAC split', () => {
     await request(app.getHttpServer())
       .post('/returns')
       .set('Authorization', `Bearer ${customerToken(other)}`)
+      .set('Idempotency-Key', `legacy-return-other-${RUN}`)
       .send({ orderId: order.id, reason: 'wrong size', requester: 'spoof' })
       .expect(403);
+
+    await request(app.getHttpServer())
+      .post('/returns')
+      .set('Authorization', `Bearer ${customerToken(customer)}`)
+      .send({ orderId: order.id, reason: 'wrong size', requester: 'spoof' })
+      .expect(400);
 
     const ret = await request(app.getHttpServer())
       .post('/returns')
       .set('Authorization', `Bearer ${customerToken(customer)}`)
+      .set('Idempotency-Key', `legacy-return-${RUN}`)
       .send({ orderId: order.id, reason: 'wrong size', requester: 'spoof' })
       .expect(201);
 
@@ -261,6 +269,13 @@ describe('Returns and exchanges RBAC split', () => {
     ]);
     expect(calls.map((call) => call.status)).toEqual([201, 201]);
     expect(calls[0].body.id).toBe(calls[1].body.id);
+
+    await request(app.getHttpServer())
+      .post('/returns/mine')
+      .set('Authorization', `Bearer ${customerToken(other)}`)
+      .set('Idempotency-Key', `native-return-${RUN}`)
+      .send(payload)
+      .expect(403);
 
     await request(app.getHttpServer())
       .post('/returns/mine')

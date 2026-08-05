@@ -1,4 +1,5 @@
 import { Injectable, Optional } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { Prisma, Return as ReturnRecord, ReturnStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -10,6 +11,7 @@ import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications
 import { reverseInventoryCostOnTx, reverseQuantityCostOnTx } from '../inventory/inventory-valuation';
 import { postConsignmentReturnAccountingOnTx } from '../inventory/consignment-accounting';
 import { createQuarantineCaseOnTx } from '../inventory/inventory-quarantine';
+import { lockActiveCustomerOnTx } from '../auth/customer-session-state';
 
 type ReturnWithItems = Prisma.ReturnGetPayload<{ include: { items: true } }>;
 
@@ -92,15 +94,34 @@ export class ReturnsService {
     selections?: ReturnSelectionDto[],
   ) {
     const key = idempotencyKey?.trim() || undefined;
+    const normalizedReason = reason.trim();
+    const requestHash = hashReturnRequest(orderId, normalizedReason, selections);
     if (key) {
-      const existing = await this.prisma.return.findUnique({ where: { idempotencyKey: key }, include: { items: true } });
-      if (existing) return replayReturn(existing, orderId, reason, selections);
+      const existing = expectedCustomerId
+        ? await this.prisma.$transaction(async (tx) => {
+            await lockActiveCustomerOnTx(tx, expectedCustomerId);
+            const replay = await tx.return.findUnique({ where: { idempotencyKey: key }, include: { items: true } });
+            if (replay) await this.assertCustomerOwnsOrderOnTx(tx, orderId, expectedCustomerId);
+            return replay;
+          })
+        : await this.prisma.return.findUnique({ where: { idempotencyKey: key }, include: { items: true } });
+      if (existing) return replayReturn(existing, orderId, normalizedReason, selections, requestHash);
     }
     return this.audit.transaction(async (tx) => {
+      if (expectedCustomerId) {
+        // Account lifecycle is the first durable lock for self-service returns.
+        // Staff transitions and refund processing deliberately remain independent.
+        await lockActiveCustomerOnTx(tx, expectedCustomerId);
+      }
       if (key) {
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'return:' + key}))::text AS locked`;
         const replay = await tx.return.findUnique({ where: { idempotencyKey: key }, include: { items: true } });
-        if (replay) return { result: replayReturn(replay, orderId, reason, selections), events: [] };
+        if (replay) {
+          if (expectedCustomerId) {
+            await this.assertCustomerOwnsOrderOnTx(tx, orderId, expectedCustomerId);
+          }
+          return { result: replayReturn(replay, orderId, normalizedReason, selections, requestHash), events: [] };
+        }
       }
       await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
@@ -119,9 +140,10 @@ export class ReturnsService {
       const ret = await tx.return.create({
         data: {
           orderId,
-          reason,
+          reason: normalizedReason,
           status: 'requested',
           idempotencyKey: key,
+          requestHash: key ? requestHash : null,
           refundAmount: quote.refundAmount,
           isFullOrder: quote.isFullOrder,
           items: {
@@ -140,12 +162,23 @@ export class ReturnsService {
           {
             type: EventType.ReturnRequested,
             actor,
-            payload: { returnId: ret.id, orderId, reason, refundAmount: ret.refundAmount, isFullOrder: ret.isFullOrder, items: ret.items.map((item) => ({ orderItemId: item.orderItemId, qty: item.qty })) },
+            payload: { returnId: ret.id, orderId, reason: normalizedReason, refundAmount: ret.refundAmount, isFullOrder: ret.isFullOrder, items: ret.items.map((item) => ({ orderItemId: item.orderItemId, qty: item.qty })) },
             refs: [ret.id, orderId],
           },
         ],
       };
     });
+  }
+
+  private async assertCustomerOwnsOrderOnTx(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    customerId: string,
+  ): Promise<void> {
+    const order = await tx.order.findUnique({ where: { id: orderId }, select: { customerId: true } });
+    if (!order || order.customerId !== customerId) {
+      throw new ForbiddenError('return_order_forbidden', 'Нельзя оформить возврат по чужому заказу');
+    }
   }
 
   async transition(id: string, status: ReturnStatus, actor: string, location?: string) {
@@ -845,7 +878,14 @@ function replayReturn(
   orderId: string,
   reason: string,
   selections?: ReturnSelectionDto[],
+  requestHash?: string,
 ) {
+  if (ret.idempotencyKey && !ret.requestHash) {
+    throw new ConflictError('idempotency_key_reused', 'Исторический Idempotency key нельзя безопасно воспроизвести');
+  }
+  if (ret.requestHash && ret.requestHash !== requestHash) {
+    throw new ConflictError('idempotency_key_reused', 'Idempotency key уже использован с другим возвратом');
+  }
   if (ret.orderId !== orderId || ret.reason !== reason) {
     throw new ConflictError('idempotency_key_reused', 'Idempotency key уже использован с другим возвратом');
   }
@@ -863,4 +903,17 @@ function replayReturn(
     }
   }
   return ret;
+}
+
+function hashReturnRequest(
+  orderId: string,
+  reason: string,
+  selections?: ReturnSelectionDto[],
+): string {
+  const items = selections
+    ? selections
+      .map((item) => ({ orderItemId: item.orderItemId, qty: item.qty }))
+      .sort((left, right) => left.orderItemId.localeCompare(right.orderItemId))
+    : null;
+  return createHash('sha256').update(JSON.stringify({ orderId, reason, items })).digest('hex');
 }

@@ -1840,6 +1840,7 @@ model Return {
   refundAmount       Int                          @default(0)
   isFullOrder        Boolean                      @default(true)
   idempotencyKey     String?                      @unique
+  requestHash        String?
   restockLocation    String?
   restockedAt        DateTime?
   createdAt          DateTime                     @default(now())
