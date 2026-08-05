@@ -13,6 +13,7 @@ import { isUniqueConstraintViolation } from '../common/prisma-errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { enqueueSupplyCustomerNotice } from '../outbox/customer-notifications';
 import { OutboxService } from '../outbox/outbox.service';
+import { lockActiveCustomerOnTx } from '../auth/customer-session-state';
 
 const ACTIVE_STATUSES: OrderCancellationStatus[] = [
   'requested',
@@ -100,14 +101,18 @@ export class OrderCancellationsService {
     }
     const normalizedReason = reason.trim();
     const requestHash = hashRequest({ orderId, customerId, reason: normalizedReason });
-    const replay = await this.prisma.orderCancellation.findUnique({
-      where: { idempotencyKey },
-      select: { ...PUBLIC_SELECT, requestHash: true, customerIdSnapshot: true },
+    const replay = await this.prisma.$transaction(async (tx) => {
+      await lockActiveCustomerOnTx(tx, customerId);
+      return tx.orderCancellation.findUnique({
+        where: { idempotencyKey },
+        select: { ...PUBLIC_SELECT, requestHash: true, customerIdSnapshot: true },
+      });
     });
     if (replay) return replayCancellation(replay, orderId, customerId, requestHash);
 
     try {
       return await this.audit.transaction(async (tx) => {
+        await lockActiveCustomerOnTx(tx, customerId);
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'order-cancellation:' + idempotencyKey}))::text AS locked`;
         const lockedReplay = await tx.orderCancellation.findUnique({
           where: { idempotencyKey },
@@ -254,9 +259,12 @@ export class OrderCancellationsService {
       });
     } catch (error) {
       if (!isUniqueConstraintViolation(error)) throw error;
-      const racedReplay = await this.prisma.orderCancellation.findUnique({
-        where: { idempotencyKey },
-        select: { ...PUBLIC_SELECT, requestHash: true, customerIdSnapshot: true },
+      const racedReplay = await this.prisma.$transaction(async (tx) => {
+        await lockActiveCustomerOnTx(tx, customerId);
+        return tx.orderCancellation.findUnique({
+          where: { idempotencyKey },
+          select: { ...PUBLIC_SELECT, requestHash: true, customerIdSnapshot: true },
+        });
       });
       if (racedReplay) return replayCancellation(racedReplay, orderId, customerId, requestHash);
       throw new ConflictError(

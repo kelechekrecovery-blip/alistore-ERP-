@@ -29,6 +29,7 @@ import { MAX_REFUND_ATTEMPTS } from '../src/refunds/refunds.constants';
 describe('Order supply mode: to_order request (slice 2)', () => {
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   let prisma: PrismaService;
+  let audit: AuditService;
   let orders: OrdersService;
   let payments: PaymentsService;
   let inventory: InventoryService;
@@ -43,7 +44,7 @@ describe('Order supply mode: to_order request (slice 2)', () => {
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
-    const audit = new AuditService(prisma);
+    audit = new AuditService(prisma);
     const units = new UnitsService(prisma);
     const approvals = new ApprovalsService(prisma, audit);
     orders = new OrdersService(
@@ -106,6 +107,12 @@ describe('Order supply mode: to_order request (slice 2)', () => {
   });
 
   beforeEach(() => clean());
+
+  function deferred() {
+    let resolve!: () => void;
+    const promise = new Promise<void>((done) => { resolve = done; });
+    return { promise, resolve };
+  }
 
   async function clean() {
     // Создание заказа кладёт уведомление покупателю в исходящую очередь.
@@ -625,6 +632,73 @@ describe('Order supply mode: to_order request (slice 2)', () => {
       'Ещё одна параллельная отмена',
       `${key}-other`,
     )).rejects.toMatchObject({ code: 'order_cancellation_active' });
+
+    await prisma.customer.update({
+      where: { id: buyer.id },
+      data: { phone: `deleted:${buyer.id}`, name: 'Удалённый пользователь' },
+    });
+    await expect(create()).rejects.toMatchObject({ code: 'customer_session_revoked' });
+  });
+
+  it('does not cancel supply or queue a refund when deletion commits before the request transaction', async () => {
+    const product = await toOrderProduct();
+    const buyer = await customer();
+    const order = await orders.createFromCatalog({
+      customerId: buyer.id,
+      channel: 'web',
+      fulfillmentType: 'pickup',
+      pickupPoint: 'BISHKEK-1',
+      total: product.price,
+      items: [{ sku: product.sku, qty: 1, price: product.price }],
+    }, buyer.id, `cancellation-delete-race-order-${seq}`);
+    const deposit = await prisma.orderReceivable.findFirstOrThrow({
+      where: { orderId: order.id, kind: 'supply_deposit' },
+    });
+    await payments.settleReceivable(
+      deposit.id,
+      { method: 'card', amount: deposit.amount, txnId: `cancel-delete-race-${runId}-${seq}` },
+      'staff:test-cashier',
+      { staffId: 'test-cashier', idempotencyKey: `cancel-delete-race-pay-${runId}-${seq}` },
+    );
+    const atTransaction = deferred();
+    const resumeTransaction = deferred();
+    const originalTransaction = audit.transaction.bind(audit);
+    const transaction = jest.spyOn(audit, 'transaction').mockImplementationOnce(async (fn) => {
+      atTransaction.resolve();
+      await resumeTransaction.promise;
+      return originalTransaction(fn);
+    });
+
+    try {
+      const request = cancellations.request(
+        order.id,
+        buyer.id,
+        'Удаление выиграло гонку',
+        `cancel-delete-race-${runId}-${seq}`,
+      );
+      await atTransaction.promise;
+      await prisma.customer.update({
+        where: { id: buyer.id },
+        data: { phone: `deleted:${buyer.id}`, name: 'Удалённый пользователь' },
+      });
+      resumeTransaction.resolve();
+
+      await expect(request).rejects.toMatchObject({ code: 'customer_session_revoked' });
+      expect(await prisma.orderCancellation.count({ where: { orderId: order.id } })).toBe(0);
+      expect(await prisma.refund.count({ where: { orderId: order.id } })).toBe(0);
+      expect(await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
+        .toMatchObject({ status: 'confirmed' });
+      expect(await prisma.purchaseOrder.findFirstOrThrow({ where: { sourceOrderId: order.id } }))
+        .toMatchObject({ status: 'draft' });
+      expect(await prisma.orderReceivable.findUniqueOrThrow({ where: { id: deposit.id } }))
+        .toMatchObject({ status: 'settled' });
+      expect(await prisma.auditEvent.count({
+        where: { type: 'order.cancellation_requested', refs: { has: order.id } },
+      })).toBe(0);
+    } finally {
+      resumeTransaction.resolve();
+      transaction.mockRestore();
+    }
   });
 
   it('executes a pre-PO deposit refund against liability 2400 without reversing revenue or tax', async () => {
