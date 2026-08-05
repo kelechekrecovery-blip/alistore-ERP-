@@ -9,6 +9,8 @@ import { pipeline } from 'node:stream/promises';
 import { createGzip } from 'node:zlib';
 import { AlerterService } from '../observability/alerter.service';
 import { BACKUP_LAST_FAILURE_KEY, BACKUP_LAST_SUCCESS_KEY } from './backup-status';
+import { assertEventLedgerRole } from '../prisma/event-ledger-role.guard';
+import { assertBackupDatabaseRole } from '../prisma/backup-database-role.guard';
 
 /**
  * Ночной дамп в S3.
@@ -24,6 +26,7 @@ import { BACKUP_LAST_FAILURE_KEY, BACKUP_LAST_SUCCESS_KEY } from './backup-statu
  */
 async function main(): Promise<void> {
   const databaseUrl = required('DATABASE_URL');
+  const backupDatabaseUrl = required('DATABASE_BACKUP_URL');
   const endpoint = required('S3_ENDPOINT');
   const bucket = required('S3_BACKUP_BUCKET');
   const accessKeyId = required('MINIO_ROOT_USER');
@@ -43,10 +46,16 @@ async function main(): Promise<void> {
   });
 
   try {
+    await verifyRuntimeRole();
+    await verifyBackupRole(backupDatabaseUrl);
     // `--file` вместо stdout: раньше дамп целиком лежал в буфере процесса, а
     // потом второй копией — в gzip-буфере, с потолком 1 ГиБ. На выросшей базе
     // джоба умирала бы молча, ровно в ту ночь, когда бэкап впервые нужен.
-    execFileSync('pg_dump', ['--format=custom', '--no-owner', '--no-acl', '--file', dumpPath, libpqUrl(databaseUrl)]);
+    execFileSync('pg_dump', ['--format=custom', '--no-owner', '--no-acl', '--file', dumpPath], {
+      // Keep the credential out of argv: Node includes argv in thrown command
+      // errors, which would otherwise copy the password into Render logs.
+      env: { ...process.env, ...libpqEnv(backupDatabaseUrl) },
+    });
 
     // Целостность. Оборванный дамп записывался и помечался успехом наравне с
     // целым — то самое «сломанный бэкап выглядит как рабочий», против которого
@@ -92,6 +101,30 @@ async function main(): Promise<void> {
   }
 }
 
+async function verifyRuntimeRole(): Promise<void> {
+  const prisma = new PrismaClient();
+  try {
+    await prisma.$connect();
+    await assertEventLedgerRole(<T>(sql: string) => prisma.$queryRawUnsafe<T>(sql));
+  } catch {
+    throw new Error('Backup runtime database role preflight failed');
+  } finally {
+    await prisma.$disconnect().catch(() => undefined);
+  }
+}
+
+async function verifyBackupRole(databaseUrl: string): Promise<void> {
+  const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
+  try {
+    await prisma.$connect();
+    await assertBackupDatabaseRole(<T>(sql: string) => prisma.$queryRawUnsafe<T>(sql));
+  } catch {
+    throw new Error('Backup database role preflight failed');
+  } finally {
+    await prisma.$disconnect().catch(() => undefined);
+  }
+}
+
 /**
  * `pg_dump` работает с libpq-строкой и падает на параметрах Prisma: «неверный
  * параметр в URI: schema». Прод получает URL от Render без них и потому цел, но
@@ -106,6 +139,27 @@ export function libpqUrl(value: string): string {
     if (!allowed.has(name)) url.searchParams.delete(name);
   }
   return url.toString();
+}
+
+export function libpqEnv(value: string): NodeJS.ProcessEnv {
+  const url = new URL(libpqUrl(value));
+  const env: NodeJS.ProcessEnv = {
+    PGHOST: url.hostname.replace(/^\[|\]$/g, ''),
+    PGPORT: url.port || '5432',
+    PGUSER: decodeURIComponent(url.username),
+    PGPASSWORD: decodeURIComponent(url.password),
+    PGDATABASE: decodeURIComponent(url.pathname.replace(/^\//, '')),
+  };
+  const mappings: Record<string, string> = {
+    sslmode: 'PGSSLMODE', sslrootcert: 'PGSSLROOTCERT', sslcert: 'PGSSLCERT',
+    sslkey: 'PGSSLKEY', connect_timeout: 'PGCONNECT_TIMEOUT',
+    application_name: 'PGAPPNAME', options: 'PGOPTIONS',
+  };
+  for (const [parameter, variable] of Object.entries(mappings)) {
+    const parameterValue = url.searchParams.get(parameter);
+    if (parameterValue !== null) env[variable] = parameterValue;
+  }
+  return env;
 }
 
 /**

@@ -2,22 +2,26 @@ name: CD — Staging
 
 # Controlled staging deploy for the Render Blueprint `infra/render.staging.yaml`.
 #
-# Trigger model: the Blueprint already carries `autoDeployTrigger: checksPass`,
-# so Render also auto-deploys the connected branch once required checks pass.
-# This workflow is the explicit, gated path: it rehearses every Prisma migration
-# against an ephemeral PostgreSQL (same shape as the CI `test` job), then fires
-# the Render deploy hooks and verifies public health before reporting success.
+# Render automatic deploys are disabled so they cannot race the database gate.
+# This workflow rehearses every migration, applies it with the owner credential,
+# configures/verifies the restricted runtime credential, then fires deploy hooks.
 #
 # Owner configuration (one-time, see docs/OWNER-LAUNCH-CHECKLIST.md §1/§2):
-#   Secrets: RENDER_DEPLOY_HOOK_API / RENDER_DEPLOY_HOOK_WEB / RENDER_DEPLOY_HOOK_WORKER
+#   Secrets: STAGING_DATABASE_OWNER_URL, STAGING_DATABASE_RUNTIME_URL, RENDER_API_KEY,
+#     RENDER_DEPLOY_HOOK_API / RENDER_DEPLOY_HOOK_WEB / RENDER_DEPLOY_HOOK_WORKER
 #     Render dashboard → service → Settings → Deploy Hook → copy URL.
+#   Save the current owner URL first. Create the runtime credential (Render
+#   makes it the default), but run this ACL gate against its explicit URL before
+#   syncing the Blueprint. Existing fromDatabase values change only on sync.
+#   Register a locked-down GitHub Actions runner in Render's Frankfurt private
+#   network with the label `alistore-render-db-staging`; store internal (not external)
+#   owner/runtime URLs in the two database secrets. ipAllowList stays closed.
 #   Vars (optional): STAGING_API_BASE_URL, STAGING_WEB_BASE_URL override the
 #     default staging hostnames from infra/render.staging.yaml.
 # No secret values belong in this file or anywhere in git.
 #
 # ROLLBACK: Render dashboard → service → Events → "Rollback" on the previous
-# successful deploy (re-deploys the previous image; the Blueprint preDeployCommand
-# re-runs `prisma migrate deploy`, which is a no-op on an already-migrated DB).
+# successful deploy. The database is not rolled back with an image.
 # Never reverse a data-bearing migration during an image rollback — ship a
 # forward migration instead (docs/MANAGED-CLOUD-LAUNCH.md §5).
 
@@ -39,9 +43,8 @@ env:
 
 jobs:
   migration-rehearsal:
-    # Proves every pending migration applies cleanly before any deploy trigger.
-    # The real staging migration runs on Render via the Blueprint
-    # preDeployCommand (`npm run db:deploy -w @alistore/api`).
+    # Proves every pending migration and the runtime ACL apply cleanly before
+    # any deploy trigger.
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -63,49 +66,98 @@ jobs:
       JWT_SECRET: cd-rehearsal-secret
       AUTH_REFRESH_ROTATION_GRACE_ENABLED: 'false'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run prisma:generate -w @alistore/api
       - run: npm run db:deploy -w @alistore/api
-
-  deploy:
-    needs: migration-rehearsal
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Render deploy hooks
+      - run: npm run test:database-role -w @alistore/api
+      - name: Rehearse the runtime ACL against a disposable role
         env:
+          PGPASSWORD: alistore
+        run: |
+          set -euo pipefail
+          psql -h localhost -U alistore -d alistore_cd_rehearsal -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE alistore_runtime_rehearsal LOGIN PASSWORD 'runtime-rehearsal-only'"
+          DATABASE_OWNER_URL="$DATABASE_URL" \
+          DATABASE_RUNTIME_URL='postgresql://alistore_runtime_rehearsal:runtime-rehearsal-only@localhost:5432/alistore_cd_rehearsal?schema=public' \
+            npm run db:configure-runtime-role -w @alistore/api
+
+  release-preflight:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Require protected Render deployment credentials
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
           WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
           WORKER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WORKER }}
         run: |
           set -euo pipefail
-          triggered=0
-          for pair in "api:$API_HOOK" "web:$WEB_HOOK" "worker:$WORKER_HOOK"; do
-            name="${pair%%:*}"
-            url="${pair#*:}"
-            if [ -n "$url" ]; then
-              echo "Triggering $name deploy hook"
-              curl -fsS -X POST "$url"
-              triggered=1
-            else
-              echo "::notice::RENDER_DEPLOY_HOOK_$(echo "$name" | tr '[:lower:]' '[:upper:]') is not set — skipping $name (owner gate, docs/OWNER-LAUNCH-CHECKLIST.md §2)"
-            fi
-          done
-          if [ "$triggered" -eq 0 ]; then
-            echo "::error::No Render deploy hooks configured; nothing was deployed."
-            exit 1
-          fi
+          test -n "$RENDER_API_KEY" || { echo '::error::RENDER_API_KEY is not configured'; exit 1; }
+          test -n "$API_HOOK" && test -n "$WEB_HOOK" && test -n "$WORKER_HOOK" || { echo '::error::All staging deploy hooks are required'; exit 1; }
+
+  migrate-staging:
+    needs: [migration-rehearsal, release-preflight]
+    # GitHub-hosted runners cannot reach a Render database with ipAllowList: [].
+    # This label must resolve to the private-network runner documented above.
+    runs-on: [self-hosted, linux, alistore-render-db-staging]
+    environment: staging
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:generate -w @alistore/api
+      - name: Require owner and Render-managed runtime credentials
+        env:
+          DATABASE_OWNER_URL: ${{ secrets.STAGING_DATABASE_OWNER_URL }}
+          DATABASE_RUNTIME_URL: ${{ secrets.STAGING_DATABASE_RUNTIME_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_OWNER_URL" || { echo '::error::STAGING_DATABASE_OWNER_URL is not configured'; exit 1; }
+          test -n "$DATABASE_RUNTIME_URL" || { echo '::error::STAGING_DATABASE_RUNTIME_URL is not configured'; exit 1; }
+      - name: Apply staging migrations with the owner credential
+        env:
+          NODE_ENV: production
+          DATABASE_OWNER_URL: ${{ secrets.STAGING_DATABASE_OWNER_URL }}
+        run: npm run db:deploy -w @alistore/api
+      - name: Configure and verify the staging runtime role
+        env:
+          NODE_ENV: production
+          DATABASE_OWNER_URL: ${{ secrets.STAGING_DATABASE_OWNER_URL }}
+          DATABASE_RUNTIME_URL: ${{ secrets.STAGING_DATABASE_RUNTIME_URL }}
+        run: npm run db:configure-runtime-role -w @alistore/api
+
+  deploy:
+    needs: migrate-staging
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: Deploy the exact tested commit and wait for all services
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_DEPLOY_HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+          RENDER_DEPLOY_HOOK_WEB: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
+          RENDER_DEPLOY_HOOK_WORKER: ${{ secrets.RENDER_DEPLOY_HOOK_WORKER }}
+        run: node scripts/render-deploy.mjs
 
   health-check:
     needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Wait for staging health endpoints
         # Render builds and swaps images asynchronously after the hook fires;
         # poll the Blueprint healthCheckPath endpoints until both are live.

@@ -13,6 +13,8 @@
     "prisma:generate": "prisma generate",
     "db:migrate": "prisma migrate dev && node scripts/postdeploy-indexes.mjs",
     "db:deploy": "node scripts/deploy-database.mjs",
+    "db:configure-runtime-role": "node scripts/configure-runtime-database-role.mjs",
+    "test:database-role": "node --test scripts/configure-runtime-database-role.test.mjs",
     "test:refund-migration-upgrade": "node scripts/test-refund-migration-upgrade.mjs",
     "test:inventory-roll-forward-migration-upgrade": "node scripts/test-inventory-roll-forward-migration-upgrade.mjs",
     "benchmark:inventory-valuation": "node scripts/benchmark-inventory-roll-forward.mjs",

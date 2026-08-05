@@ -15,7 +15,6 @@ services:
     healthCheckPath: /api/health/ready
     domains:
       - api.ali.kg
-    preDeployCommand: npm run db:deploy -w @alistore/api
     envVars:
       - fromGroup: alistore-prod-common
       - key: PROCESS_ROLE
@@ -28,10 +27,6 @@ services:
         fromDatabase:
           name: alistore-postgres-prod
           property: connectionPoolString
-      - key: DIRECT_DATABASE_URL
-        fromDatabase:
-          name: alistore-postgres-prod
-          property: connectionString
       - key: REDIS_URL
         fromService:
           name: alistore-redis-prod
@@ -117,7 +112,7 @@ services:
       - key: DATABASE_URL
         fromDatabase:
           name: alistore-postgres-prod
-          property: connectionPoolString
+          property: connectionString
       - key: REDIS_URL
         fromService:
           name: alistore-redis-prod
@@ -151,6 +146,10 @@ services:
         fromDatabase:
           name: alistore-postgres-prod
           property: connectionString
+      # Dedicated read-only credential. For an existing Blueprint, set this
+      # manually in Render before the next cron run; never place the owner URL here.
+      - key: DATABASE_BACKUP_URL
+        sync: false
       - key: S3_ENDPOINT
         fromService: { name: alistore-api-prod, type: web, envVarKey: S3_ENDPOINT }
       - key: MINIO_ROOT_USER

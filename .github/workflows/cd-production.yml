@@ -4,12 +4,21 @@ name: CD — Production
 #
 # The production Blueprint has `autoDeployTrigger: off`, so the only way to
 # update the live services is through these explicit deploy hooks. The workflow
-# rehearses every pending Prisma migration against an ephemeral PostgreSQL,
-# then fires the hooks and polls the production health endpoints.
+# rehearses every pending Prisma migration, applies it with the owner credential,
+# configures/verifies the restricted runtime credential, and only then deploys.
 #
 # Owner configuration (one-time):
-#   Secrets: RENDER_DEPLOY_HOOK_API_PROD / _WEB_PROD / _WORKER_PROD
+#   Secrets: PROD_DATABASE_OWNER_URL, PROD_DATABASE_RUNTIME_URL,
+#     PROD_DATABASE_BACKUP_URL, RENDER_API_KEY,
+#     RENDER_DEPLOY_HOOK_API_PROD / _WEB_PROD / _WORKER_PROD
 #     Render dashboard → each production service → Settings → Deploy Hook → copy URL.
+#   Save the current owner URL first. Create the read-only backup credential,
+#   then create runtime last (Render makes the newest credential the default).
+#   Existing fromDatabase values change only on Blueprint sync: run this ACL
+#   gate against both explicit URLs before that sync. Never sync first.
+#   Register a locked-down GitHub Actions runner in Render's Frankfurt private
+#   network with the label `alistore-render-db-production`; store internal (not external)
+#   owner/runtime/backup URLs in the three database secrets. ipAllowList stays closed.
 #   Vars (optional): PROD_API_BASE_URL, PROD_WEB_BASE_URL override defaults.
 # No secret values belong in this file or anywhere in git.
 #
@@ -56,49 +65,104 @@ jobs:
       JWT_SECRET: cd-rehearsal-secret
       AUTH_REFRESH_ROTATION_GRACE_ENABLED: 'false'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run prisma:generate -w @alistore/api
       - run: npm run db:deploy -w @alistore/api
-
-  deploy:
-    needs: migration-rehearsal
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Render production deploy hooks
+      - run: npm run test:database-role -w @alistore/api
+      - name: Rehearse the runtime ACL against a disposable role
         env:
+          PGPASSWORD: alistore
+        run: |
+          set -euo pipefail
+          psql -h localhost -U alistore -d alistore_cd_rehearsal -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE alistore_runtime_rehearsal LOGIN PASSWORD 'runtime-rehearsal-only'"
+          psql -h localhost -U alistore -d alistore_cd_rehearsal -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE alistore_backup_rehearsal LOGIN PASSWORD 'backup-rehearsal-only'"
+          DATABASE_OWNER_URL="$DATABASE_URL" \
+          DATABASE_RUNTIME_URL='postgresql://alistore_runtime_rehearsal:runtime-rehearsal-only@localhost:5432/alistore_cd_rehearsal?schema=public' \
+          DATABASE_BACKUP_URL='postgresql://alistore_backup_rehearsal:backup-rehearsal-only@localhost:5432/alistore_cd_rehearsal?schema=public' \
+            npm run db:configure-runtime-role -w @alistore/api
+
+  release-preflight:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Require protected Render deployment credentials
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API_PROD }}
           WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB_PROD }}
           WORKER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WORKER_PROD }}
         run: |
           set -euo pipefail
-          triggered=0
-          for pair in "api:$API_HOOK" "web:$WEB_HOOK" "worker:$WORKER_HOOK"; do
-            name="${pair%%:*}"
-            url="${pair#*:}"
-            if [ -n "$url" ]; then
-              echo "Triggering $name deploy hook"
-              curl -fsS -X POST "$url"
-              triggered=1
-            else
-              echo "::notice::RENDER_DEPLOY_HOOK_$(echo "$name" | tr '[:lower:]' '[:upper:]')_PROD is not set — skipping $name"
-            fi
-          done
-          if [ "$triggered" -eq 0 ]; then
-            echo "::error::No Render production deploy hooks configured; nothing was deployed."
-            exit 1
-          fi
+          test -n "$RENDER_API_KEY" || { echo '::error::RENDER_API_KEY is not configured'; exit 1; }
+          test -n "$API_HOOK" && test -n "$WEB_HOOK" && test -n "$WORKER_HOOK" || { echo '::error::All production deploy hooks are required'; exit 1; }
+
+  migrate-production:
+    needs: [migration-rehearsal, release-preflight]
+    # GitHub-hosted runners cannot reach a Render database with ipAllowList: [].
+    # This label must resolve to the private-network runner documented above.
+    runs-on: [self-hosted, linux, alistore-render-db-production]
+    environment: production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:generate -w @alistore/api
+      - name: Require owner and Render-managed runtime credentials
+        env:
+          DATABASE_OWNER_URL: ${{ secrets.PROD_DATABASE_OWNER_URL }}
+          DATABASE_RUNTIME_URL: ${{ secrets.PROD_DATABASE_RUNTIME_URL }}
+          DATABASE_BACKUP_URL: ${{ secrets.PROD_DATABASE_BACKUP_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_OWNER_URL" || { echo '::error::PROD_DATABASE_OWNER_URL is not configured'; exit 1; }
+          test -n "$DATABASE_RUNTIME_URL" || { echo '::error::PROD_DATABASE_RUNTIME_URL is not configured'; exit 1; }
+          test -n "$DATABASE_BACKUP_URL" || { echo '::error::PROD_DATABASE_BACKUP_URL is not configured'; exit 1; }
+      - name: Apply production migrations with the owner credential
+        env:
+          NODE_ENV: production
+          DATABASE_OWNER_URL: ${{ secrets.PROD_DATABASE_OWNER_URL }}
+        run: npm run db:deploy -w @alistore/api
+      - name: Configure and verify the production runtime role
+        env:
+          NODE_ENV: production
+          DATABASE_OWNER_URL: ${{ secrets.PROD_DATABASE_OWNER_URL }}
+          DATABASE_RUNTIME_URL: ${{ secrets.PROD_DATABASE_RUNTIME_URL }}
+          DATABASE_BACKUP_URL: ${{ secrets.PROD_DATABASE_BACKUP_URL }}
+        run: npm run db:configure-runtime-role -w @alistore/api
+
+  deploy:
+    needs: migrate-production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: Deploy the exact tested commit and wait for all services
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_DEPLOY_HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API_PROD }}
+          RENDER_DEPLOY_HOOK_WEB: ${{ secrets.RENDER_DEPLOY_HOOK_WEB_PROD }}
+          RENDER_DEPLOY_HOOK_WORKER: ${{ secrets.RENDER_DEPLOY_HOOK_WORKER_PROD }}
+        run: node scripts/render-deploy.mjs
 
   health-check:
     needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Wait for production health endpoints
         run: |
           set -euo pipefail

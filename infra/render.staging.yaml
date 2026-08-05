@@ -6,11 +6,12 @@ services:
     plan: starter
     dockerfilePath: ./docker/api.Dockerfile
     dockerContext: .
-    autoDeployTrigger: checksPass
+    # Database migrations and ACL verification run in cd-staging before the
+    # deploy hook. Automatic deploys could race that owner-only gate.
+    autoDeployTrigger: off
     healthCheckPath: /api/health/ready
     domains:
       - api-staging.ali.kg
-    preDeployCommand: npm run db:deploy -w @alistore/api
     envVars:
       - fromGroup: alistore-staging-common
       - key: PROCESS_ROLE
@@ -18,8 +19,6 @@ services:
       - key: AUTH_RECOVERY_OTP_ENABLED
         value: "false"
       - key: DATABASE_URL
-        fromDatabase: { name: alistore-postgres-staging, property: connectionString }
-      - key: DIRECT_DATABASE_URL
         fromDatabase: { name: alistore-postgres-staging, property: connectionString }
       - key: REDIS_URL
         fromService: { name: alistore-redis-staging, type: keyvalue, property: connectionString }
@@ -39,7 +38,7 @@ services:
     plan: starter
     dockerfilePath: ./docker/web.Dockerfile
     dockerContext: .
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: off
     healthCheckPath: /healthz
     domains:
       - staging.ali.kg
@@ -71,7 +70,7 @@ services:
     dockerfilePath: ./docker/api.Dockerfile
     dockerContext: .
     dockerCommand: npm run start:worker -w @alistore/api
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: off
     envVars:
       - fromGroup: alistore-staging-common
       - key: PROCESS_ROLE
@@ -122,7 +121,9 @@ envVarGroups:
   - name: alistore-staging-common
     envVars:
       - { key: NODE_ENV, value: production }
-      - { key: JWT_SECRET, value: "59aa2f497ab4725c56244e0347a058ed3b26f830d5ab451fdad2a25de9f820f4" }
+      # The previous tracked value must be rotated in Render; never deploy a
+      # repository-stored signing key.
+      - { key: JWT_SECRET, generateValue: true }
       - { key: AUTH_REFRESH_ROTATION_GRACE_ENABLED, value: "false" }
       # Генерируется Render, чтобы не хранить секрет в git; в проде заменяется
       # на управляемый владельцем ключ через Environment Group.

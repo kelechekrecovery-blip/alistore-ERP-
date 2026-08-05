@@ -1,4 +1,4 @@
-import { libpqUrl } from '../src/ops/backup-to-s3';
+import { libpqEnv, libpqUrl } from '../src/ops/backup-to-s3';
 
 /**
  * The production nightly backup shells out to `pg_dump`, which speaks libpq
@@ -27,5 +27,15 @@ describe('libpqUrl', () => {
 
   it('leaves a clean URL untouched', () => {
     expect(libpqUrl('postgresql://u@h:5432/db')).toBe('postgresql://u@h:5432/db');
+  });
+});
+
+describe('libpqEnv', () => {
+  it('keeps credentials out of argv-compatible values and maps safe libpq options', () => {
+    expect(libpqEnv('postgresql://backup:p%40ss@db.example:6432/alistore?schema=public&sslmode=require'))
+      .toEqual(expect.objectContaining({
+        PGHOST: 'db.example', PGPORT: '6432', PGUSER: 'backup', PGPASSWORD: 'p@ss',
+        PGDATABASE: 'alistore', PGSSLMODE: 'require',
+      }));
   });
 });

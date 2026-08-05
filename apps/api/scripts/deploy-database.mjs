@@ -1,12 +1,13 @@
 import { spawnSync } from 'node:child_process';
 
+const ownerUrl = process.env.DATABASE_OWNER_URL;
 const directUrl = process.env.DIRECT_DATABASE_URL;
-if (process.env.NODE_ENV === 'production' && !directUrl) {
-  throw new Error('DIRECT_DATABASE_URL is required for production database deployment');
+if (process.env.NODE_ENV === 'production' && !ownerUrl) {
+  throw new Error('DATABASE_OWNER_URL is required for production database deployment');
 }
-const databaseUrl = directUrl ?? process.env.DATABASE_URL;
+const databaseUrl = ownerUrl ?? directUrl ?? process.env.DATABASE_URL;
 if (!databaseUrl) {
-  throw new Error('DIRECT_DATABASE_URL or DATABASE_URL is required for database deployment');
+  throw new Error('DATABASE_OWNER_URL, DIRECT_DATABASE_URL or DATABASE_URL is required for database deployment');
 }
 
 run('npx', ['prisma', 'migrate', 'deploy']);
@@ -20,7 +21,7 @@ run('node', ['scripts/ensure-reference-data.mjs']);
 function run(command, args) {
   const result = spawnSync(command, args, {
     cwd: process.cwd(),
-    env: { ...process.env, DATABASE_URL: databaseUrl, DIRECT_DATABASE_URL: directUrl ?? databaseUrl },
+    env: { ...process.env, DATABASE_URL: databaseUrl, DIRECT_DATABASE_URL: databaseUrl },
     shell: false,
     stdio: 'inherit',
   });
