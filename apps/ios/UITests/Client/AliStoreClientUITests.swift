@@ -4,6 +4,11 @@ import XCTest
 final class AliStoreClientUITests: XCTestCase {
     override func setUp() async throws {
         continueAfterFailure = false
+        // Several evidence/account journeys intentionally relaunch the app and
+        // traverse multiple screens. Xcode 26 otherwise kills the runner around
+        // its short inferred allowance and reports unrelated follow-up failures
+        // as “application is not running”. Keep the bound explicit and finite.
+        executionTimeAllowance = 120
         terminateOtherAliStoreApps()
     }
 
@@ -184,9 +189,7 @@ final class AliStoreClientUITests: XCTestCase {
     }
 
     func testSignedInNotificationsUseCustomerInboxShell() {
-        let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-account"]
-        app.launch()
+        let app = launchSignedInAccount()
 
         app.buttons["Уведомления"].tap()
         XCTAssertTrue(app.navigationBars["Уведомления"].waitForExistence(timeout: 5))
@@ -210,11 +213,7 @@ final class AliStoreClientUITests: XCTestCase {
     }
 
     func testSignedInAccountUsesPrototypeSummaryAndGrid() {
-        let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-account"]
-        app.launch()
-
-        XCTAssertTrue(app.staticTexts["Нурбек"].waitForExistence(timeout: 10))
+        let app = launchSignedInAccount()
         XCTAssertTrue(app.staticTexts["GOLD"].exists)
         XCTAssertTrue(app.staticTexts["Уровень Gold"].exists)
         XCTAssertTrue(app.staticTexts["4 820 бонусов"].exists)
@@ -600,7 +599,15 @@ final class AliStoreClientUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing-signed-in", "--ui-testing-account"] + arguments
         app.launch()
-        XCTAssertTrue(app.staticTexts["Нурбек"].waitForExistence(timeout: 10))
+        // Xcode 26 can occasionally lose the first automation launch while it
+        // restarts a UI-test runner between methods. Retry the launch once, but
+        // keep the assertion fail-closed: a persistent auth/bootstrap defect
+        // still fails after the second bounded wait.
+        if !app.staticTexts["Нурбек"].waitForExistence(timeout: 10) {
+            app.terminate()
+            app.launch()
+        }
+        XCTAssertTrue(app.staticTexts["Нурбек"].waitForExistence(timeout: 15))
         return app
     }
 
