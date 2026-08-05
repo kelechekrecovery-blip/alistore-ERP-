@@ -85,7 +85,7 @@ export interface InstallmentStep {
   months: number;
   /** Наименьший платёж на этой ступени. */
   monthlySom: number;
-  /** Где эту ступень можно оформить, в порядке передачи провайдеров. */
+  /** Где эту ступень можно оформить по указанному минимальному платежу. */
   providers: string[];
 }
 
@@ -95,8 +95,9 @@ export interface InstallmentStep {
  * Четыре партнёра под 0% дают на трёх месяцах ровно один и тот же платёж, и
  * четыре одинаковые строки — это шум, а не выбор. Покупатель выбирает срок;
  * банк ему важен только тем, где подписывать, поэтому провайдеры перечислены
- * внутри ступени. Если условия расходятся (у кого-то наценка), ступень
- * показывает наименьший платёж — обещать больший, когда есть меньший, нельзя.
+ * внутри ступени. Если условия расходятся (у кого-то наценка), рядом с
+ * минимальным платежом остаются только провайдеры, которые действительно его
+ * предлагают. Иначе витрина приписала бы дешёвую цену более дорогому банку.
  */
 export function installmentLadder(
   priceSom: number,
@@ -109,8 +110,12 @@ export function installmentLadder(
       byMonths.set(offer.months, { months: offer.months, monthlySom: offer.monthlySom, providers: [offer.label] });
       continue;
     }
-    step.providers.push(offer.label);
-    step.monthlySom = Math.min(step.monthlySom, offer.monthlySom);
+    if (offer.monthlySom < step.monthlySom) {
+      step.monthlySom = offer.monthlySom;
+      step.providers = [offer.label];
+    } else if (offer.monthlySom === step.monthlySom && !step.providers.includes(offer.label)) {
+      step.providers.push(offer.label);
+    }
   }
   return [...byMonths.values()].sort((a, b) => a.monthlySom - b.monthlySom || b.months - a.months);
 }

@@ -285,7 +285,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               )}
               {typeof product.bonusPoints === "number" && product.bonusPoints > 0 && (
                 <div className="mt-3 text-sm text-white/55">
-                  Начислим <span className="font-semibold text-white">{product.bonusPoints.toLocaleString("ru-RU")}</span> бонусов за покупку
+                  Около <span className="font-semibold text-white">{product.bonusPoints.toLocaleString("ru-RU")}</span> бонусов до скидок и доставки
                 </div>
               )}
               {!product.installmentSteps?.length && typeof product.attrs?.financingText === "string" && <div className="mt-2 text-sm text-[#c6ff3d]">{product.attrs.financingText}</div>}

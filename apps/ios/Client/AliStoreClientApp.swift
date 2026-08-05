@@ -7370,7 +7370,7 @@ private struct ProductDetail: View {
                         .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
                     }
                     if let bonus = displayProduct.bonusPoints, bonus > 0 {
-                        Text("Начислим \(Money.som(bonus).replacingOccurrences(of: " сом", with: "")) бонусов за покупку")
+                        Text("Около \(Money.som(bonus).replacingOccurrences(of: " сом", with: "")) бонусов до скидок и доставки")
                             .font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
                     }
                     HStack(spacing: 8) {

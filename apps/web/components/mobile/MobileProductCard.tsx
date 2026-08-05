@@ -94,7 +94,7 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
         {product.installment && <div className="mt-1 text-[10px] text-lime">от {som(product.installment.monthlySom)}/мес · {product.installment.label}</div>}
         {/* Бонус считает сервер той же функцией, что потом начислит заказ. */}
         {typeof product.bonusPoints === 'number' && product.bonusPoints > 0 && (
-          <div className="mt-0.5 text-[10px] text-subtle">+{product.bonusPoints.toLocaleString('ru-RU')} бонусов</div>
+          <div className="mt-0.5 text-[10px] text-subtle">около +{product.bonusPoints.toLocaleString('ru-RU')} бонусов</div>
         )}
         <div className="mt-0.5 text-[10px] text-subtle">
           {inStock ? (

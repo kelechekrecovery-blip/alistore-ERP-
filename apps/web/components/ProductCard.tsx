@@ -126,7 +126,7 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
             кабинет показывал другое. */}
         {typeof product.bonusPoints === 'number' && product.bonusPoints > 0 && (
           <div className={`mt-1 text-[11px] ${design3 ? 'text-white/45' : 'text-faint'}`}>
-            +{product.bonusPoints.toLocaleString('ru-RU')} бонусов
+            около +{product.bonusPoints.toLocaleString('ru-RU')} бонусов
           </div>
         )}
         {!product.installment && typeof product.attrs?.financingText === 'string' && <div className={`mt-1 text-[11px] ${design3 ? 'text-[#c6ff3d]' : 'text-faint'}`}>{product.attrs.financingText}</div>}

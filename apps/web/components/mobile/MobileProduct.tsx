@@ -175,7 +175,7 @@ export default function MobileProduct({
           )}
           {typeof product.bonusPoints === "number" && product.bonusPoints > 0 && (
             <div className="mt-2 text-[12px] text-subtle">
-              Начислим <span className="font-semibold text-white">{product.bonusPoints.toLocaleString("ru-RU")}</span> бонусов за покупку
+              Около <span className="font-semibold text-white">{product.bonusPoints.toLocaleString("ru-RU")}</span> бонусов до скидок и доставки
             </div>
           )}
           {!product.installmentSteps?.length && typeof attrs.financingText === "string" && <div className="mt-1.5 text-[13px] text-lime">{attrs.financingText}</div>}

@@ -106,14 +106,14 @@ describe('installments', () => {
       });
     });
 
-    it('на ступени показывает наименьший платёж, если провайдеры расходятся', () => {
+    it('не приписывает минимальный платёж более дорогому провайдеру', () => {
       // У ZERO наценка 10% — на той же ступени он дороже, и ступень должна
       // показать дешёвый платёж, а не первый попавшийся.
       const pricier = { ...ZERO, markupBps: 1_000 };
       const [step] = installmentLadder(120_000, [OMARKET, pricier]);
       expect(step.months).toBe(12);
       expect(step.monthlySom).toBe(10_000);
-      expect(step.providers).toEqual(['O!Market', 'ZERO']);
+      expect(step.providers).toEqual(['O!Market']);
     });
 
     it('пустая лестница, когда рассрочка недоступна', () => {
