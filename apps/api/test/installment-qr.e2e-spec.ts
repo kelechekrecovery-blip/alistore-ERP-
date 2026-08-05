@@ -3,6 +3,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { CatalogService } from '../src/catalog/catalog.service';
 import { SettingsService } from '../src/settings/settings.service';
+import { LegalController } from '../src/settings/legal.controller';
 
 /**
  * QR провайдера, загруженный владельцем в ERP, обязан доехать до карточки товара.
@@ -84,5 +85,51 @@ describe('QR рассрочки: из настроек ERP на карточку
     expect(product?.installmentProviders ?? []).not.toContainEqual(
       expect.objectContaining({ id: 'payda' }),
     );
+  });
+});
+
+/**
+ * Публичный эндпоинт оферты: пусто — «не опубликована», текст — «опубликована».
+ *
+ * Флаг `published` решает на витрине три вещи разом: что показывать на
+ * странице, индексировать ли её и на что ссылается обязательная галочка в
+ * оформлении. Ошибиться в нём — значит либо спрятать настоящий документ, либо
+ * выдать заготовку за договор.
+ */
+describe('публичная оферта', () => {
+  let prisma: PrismaService;
+  let settings: SettingsService;
+  let legal: LegalController;
+
+  beforeAll(async () => {
+    prisma = new PrismaService();
+    await prisma.$connect();
+    settings = new SettingsService(prisma, new AuditService(prisma));
+    legal = new LegalController(settings);
+  });
+
+  afterAll(async () => {
+    await prisma.setting.deleteMany({ where: { key: 'legal.offer_text' } });
+    await prisma.$disconnect();
+  });
+
+  beforeEach(async () => {
+    await prisma.setting.deleteMany({ where: { key: 'legal.offer_text' } });
+  });
+
+  it('без текста — не опубликована', async () => {
+    expect(await legal.offer()).toEqual({ text: '', published: false });
+  });
+
+  it('с текстом — опубликована и отдаёт документ целиком', async () => {
+    const document = '1. Общие положения\n\nПродавец: ОсОО «Пример», ИНН 123.\n\n2. Предмет договора\n\nТовар.';
+    await settings.set('legal.offer_text', document, 'owner-legal-test');
+    expect(await legal.offer()).toEqual({ text: document, published: true });
+  });
+
+  it('снятый текст возвращает витрину в «не опубликована»', async () => {
+    await settings.set('legal.offer_text', 'какой-то текст', 'owner-legal-test');
+    await settings.set('legal.offer_text', '', 'owner-legal-test');
+    expect(await legal.offer()).toEqual({ text: '', published: false });
   });
 });
