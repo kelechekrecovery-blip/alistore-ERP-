@@ -15,7 +15,8 @@
  * Environment alternatives:
  *   ALISTORE_REVIEW_POINT
  *   ALISTORE_REVIEW_CREDENTIALS_FILE
- *   API_BASE
+ *   ALISTORE_REVIEW_PHONE
+ *   ALISTORE_REVIEW_CUSTOMER_ID
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -29,6 +30,7 @@ const UPPER = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const DIGIT = '23456789';
 const SPECIAL = '!@#$%-_+=';
 const ALL = LOWER + UPPER + DIGIT + SPECIAL;
+const REVIEW_WINDOW_MS = 72 * 60 * 60 * 1000;
 
 function canonicalPath(target) {
   const missing = [];
@@ -74,6 +76,20 @@ export function resolveReviewPoint(args, env = process.env) {
   return normalized;
 }
 
+export function resolveClientIdentity(args, env = process.env) {
+  const phone = (valueAfter(args, '--client-phone') ?? env.ALISTORE_REVIEW_PHONE)?.trim();
+  const customerId = (
+    valueAfter(args, '--client-customer-id') ?? env.ALISTORE_REVIEW_CUSTOMER_ID
+  )?.trim();
+  if (!phone || !/^\+996\d{9}$/u.test(phone)) {
+    throw new Error('--client-phone or ALISTORE_REVIEW_PHONE must be an existing +996 account');
+  }
+  if (!customerId || !/^[A-Za-z0-9_-]{8,128}$/u.test(customerId)) {
+    throw new Error('--client-customer-id or ALISTORE_REVIEW_CUSTOMER_ID is required');
+  }
+  return { phone, customerId };
+}
+
 export function resolveOutputPath(args, env = process.env) {
   const value = valueAfter(args, '--output') ?? env.ALISTORE_REVIEW_CREDENTIALS_FILE;
   if (!value?.trim()) {
@@ -107,17 +123,23 @@ export function normalizeApiBase(value) {
 
 export function buildCredentialBundle({
   point,
-  apiBase = DEFAULT_API_BASE,
+  clientPhone,
+  clientCustomerId,
   now = Date.now(),
   randomInt = crypto.randomInt,
   randomBytes = crypto.randomBytes,
 } = {}) {
   const normalizedPoint = resolveReviewPoint([], { ALISTORE_REVIEW_POINT: point });
-  const normalizedApiBase = normalizeApiBase(apiBase);
+  const clientIdentity = resolveClientIdentity([], {
+    ALISTORE_REVIEW_PHONE: clientPhone,
+    ALISTORE_REVIEW_CUSTOMER_ID: clientCustomerId,
+  });
   const suffix = randomBytes(3).toString('hex');
-  const reviewPhone = `+996700${String(randomInt(1_000_000)).padStart(6, '0')}`;
   const reviewOtp = String(randomInt(1_000_000)).padStart(6, '0');
-  const until = new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString();
+  // The API deliberately rejects review windows longer than seven days.
+  // Keep generated credentials short-lived while leaving enough time for a
+  // normal App Review pass; regenerate instead of extending stale access.
+  const until = new Date(now + REVIEW_WINDOW_MS).toISOString();
   const staff = [
     {
       app: 'Staff',
@@ -143,27 +165,24 @@ export function buildCredentialBundle({
     'ALISTORE APP REVIEW CREDENTIALS — SECRET — DELETE AFTER REVIEW',
     '',
     'CLIENT SERVER ENV',
-    `AUTH_REVIEW_PHONE=${reviewPhone}`,
+    `AUTH_REVIEW_PHONE=${clientIdentity.phone}`,
+    `AUTH_REVIEW_CUSTOMER_ID=${clientIdentity.customerId}`,
     `AUTH_REVIEW_OTP=${reviewOtp}`,
     `AUTH_REVIEW_UNTIL=${until}`,
     '',
     'CLIENT APP STORE CONNECT DEMO ACCOUNT',
-    `User name: ${reviewPhone}`,
+    `User name: ${clientIdentity.phone}`,
     `Password: ${reviewOtp}`,
     '',
     'STAFF / COURIER / POS',
-    'Run each command with an active owner token substituted locally.',
-    'The API verifies that the configured point exists and is active.',
+    'Create these accounts through the protected owner ERP provisioning flow.',
+    'Never place owner tokens or generated passwords in shell arguments.',
   ];
 
   for (const account of staff) {
-    const payload = provisionStaffPayload(account, normalizedPoint);
     lines.push(
       '',
       `${account.app} — role ${account.role}`,
-      `curl -sS -X POST ${normalizedApiBase}/staff-auth/staff \\`,
-      "  -H 'Authorization: Bearer <OWNER_TOKEN>' -H 'Content-Type: application/json' \\",
-      `  -d '${JSON.stringify(payload)}'`,
       `ASC User name: ${account.username}`,
       `ASC Password: ${account.password}`,
     );
@@ -210,8 +229,12 @@ if (isMain) {
     const args = process.argv.slice(2);
     const point = resolveReviewPoint(args);
     const output = resolveOutputPath(args);
-    const apiBase = normalizeApiBase(process.env.API_BASE ?? DEFAULT_API_BASE);
-    const { bundle } = buildCredentialBundle({ point, apiBase });
+    const clientIdentity = resolveClientIdentity(args);
+    const { bundle } = buildCredentialBundle({
+      point,
+      clientPhone: clientIdentity.phone,
+      clientCustomerId: clientIdentity.customerId,
+    });
     writeCredentialBundle(output, bundle);
     console.log('✓ Secure App Review credential bundle written with mode 0600');
   } catch (error) {

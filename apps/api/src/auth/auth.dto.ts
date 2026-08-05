@@ -16,6 +16,7 @@ export class VerifyOtpDto {
 
   @IsString()
   @Length(6, 6, { message: 'code must be 6 digits' })
+  @Matches(/^\d{6}$/u, { message: 'code must be 6 digits' })
   code!: string;
 
   @IsOptional()
@@ -32,6 +33,7 @@ export class RequestEmailOtpDto {
 export class VerifyEmailOtpDto extends RequestEmailOtpDto {
   @IsString()
   @Length(6, 6, { message: 'code must be 6 digits' })
+  @Matches(/^\d{6}$/u, { message: 'code must be 6 digits' })
   code!: string;
 
   @IsOptional()

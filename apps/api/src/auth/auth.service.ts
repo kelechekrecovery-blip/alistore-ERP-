@@ -101,11 +101,37 @@ export class AuthService implements OnModuleInit {
    * a review window.
    */
   onModuleInit(): void {
-    if (this.config.get<string>('AUTH_REVIEW_PHONE')?.trim()) {
-      this.logger.warn(
-        'AUTH_REVIEW_PHONE is set — App Store review login is ACTIVE. Use a throwaway number and clear AUTH_REVIEW_PHONE/AUTH_REVIEW_OTP after review.',
-      );
+    const values = {
+      phone: this.config.get<string>('AUTH_REVIEW_PHONE')?.trim(),
+      otp: this.config.get<string>('AUTH_REVIEW_OTP')?.trim(),
+      customerId: this.config.get<string>('AUTH_REVIEW_CUSTOMER_ID')?.trim(),
+      until: this.config.get<string>('AUTH_REVIEW_UNTIL')?.trim(),
+    };
+    if (!Object.values(values).some(Boolean)) return;
+    let validPhone = false;
+    try {
+      validPhone = Boolean(values.phone && normalizePhone(values.phone));
+    } catch {
+      validPhone = false;
     }
+    const expiry = new Date(values.until ?? '').getTime();
+    const remaining = expiry - Date.now();
+    const validWindow = Number.isFinite(expiry)
+      && remaining > 0
+      && remaining <= REVIEW_LOGIN_MAX_WINDOW_MS;
+    const fullyConfigured = validPhone
+      && /^\d{6}$/u.test(values.otp ?? '')
+      && Boolean(values.customerId)
+      && validWindow;
+    if (fullyConfigured) {
+      this.logger.warn(
+        'AUTH_REVIEW_PHONE is set — App Store review login is ACTIVE. Clear every AUTH_REVIEW_* value after review.',
+      );
+      return;
+    }
+    this.logger.error(
+      'App Store review login is MISCONFIGURED and INACTIVE. Set a valid AUTH_REVIEW_PHONE, six-digit AUTH_REVIEW_OTP, AUTH_REVIEW_CUSTOMER_ID and short future AUTH_REVIEW_UNTIL together.',
+    );
   }
 
   /**
@@ -152,7 +178,7 @@ export class AuthService implements OnModuleInit {
      * лишь после успешного запроса. Ревьюеру физически некуда было ввести
      * согласованный код — это и есть отказ App Store 2.1(a).
      *
-     * Обход не расширяет обычный вход: `reviewOtpForPhone` требует все три
+     * Обход не расширяет обычный вход: `reviewOtpForPhone` требует все четыре
      * переменные, точное совпадение номера и непросроченное окно не длиннее
      * семи дней, а `purpose` ограничен логином — восстановление доступа отзывает
      * чужие сессии и этим ключом не открывается. Любой другой номер по-прежнему
@@ -529,9 +555,9 @@ export class AuthService implements OnModuleInit {
     // pre-agreed phone accepts one fixed code — only when both env vars are set,
     // and only for an exact phone+code match. Any other phone, any other code, or
     // a missing env var falls through to the normal challenge check below.
-    const reviewOtp = this.reviewOtpForPhone(phone);
-    if (reviewOtp) {
-      return this.authenticateReviewLogin(phone, code, reviewOtp);
+    const reviewLogin = this.reviewOtpForPhone(phone);
+    if (reviewLogin) {
+      return this.authenticateReviewLogin(phone, code, reviewLogin.code, reviewLogin.customerId);
     }
 
     const challenge = await this.claimPhoneOtp(phone, code, 'login', challengeId);
@@ -543,14 +569,15 @@ export class AuthService implements OnModuleInit {
   }
 
   /**
-   * True only when a review account is configured (both AUTH_REVIEW_PHONE and
-   * AUTH_REVIEW_OTP) and the request matches it exactly. Absent either env var the
-   * method is inert, so production without these variables has no bypass at all.
+   * True only when a review account is configured with an exact phone, OTP and
+   * immutable customer id. A random phone collision can therefore never turn a
+   * real customer into the review account.
    */
-  private reviewOtpForPhone(phone: string): string | null {
+  private reviewOtpForPhone(phone: string): { code: string; customerId: string } | null {
     const configuredPhone = this.config.get<string>('AUTH_REVIEW_PHONE')?.trim();
     const reviewOtp = this.config.get<string>('AUTH_REVIEW_OTP')?.trim();
-    if (!configuredPhone || !reviewOtp) return null;
+    const customerId = this.config.get<string>('AUTH_REVIEW_CUSTOMER_ID')?.trim();
+    if (!configuredPhone || !reviewOtp || !/^\d{6}$/u.test(reviewOtp) || !customerId) return null;
     let reviewPhone: string;
     try {
       reviewPhone = normalizePhone(configuredPhone);
@@ -566,13 +593,14 @@ export class AuthService implements OnModuleInit {
     if (!Number.isFinite(expiry) || remaining <= 0 || remaining > REVIEW_LOGIN_MAX_WINDOW_MS) {
       return null;
     }
-    return phone === reviewPhone ? reviewOtp : null;
+    return phone === reviewPhone ? { code: reviewOtp, customerId } : null;
   }
 
   private async authenticateReviewLogin(
     phone: string,
     code: string,
     expectedCode: string,
+    expectedCustomerId: string,
   ): Promise<AuthTokens> {
     const now = new Date();
     const actor = `auth:review:${this.hashToken(phone)}`;
@@ -618,7 +646,8 @@ export class AuthService implements OnModuleInit {
       }
 
       const customer = await tx.customer.findUnique({ where: { phone } });
-      if (!constantTimeEquals(code, expectedCode) || !customer) {
+      const correctAccount = customer?.id === expectedCustomerId;
+      if (!constantTimeEquals(code, expectedCode) || !correctAccount) {
         const attempts = guard.attempts + 1;
         const lockedUntil = attempts >= REVIEW_LOGIN_MAX_ATTEMPTS
           ? new Date(now.getTime() + REVIEW_LOGIN_LOCK_MS)
@@ -630,7 +659,7 @@ export class AuthService implements OnModuleInit {
         await this.auditReviewLogin(
           tx,
           actor,
-          customer ? (lockedUntil ? 'locked' : 'invalid') : 'account_missing',
+          correctAccount ? (lockedUntil ? 'locked' : 'invalid') : 'account_missing',
           attempts,
           lockedUntil,
         );

@@ -22,6 +22,7 @@ describe('Auth: App Store review login (integration)', () => {
   const reviewPhone = `+996700${String(Math.floor(Math.random() * 9_000_000) + 1_000_000)}`;
   const otherPhone = `+996701${String(Math.floor(Math.random() * 9_000_000) + 1_000_000)}`;
   const reviewOtp = '424242';
+  const reviewCustomerId = `review_customer_${Date.now()}`;
 
   function makeAuth(values: Record<string, string>, otpSender?: OtpSender) {
     const jwt = new JwtService({ secret: 'test-secret', signOptions: { expiresIn: '15m' } });
@@ -35,6 +36,7 @@ describe('Auth: App Store review login (integration)', () => {
     return {
       AUTH_REVIEW_PHONE: reviewPhone,
       AUTH_REVIEW_OTP: reviewOtp,
+      AUTH_REVIEW_CUSTOMER_ID: reviewCustomerId,
       AUTH_REVIEW_UNTIL: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
   }
@@ -60,7 +62,7 @@ describe('Auth: App Store review login (integration)', () => {
 
   async function seedReviewAccount() {
     return prisma.customer.create({
-      data: { phone: reviewPhone, name: 'Short-lived review account' },
+      data: { id: reviewCustomerId, phone: reviewPhone, name: 'Short-lived review account' },
     });
   }
 
@@ -82,6 +84,7 @@ describe('Auth: App Store review login (integration)', () => {
     const auth = makeAuth({
       AUTH_REVIEW_PHONE: reviewPhone.slice(1),
       AUTH_REVIEW_OTP: reviewOtp,
+      AUTH_REVIEW_CUSTOMER_ID: reviewCustomerId,
       AUTH_REVIEW_UNTIL: configured().AUTH_REVIEW_UNTIL,
     });
     const tokens = await auth.verifyOtp(reviewPhone, reviewOtp);
@@ -109,6 +112,21 @@ describe('Auth: App Store review login (integration)', () => {
     await expect(makeAuth({ AUTH_REVIEW_PHONE: reviewPhone }).verifyOtp(reviewPhone, reviewOtp))
       .rejects.toBeInstanceOf(ValidationError);
     await expect(makeAuth({ AUTH_REVIEW_OTP: reviewOtp }).verifyOtp(reviewPhone, reviewOtp))
+      .rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('is inert without the immutable review customer id', async () => {
+    await seedReviewAccount();
+    const { AUTH_REVIEW_CUSTOMER_ID: _omitted, ...withoutCustomerId } = configured();
+    await expect(makeAuth(withoutCustomerId).verifyOtp(reviewPhone, reviewOtp))
+      .rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('rejects the fixed code when the phone resolves to a different customer id', async () => {
+    await prisma.customer.create({
+      data: { id: `${reviewCustomerId}_different`, phone: reviewPhone, name: 'Real customer' },
+    });
+    await expect(makeAuth(configured()).verifyOtp(reviewPhone, reviewOtp))
       .rejects.toBeInstanceOf(ValidationError);
   });
 
@@ -277,6 +295,7 @@ describe('Auth: запрос кода для ревьюера при выклю�
       SMS_PROVIDER: 'disabled',
       AUTH_REVIEW_PHONE: reviewPhone,
       AUTH_REVIEW_OTP: reviewOtp,
+      AUTH_REVIEW_CUSTOMER_ID: 'review_request_customer',
       AUTH_REVIEW_UNTIL: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
   }
@@ -319,6 +338,16 @@ describe('Auth: запрос кода для ревьюера при выклю�
   it('инертен без переменных: тот же номер получает 503', async () => {
     const auth = makeAuth(
       { NODE_ENV: 'production', SMS_PROVIDER: 'disabled' },
+      new RecordingDisabledSender(),
+    );
+    await expect(auth.requestOtp(reviewPhone)).rejects.toMatchObject({
+      response: { code: 'sms_login_unavailable' },
+    });
+  });
+
+  it('инертен с malformed review OTP и не открывает тупиковый challenge', async () => {
+    const auth = makeAuth(
+      { ...configured(), AUTH_REVIEW_OTP: 'Xy7Qw2' },
       new RecordingDisabledSender(),
     );
     await expect(auth.requestOtp(reviewPhone)).rejects.toMatchObject({
@@ -379,6 +408,7 @@ describe('Auth: вызов из обхода не годится для прив
           TELEGRAM_BOT_TOKEN: botToken,
           AUTH_REVIEW_PHONE: reviewPhone,
           AUTH_REVIEW_OTP: '626262',
+          AUTH_REVIEW_CUSTOMER_ID: 'review_social_customer',
           AUTH_REVIEW_UNTIL: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         })[key],
       } as unknown as ConfigService,
@@ -479,6 +509,7 @@ describe('Auth: обход входа ревьюера — эхо кода и с
     return {
       AUTH_REVIEW_PHONE: reviewPhone,
       AUTH_REVIEW_OTP: '737373',
+      AUTH_REVIEW_CUSTOMER_ID: 'review_echo_customer',
       AUTH_REVIEW_UNTIL: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
   }

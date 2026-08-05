@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 /**
- * Read-only App Review readiness gate.
+ * App Review readiness gate. App Store Connect checks are read-only by default.
  *
  * The gate reads App Store Connect credentials from apps/ios/.env.production,
  * requests only the App Review fields needed for verification, signs in with
- * the demo accounts already stored by Apple, and performs GET-only readiness
- * checks after authentication. It never prints credentials, tokens, response
+ * the demo accounts already stored by Apple. Live logins are opt-in because
+ * they write auth audit/session state and consume the bounded review-login
+ * success budget. It never prints credentials, tokens, response
  * bodies, customer data, or store-point identifiers.
  *
  * Usage:
  *   node scripts/verify-ios-review-readiness.mjs
+ *   node scripts/verify-ios-review-readiness.mjs --live-login
  *   node scripts/verify-ios-review-readiness.mjs --env-file apps/ios/.env.production
  */
 import fs from 'node:fs';
@@ -116,6 +118,12 @@ export function assertStaffPrincipal(appKey, principal, expectedRole, expectedPo
   }
 }
 
+export function assertCustomerPrincipal(principal, expectedCustomerId) {
+  if (principal?.typ !== 'customer' || principal?.customerId !== expectedCustomerId) {
+    throw new Error('client: reviewer principal does not match the configured customer account');
+  }
+}
+
 export function assertReadinessValue(appKey, kind, value) {
   if (kind === 'collection') {
     if (!Array.isArray(value) || value.length === 0) {
@@ -179,8 +187,10 @@ export async function verifyLiveReadiness({
   apiRequest,
   credentialsByApp,
   expectedPoint,
+  expectedCustomerId,
 }) {
   if (!expectedPoint?.trim()) throw new Error('ALISTORE_REVIEW_POINT is required');
+  if (!expectedCustomerId?.trim()) throw new Error('ALISTORE_REVIEW_CUSTOMER_ID is required');
 
   const catalog = await apiRequest('GET', 'catalog/products?limit=100&offset=0');
   assertCatalogReady(catalog);
@@ -191,16 +201,24 @@ export async function verifyLiveReadiness({
     if (!credentials) throw new Error(`${appKey}: review credentials are unavailable`);
 
     if (profile.kind === 'customer') {
+      const challenge = await apiRequest('POST', 'auth/otp/request', {
+        body: { phone: credentials.username },
+      });
+      if (typeof challenge?.challengeId !== 'string' || challenge.challengeId.length === 0) {
+        throw new Error('client: OTP request returned no challenge ID');
+      }
       const session = await apiRequest('POST', 'auth/otp/verify', {
-        body: { phone: credentials.username, code: credentials.password },
+        body: {
+          phone: credentials.username,
+          code: credentials.password,
+          challengeId: challenge.challengeId,
+        },
       });
       if (typeof session?.accessToken !== 'string' || session.accessToken.length === 0) {
         throw new Error('client: login returned no access token');
       }
       const principal = await apiRequest('GET', 'auth/me', { token: session.accessToken });
-      if (principal?.typ !== 'customer') {
-        throw new Error('client: reviewer principal is not a customer');
-      }
+      assertCustomerPrincipal(principal, expectedCustomerId.trim());
       continue;
     }
 
@@ -234,14 +252,11 @@ if (isMain) {
 
 async function main() {
   const args = process.argv.slice(2);
+  const liveLogin = args.includes('--live-login');
   const envFileArg = valueAfter(args, '--env-file') ?? DEFAULT_ENV_FILE;
   const envFile = path.resolve(PROJECT_ROOT, envFileArg);
   if (!fs.existsSync(envFile)) throw new Error('iOS production env file is not readable');
   const env = { ...process.env, ...parseEnvFile(fs.readFileSync(envFile, 'utf8')) };
-
-  const apiBase = normalizeApiBase(env.ALISTORE_API_BASE_URL ?? env.API_BASE_URL);
-  const expectedPoint = env.ALISTORE_REVIEW_POINT?.trim();
-  if (!expectedPoint) throw new Error('ALISTORE_REVIEW_POINT is required');
 
   const ascCredentials = {
     keyPath: env.ASC_API_KEY_PATH,
@@ -277,7 +292,6 @@ async function main() {
     service: 'App Store Connect',
     defaultToken: ascToken,
   });
-  const apiRequest = createJsonRequester({ baseUrl: apiBase, service: 'AliStore API' });
 
   const credentialsByApp = {};
   for (const appKey of APP_KEYS) {
@@ -294,11 +308,27 @@ async function main() {
     console.log(`✓ ${appKey}: App Store review configuration matches metadata`);
   }
 
-  await verifyLiveReadiness({ apiRequest, credentialsByApp, expectedPoint });
-  for (const appKey of APP_KEYS) {
-    console.log(`✓ ${appKey}: live reviewer login and read-only readiness passed`);
+  if (!liveLogin) {
+    console.log('✓ App Store Connect configuration passed (live login skipped)');
+    return;
   }
-  console.log('✓ iOS App Review readiness passed; no business mutations were requested');
+  const apiBase = normalizeApiBase(env.ALISTORE_API_BASE_URL ?? env.API_BASE_URL);
+  const expectedPoint = env.ALISTORE_REVIEW_POINT?.trim();
+  const expectedCustomerId = env.ALISTORE_REVIEW_CUSTOMER_ID?.trim();
+  if (!expectedPoint) throw new Error('ALISTORE_REVIEW_POINT is required');
+  if (!expectedCustomerId) throw new Error('ALISTORE_REVIEW_CUSTOMER_ID is required');
+  const apiRequest = createJsonRequester({ baseUrl: apiBase, service: 'AliStore API' });
+  console.log('! Live login writes auth audit/session state and consumes one review-login success');
+  await verifyLiveReadiness({
+    apiRequest,
+    credentialsByApp,
+    expectedPoint,
+    expectedCustomerId,
+  });
+  for (const appKey of APP_KEYS) {
+    console.log(`✓ ${appKey}: live reviewer login and readiness passed`);
+  }
+  console.log('✓ iOS App Review live readiness passed; auth state was updated');
 }
 
 function normalizeApiBase(value) {

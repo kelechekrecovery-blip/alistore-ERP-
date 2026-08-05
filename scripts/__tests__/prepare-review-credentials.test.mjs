@@ -7,10 +7,26 @@ import {
   buildCredentialBundle,
   normalizeApiBase,
   provisionStaffPayload,
+  resolveClientIdentity,
   resolveOutputPath,
   resolveReviewPoint,
   strongPassword,
 } from '../prepare-review-credentials.mjs';
+
+test('client review identity must reference an explicit existing account', () => {
+  assert.deepEqual(
+    resolveClientIdentity([], {
+      ALISTORE_REVIEW_PHONE: '+996700123456',
+      ALISTORE_REVIEW_CUSTOMER_ID: 'customer_review_123',
+    }),
+    { phone: '+996700123456', customerId: 'customer_review_123' },
+  );
+  assert.throws(() => resolveClientIdentity([], {}), /existing \+996 account/iu);
+  assert.throws(
+    () => resolveClientIdentity(['--client-phone', '+996700123456'], {}),
+    /customer-id/iu,
+  );
+});
 
 test('review point is explicit, normalized, and may come from argv or env', () => {
   assert.equal(resolveReviewPoint(['--point', ' REVIEW-POINT '], {}), 'REVIEW-POINT');
@@ -60,14 +76,16 @@ test('credential bundle is deterministic under injected randomness and includes 
   const randomBytes = () => Buffer.from('a1b2c3', 'hex');
   const first = buildCredentialBundle({
     point: 'REVIEW-POINT',
-    apiBase: 'https://api.example.test/api/',
+    clientPhone: '+996700123456',
+    clientCustomerId: 'customer_review_123',
     now: Date.parse('2026-07-30T00:00:00.000Z'),
     randomInt,
     randomBytes,
   });
   const second = buildCredentialBundle({
     point: 'REVIEW-POINT',
-    apiBase: 'https://api.example.test/api/',
+    clientPhone: '+996700123456',
+    clientCustomerId: 'customer_review_123',
     now: Date.parse('2026-07-30T00:00:00.000Z'),
     randomInt,
     randomBytes,
@@ -75,9 +93,10 @@ test('credential bundle is deterministic under injected randomness and includes 
 
   assert.equal(first.bundle, second.bundle);
   assert.equal(first.staff.length, 3);
-  assert.match(first.bundle, /"point":"REVIEW-POINT"/u);
-  assert.equal((first.bundle.match(/"point":"REVIEW-POINT"/gu) ?? []).length, 3);
-  assert.match(first.bundle, /AUTH_REVIEW_UNTIL=2026-08-29T00:00:00.000Z/u);
+  assert.match(first.bundle, /AUTH_REVIEW_PHONE=\+996700123456/u);
+  assert.match(first.bundle, /AUTH_REVIEW_CUSTOMER_ID=customer_review_123/u);
+  assert.match(first.bundle, /AUTH_REVIEW_UNTIL=2026-08-02T00:00:00.000Z/u);
+  assert.doesNotMatch(first.bundle, /curl|OWNER_TOKEN|Authorization:/u);
   assert.doesNotMatch(first.bundle, /undefined|null/u);
 });
 

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   assertCatalogReady,
+  assertCustomerPrincipal,
   assertReadinessValue,
   assertReviewCredentials,
   assertReviewNotesMatch,
@@ -14,6 +15,20 @@ import {
   selectReviewVersion,
   verifyLiveReadiness,
 } from '../verify-ios-review-readiness.mjs';
+
+test('customer principal must match the explicitly configured review account', () => {
+  assert.doesNotThrow(() => assertCustomerPrincipal(
+    { typ: 'customer', customerId: 'customer-review' },
+    'customer-review',
+  ));
+  assert.throws(
+    () => assertCustomerPrincipal(
+      { typ: 'customer', customerId: 'another-customer' },
+      'customer-review',
+    ),
+    /does not match/iu,
+  );
+});
 
 const credentialsByApp = {
   client: { username: 'client-review', password: 'client-secret' },
@@ -175,11 +190,15 @@ test('live verification performs only login POSTs and readiness GETs', async () 
         ],
       };
     }
+    if (method === 'POST' && endpoint === 'auth/otp/request') {
+      return { challengeId: 'review-challenge' };
+    }
     if (method === 'POST' && endpoint === 'auth/otp/verify') {
+      assert.equal(options.body.challengeId, 'review-challenge');
       return { accessToken: tokens.client, refreshToken: 'not-reported' };
     }
     if (method === 'GET' && endpoint === 'auth/me') {
-      return { typ: 'customer' };
+      return { typ: 'customer', customerId: 'customer-review' };
     }
     if (method === 'POST' && endpoint === 'staff-auth/login') {
       return { accessToken: byUsername[options.body.username], refreshToken: 'not-reported' };
@@ -208,9 +227,10 @@ test('live verification performs only login POSTs and readiness GETs', async () 
     apiRequest,
     credentialsByApp,
     expectedPoint: 'REVIEW-POINT',
+    expectedCustomerId: 'customer-review',
   });
 
-  assert.equal(calls.filter((call) => call.method === 'POST').length, 4);
+  assert.equal(calls.filter((call) => call.method === 'POST').length, 5);
   assert.ok(
     calls
       .filter((call) => call.method !== 'POST')
@@ -218,7 +238,13 @@ test('live verification performs only login POSTs and readiness GETs', async () 
   );
   assert.deepEqual(
     calls.filter((call) => call.method === 'POST').map((call) => call.endpoint),
-    ['auth/otp/verify', 'staff-auth/login', 'staff-auth/login', 'staff-auth/login'],
+    [
+      'auth/otp/request',
+      'auth/otp/verify',
+      'staff-auth/login',
+      'staff-auth/login',
+      'staff-auth/login',
+    ],
   );
 });
 
@@ -233,8 +259,9 @@ test('live verification propagates empty and forbidden readiness failures', asyn
         ],
       };
     }
+    if (endpoint === 'auth/otp/request') return { challengeId: 'review-challenge' };
     if (endpoint === 'auth/otp/verify') return { accessToken: 'customer-token' };
-    if (endpoint === 'auth/me') return { typ: 'customer' };
+    if (endpoint === 'auth/me') return { typ: 'customer', customerId: 'customer-review' };
     if (endpoint === 'staff-auth/login') return { accessToken: `token-${options.body.username}` };
     if (endpoint === 'staff-auth/me') {
       return { typ: 'staff', active: true, role: 'seller', point: 'REVIEW-POINT' };
@@ -248,7 +275,40 @@ test('live verification propagates empty and forbidden readiness failures', asyn
       apiRequest,
       credentialsByApp,
       expectedPoint: 'REVIEW-POINT',
+      expectedCustomerId: 'customer-review',
     }),
     /HTTP 403/u,
   );
+});
+
+test('live verification fails before verify when OTP request returns no challenge', async () => {
+  const calls = [];
+  const apiRequest = async (method, endpoint) => {
+    calls.push({ method, endpoint });
+    if (endpoint.startsWith('catalog/products')) {
+      return {
+        items: [
+          { availableUnits: 1 },
+          { availableUnits: 1 },
+          { availableUnits: 1 },
+        ],
+      };
+    }
+    if (endpoint === 'auth/otp/request') return {};
+    throw new Error(`Unexpected call: ${method} ${endpoint}`);
+  };
+
+  await assert.rejects(
+    verifyLiveReadiness({
+      apiRequest,
+      credentialsByApp,
+      expectedPoint: 'REVIEW-POINT',
+      expectedCustomerId: 'customer-review',
+    }),
+    /OTP request returned no challenge ID/u,
+  );
+  assert.deepEqual(calls.map((call) => call.endpoint), [
+    'catalog/products?limit=100&offset=0',
+    'auth/otp/request',
+  ]);
 });
