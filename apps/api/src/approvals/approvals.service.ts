@@ -304,6 +304,12 @@ export class ApprovalsService {
 
       const parkedPayload = (approval.evidence as { payload?: Record<string, unknown> } | null)
         ?.payload;
+      if (input.status === 'approved' && approval.action === 'procurement_draft' && !parkedPayload) {
+        throw new ValidationError(
+          'procurement_draft_snapshot_missing',
+          'Закупочный draft не содержит сохранённого snapshot для исполнения',
+        );
+      }
       if (
         input.status === 'approved'
         && approval.action === 'stock_adjust'
