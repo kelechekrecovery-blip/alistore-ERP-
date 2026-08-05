@@ -30,7 +30,12 @@ describe('Notifications push token registry (integration)', () => {
       where: { username: { startsWith: 'push-' } },
     });
     await prisma.customer.deleteMany({
-      where: { phone: { startsWith: '+99676' } },
+      where: {
+        OR: [
+          { phone: { startsWith: '+9967600000' } },
+          { phone: { startsWith: 'deleted:push-' } },
+        ],
+      },
     });
   });
 
@@ -74,6 +79,49 @@ describe('Notifications push token registry (integration)', () => {
     expect(second.customerId).toBe(customer.id);
     expect(second.deviceId).toBe('android-install-2');
     await expect(prisma.pushToken.count({ where: { token: first.token } })).resolves.toBe(1);
+  });
+
+  it('rejects push binding for a tombstoned customer', async () => {
+    const customer = await prisma.customer.create({
+      data: { phone: 'deleted:push-customer', name: 'Удалённый пользователь' },
+    });
+
+    await expect(notifications.registerPushToken(
+      {
+        token: 'ExponentPushToken[deletedcustomer123]',
+        platform: 'ios',
+        deviceId: 'deleted-customer-install',
+      },
+      { typ: 'customer', customerId: customer.id, phone: customer.phone },
+    )).rejects.toMatchObject({ code: 'customer_session_revoked' });
+    expect(await prisma.pushToken.count({ where: { customerId: customer.id } })).toBe(0);
+  });
+
+  it('allows only one owner when two customers concurrently claim a new token', async () => {
+    const [first, second] = await Promise.all([
+      prisma.customer.create({ data: { phone: '+996760000002', name: 'Push contender A' } }),
+      prisma.customer.create({ data: { phone: '+996760000003', name: 'Push contender B' } }),
+    ]);
+    const sharedToken = 'ExponentPushToken[concurrent-owner-guard]';
+    const registration = (customer: typeof first, deviceId: string) =>
+      notifications.registerPushToken(
+        { token: sharedToken, platform: 'ios', deviceId },
+        { typ: 'customer', customerId: customer.id, phone: customer.phone },
+      );
+
+    const outcomes = await Promise.allSettled([
+      registration(first, 'concurrent-a'),
+      registration(second, 'concurrent-b'),
+    ]);
+
+    expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1);
+    const rejected = outcomes.find((outcome) => outcome.status === 'rejected');
+    expect(rejected).toMatchObject({
+      status: 'rejected',
+      reason: { code: 'push_token_already_bound' },
+    });
+    const persisted = await prisma.pushToken.findUniqueOrThrow({ where: { token: sharedToken } });
+    expect([first.id, second.id]).toContain(persisted.customerId);
   });
 
   it('binds staff tokens only to active staff accounts', async () => {

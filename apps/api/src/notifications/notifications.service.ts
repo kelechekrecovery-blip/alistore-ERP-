@@ -1,18 +1,41 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
+import { ConflictError, ForbiddenError } from '../common/errors';
 import type { AuthPrincipal } from '../auth/jwt.strategy';
 import type { RegisterPushTokenDto } from './push-token.dto';
+import type { Prisma } from '@prisma/client';
+import { lockActiveCustomerOnTx } from '../auth/customer-session-state';
 
 @Injectable()
 export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async registerPushToken(dto: RegisterPushTokenDto, user?: AuthPrincipal) {
-    const binding = await this.resolveBinding(user);
-    const existing = await this.prisma.pushToken.findUnique({ where: { token: dto.token } });
+    return this.prisma.$transaction(async (tx) => {
+      let binding: { scope: string; customerId: string | null; staffId: string | null };
+      if (user?.typ === 'customer') {
+        const customer = await lockActiveCustomerOnTx(tx, user.customerId);
+        binding = { scope: 'customer', customerId: customer.id, staffId: null };
+      } else {
+        binding = await this.resolveBinding(user, tx);
+      }
+      return this.registerForBinding(dto, binding, tx);
+    });
+  }
+
+  private async registerForBinding(
+    dto: RegisterPushTokenDto,
+    binding: { scope: string; customerId: string | null; staffId: string | null },
+    db: Pick<Prisma.TransactionClient, 'pushToken' | '$queryRaw'>,
+  ) {
+    // Device tokens are global bearer-like identifiers. Serialize all customer
+    // and staff registrations by token before the read/ownership-check/upsert,
+    // otherwise concurrent first claims could both pass the empty read and the
+    // second ON CONFLICT branch would silently steal the first owner's token.
+    await db.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'push-token:' + dto.token}))::text AS locked`;
+    const existing = await db.pushToken.findUnique({ where: { token: dto.token } });
     if (existing) this.assertTokenOwnership(existing, binding);
-    const token = await this.prisma.pushToken.upsert({
+    const token = await db.pushToken.upsert({
       where: { token: dto.token },
       update: {
         platform: dto.platform,
@@ -69,24 +92,16 @@ export class NotificationsService {
     return this.prisma.customerNotification.findUniqueOrThrow({ where: { id: notification.id } });
   }
 
-  private async resolveBinding(user: AuthPrincipal | undefined) {
+  private async resolveBinding(
+    user: AuthPrincipal | undefined,
+    db: Pick<Prisma.TransactionClient, 'staffUser'>,
+  ) {
     if (!user) {
       throw new UnauthorizedException('Для регистрации push-токена требуется авторизация');
     }
 
-    if (user.typ === 'customer') {
-      const customer = await this.prisma.customer.findUnique({
-        where: { id: user.customerId },
-        select: { id: true },
-      });
-      if (!customer) {
-        throw new ValidationError('customer_not_found', 'Клиент не найден');
-      }
-      return { scope: 'customer', customerId: customer.id, staffId: null };
-    }
-
     if (user.typ === 'staff') {
-      const staff = await this.prisma.staffUser.findUnique({
+      const staff = await db.staffUser.findUnique({
         where: { id: user.customerId },
         select: { id: true, active: true },
       });

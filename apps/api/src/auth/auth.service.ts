@@ -28,7 +28,11 @@ import {
 import type { AuthPrincipal, JwtPayload } from './jwt.strategy';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
 import { normalizePhone } from './phone-normalization';
-import { isActiveCustomerPhone, lockActiveCustomerOnTx } from './customer-session-state';
+import {
+  CustomerSessionRevokedException,
+  isActiveCustomerPhone,
+  lockActiveCustomerOnTx,
+} from './customer-session-state';
 
 export interface AuthTokens {
   accessToken: string;
@@ -338,11 +342,10 @@ export class AuthService implements OnModuleInit {
     email: string,
   ): Promise<{ challengeId: string; devCode?: string }> {
     const normalized = normalizeEmail(email);
-    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
-    if (!customer) {
-      throw new ValidationError('customer_not_found', 'Аккаунт не найден');
-    }
-    return this.issueEmailChallenge(normalized, 'email_attach');
+    return this.issueEmailChallenge(normalized, 'email_attach', {
+      deliver: true,
+      customerId,
+    });
   }
 
   /** Confirm the attach code and bind the address to the account. */
@@ -360,9 +363,11 @@ export class AuthService implements OnModuleInit {
       code,
       'email_attach',
       challengeId,
+      customerId,
     );
     try {
       await this.prisma.$transaction(async (tx) => {
+        await lockActiveCustomerOnTx(tx, customerId);
         await this.consumeEmailClaim(challenge.id, tx);
         const owner = await tx.customer.findUnique({
           where: { email: normalized },
@@ -382,6 +387,11 @@ export class AuthService implements OnModuleInit {
         });
       });
     } catch (error) {
+      if (error instanceof CustomerSessionRevokedException) {
+        await this.prisma.otpChallenge.deleteMany({
+          where: { id: challenge.id, purpose: 'email_attach' },
+        });
+      }
       if (isUniqueViolation(error)) {
         throw new ValidationError('email_taken', 'Этот адрес уже привязан к другому аккаунту');
       }
@@ -392,7 +402,11 @@ export class AuthService implements OnModuleInit {
   private async issueEmailChallenge(
     email: string,
     purpose: 'login' | 'email_attach',
-    options: { deliver: boolean; genericDeliveryResponse?: boolean } = { deliver: true },
+    options: {
+      deliver: boolean;
+      genericDeliveryResponse?: boolean;
+      customerId?: string;
+    } = { deliver: true },
   ): Promise<{ challengeId: string; devCode?: string }> {
     if (this.config.get<string>('NODE_ENV') === 'production' && this.emailOtpSender.name === 'noop') {
       throw new ValidationError('email_transport_unavailable', 'Email transport is not configured');
@@ -403,25 +417,51 @@ export class AuthService implements OnModuleInit {
     // в запросе, и пропустить её значило бы вернуть таймингу ту же роль оракула,
     // которую только что отняли у формы идентификатора.
     const codeHash = await argon2.hash(code);
-    const challenge = await this.prisma.otpChallenge.create({
-      data: {
-        email,
-        channel: 'email',
-        purpose,
-        codeHash,
-        expiresAt: new Date(Date.now() + OTP_TTL_MS),
-      },
-    });
+    const challengeData = {
+      email,
+      channel: 'email' as const,
+      purpose,
+      codeHash,
+      expiresAt: new Date(Date.now() + OTP_TTL_MS),
+      ...(options.customerId ? { customerId: options.customerId } : {}),
+    };
+    const challenge = options.customerId
+      ? await this.prisma.$transaction(async (tx) => {
+          await lockActiveCustomerOnTx(tx, options.customerId!);
+          return tx.otpChallenge.create({ data: challengeData });
+        })
+      : await this.prisma.otpChallenge.create({ data: challengeData });
     const deliveryStartedAt = Date.now();
     let delivered = !options.deliver;
     if (options.deliver) {
       try {
-        await this.emailOtpSender.send({
+        const send = () => this.emailOtpSender.send({
           email,
           code,
           purpose,
           expiresInSeconds: OTP_TTL_MS / 1000,
         });
+        if (options.customerId) {
+          // The challenge creation commits before external I/O. A second short
+          // ownership fence makes deletion and SMTP delivery mutually ordered:
+          // deletion-first suppresses the email; send-first is cleaned by delete.
+          await this.prisma.$transaction(
+            async (tx) => {
+              await lockActiveCustomerOnTx(tx, options.customerId!);
+              const pending = await tx.otpChallenge.findUnique({
+                where: { id: challenge.id },
+                select: { id: true },
+              });
+              if (!pending) throw new CustomerSessionRevokedException();
+              await send();
+            },
+            // SMTP has an explicit <=10s total deadline. Keep the transaction
+            // budget larger so a delivered email cannot be followed by P2028.
+            { maxWait: 5_000, timeout: 12_000 },
+          );
+        } else {
+          await send();
+        }
         delivered = true;
       } catch (error) {
         if (!options.genericDeliveryResponse) {
@@ -485,6 +525,7 @@ export class AuthService implements OnModuleInit {
     code: string,
     purpose: 'login' | 'email_attach',
     challengeId?: string,
+    customerId?: string,
   ): Promise<ClaimedOtp> {
     const pinnedId = challengeId ?? null;
     // Попытка занимается ОДНИМ запросом. Прежняя версия читала строку, сверяла
@@ -500,6 +541,7 @@ export class AuthService implements OnModuleInit {
         WHERE email = ${email}
           AND channel::text = 'email'
           AND purpose::text = ${purpose}
+          AND (${customerId ?? null}::text IS NULL OR "customerId" = ${customerId ?? null})
           AND (${pinnedId}::text IS NULL OR id = ${pinnedId})
           AND "consumedAt" IS NULL
           -- expiresAt это timestamp БЕЗ зоны, и в нём лежит UTC; NOW() это
@@ -523,6 +565,7 @@ export class AuthService implements OnModuleInit {
           email,
           channel: 'email',
           purpose,
+          ...(customerId ? { customerId } : {}),
           consumedAt: null,
           expiresAt: { gt: new Date() },
         },
@@ -788,7 +831,7 @@ export class AuthService implements OnModuleInit {
         'Обновите приложение и подтвердите номер телефона для входа',
       );
     }
-    await this.reserveConsumedSocialAssertion(profile, profile.replayIdentity);
+    await this.reserveConsumedSocialAssertion(profile, profile.replayIdentity, customer.id);
     return this.issueTokens(customer.id, customer.phone);
   }
 
@@ -834,7 +877,7 @@ export class AuthService implements OnModuleInit {
         'Обновите приложение и подтвердите номер телефона для входа',
       );
     }
-    await this.reserveConsumedSocialAssertion(profile, dto.identityToken);
+    await this.reserveConsumedSocialAssertion(profile, dto.identityToken, customer.id);
     return this.issueTokens(customer.id, customer.phone);
   }
 
@@ -869,7 +912,7 @@ export class AuthService implements OnModuleInit {
   ): Promise<SocialAuthResult> {
     const customer = await this.existingCustomerForSocialProfile(profile);
     if (customer) {
-      await this.reserveConsumedSocialAssertion(profile, providerAssertion);
+      await this.reserveConsumedSocialAssertion(profile, providerAssertion, customer.id);
       return {
         status: 'authenticated',
         ...(await this.issueTokens(customer.id, customer.phone)),
@@ -913,6 +956,28 @@ export class AuthService implements OnModuleInit {
 
     try {
       const outcome = await this.prisma.$transaction(async (tx) => {
+        // Read without locking only to discover whether an existing customer
+        // must be fenced. The enrollment is re-read authoritatively below.
+        const candidate = await tx.socialEnrollment.findUnique({
+          where: { tokenHash },
+          select: { consumedAt: true, expiresAt: true },
+        });
+        if (!candidate || candidate.consumedAt || candidate.expiresAt <= new Date()) {
+          throw new ValidationError(
+            'social_enrollment_invalid',
+            'Enrollment token недействителен, истёк или уже использован',
+          );
+        }
+
+        // Customer-first is the global account-deletion lock order. Only after
+        // this fence may completion lock SocialEnrollment and OTP rows.
+        const existingCustomer = await tx.customer.findFirst({
+          where: { phone: { in: [phone, legacyPhone] } },
+        });
+        if (existingCustomer) {
+          await lockActiveCustomerOnTx(tx, existingCustomer.id);
+        }
+
         const rows = await tx.$queryRaw<Array<{
           id: string;
           provider: string;
@@ -939,17 +1004,6 @@ export class AuthService implements OnModuleInit {
             'social_enrollment_invalid',
             'Enrollment token недействителен, истёк или уже использован',
           );
-        }
-
-        // Existing accounts take the authoritative customer lock before the OTP
-        // row. Deletion uses the same Customer → OTP/identity order, preventing
-        // a delete/login deadlock. A missing customer is created only after the
-        // OTP is proven, so invalid attempts cannot create accounts.
-        const existingCustomer = await tx.customer.findFirst({
-          where: { phone: { in: [phone, legacyPhone] } },
-        });
-        if (existingCustomer) {
-          await lockActiveCustomerOnTx(tx, existingCustomer.id);
         }
 
         const pinnedId = dto.challengeId ?? null;
@@ -1033,6 +1087,10 @@ export class AuthService implements OnModuleInit {
           data: {
             consumedAt: new Date(),
             expiresAt: new Date(Date.now() + SOCIAL_ASSERTION_RETENTION_SECONDS * 1000),
+            customerId: customer.id,
+            email: null,
+            displayName: null,
+            avatarUrl: null,
           },
         });
         const consumedChallenge = await tx.otpChallenge.updateMany({
@@ -1088,23 +1146,25 @@ export class AuthService implements OnModuleInit {
   private async reserveConsumedSocialAssertion(
     profile: SocialProfile,
     providerAssertion: string,
+    customerId: string,
   ): Promise<void> {
     const now = new Date();
     await this.deleteExpiredSocialAssertions(now);
     const internalMarker = randomBytes(32).toString('base64url');
     try {
-      await this.prisma.socialEnrollment.create({
-        data: {
-          tokenHash: this.hashToken(internalMarker),
-          assertionHash: this.hashToken(providerAssertion),
-          provider: profile.provider,
-          subject: profile.subject,
-          email: profile.email,
-          displayName: profile.displayName,
-          avatarUrl: profile.avatarUrl,
-          expiresAt: new Date(now.getTime() + SOCIAL_ASSERTION_RETENTION_SECONDS * 1000),
-          consumedAt: now,
-        },
+      await this.prisma.$transaction(async (tx) => {
+        await lockActiveCustomerOnTx(tx, customerId);
+        await tx.socialEnrollment.create({
+          data: {
+            tokenHash: this.hashToken(internalMarker),
+            assertionHash: this.hashToken(providerAssertion),
+            provider: profile.provider,
+            subject: profile.subject,
+            customerId,
+            expiresAt: new Date(now.getTime() + SOCIAL_ASSERTION_RETENTION_SECONDS * 1000),
+            consumedAt: now,
+          },
+        });
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -1391,31 +1451,36 @@ export class AuthService implements OnModuleInit {
   private async existingCustomerForSocialProfile(
     profile: SocialProfile,
   ): Promise<Customer | null> {
-    const existing = await this.prisma.customerIdentity.findUnique({
+    const identity = await this.prisma.customerIdentity.findUnique({
       where: {
         provider_subject: {
           provider: profile.provider,
           subject: profile.subject,
         },
       },
-      include: { customer: true },
+      select: { id: true, customerId: true },
     });
-    if (!existing) return null;
-    await this.prisma.customerIdentity.update({
-      where: { id: existing.id },
-      data: {
-        email: profile.email,
-        displayName: profile.displayName,
-        avatarUrl: profile.avatarUrl,
-      },
-    });
-    if (!existing.customer.name && profile.displayName) {
-      return this.prisma.customer.update({
-        where: { id: existing.customerId },
-        data: { name: profile.displayName },
+    if (!identity) return null;
+    return this.prisma.$transaction(async (tx) => {
+      let customer = await lockActiveCustomerOnTx(tx, identity.customerId);
+      const stillLinked = await tx.customerIdentity.findUnique({ where: { id: identity.id } });
+      if (!stillLinked || stillLinked.customerId !== customer.id) return null;
+      await tx.customerIdentity.update({
+        where: { id: identity.id },
+        data: {
+          email: profile.email,
+          displayName: profile.displayName,
+          avatarUrl: profile.avatarUrl,
+        },
       });
-    }
-    return existing.customer;
+      if (!customer.name && profile.displayName) {
+        customer = await tx.customer.update({
+          where: { id: customer.id },
+          data: { name: profile.displayName },
+        });
+      }
+      return customer;
+    });
   }
 
   private async issueTokens(

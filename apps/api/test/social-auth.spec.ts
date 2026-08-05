@@ -62,6 +62,15 @@ describe('Auth: social provider login', () => {
     expect(identities[0].displayName).toBe('Ali Buyer @ali_buyer');
     expect(identities[0].customer.segments).toContain('auth:telegram');
     expect(identities[0].customer.phone).toMatch(/^\+999\d{10}$/);
+    const replayMarker = await prisma.socialEnrollment.findFirstOrThrow({
+      where: { provider: 'telegram', subject: '777001', consumedAt: { not: null } },
+    });
+    expect(replayMarker).toMatchObject({
+      customerId: identities[0].customerId,
+      email: null,
+      displayName: null,
+      avatarUrl: null,
+    });
   });
 
   it('rejects reordered and percent-equivalent replays on the legacy Telegram path', async () => {

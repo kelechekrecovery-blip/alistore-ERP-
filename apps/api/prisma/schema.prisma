@@ -593,6 +593,8 @@ model Customer {
   segments                String[]
   ltv                     Int                     @default(0)
   identities              CustomerIdentity[]
+  otpChallenges           OtpChallenge[]          @relation("CustomerOtpChallenges")
+  socialEnrollments       SocialEnrollment[]      @relation("CustomerSocialEnrollments")
   pushTokens              PushToken[]
   addresses               CustomerAddress[]
   preferences             CustomerPreferences?
@@ -718,10 +720,13 @@ model SocialEnrollment {
   avatarUrl     String?
   expiresAt     DateTime
   consumedAt    DateTime?
+  customerId    String?
+  customer      Customer? @relation("CustomerSocialEnrollments", fields: [customerId], references: [id], onDelete: Cascade)
   createdAt     DateTime @default(now())
 
   @@index([provider, subject])
   @@index([expiresAt])
+  @@index([customerId])
 }
 
 // Durable global budget for the deliberately narrow App Store / Play review
@@ -3594,10 +3599,13 @@ model OtpChallenge {
   attempts   Int        @default(0)
   expiresAt  DateTime
   consumedAt DateTime?
+  customerId String?
+  customer   Customer?  @relation("CustomerOtpChallenges", fields: [customerId], references: [id], onDelete: Cascade)
   createdAt  DateTime   @default(now())
 
   @@index([phone])
   @@index([email])
+  @@index([customerId])
 }
 
 // Rotating refresh token, stored as a sha-256 hash and single-use (revoked on

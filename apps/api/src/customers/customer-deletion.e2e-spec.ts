@@ -4,12 +4,14 @@ import { JwtModule, JwtService } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { Test } from '@nestjs/testing';
 import * as argon2 from 'argon2';
+import { createHash } from 'node:crypto';
 import request from 'supertest';
 import { AuditModule } from '../audit/audit.module';
 import { AuthService } from '../auth/auth.service';
 import { JwtStrategy } from '../auth/jwt.strategy';
 import { NoopOtpSender } from '../auth/noop-otp.sender';
 import { OTP_SENDER } from '../auth/otp-sender';
+import { EMAIL_OTP_SENDER, type EmailOtpSender } from '../auth/email-otp.sender';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { CustomersModule } from './customers.module';
@@ -28,6 +30,7 @@ describe('Customer account deletion and export', () => {
   let jwt: JwtService;
   let auth: AuthService;
   let customers: CustomersService;
+  const sendEmailOtp = jest.fn<Promise<void>, Parameters<EmailOtpSender['send']>>(async () => undefined);
   const run = `${Date.now()}${Math.floor(Math.random() * 10_000)}`.slice(-8);
 
   beforeAll(async () => {
@@ -41,7 +44,19 @@ describe('Customer account deletion and export', () => {
         AuditModule,
         CustomersModule,
       ],
-      providers: [JwtStrategy, AuthService, { provide: OTP_SENDER, useClass: NoopOtpSender }],
+      providers: [
+        JwtStrategy,
+        AuthService,
+        { provide: OTP_SENDER, useClass: NoopOtpSender },
+        {
+          provide: EMAIL_OTP_SENDER,
+          useValue: {
+            name: 'smtp',
+            assertOperational: () => undefined,
+            send: sendEmailOtp,
+          } satisfies EmailOtpSender,
+        },
+      ],
     }).compile();
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
@@ -106,6 +121,32 @@ describe('Customer account deletion and export', () => {
     }
   }
 
+  async function waitForCustomerLockWaiters(minimum: number) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Client } = require('pg');
+    const observer = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+    await observer.connect();
+    try {
+      const deadline = Date.now() + 5_000;
+      for (;;) {
+        const observed = await observer.query(`
+          SELECT COUNT(*)::int AS count
+          FROM pg_stat_activity
+          WHERE pid <> pg_backend_pid()
+            AND datname = current_database()
+            AND state = 'active'
+            AND wait_event_type = 'Lock'
+            AND query LIKE '%FROM "Customer"%FOR UPDATE%'
+        `);
+        if (Number(observed.rows[0]?.count ?? 0) >= minimum) return;
+        if (Date.now() >= deadline) throw new Error(`expected ${minimum} Customer lock waiters`);
+        await new Promise<void>((done) => setImmediate(done));
+      }
+    } finally {
+      await observer.end();
+    }
+  }
+
   it('anonymizes PII, erases addresses/identities and revokes every session', async () => {
     const owner = await customer('11', true);
     const ownerAccessToken = token(owner);
@@ -148,6 +189,27 @@ describe('Customer account deletion and export', () => {
     await prisma.pushToken.create({
       data: { customerId: owner.id, token: `push-${run}`, platform: 'ios', deviceId: `device-${run}` },
     });
+    await prisma.otpChallenge.create({
+      data: {
+        customerId: owner.id,
+        email: `pending-${run}@example.test`,
+        channel: 'email',
+        purpose: 'email_attach',
+        codeHash: await argon2.hash('123456'),
+        expiresAt: new Date(Date.now() + 300_000),
+      },
+    });
+    await prisma.socialEnrollment.create({
+      data: {
+        customerId: owner.id,
+        tokenHash: `owned-token-${run}`,
+        assertionHash: `owned-assertion-${run}`,
+        provider: 'apple',
+        subject: `owned-subject-${run}`,
+        expiresAt: new Date(Date.now() + 300_000),
+        consumedAt: new Date(),
+      },
+    });
     await prisma.refreshToken.createMany({
       data: [1, 2].map((n) => ({
         customerId: owner.id,
@@ -182,6 +244,8 @@ describe('Customer account deletion and export', () => {
       payload: { redacted: true, reason: 'customer_account_deleted' },
     });
     expect(await prisma.pushToken.count({ where: { customerId: owner.id } })).toBe(0);
+    expect(await prisma.otpChallenge.count({ where: { customerId: owner.id } })).toBe(0);
+    expect(await prisma.socialEnrollment.count({ where: { customerId: owner.id } })).toBe(0);
     const sessions = await prisma.refreshToken.findMany({ where: { customerId: owner.id } });
     expect(sessions).toHaveLength(2);
     expect(sessions.every((session) => session.revokedAt !== null)).toBe(true);
@@ -610,6 +674,110 @@ describe('Customer account deletion and export', () => {
     const issued = await auth.requestEmailOtp(email);
     expect(issued.devCode).toBeUndefined();
     await expect(auth.verifyEmailOtp(email, emailCode)).rejects.toThrow();
+  });
+
+  it('does not attach email PII when confirmation resumes after deletion', async () => {
+    const owner = await customer('20');
+    const email = `attach-after-delete-${run}@example.test`;
+    const code = '384726';
+    const challenge = await prisma.otpChallenge.create({
+      data: {
+        customerId: owner.id,
+        email,
+        channel: 'email',
+        purpose: 'email_attach',
+        codeHash: await argon2.hash(code),
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      },
+    });
+
+    await expect(customers.deleteAccount(owner.id)).resolves.toEqual({ id: owner.id, deleted: true });
+    await expect(auth.confirmEmailAttach(owner.id, email, code, challenge.id))
+      .rejects.toMatchObject({ code: 'otp_not_found' });
+
+    expect(await prisma.customer.findUniqueOrThrow({ where: { id: owner.id } }))
+      .toMatchObject({ email: null, emailVerifiedAt: null });
+    expect(await prisma.otpChallenge.count({ where: { id: challenge.id } })).toBe(0);
+  });
+
+  it('does not create or send an email-attach challenge when deletion owns the lock first', async () => {
+    const owner = await customer('21');
+    const email = `attach-race-${run}@example.test`;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Client } = require('pg');
+    const blocker = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+    sendEmailOtp.mockClear();
+    await blocker.connect();
+    let transactionOpen = false;
+    try {
+      await blocker.query('BEGIN');
+      transactionOpen = true;
+      await blocker.query('SELECT id FROM "Customer" WHERE id = $1 FOR UPDATE', [owner.id]);
+
+      const deletion = customers.deleteAccount(owner.id);
+      await waitForCustomerLockWaiters(1);
+      const requestAttach = auth.requestEmailAttach(owner.id, email);
+      await waitForCustomerLockWaiters(2);
+      await blocker.query('COMMIT');
+      transactionOpen = false;
+
+      await expect(deletion).resolves.toEqual({ id: owner.id, deleted: true });
+      await expect(requestAttach).rejects.toMatchObject({ code: 'customer_session_revoked' });
+      expect(await prisma.otpChallenge.count({ where: { email } })).toBe(0);
+      expect(sendEmailOtp).not.toHaveBeenCalled();
+    } finally {
+      if (transactionOpen) await blocker.query('ROLLBACK');
+      await blocker.end();
+    }
+  });
+
+  it('orders social completion behind deletion without recreating identity PII', async () => {
+    const owner = await customer('23');
+    const enrollmentToken = `social-delete-race-${run}`;
+    const subject = `social-delete-subject-${run}`;
+    const enrollment = await prisma.socialEnrollment.create({
+      data: {
+        tokenHash: createHash('sha256').update(enrollmentToken).digest('hex'),
+        assertionHash: createHash('sha256').update(`${enrollmentToken}:assertion`).digest('hex'),
+        provider: 'apple',
+        subject,
+        email: `social-delete-${run}@example.test`,
+        displayName: 'Не восстанавливать',
+        expiresAt: new Date(Date.now() + 300_000),
+      },
+    });
+    const challenge = await auth.requestOtp(owner.phone);
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Client } = require('pg');
+    const blocker = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+    await blocker.connect();
+    let transactionOpen = false;
+    try {
+      await blocker.query('BEGIN');
+      transactionOpen = true;
+      await blocker.query('SELECT id FROM "Customer" WHERE id = $1 FOR UPDATE', [owner.id]);
+
+      const deletion = customers.deleteAccount(owner.id);
+      await waitForCustomerLockWaiters(1);
+      const completion = auth.completeSocialEnrollment({
+        enrollmentToken,
+        phone: owner.phone,
+        code: challenge.devCode!,
+        challengeId: challenge.challengeId,
+      });
+      await waitForCustomerLockWaiters(2);
+      await blocker.query('COMMIT');
+      transactionOpen = false;
+
+      await expect(deletion).resolves.toEqual({ id: owner.id, deleted: true });
+      await expect(completion).rejects.toMatchObject({ code: 'customer_session_revoked' });
+      expect(await prisma.customerIdentity.count({ where: { provider: 'apple', subject } })).toBe(0);
+      expect(await prisma.socialEnrollment.findUnique({ where: { id: enrollment.id } }))
+        .toMatchObject({ customerId: null, consumedAt: null });
+    } finally {
+      if (transactionOpen) await blocker.query('ROLLBACK');
+      await blocker.end();
+    }
   });
 
   it('keeps orders and ledger rows intact for accounting', async () => {

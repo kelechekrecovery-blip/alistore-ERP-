@@ -411,6 +411,7 @@ export class CustomersService {
       await tx.otpChallenge.deleteMany({
         where: {
           OR: [
+            { customerId },
             { phone: customer.phone },
             ...(customer.email ? [{ email: customer.email }] : []),
           ],
@@ -436,6 +437,7 @@ export class CustomersService {
       });
       await tx.customerAddress.deleteMany({ where: { customerId } });
       await tx.customerIdentity.deleteMany({ where: { customerId } });
+      await tx.socialEnrollment.deleteMany({ where: { customerId } });
       await tx.pushToken.deleteMany({ where: { customerId } });
       await tx.customerNotification.deleteMany({ where: { customerId } });
       await tx.customerPreferences.updateMany({

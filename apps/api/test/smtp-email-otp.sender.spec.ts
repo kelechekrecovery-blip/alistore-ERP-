@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { type AddressInfo, createServer } from 'node:net';
 import { SmtpEmailOtpSender } from '../src/auth/smtp-email-otp.sender';
 
 function config(values: Record<string, string | undefined>): ConfigService {
@@ -49,5 +50,61 @@ describe('SmtpEmailOtpSender', () => {
         expiresInSeconds: 300,
       }).subject,
     ).toBe('AliStore — код для входа');
+  });
+
+  it('closes a stalled SMTP transport at the configured total deadline', async () => {
+    let markSocketClosed!: () => void;
+    const socketClosed = new Promise<void>((resolve) => { markSocketClosed = resolve; });
+    const server = createServer((socket) => {
+      // Deliberately never send the SMTP greeting. The production low-level
+      // connection must destroy this real TCP socket at its total deadline.
+      socket.once('close', () => markSocketClosed());
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const sender = new SmtpEmailOtpSender(config({
+        SMTP_HOST: '127.0.0.1',
+        SMTP_PORT: String((server.address() as AddressInfo).port),
+        SMTP_OTP_TOTAL_TIMEOUT_MS: '50',
+      }));
+
+      const delivery = sender.send({
+        email: 'buyer@example.test',
+        code: '123456',
+        purpose: 'email_attach',
+        expiresInSeconds: 300,
+      });
+      await expect(delivery).rejects.toThrow('SMTP OTP delivery timed out');
+      await expect(socketClosed).resolves.toBeUndefined();
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close((error) => {
+        if (error) reject(error);
+        else resolve();
+      }));
+    }
+  });
+
+  it('rejects a peer socket failure instead of emitting an unhandled error', async () => {
+    const server = createServer((socket) => socket.destroy());
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const sender = new SmtpEmailOtpSender(config({
+        SMTP_HOST: '127.0.0.1',
+        SMTP_PORT: String((server.address() as AddressInfo).port),
+        SMTP_OTP_TOTAL_TIMEOUT_MS: '1000',
+      }));
+
+      await expect(sender.send({
+        email: 'buyer@example.test',
+        code: '123456',
+        purpose: 'email_attach',
+        expiresInSeconds: 300,
+      })).rejects.toThrow();
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close((error) => {
+        if (error) reject(error);
+        else resolve();
+      }));
+    }
   });
 });
