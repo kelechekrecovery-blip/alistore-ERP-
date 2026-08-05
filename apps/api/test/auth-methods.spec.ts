@@ -226,6 +226,17 @@ describe('describeAuthMethods: что реально пустит человек
       }));
       expect(methods.apple.clientId).toBe('kg.alistore.web');
     });
+
+    it('не показывает Apple в вебе, если Services ID не входит в accepted audiences', () => {
+      const methods = describeAuthMethods(env({
+        NODE_ENV: 'production',
+        SMS_PROVIDER: 'android_gateway',
+        APPLE_CLIENT_ID: 'kg.alistore.client',
+        APPLE_WEB_CLIENT_ID: 'kg.alistore.web',
+      }));
+      expect(methods.apple.enabled).toBe(true);
+      expect(methods.apple.clientId).toBeNull();
+    });
   });
 
   describe('восстановление доступа', () => {

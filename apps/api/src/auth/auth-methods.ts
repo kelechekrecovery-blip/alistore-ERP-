@@ -88,11 +88,17 @@ export function describeAuthMethods(env: AuthMethodsEnvReader): AuthMethodsView 
     botUsername: telegramEnabled ? env('TELEGRAM_BOT_USERNAME')?.trim() || null : null,
   };
 
-  const appleEnabled = appleAudiences(env).length > 0;
+  const appleTokenAudiences = appleAudiences(env);
+  const appleEnabled = appleTokenAudiences.length > 0;
+  const configuredAppleWebClientId = appleWebClientId(env);
   const apple: AppleMethodState = {
     enabled: appleEnabled,
     registers: appleEnabled && phoneEnabled,
-    clientId: appleWebClientId(env),
+    // Не показываем браузерную кнопку, если API не принимает выпущенный для
+    // неё audience. Иначе Apple успешно вернёт токен, а наш API отвергнет его.
+    clientId: configuredAppleWebClientId && appleTokenAudiences.includes(configuredAppleWebClientId)
+      ? configuredAppleWebClientId
+      : null,
   };
 
   const googleTokenAudiences = googleAudiences(env);
