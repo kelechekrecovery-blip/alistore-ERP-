@@ -1,7 +1,7 @@
 # AliStore AI Executive OS — Phase 0 Baseline
 
 Дата снимка: 2026-08-05
-Git SHA evidence through: `e18781ca`
+Git SHA evidence through: `30e0661c`
 Статус решения: **REVISE — переход к production rollout запрещён до закрытия P0**.
 
 ## Scope
@@ -20,8 +20,8 @@ Status: REVISE
 Summary: локальная программная основа AliStore сильная и собирается, но система не
 доказана как production-ready. Auth/account, support retry, AI image SSRF и
 production dependency HIGH закрыты проверяемыми slices. Остаются camera/Event
-Ledger/approval security gaps, paid-repair identity races, guest-order response-loss
-и mobile/staff checkout contract defects, а также внешняя сертификация платежей,
+Ledger/approval security gaps, guest-order response-loss и mobile/staff checkout
+contract defects, а также внешняя сертификация платежей,
 фискализации, каналов, камер и физических устройств. Все четыре App Store
 submission ожидают review.
 
@@ -31,9 +31,9 @@ Level: high
 
 Reason: вывод основан на текущем worktree, production builds, изолированных
 PostgreSQL test runs, схеме/миграциях и независимых architecture/security/release
-reviews. Live production credentials, реальные провайдеры, камеры, POS hardware и
-актуальный App Store Connect readback в этом worktree отсутствуют, поэтому они не
-считаются проверенными.
+reviews. Live production credentials, реальные провайдеры, камеры и POS hardware
+в этом worktree отсутствуют, поэтому они не считаются проверенными; ASC status
+основан на записанном live readback, а не на постоянном доступе.
 
 ## Evidence
 
@@ -48,6 +48,8 @@ reviews. Live production credentials, реальные провайдеры, к�
   13/13 tests PASS on isolated PostgreSQL.
 - VERIFIED: anonymous POS walk-in identity regression closed with a DB-atomic
   internal sentinel; POS/inventory/ledger/bundle gate — 7 suites, 58/58 PASS.
+- VERIFIED: paid-repair phone identity canonicalization, legacy adoption,
+  alias concurrency and bounded P2002 recovery — service/auth gate 33/33 PASS.
 - VERIFIED: production dependency audit — 0 vulnerabilities after compatible
   per-consumer resolution; legacy glob/coverage and Socket.IO runtime tests PASS.
 - VERIFIED: iOS unit/contract 164/164 and UI E2E 47/47 PASS across Client,
@@ -66,7 +68,7 @@ reviews. Live production credentials, реальные провайдеры, к�
 | RBAC | PARTIAL | Casbin guard и серверная approval matrix; isolated RBAC/authz tests PASS | Требуемые AI-роли и canonical `manager` не существуют; approval lifecycle не имеет claim/expiry/cancel ownership; один consent endpoint не rechecks active staff | Спроектировать AI capability roles; добавить claim/expiry/cancel и concurrency tests; закрыть active-staff gap; прогнать deny matrix |
 | Orders | PARTIAL | Transactional order creation/reservation/state machine, idempotency и ledger; Web checkout E2E specs существуют | Guest customer command не имеет response-loss replay; React Native теряет guest capability и использует неверный order contract; staff buyback вызывает guest-only endpoint | Сначала idempotent guest command и mobile/staff contract fix; затем create→reserve→pay/COD→fulfill→return E2E |
 | Payments | BLOCKED_EXTERNAL | Provider-neutral ports, refund approvals, webhook/idempotency tests; `production-payment-gateway.provider.ts` fail-closed | Production gateway намеренно не активирован; фискальный чек отсутствует | Выбрать cash/COD pilot или сертифицированный provider; live signed webhook/refund reconciliation; OFD/KKM |
-| Inventory | PARTIAL | IMEI/quantity locks, reservation, valuation, quarantine and ledger paths in API; 58/58 focused POS/inventory/ledger tests PASS | Paid-repair intake остаётся raw phone writer с alias/race risk; scanner/physical store flow не сертифицирован | Canonicalize service-center identity with concurrency tests; exact-once procurement→receipt→sale→return; physical UAT |
+| Inventory | PARTIAL | IMEI/quantity locks, reservation, valuation, quarantine and ledger paths in API; POS/inventory 58/58 and service/auth 33/33 gates PASS | Scanner/physical store flow and complete supply reconciliation are not certified | Exact-once procurement→receipt→sale→repair/return; physical scanner and stock-count UAT |
 | Delivery | BLOCKED_EXTERNAL | Courier assignment, evidence, COD handover and offline queues implemented; courier E2E specs существуют | Live push/maps/camera/network and physical COD handover не сертифицированы | Physical-device run with offline restart, evidence upload, failure→redispatch and cash reconciliation |
 | Support | PARTIAL | Auth and guest create are atomic/idempotent; evidence keys are content-stable; canonical/legacy ownership, concurrent replay and expiry tests PASS | Live WhatsApp/Telegram delivery remains external | Channel certification plus SLA/escalation/failure E2E |
 | AI | PARTIAL | Allowlisted read tools, owner/admin guard, kill switch, durable runs/steps/decisions, approval-backed triage and hardened image URL resolver | `confidence=1` hard-coded; sourceRefs insufficient; no complete eval gate | Typed Executive response, real evidence refs, confidence policy and offline evals |
@@ -74,7 +76,7 @@ reviews. Live production credentials, реальные провайдеры, к�
 | Cameras | PARTIAL | Edge enrollment, hashed secrets, idempotent metadata ingest, global kill switch and retention purge; isolated camera tests PASS | `value` — arbitrary JSON; privacy label caller-controlled; нет EZVIZ/ONVIF/RTSP adapter, per-camera kill switch и legal decision | Typed per-event schemas, server-derived TTL/privacy, local gateway adapter and physical privacy UAT; face recognition запрещено |
 | iOS | PARTIAL | 4 SwiftUI targets at repository build 6; unit/contract 164/164, UI 47/47 and strict signing/metadata preflight PASS | Pending ASC submissions use build 5; fresh physical-device SIWA is unverified | Do not replace build 5 while under review; physical-device auth smoke and post-review readback |
 | Web | PARTIAL | Production build PASS, 45 routes; 30 unit test files and 45 Playwright specs exist | Worktree contains unrelated uncommitted UI changes; full E2E not rerun | Separate/commit UI work, then full route audit, a11y, cross-browser and visual regression |
-| E2E | PARTIAL | Auth/account 55/55, customer/support 13/13 and POS/inventory/ledger 58/58 isolated gates PASS; comprehensive Playwright journeys exist | Targeted checks do not prove whole ecosystem; no repeated full-suite flake run on current SHA | Run full isolated API twice, full Playwright, reconciled ecosystem, native UI and failure injection |
+| E2E | PARTIAL | Auth/account 55/55, customer/support 13/13, POS/inventory/ledger 58/58 and service/auth 33/33 isolated gates PASS; comprehensive Playwright journeys exist | Targeted checks do not prove whole ecosystem; no repeated full-suite flake run on current SHA | Run full isolated API twice, full Playwright, reconciled ecosystem, native UI and failure injection |
 | Security | PARTIAL | JWT/OTP/storage guards, hardened image resolver, exhaustive account deletion tests and production audit 0; independent reviews APPROVE completed slices | Camera metadata policy, DB-enforced Event Ledger immutability, approval ownership and cross-writer phone consistency remain open; phone-existence response is an accepted rate-limited privacy risk | Close camera schema/retention, AuditEvent immutability, approval lifecycle and phone-writer consistency; full secret/container/IDOR scan |
 | App Store | BLOCKED_EXTERNAL | All four `1.0.0` build-5 versions verified WAITING_FOR_REVIEW; strict signing/metadata preflight and reviewer logins PASS; iOS UI 47/47 | Apple review, Unlisted distribution and fresh physical-iPad SIWA remain external | Do not replace build 5; monitor review; physical SIWA smoke and distribution decision |
 
@@ -84,8 +86,8 @@ reviews. Live production credentials, реальные провайдеры, к�
 - VERIFIED: `AuditEvent` is described as append-only but the database role can update/delete it; immutability is convention, not DB enforcement.
 - VERIFIED: approval status has only requested/approved/rejected; no atomic claim,
   expiry or cancellation ownership protects concurrent execution.
-- VERIFIED: paid-repair intake normalizes neither phone aliases nor the shared
-  writer lock, while guest customer creation lacks response-loss idempotency.
+- VERIFIED: guest customer creation lacks response-loss idempotency; remaining
+  auth/customer writers still need one explicit shared-lock/P2002 contract audit.
 - VERIFIED: React Native checkout drops guest capability and posts guest and
   authenticated orders through the same incompatible contract; staff buyback calls
   the guest-only customer endpoint.
@@ -128,11 +130,10 @@ reviews. Live production credentials, реальные провайдеры, к�
 - Owner: Backend + Mobile + Web
 - Priority: P0
 - Dependencies: shared canonical phone identity and idempotency design
-- Acceptance: paid-repair alias/concurrency cases converge on one customer; guest
-  creation replays safely after response loss; React Native sends guest capability or
+- Acceptance: guest creation replays safely after response loss; React Native sends guest capability or
   authenticated token to the correct order endpoint; staff buyback uses an authenticated
   resolver; isolated API and role-specific E2E pass.
-- Rollback: disable affected repair intake, mobile checkout and staff buyback entry points;
+- Rollback: disable affected guest customer/order creation, mobile checkout and staff buyback entry points;
   retain the verified Web/iOS paths without broadening guest capabilities.
 - Kill criterion: any alias split, stranded retry, unauthenticated order, capability leak
   or guest endpoint use from staff remains.
@@ -149,7 +150,8 @@ reviews. Live production credentials, реальные провайдеры, к�
 
 - VERIFIED: API and Web production builds passed on 2026-08-05.
 - VERIFIED: isolated gates passed for auth/account 55/55, customer/support 13/13,
-  POS/inventory/ledger 58/58, auth/preflight/RBAC/outbox 179/179 and authz/AI/camera 13/13.
+  POS/inventory/ledger 58/58, service/auth 33/33, auth/preflight/RBAC/outbox
+  179/179 and authz/AI/camera 13/13.
 - VERIFIED: `git diff --check` passed before documentation edits.
 - UNKNOWN: full ecosystem, native physical and live external gates remain required.
 
