@@ -22,4 +22,3 @@ test('catalog to cart to checkout keeps guest flow healthy', async ({ page }) =>
   expect(errors.filter((message) => /ChunkLoadError|MIME/i.test(message))).toEqual([]);
   expect(await prisma.product.count({ where: { id: product.id } })).toBe(1);
 });
-
