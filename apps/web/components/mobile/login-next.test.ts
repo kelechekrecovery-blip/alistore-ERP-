@@ -14,6 +14,17 @@ describe('safeLoginNext', () => {
     expect(safeLoginNext('//evil.example.com')).toBe('/');
   });
 
+  it('falls back for a backslash URL that browsers normalize to another host', () => {
+    expect(safeLoginNext('/\\evil.example.com')).toBe('/');
+    expect(safeLoginNext('/catalog\\..\\evil.example.com')).toBe('/');
+  });
+
+  it('falls back for control characters stripped by URL parsing', () => {
+    expect(safeLoginNext('/\t/evil.example.com')).toBe('/');
+    expect(safeLoginNext('/\n/evil.example.com')).toBe('/');
+    expect(safeLoginNext('/\r/evil.example.com')).toBe('/');
+  });
+
   it('falls back to "/" for an absolute URL', () => {
     expect(safeLoginNext('https://evil.example.com/phish')).toBe('/');
   });

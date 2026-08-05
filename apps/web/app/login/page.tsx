@@ -11,6 +11,7 @@ import { telegramWidgetInitData } from '@/lib/telegram-widget';
 import { describeAuthError } from '@/lib/auth-errors';
 import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
+import { safeLoginNext } from '@/components/mobile/login-next';
 
 interface TelegramWebApp {
   initData?: string;
@@ -102,10 +103,7 @@ function LoginForm() {
   const router = useRouter();
   const { locale, t } = useT();
   const params = useSearchParams();
-  const requestedNext = params.get('next');
-  const next = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
-    ? requestedNext
-    : '/account';
+  const next = safeLoginNext(params.get('next'), '/account');
 
   const [channel, setChannel] = useState<Channel>('phone');
   const [mode, setMode] = useState<Mode>('login');
@@ -139,7 +137,14 @@ function LoginForm() {
   // Пока ответа нет — форма телефона на месте: мигать заглушкой на каждой
   // загрузке хуже, чем на секунду показать основной путь.
   const phoneLoginEnabled = methods?.phone.enabled ?? true;
-  const nothingAvailable = methods !== null && !methods.anyLoginAvailable;
+  // API-wide `enabled` may describe a native-only method. The website needs
+  // the public Apple Services ID or Telegram Mini App/widget material too.
+  const webLoginAvailable = phoneLoginEnabled
+    || emailLoginEnabled
+    || appleEnabled
+    || telegramEnabled
+    || telegramWidgetEnabled;
+  const nothingAvailable = methods !== null && !webLoginAvailable;
   // Восстановление ходит тем же SMS-каналом и живёт под своим rollout-флагом:
   // сервер уже свёл оба условия в одно поле.
   const recoveryEnabled = Boolean(methods?.recovery.enabled);
@@ -272,11 +277,9 @@ function LoginForm() {
       setResendSeconds(60);
       setStatus(copy.sent);
     } catch (err) {
-      // Для восстановления причина отказа осмысленна для человека
-      // (`recovery_temporarily_unavailable`), поэтому её не глушим общей фразой.
-      setError(channel === 'email' || recovering
-        ? describeAuthError(err, 'Не удалось отправить код.')
-        : 'Не удалось отправить код.');
+      // Machine-readable gateway errors contain no phone or credentials and
+      // let the customer distinguish an offline gateway from invalid input.
+      setError(describeAuthError(err, 'Не удалось отправить код.'));
     } finally {
       setBusy(false);
     }
