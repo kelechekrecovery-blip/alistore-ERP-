@@ -24,10 +24,11 @@ export class CreateTradeInDto {
   @IsEnum(Grade)
   grade!: Grade;
 
-  @ApiProperty({ minimum: 1, example: 42000 })
+  @ApiPropertyOptional({ minimum: 1, example: 42000, description: 'Цена только для staff intake; публичный trade-in считает её на сервере.' })
+  @IsOptional()
   @IsInt()
   @Min(1)
-  price!: number;
+  price?: number;
 
   @ApiProperty({
     description: 'Seller passport or national id. Stored for anti-fraud, masked in responses.',

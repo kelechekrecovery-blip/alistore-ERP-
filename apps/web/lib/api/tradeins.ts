@@ -1,4 +1,4 @@
-import { getJson, postAuthJson, postJson } from './http';
+import { getJson, getPublicJson, postAuthJson, postJson } from './http';
 
 export type TradeInGrade = 'A' | 'B' | 'C';
 
@@ -18,7 +18,8 @@ export function createTradeIn(input: {
   model: string;
   imei?: string;
   grade: TradeInGrade;
-  price: number;
+  /** Только для приёмки сотрудником: на публичном пути цену считает сервер. */
+  price?: number;
   sellerPassport: string;
 }, credential: { accessToken?: string; guestCapability?: string; staffIntake?: boolean; idempotencyKey?: string }): Promise<TradeIn> {
   const idempotencyKey = credential.idempotencyKey ?? globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
@@ -35,4 +36,23 @@ export function createTradeIn(input: {
 
 export function listMyTradeIns(accessToken: string): Promise<TradeIn[]> {
   return getJson<TradeIn[]>('/tradeins/mine', accessToken);
+}
+
+export interface TradeInEstimate {
+  model: string;
+  grade: TradeInGrade;
+  priceSom: number;
+}
+
+/**
+ * Предварительная оценка выкупа — считает сервер.
+ *
+ * Страница считала её сама по таблице моделей, зашитой во фронт, и присылала
+ * получившееся число в `POST /tradeins`. Показанное и записанное в договор
+ * могли разойтись, а на публичном эндпоинте сумму фактически назначал тот,
+ * кто её получает. Теперь обе цифры приходят из одной функции на сервере.
+ */
+export function fetchTradeInEstimate(model: string, grade: TradeInGrade): Promise<TradeInEstimate> {
+  const params = new URLSearchParams({ model, grade });
+  return getPublicJson<TradeInEstimate>(`/tradeins/estimate?${params.toString()}`);
 }

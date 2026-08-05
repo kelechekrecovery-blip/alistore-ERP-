@@ -111,8 +111,12 @@ describe('Trade-ins (integration)', () => {
     expect(await prisma.tradeInDevice.count()).toBe(1);
     expect(await prisma.auditEvent.count({ where: { type: 'tradein.assessed' } })).toBe(1);
 
+    // Менять здесь `price` больше нечего: на клиентском пути цену считает
+    // сервер по модели и состоянию, поэтому присланная сумма на сохранённые
+    // данные не влияет и «изменением» уже не является. Проверяем тем полем,
+    // которое клиент действительно задаёт.
     const reused = await tradeIns
-      .create({ ...input, price: 1 }, seller.id, 'tradein-replay')
+      .create({ ...input, model: 'iPhone 12 mini' }, seller.id, 'tradein-replay')
       .catch((error) => error);
     expect(reused).toBeInstanceOf(ConflictError);
     expect(reused.code).toBe('idempotency_key_reused');

@@ -1,30 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EvidencePicker } from '@/components/EvidencePicker';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
-import { createCustomer, createTradeIn, uploadEvidenceImages, type TradeIn, type TradeInGrade } from '@/lib/api';
+import { createCustomer, createTradeIn, fetchTradeInEstimate, uploadEvidenceImages, type TradeIn, type TradeInGrade } from '@/lib/api';
 import { som } from '@/lib/format';
 
-const grades: { id: TradeInGrade; label: string; desc: string; factor: number }[] = [
-  { id: 'A', label: 'Отличное', desc: 'без царапин, как новый', factor: 1 },
-  { id: 'B', label: 'Хорошее', desc: 'мелкие потёртости', factor: 0.82 },
-  { id: 'C', label: 'Удовлетворительное', desc: 'заметный износ, нужна диагностика', factor: 0.62 },
+// Множители состояний живут в настройках на сервере: они — коммерческое
+// условие, а не константа вёрстки. Здесь остаётся только то, что показать.
+const grades: { id: TradeInGrade; label: string; desc: string }[] = [
+  { id: 'A', label: 'Отличное', desc: 'без царапин, как новый' },
+  { id: 'B', label: 'Хорошее', desc: 'мелкие потёртости' },
+  { id: 'C', label: 'Удовлетворительное', desc: 'заметный износ, нужна диагностика' },
 ];
-
-function basePrice(model: string) {
-  const value = model.toLowerCase();
-  if (value.includes('iphone 15')) return 65000;
-  if (value.includes('iphone 14')) return 52000;
-  if (value.includes('iphone 13')) return 38000;
-  if (value.includes('iphone 12')) return 28000;
-  if (value.includes('macbook')) return 70000;
-  if (value.includes('ipad')) return 32000;
-  if (value.includes('airpods')) return 8000;
-  return 30000;
-}
 
 function normalizePhone(value: string): string {
   const digits = value.replace(/\D/g, '');
@@ -53,9 +43,23 @@ export default function TradeInPage() {
 
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user?.phone]);
 
-  const selectedGrade = grades.find((g) => g.id === grade) ?? grades[1];
-  const price = useMemo(() => Math.round((basePrice(model) * selectedGrade.factor) / 500) * 500, [model, selectedGrade.factor]);
-  const range = `${som(Math.max(price - 2000, 1000))}–${som(price + 2000)}`;
+  // Оценку считает сервер той же функцией, что потом запишет её в договор.
+  // Раньше страница считала сама по таблице моделей и показывала вилку
+  // «цена ± 2000» — числа, за которыми не стоял никто: магазин ими не связан,
+  // а в договор уходило то, что посчитал браузер.
+  const [price, setPrice] = useState<number | null>(null);
+  const [priceError, setPriceError] = useState(false);
+  useEffect(() => {
+    const wanted = model.trim();
+    if (!wanted) { setPrice(null); setPriceError(false); return; }
+    let live = true;
+    const timer = window.setTimeout(() => {
+      fetchTradeInEstimate(wanted, grade)
+        .then((result) => { if (live) { setPrice(result.priceSom); setPriceError(false); } })
+        .catch(() => { if (live) { setPrice(null); setPriceError(true); } });
+    }, 300);
+    return () => { live = false; window.clearTimeout(timer); };
+  }, [model, grade]);
 
   async function submit() {
     if (!model.trim() || !passport.trim()) return;
@@ -69,7 +73,7 @@ export default function TradeInPage() {
         model: note.trim() ? `${model.trim()} (${note.trim()})` : model.trim(),
         imei: imei.trim() || undefined,
         grade,
-        price,
+        ...(price === null ? {} : { price }),
         sellerPassport: passport.trim(),
       }, { accessToken, guestCapability: guest?.guestCapability });
       const tradeIn = user ? await authed(create) : await create();
@@ -113,9 +117,19 @@ export default function TradeInPage() {
   return (
     <MobileAppFrame title="Trade-in оценка" subtitle="Оцените старое устройство за 30 секунд и зачтите сумму в новую покупку." active="home" backHref="/account">
       <div className="rounded-[18px] border border-surface-3 bg-gradient-to-br from-surface-3 to-surface-2 p-5 text-center">
-        <div className="text-[13px] text-muted">Ориентир по текущим данным</div>
-        <div className="mt-2 font-display text-[30px] font-extrabold leading-none text-lime">{range}</div>
-        <div className="mt-2 text-[12px] leading-relaxed text-subtle">Точная цена после диагностики. Можно получить выплату или скидку на новый товар.</div>
+        <div className="text-[13px] text-muted">Предварительная оценка магазина</div>
+        {/* Молчание вместо числа, когда сервер не ответил: показать «примерно
+            столько» без источника — то же самое, что придумать цену. */}
+        <div className="mt-2 font-display text-[30px] font-extrabold leading-none text-lime">
+          {price !== null && price > 0 ? som(price) : priceError ? '—' : '…'}
+        </div>
+        <div className="mt-2 text-[12px] leading-relaxed text-subtle">
+          {priceError
+            ? 'Не удалось получить оценку. Попробуйте позже или оформите выкуп в магазине.'
+            : price === 0
+              ? 'Эту модель не оцениваем онлайн — оценку сделает мастер в магазине.'
+              : 'Точная цена после диагностики. Можно получить выплату или скидку на новый товар.'}
+        </div>
       </div>
 
       <div className="mt-4 text-[13px] text-muted">Модель</div>
