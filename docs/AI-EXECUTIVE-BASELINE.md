@@ -38,7 +38,7 @@ reviews. Live production credentials, реальные провайдеры, к�
 
 ## Evidence
 
-- VERIFIED: 151 Prisma models, 78 enums, 160 migrations, 72 API controllers, 62 Nest modules, 43 Web pages, 103 API spec files, 45 Playwright specs, 70 Swift files и 98 Kotlin files.
+- VERIFIED: 151 Prisma models, 78 enums, 161 migrations, 72 API controllers, 62 Nest modules, 43 Web pages, 103 API spec files, 45 Playwright specs, 70 Swift files и 98 Kotlin files.
 - VERIFIED: `npm run api:build` — PASS.
 - VERIFIED: `npm run build -w @alistore/web` — PASS, 45 Next.js routes generated; storefront `no-store` fetch корректно оставил `/` dynamic.
 - VERIFIED: isolated auth/preflight/RBAC/outbox run — 4 suites, 179/179 tests PASS.
@@ -58,6 +58,10 @@ reviews. Live production credentials, реальные провайдеры, к�
 - VERIFIED: commit `df091d72` serializes fresh and idempotent order creation
   with account deletion before slot, promotion, loyalty, receivable, outbox and
   ledger effects; customer and guest order gate: 2 suites, 18/18 PASS.
+- VERIFIED: commit `1d218422` fences trade-in passport, cash, accounting,
+  outbox and ledger writes from deletion; persisted payout mode closes
+  self-service/staff cross-mode replay. Fresh 161-migration rehearsal and
+  customer/RBAC/buyback gate: 3 suites, 13/13 PASS.
 - VERIFIED: customer/support canonical identity and concurrency — 2 suites,
   13/13 tests PASS on isolated PostgreSQL.
 - VERIFIED: anonymous POS walk-in identity regression closed with a DB-atomic
