@@ -27,6 +27,9 @@ describe('canApprove — authoritative approval matrix', () => {
     campaign_budget: ['admin', 'owner'],
     ai_support_triage: ['admin', 'owner'],
     manual_adjustment: ['admin', 'owner'],
+    // AI reorder creates only an approval-bound procurement draft; it must be
+    // explicitly approved by an admin or owner before a PO is written.
+    procurement_draft: ['admin', 'owner'],
     // Publishing a parked revision changes what every visitor sees, so it is
     // approved at the same level as price and pii rather than by the marketer who
     // drafted it. admin+owner is asserted from two independent sources that agree:
