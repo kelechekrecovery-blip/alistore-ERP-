@@ -3,6 +3,7 @@ import {
   authAppleLogin,
   authConfirmEmailAttach,
   authCompleteSocialEnrollment,
+  authGoogleLogin,
   authLogout,
   authMethods,
   authRequestEmailAttach,
@@ -168,6 +169,20 @@ describe('Telegram social enrollment v2 fetchers', () => {
       code: '123456',
       challengeId: 'phone-challenge',
     });
+    expect(calls[0].init.credentials).toBe('include');
+  });
+});
+
+describe('Google social enrollment v2 fetcher', () => {
+  it('sends the ID token and one-time nonce as a web cookie session request', async () => {
+    const calls = stubFetch({ status: 'authenticated', accessToken: 'a', tokenType: 'Bearer', expiresIn: '15m' });
+    await authGoogleLogin('google-id-token', 'google-nonce');
+    expect(calls[0].url).toMatch(/\/auth\/v2\/social\/google$/);
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({
+      identityToken: 'google-id-token',
+      nonce: 'google-nonce',
+    });
+    expect((calls[0].init.headers as Record<string, string>)['x-alistore-web']).toBe('1');
     expect(calls[0].init.credentials).toBe('include');
   });
 });

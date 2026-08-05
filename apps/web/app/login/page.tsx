@@ -38,6 +38,24 @@ declare global {
         }>;
       };
     };
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: {
+            client_id: string;
+            callback: (response: { credential: string }) => void;
+            nonce: string;
+            auto_select: boolean;
+          }) => void;
+          renderButton: (parent: HTMLElement, options: {
+            theme: 'outline';
+            size: 'large';
+            width: number;
+            text: 'continue_with';
+          }) => void;
+        };
+      };
+    };
   }
 }
 
@@ -88,6 +106,18 @@ function loadAppleSdk(): Promise<void> {
   });
 }
 
+function loadGoogleSdk(): Promise<void> {
+  if (typeof window === 'undefined' || window.google) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('google-sdk-load-failed'));
+    document.head.appendChild(script);
+  });
+}
+
 function LoginForm() {
   const {
     requestOtp,
@@ -98,6 +128,7 @@ function LoginForm() {
     verifyRecoveryOtp,
     telegramLogin,
     appleLogin,
+    googleLogin,
     completeSocialEnrollment,
   } = useAuth();
   const router = useRouter();
@@ -119,7 +150,7 @@ function LoginForm() {
   const [resendSeconds, setResendSeconds] = useState(0);
   const [telegramInitData, setTelegramInitData] = useState('');
   const [socialEnrollmentToken, setSocialEnrollmentToken] = useState<string | null>(null);
-  const [socialEnrollmentProvider, setSocialEnrollmentProvider] = useState<'telegram' | 'apple'>('telegram');
+  const [socialEnrollmentProvider, setSocialEnrollmentProvider] = useState<'telegram' | 'apple' | 'google'>('telegram');
   const socialEnrollmentActive = socialEnrollmentToken !== null;
   // Способы входа приходят с сервера: собранный заранее бандл не знает, какие
   // каналы владелец включил в дашборде хостинга уже после сборки образа.
@@ -127,6 +158,8 @@ function LoginForm() {
   const emailLoginEnabled = methods?.email.enabled ?? false;
   const appleClientId = methods?.apple.clientId ?? null;
   const appleEnabled = methods !== null && methods.apple.enabled && appleClientId !== null;
+  const googleClientId = methods?.google?.clientId ?? null;
+  const googleEnabled = Boolean(methods?.google?.enabled) && googleClientId !== null;
   const telegramEnabled = Boolean(methods?.telegram.enabled) && telegramInitData.length > 0;
   // Виджет — путь для обычного браузера, где Mini App не подписывает вход сам.
   // Внутри Mini App он не нужен: там уже есть подписанный initData.
@@ -142,6 +175,7 @@ function LoginForm() {
   const webLoginAvailable = phoneLoginEnabled
     || emailLoginEnabled
     || appleEnabled
+    || googleEnabled
     || telegramEnabled
     || telegramWidgetEnabled;
   const nothingAvailable = methods !== null && !webLoginAvailable;
@@ -152,7 +186,11 @@ function LoginForm() {
   const phoneValid = /^\+996\d{9}$/.test(phone.trim());
   const emailValid = EMAIL_RE.test(email.trim());
   const identity = channel === 'email' ? email.trim() : phone.trim();
-  const socialProviderLabel = socialEnrollmentProvider === 'apple' ? 'Apple' : 'Telegram';
+  const socialProviderLabel = socialEnrollmentProvider === 'apple'
+    ? 'Apple'
+    : socialEnrollmentProvider === 'google'
+      ? 'Google'
+      : 'Telegram';
 
   useEffect(() => {
     const webApp = window.Telegram?.WebApp;
@@ -205,6 +243,40 @@ function LoginForm() {
       delete window.onAliStoreTelegramAuth;
     };
   }, [telegramWidgetEnabled, telegramBotUsername]);
+
+  const googleHandler = useRef<(credential: string, nonce: string) => void>(() => undefined);
+  useEffect(() => {
+    googleHandler.current = (credential, nonce) => { void loginGoogle(credential, nonce); };
+  });
+  const googleWidgetSlot = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const slot = googleWidgetSlot.current;
+    if (!googleEnabled || !googleClientId || !slot) return;
+    let cancelled = false;
+    const nonce = createAppleNonce();
+    void loadGoogleSdk().then(() => {
+      if (cancelled || !window.google) return;
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: ({ credential }) => googleHandler.current(credential, nonce),
+        nonce,
+        auto_select: false,
+      });
+      slot.replaceChildren();
+      window.google.accounts.id.renderButton(slot, {
+        theme: 'outline',
+        size: 'large',
+        width: Math.min(460, Math.max(240, slot.clientWidth || 320)),
+        text: 'continue_with',
+      });
+    }).catch(() => {
+      if (!cancelled) setError('Не удалось загрузить вход через Google.');
+    });
+    return () => {
+      cancelled = true;
+      slot.replaceChildren();
+    };
+  }, [channel, googleClientId, googleEnabled, socialEnrollmentActive]);
 
   useEffect(() => {
     if (resendSeconds <= 0) return;
@@ -387,12 +459,31 @@ function LoginForm() {
     }
   }
 
+  async function loginGoogle(identityToken: string, nonce: string) {
+    if (busy || !googleEnabled) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const result = await googleLogin(identityToken, nonce);
+      if (result.status === 'authenticated') {
+        setSocialEnrollmentToken(null);
+        router.push(next);
+        return;
+      }
+      startSocialEnrollment('google', result.enrollmentToken);
+    } catch {
+      setError('Не удалось войти через Google.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   /**
    * Общий шаг для Apple и Telegram: провайдер подтвердил личность, но телефона у
    * аккаунта ещё нет. Экран переключается на ввод номера — привязка завершится
    * SMS-кодом, как того требует `completeSocialEnrollment`.
    */
-  function startSocialEnrollment(provider: 'telegram' | 'apple', token: string) {
+  function startSocialEnrollment(provider: 'telegram' | 'apple' | 'google', token: string) {
     /**
      * Провайдер личность подтвердил, но телефона у аккаунта ещё нет — а привязка
      * завершается SMS-кодом. Если телефонный канал мёртв, переключать экран на
@@ -402,7 +493,7 @@ function LoginForm() {
      */
     if (!phoneLoginEnabled) {
       setError(
-        `Вход через ${provider === 'apple' ? 'Apple' : 'Telegram'} сейчас доступен только тем, `
+        `Вход через ${provider === 'apple' ? 'Apple' : provider === 'google' ? 'Google' : 'Telegram'} сейчас доступен только тем, `
         + 'кто уже привязал номер телефона: первая привязка требует кода по SMS, а его отправка не работает.',
       );
       return;
@@ -446,7 +537,7 @@ function LoginForm() {
     setStatus(null);
   }
 
-  function cancelTelegramEnrollment() {
+  function cancelSocialEnrollment() {
     setSocialEnrollmentToken(null);
     setStepCode(false);
     setPhone('+996');
@@ -615,13 +706,16 @@ function LoginForm() {
               // Виджет рисует Telegram своим скриптом — своей кнопки здесь нет.
               <div ref={telegramWidgetSlot} className="mt-3 flex justify-center" />
             )}
+            {channel === 'phone' && googleEnabled && !socialEnrollmentActive && (
+              <div ref={googleWidgetSlot} className="mt-3 flex min-h-10 justify-center" aria-label="Войти через Google" />
+            )}
             {socialEnrollmentActive && (
               <button
                 type="button"
-                onClick={cancelTelegramEnrollment}
+                onClick={cancelSocialEnrollment}
                 className="mt-3 w-full text-center text-[13px] text-muted"
               >
-                Отменить вход через Telegram
+                Отменить вход через {socialProviderLabel}
               </button>
             )}
             <button type="button" onClick={() => router.push('/')} className="mt-5 w-full text-center text-[13px] text-muted">{t('login.guest')}</button>
@@ -641,8 +735,8 @@ function LoginForm() {
             </button>
             <button type="button" onClick={() => { setStepCode(false); setChallengeId(null); setResendSeconds(0); setDevCode(null); setError(null); setStatus(null); }} className="mt-3 w-full text-center text-[13px] text-muted">{channel === 'email' ? t('login.code.changeEmail') : t('login.code.changePhone')}</button>
             {socialEnrollmentActive && (
-              <button type="button" onClick={cancelTelegramEnrollment} className="mt-3 w-full text-center text-[13px] text-muted">
-                Отменить вход через Telegram
+              <button type="button" onClick={cancelSocialEnrollment} className="mt-3 w-full text-center text-[13px] text-muted">
+                Отменить вход через {socialProviderLabel}
               </button>
             )}
           </form>

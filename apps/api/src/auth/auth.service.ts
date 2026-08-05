@@ -9,12 +9,14 @@ import { ValidationError } from '../common/errors';
 import {
   AppleSocialLoginDto,
   CompleteSocialEnrollmentDto,
+  GoogleSocialLoginDto,
   TelegramSocialLoginDto,
 } from './auth.dto';
 import {
   SocialProfile,
   VerifiedTelegramProfile,
   verifyAppleIdentityToken,
+  verifyGoogleIdentityToken,
   verifyTelegramLogin,
 } from './social-login';
 import { NoopOtpSender } from './noop-otp.sender';
@@ -782,6 +784,22 @@ export class AuthService implements OnModuleInit {
       throw new ValidationError('apple_nonce_required', 'Apple nonce is required');
     }
     const profile = await this.verifyAppleProfile(dto);
+    return this.resolveSocialV2(profile, dto.identityToken);
+  }
+
+  async loginWithGoogleV2(dto: GoogleSocialLoginDto): Promise<SocialAuthResult> {
+    const clientId = this.config.get<string>('GOOGLE_CLIENT_ID');
+    if (!clientId) {
+      throw new ValidationError('social_provider_not_configured', 'Google login is not configured');
+    }
+    if (!dto.nonce?.trim()) {
+      throw new ValidationError('google_nonce_required', 'Google nonce is required');
+    }
+    const profile = await verifyGoogleIdentityToken({
+      identityToken: dto.identityToken,
+      clientId,
+      nonce: dto.nonce,
+    });
     return this.resolveSocialV2(profile, dto.identityToken);
   }
 

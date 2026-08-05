@@ -15,6 +15,7 @@ import {
   authMe,
   authAppleLogin,
   authCompleteSocialEnrollment,
+  authGoogleLogin,
   authRefresh,
   authRequestEmailOtp,
   authRequestRecoveryOtp,
@@ -46,6 +47,10 @@ interface AuthContextValue {
   appleLogin: (
     identityToken: string,
     options: { nonce: string; name?: string },
+  ) => Promise<{ status: 'authenticated' } | Extract<TelegramAuthResult, { status: 'enrollment_required' }>>;
+  googleLogin: (
+    identityToken: string,
+    nonce: string,
   ) => Promise<{ status: 'authenticated' } | Extract<TelegramAuthResult, { status: 'enrollment_required' }>>;
   completeSocialEnrollment: (
     enrollmentToken: string,
@@ -577,6 +582,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [finishAuth],
   );
 
+  const googleLogin = useCallback(
+    async (identityToken: string, nonce: string) => {
+      const result = await authGoogleLogin(identityToken, nonce);
+      if (result.status === 'enrollment_required') return result;
+      const committed = await finishAuth(async () => result);
+      if (!committed) throw new Error('auth-flow-superseded');
+      return { status: 'authenticated' as const };
+    },
+    [finishAuth],
+  );
+
   const completeSocialEnrollment = useCallback(
     async (enrollmentToken: string, phone: string, code: string, challengeId?: string) => {
       const committed = await finishAuth(
@@ -675,6 +691,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       verifyEmailOtp,
       telegramLogin,
       appleLogin,
+      googleLogin,
       completeSocialEnrollment,
       logout,
       authed,
@@ -690,6 +707,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       verifyEmailOtp,
       telegramLogin,
       appleLogin,
+      googleLogin,
       completeSocialEnrollment,
       logout,
       authed,

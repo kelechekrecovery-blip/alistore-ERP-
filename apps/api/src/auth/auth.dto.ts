@@ -68,6 +68,14 @@ export class AppleSocialLoginDto {
   name?: string;
 }
 
+export class GoogleSocialLoginDto {
+  @IsString()
+  identityToken!: string;
+
+  @IsString()
+  nonce!: string;
+}
+
 export class CompleteSocialEnrollmentDto extends VerifyOtpDto {
   @IsString()
   @Length(32, 256)
