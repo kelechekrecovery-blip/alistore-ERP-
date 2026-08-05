@@ -13,22 +13,34 @@ export interface SupportTicket {
   createdAt: string;
 }
 
-export function openSupportTicket(input: {
+type SupportTicketInput = {
   customerId: string;
   channel: 'web' | 'app' | 'whatsapp' | 'telegram' | 'call' | 'store';
   subject: string;
   body?: string;
   priority?: 'normal' | 'high' | 'urgent';
   actor?: string;
-}, credential: { accessToken?: string; guestCapability?: string }): Promise<SupportTicket> {
+};
+
+type SupportCredential =
+  | { accessToken: string; idempotencyKey: string }
+  | { guestCapability: string };
+
+export function openSupportTicket(input: SupportTicketInput, credential: SupportCredential): Promise<SupportTicket> {
+  if ('accessToken' in credential) {
+    const { customerId: _customerId, actor: _actor, ...ownedInput } = input;
+    return postJson('/support/tickets/mine', ownedInput, {
+      authorization: `Bearer ${credential.accessToken}`,
+      'idempotency-key': credential.idempotencyKey,
+    });
+  }
   return postJson('/support/tickets', input, {
-    ...(credential.accessToken ? { authorization: `Bearer ${credential.accessToken}` } : {}),
-    ...(credential.guestCapability ? { 'x-guest-capability': credential.guestCapability } : {}),
+    'x-guest-capability': credential.guestCapability,
   });
 }
 
-export async function fetchSupportTickets(customerId: string, accessToken: string): Promise<SupportTicket[]> {
-  const res = await fetch(`${API_BASE}/support/tickets?customerId=${encodeURIComponent(customerId)}`, {
+export async function fetchSupportTickets(accessToken: string): Promise<SupportTicket[]> {
+  const res = await fetch(`${API_BASE}/support/tickets/mine`, {
     cache: 'no-store',
     headers: { authorization: `Bearer ${accessToken}` },
   });

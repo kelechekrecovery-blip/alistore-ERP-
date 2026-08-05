@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MessageCircle, Phone, Send, type LucideIcon } from 'lucide-react';
 import { EvidencePicker } from '@/components/EvidencePicker';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
@@ -33,6 +33,7 @@ export default function SupportPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storefront, setStorefront] = useState<StorefrontPayload | null>(null);
+  const authenticatedAttempt = useRef<{ fingerprint: string; idempotencyKey: string } | null>(null);
 
   // «Телефон не указан» и «не смогли загрузить контакты» — разные вещи. Первое
   // клиент читает как «звонить некуда» и уходит; второе означает лишь, что
@@ -51,7 +52,7 @@ export default function SupportPage() {
     // `setTickets([])` просто убирал блок «Мои обращения»: клиент не видел
     // своего открытого тикета и заводил второй по тому же вопросу.
     setTicketsError('');
-    authed((token) => fetchSupportTickets(user.customerId, token))
+    authed((token) => fetchSupportTickets(token))
       .then(setTickets)
       .catch((cause) => setTicketsError(cause instanceof Error ? cause.message : 'Не удалось загрузить обращения'));
   }, [user?.customerId, done, authed]);
@@ -63,15 +64,25 @@ export default function SupportPage() {
     try {
       const guest = user ? null : await createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
       const customerId = user?.customerId ?? guest!.id;
-      const create = (accessToken?: string) => openSupportTicket({
+      const ticketInput = {
         customerId,
         channel,
         subject: subject.trim(),
         body: body.trim(),
         priority: subject.toLowerCase().includes('возврат') || subject.toLowerCase().includes('гарант') ? 'high' : 'normal',
         actor: 'customer_app',
-      }, { accessToken, guestCapability: guest?.guestCapability });
-      const ticket = user ? await authed(create) : await create();
+      } as const;
+      let ticket: SupportTicket;
+      if (user) {
+        const fingerprint = JSON.stringify(ticketInput);
+        if (authenticatedAttempt.current?.fingerprint !== fingerprint) {
+          authenticatedAttempt.current = { fingerprint, idempotencyKey: crypto.randomUUID() };
+        }
+        const idempotencyKey = authenticatedAttempt.current.idempotencyKey;
+        ticket = await authed((accessToken) => openSupportTicket(ticketInput, { accessToken, idempotencyKey }));
+      } else {
+        ticket = await openSupportTicket(ticketInput, { guestCapability: guest!.guestCapability });
+      }
       const evidence = files.length
         ? await uploadEvidenceImages({
             files,
@@ -85,6 +96,7 @@ export default function SupportPage() {
           })
         : [];
       setDone({ ticket, evidenceCount: evidence.length });
+      authenticatedAttempt.current = null;
       setBody('');
       setFiles([]);
     } catch {
