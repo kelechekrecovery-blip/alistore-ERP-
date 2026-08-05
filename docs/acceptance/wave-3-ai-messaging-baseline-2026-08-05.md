@@ -15,3 +15,7 @@ AI has no direct tools for payment, refund, inventory mutation, role changes, pr
 ## Messaging reliability
 
 Outbox/Telegram/provider gate: **4 suites / 39 tests passed**. Coverage includes retry backoff and DLQ/redrive rules, FCM retry propagation, multi-channel transport errors, duplicate Telegram update suppression, webhook-secret validation, Telegram identity scoping, approval routing and retention/redaction.
+
+## Camera/edge control plane
+
+Camera gateway and ledger coverage: **2 suites / 7 tests passed**. Edge devices use hashed one-time secrets, timestamped HMAC signatures, store-point binding, metadata privacy limits, idempotent ingestion, kill-switch behavior, retention deadlines and ledger events. Raw frames/audio/face/document payloads are rejected; EZVIZ integration remains an external adapter task, not an implicit trust boundary.
