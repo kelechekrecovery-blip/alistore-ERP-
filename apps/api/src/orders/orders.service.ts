@@ -1125,6 +1125,20 @@ export class OrdersService {
           'Статус reserved ставит только резерв стока — POST /orders/:id/reserve',
         );
       }
+      // `courier_assigned` — та же история, что и `reserved`, но ломалось тише.
+      // Generic-переход пишет одно поле `status`, а `courierId` проставляет
+      // только создание рейса (`POST /courier/runs`). Заказ оказывался
+      // «назначен курьеру» с `courierId = null` и застревал намертво: `listMine`
+      // фильтрует по `courierId` и его не видел никто, `createRun` требует
+      // `paid|packed` и отвечал `order_not_assignable`, `startDelivery` матчит
+      // по `courierId` и не обновлял ни строки. Выход оставался один — отменить
+      // уже собранный заказ.
+      if (to === 'courier_assigned') {
+        throw new ValidationError(
+          'order_courier_assign_requires_run',
+          'Курьера назначает создание рейса — POST /courier/runs',
+        );
+      }
       if (order.status === 'reserved' && to === 'picking' && order.paymentMode !== 'cod') {
         throw new ValidationError('cod_picking_required', 'Неоплаченный заказ можно собирать только в режиме COD');
       }
