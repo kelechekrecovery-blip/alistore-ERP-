@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ReorderRec, ReorderUrgency, suggestReorder } from './reorder';
 
 export interface ReorderReview extends ReorderRec {
+  productId: string;
   sku: string;
   name: string;
   category: string;
@@ -52,7 +53,7 @@ export class ReorderService {
     const reviews: ReorderReview[] = products.map((p) => {
       const c = counts.get(p.id) ?? { inStock: 0, reserved: 0, soldUnits: 0 };
       const rec = suggestReorder({ inStock: c.inStock, reserved: c.reserved, soldUnits: c.soldUnits });
-      return { sku: p.sku, name: p.name, category: p.category, ...c, ...rec };
+      return { productId: p.id, sku: p.sku, name: p.name, category: p.category, ...c, ...rec };
     });
 
     // Most urgent first, then by suggested quantity.

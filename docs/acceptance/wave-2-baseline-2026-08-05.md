@@ -23,6 +23,8 @@ Read-only AI reorder report coverage: **2 suites / 7 tests passed** with mocked 
 
 Owner Copilot read-only tool contract: **3 suites / 13 tests passed** for insights composition, tool budgets and deterministic insight output. The tools expose KPI/risk/pricing/reorder signals without mutation tools.
 
+Procurement bridge: `buildReorderDraft` is pure and requires explicit supplier, location, idempotency key and human-entered unit costs. Its 3 tests pass; it filters non-urgent recommendations and fails closed instead of creating a purchase order or mutating stock.
+
 The provider contract confirms that `PAYMENT_PROVIDER=none` exposes cash-on-delivery while online payment fails closed with `online_payments_unavailable`; unknown providers are rejected.
 
 The first attempt was blocked by a transient PostgreSQL advisory lock (`P1002`) from another local worker. After the worker exited, the same command completed successfully; no application assertion failed.
