@@ -16,6 +16,8 @@ import {
   type OnlinePaymentMethod,
   type PaymentIntent,
   type StorePoint,
+  fetchPaymentMethods,
+  type ServerPaymentMethods,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { LoadFailure } from '@/components/LoadFailure';
@@ -84,10 +86,39 @@ export default function TelegramMiniAppPage() {
   const [phone, setPhone] = useState('+996');
   const [name, setName] = useState('');
   const [payment, setPayment] = useState<PaymentChoice>('cash');
+  // Способы оплаты называет сервер. Здесь стоял жёсткий список
+  // ['cash','qr_mbank'] — та же ошибка, что была в вебе: покупателю
+  // предлагали способ, который сервер не доводит до оплаты.
+  const [serverPayment, setServerPayment] = useState<ServerPaymentMethods | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState<DoneState | null>(null);
   const [storePoint, setStorePoint] = useState<StorePoint | null>(null);
+
+  useEffect(() => {
+    void fetchPaymentMethods().then((result) => setServerPayment(result));
+  }, []);
+
+  // Показываем только то, что сервер доводит до конца. `null` — ответа не было,
+  // и выдумывать онлайн-оплату по нему нельзя: остаётся оплата при получении.
+  const paymentChoices = useMemo<[PaymentChoice, string][]>(() => {
+    const labels: [PaymentChoice, string][] = [
+      ['cash', 'При получении'],
+      ['qr_mbank', 'MBank QR'],
+      ['qr_odengi', 'O!Деньги QR'],
+      ['card', 'Картой'],
+    ];
+    const allowed = new Set(serverPayment?.methods ?? ['cash']);
+    return labels.filter(([id]) => allowed.has(id));
+  }, [serverPayment]);
+
+  // Выбранный способ мог исчезнуть после ответа сервера — не оставляем
+  // недоступный выбор молча.
+  useEffect(() => {
+    if (paymentChoices.length > 0 && !paymentChoices.some(([id]) => id === payment)) {
+      setPayment(paymentChoices[0][0]);
+    }
+  }, [paymentChoices, payment]);
   const { user, authed, telegramLogin } = useAuth();
 
   useEffect(() => {
@@ -255,12 +286,38 @@ export default function TelegramMiniAppPage() {
           <p className="mt-2 text-sm leading-relaxed text-muted">
             № <span className="font-mono text-white">{done.order.id.slice(-8)}</span> · channel=telegram · {done.order.status}
           </p>
+          {/* Здесь покупателю показывали строку «Sandbox payment» и сырой
+              payload — отладочный вывод вместо счёта: ни ссылки, ни кода, ни
+              срока. Показываем то, чем действительно можно заплатить, а если
+              провайдер не дал ни ссылки, ни кода — говорим это прямо, а не
+              оставляем человека наедине с непонятной строкой. */}
           {done.intent && (
             <div className="mt-5 w-full rounded-[16px] border border-surface-3 bg-surface-2 p-4 text-left">
-              <div className="text-sm font-bold text-white">Sandbox payment</div>
-              <div className="mt-1 break-all font-mono text-[11px] text-subtle">
-                {done.intent.qrPayload ?? done.intent.paymentUrl}
-              </div>
+              <div className="text-sm font-bold text-white">Счёт на оплату</div>
+              {done.intent.paymentUrl ? (
+                <a
+                  href={done.intent.paymentUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 block rounded-[11px] bg-lime px-4 py-3 text-center text-sm font-bold text-lime-ink"
+                >
+                  Перейти к оплате
+                </a>
+              ) : done.intent.qrPayload ? (
+                <>
+                  <div className="mt-1 text-[12px] text-subtle">
+                    Код для оплаты — откройте банковское приложение и оплатите по нему.
+                  </div>
+                  <div className="mt-2 break-all rounded-[10px] border border-line bg-ink-dark p-2.5 font-mono text-[11px] text-white">
+                    {done.intent.qrPayload}
+                  </div>
+                </>
+              ) : (
+                <div className="mt-1 text-[12px] text-subtle">
+                  Ссылка на оплату не пришла. Заказ создан — оплатите при получении
+                  или свяжитесь с магазином.
+                </div>
+              )}
             </div>
           )}
           {done.order.guestAccess && (
@@ -397,6 +454,7 @@ export default function TelegramMiniAppPage() {
           phone={phone}
           name={name}
           payment={payment}
+          paymentChoices={paymentChoices}
           busy={busy}
           error={error}
           phoneValid={phoneValid}
@@ -424,6 +482,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 function Checkout({
+  paymentChoices,
   cart,
   subtotal,
   phone,
@@ -445,6 +504,8 @@ function Checkout({
   phone: string;
   name: string;
   payment: PaymentChoice;
+  /** Что сервер реально умеет провести; пустой список = только при получении. */
+  paymentChoices: [PaymentChoice, string][];
   busy: boolean;
   error: string;
   phoneValid: boolean;
@@ -496,10 +557,7 @@ function Checkout({
       />
 
       <div className="mt-5 grid grid-cols-2 gap-2">
-        {[
-          ['cash', 'При получении'],
-          ['qr_mbank', 'MBank QR'],
-        ].map(([id, label]) => (
+        {paymentChoices.map(([id, label]) => (
           <button
             key={id}
             type="button"
