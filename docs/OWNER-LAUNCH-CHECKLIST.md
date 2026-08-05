@@ -117,6 +117,10 @@ Blueprint `infra/render.staging.yaml` (регион Frankfurt). Общий ко�
       (`RENDER_DEPLOY_HOOK_API` / `_WEB` / `_WORKER` соответственно).
 - [ ] Создать GitHub Environments `staging` и `production`; production требует
       manual approval. Сохранить в них `RENDER_API_KEY`, deploy hooks и DB URLs.
+      `CD — Production` нельзя запускать напрямую: он стартует только после
+      зелёного same-repository push CI для текущего `main`/`master` SHA, затем
+      ждёт approval окружения. Для повтора использовать **Re-run jobs** у CI,
+      а не временный `workflow_dispatch` bypass.
 - [ ] Зарегистрировать одноразовые/изолированные self-hosted runners внутри
       Render Frankfurt private network с labels `alistore-render-db-staging` и
       `alistore-render-db-production`. Не запускать на них посторонние jobs.

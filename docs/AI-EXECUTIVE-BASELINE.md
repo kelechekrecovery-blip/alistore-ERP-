@@ -78,11 +78,19 @@ reviews. Live production credentials, реальные провайдеры, к�
 - VERIFIED: commit `ea5be1c9` switches only identity-verified Render services to
   the intended API pool, worker direct and backup read-only URLs before an
   exact-SHA deploy; wrong/swapped hooks and partial credential updates fail closed.
+- VERIFIED: commit `16596bca` removes direct/manual production-CD bypasses:
+  only a successful same-repository push CI on the current allowed `main`/`master` branch can release
+  its exact SHA. The branch head is reverified at migration, Render mutation,
+  every deploy hook/poll and immediately before accepting `live`; superseded
+  handoffs cancel accepted deploys and incomplete cancellation fails loudly.
+  Workflow/Render contract tests 18/18, YAML parse and independent code/security
+  reviews PASS.
 - VERIFIED: production dependency audit — 0 vulnerabilities after compatible
   per-consumer resolution; legacy glob/coverage and Socket.IO runtime tests PASS.
 - VERIFIED: iOS unit/contract 164/164 and UI E2E 47/47 PASS across Client,
   Staff, Courier and POS; all four App Store versions read back WAITING_FOR_REVIEW.
-- VERIFIED: worktree был dirty до Phase 0 docs; изменения iOS/Web/visual snapshots и незавершённый outbox slice не входят в этот documentation slice.
+- VERIFIED: every completed Phase 0 slice is committed separately; the worktree
+  was clean before starting the CI-certified production-release slice.
 - UNKNOWN: полный API, полный Playwright, XCUITest/Android connected tests и live provider/device scenarios на этом SHA не запускались.
 
 ### Baseline matrix
