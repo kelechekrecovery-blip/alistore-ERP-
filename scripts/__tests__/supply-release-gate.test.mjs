@@ -34,16 +34,15 @@ const cleanGit = { head: 'abc123', status: 'clean' };
 // The committed toolchain lock is intentionally bound to the evidence
 // workstation (currently macOS/arm64). CI still exercises the gate's policy and
 // signature logic, but cannot claim a workstation-bound fixture it does not
-// possess. Keep this check explicit so an unsupported runner skips only the
-// host-specific fixture instead of turning the whole release pre-step red.
-const PINNED_TOOLCHAIN_AVAILABLE = (() => {
-  try {
-    resolveTrustedGit(process.cwd());
-    return true;
-  } catch {
-    return false;
-  }
-})();
+// possess. Skip only for an explicit host mismatch; malformed lock/Git state on
+// the pinned host must still fail loudly rather than becoming a false skip.
+const lockedRuntime = JSON.parse(readFileSync(
+  path.join(process.cwd(), 'scripts/ecosystem-toolchain-lock.json'),
+  'utf8',
+)).runtime;
+const PINNED_TOOLCHAIN_AVAILABLE = lockedRuntime.platform === process.platform
+  && lockedRuntime.architecture === process.arch
+  && (resolveTrustedGit(process.cwd()), true);
 
 function passingRequiredResults() {
   return [
