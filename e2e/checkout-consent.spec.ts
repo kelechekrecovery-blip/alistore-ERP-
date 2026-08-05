@@ -23,6 +23,13 @@ async function reachConfirmationStep(page: import('@playwright/test').Page, prod
  * Пока он пуст, оферты не существует, и утверждать, будто покупатель с ней
  * согласился, нельзя — это проверяет отдельный тест ниже.
  */
+async function unpublishOffer(): Promise<void> {
+  // `resetDb()` не трогает таблицу настроек — оферта, опубликованная соседним
+  // тестом или прошлым прогоном, переживает сброс. Предусловие «документа нет»
+  // тест обязан ставить сам, иначе он проверяет то, что осталось от других.
+  await prisma.setting.deleteMany({ where: { key: 'legal.offer_text' } });
+}
+
 async function publishOffer(): Promise<void> {
   await prisma.setting.upsert({
     where: { key: 'legal.offer_text' },
@@ -35,6 +42,7 @@ test('без опубликованной оферты согласие ссыл
   // Ссылаться на договор, которого нет, — значит собирать юридически пустое
   // согласие. Галочка остаётся обязательной: обработка данных опубликована.
   await resetDb();
+  await unpublishOffer();
   const { product } = await seedProduct('CONSENT-NO-OFFER');
   await reachConfirmationStep(page, product);
 
