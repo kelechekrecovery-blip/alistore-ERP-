@@ -3,8 +3,8 @@ import { getJson, patchAuthJson } from './http';
 export interface BusinessSetting {
   key: string;
   label: string;
-  group: 'discounts' | 'payroll' | 'warranty' | 'tradein' | 'loyalty' | 'credit';
-  kind: 'int' | 'percent' | 'bps' | 'url';
+  group: 'discounts' | 'payroll' | 'warranty' | 'tradein' | 'loyalty' | 'credit' | 'legal';
+  kind: 'int' | 'percent' | 'bps' | 'url' | 'text';
   /**
    * The literal this parameter replaces — the value in force before any edit.
    * Строка у ссылочных параметров (`kind: 'url'`), пустая — «не задано».

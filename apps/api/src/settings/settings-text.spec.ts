@@ -74,3 +74,36 @@ describe('текстовые параметры (QR провайдеров ра�
     expect(() => parseSettingText(numeric, '3')).toThrow(ValidationError);
   });
 });
+
+describe('оферта — многострочный текстовый параметр', () => {
+  const OFFER_KEY = 'legal.offer_text';
+
+  it('объявлена и по умолчанию пуста', () => {
+    const definition = settingDefinition(OFFER_KEY);
+    expect(isTextSetting(definition)).toBe(true);
+    // Пусто — «документа ещё нет». Витрина обязана сказать это прямо, а не
+    // показывать шаблон с [Наименование компании] под обязательной галочкой.
+    expect(definition.fallback).toBe('');
+  });
+
+  it('принимает многострочный текст без ограничений формата ссылки', () => {
+    const definition = settingDefinition(OFFER_KEY);
+    const document = '1. Общие положения\n\nПродавец: ОсОО «Пример».\n2. Предмет договора\n\nТовар.';
+    expect(parseSettingText(definition, document)).toBe(document);
+  });
+
+  it('обрезает пробелы по краям, но сохраняет переносы внутри', () => {
+    const definition = settingDefinition(OFFER_KEY);
+    expect(parseSettingText(definition, '  строка один\nстрока два  ')).toBe('строка один\nстрока два');
+  });
+
+  it('пустое значение допустимо — так документ снимают с публикации', () => {
+    const definition = settingDefinition(OFFER_KEY);
+    expect(parseSettingText(definition, '   ')).toBe('');
+  });
+
+  it('отвергает документ длиннее потолка', () => {
+    const definition = settingDefinition(OFFER_KEY);
+    expect(() => parseSettingText(definition, 'я'.repeat(definition.max + 1))).toThrow(ValidationError);
+  });
+});

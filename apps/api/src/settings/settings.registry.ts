@@ -14,13 +14,14 @@ export type SettingGroup =
   | 'warranty'
   | 'tradein'
   | 'loyalty'
-  | 'credit';
+  | 'credit'
+  | 'legal';
 
 export interface SettingDefinition {
   key: string;
   label: string;
   group: SettingGroup;
-  kind: 'int' | 'percent' | 'bps' | 'url';
+  kind: 'int' | 'percent' | 'bps' | 'url' | 'text';
   /**
    * The literal this parameter replaces — the value in force before any edit.
    *
@@ -36,9 +37,9 @@ export interface SettingDefinition {
   source: string;
 }
 
-/** Ссылочный параметр (QR провайдера) — его значение строка, а не число. */
+/** Строковый параметр (QR провайдера, текст оферты) — не число. */
 export function isTextSetting(definition: SettingDefinition): boolean {
-  return definition.kind === 'url';
+  return definition.kind === 'url' || definition.kind === 'text';
 }
 
 export const SETTINGS: readonly SettingDefinition[] = [
@@ -336,6 +337,22 @@ export const SETTINGS: readonly SettingDefinition[] = [
     hint: '0 — без ограничения.',
     source: 'договор магазина',
   },
+  // Публичная оферта. Юридический текст пишет владелец, а не разработчик:
+  // здесь реквизиты компании, которые нельзя ни выдумать, ни зашить в код.
+  // Пока пусто — витрина честно говорит, что документ готовится, и оформление
+  // не утверждает, будто покупатель с ним согласился.
+  {
+    key: 'legal.offer_text',
+    label: 'Публичная оферта · текст документа',
+    group: 'legal',
+    kind: 'text',
+    fallback: '',
+    min: 0,
+    max: 40_000,
+    unit: '',
+    hint: 'Вставьте финальный текст оферты. Пусто — документ не опубликован.',
+    source: 'apps/web/app/oferta/page.tsx (шаблон с заглушками)',
+  },
   // QR провайдеров рассрочки. Публичного API у Payda, O!Market, ZERO и M+ нет —
   // рассрочку оформляют в магазине по QR, который банк выдал именно этой точке.
   // Поэтому это не интеграция, а картинка: владелец загружает её в ERP, и она
@@ -557,12 +574,16 @@ export function parseSettingText(definition: SettingDefinition, raw: string): st
       `${definition.label}: не длиннее ${definition.max} символов`,
     );
   }
-  const allowed = value.startsWith('/') || value.startsWith('https://');
-  if (!allowed) {
-    throw new ValidationError(
-      'invalid_setting_value',
-      `${definition.label}: нужен загруженный файл или https-ссылка`,
-    );
+  // Проверка адреса — только для `url`. У `text` содержимое произвольное:
+  // это документ, который владелец вставляет целиком, вместе с переносами.
+  if (definition.kind === 'url') {
+    const allowed = value.startsWith('/') || value.startsWith('https://');
+    if (!allowed) {
+      throw new ValidationError(
+        'invalid_setting_value',
+        `${definition.label}: нужен загруженный файл или https-ссылка`,
+      );
+    }
   }
   return value;
 }
