@@ -64,6 +64,8 @@ jobs:
       - run: npm ci
       - name: Supply release gate unit tests
         run: node --test scripts/__tests__/supply-release-gate.test.mjs scripts/__tests__/supply-release-gate-db.test.mjs
+      - name: Production CD exact-SHA contract
+        run: node --test scripts/__tests__/production-cd-workflow.test.mjs scripts/render-deploy.test.mjs
       - run: npm run native:deeplink-preflight
       # Guards the App Store screenshot device class; needs no simulator.
       - run: npm run ios:store-screenshots:test

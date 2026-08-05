@@ -27,6 +27,7 @@ test('extracts the service id without exposing the hook key', () => {
 
 test('binds every hook to the commit and waits for its exact deploy id', async () => {
   const calls = [];
+  let verificationCount = 0;
   const fetchImpl = async (input, init) => {
     calls.push({ input: String(input), init });
     if (String(input).includes('/env-vars/')) {
@@ -48,6 +49,7 @@ test('binds every hook to the commit and waits for its exact deploy id', async (
     commit: 'abc123', apiKey: 'token', deploymentEnvironment: 'production', databaseRuntimeUrl: 'postgresql://runtime',
     databaseRuntimePoolUrl: 'postgresql://pool',
     databaseBackupUrl: 'postgresql://backup',
+    verifyCandidate: async () => { verificationCount += 1; },
     fetchImpl, pollDelayMs: 0, maxPolls: 1,
     services: [
       { name: 'api', hook: hook(ids.api, 'one') },
@@ -67,6 +69,7 @@ test('binds every hook to the commit and waits for its exact deploy id', async (
   const workerSwitch = switches.find(({ input }) => input.includes(`/services/${ids.worker}/`));
   assert.equal(JSON.parse(apiSwitch.init.body).value, 'postgresql://pool');
   assert.equal(JSON.parse(workerSwitch.init.body).value, 'postgresql://runtime');
+  assert.equal(verificationCount, 13);
 });
 
 test('fails closed when a hook is missing or Render queues an overlapping deploy', async () => {
@@ -118,6 +121,125 @@ test('cancels an accepted deploy if a later hook fails', async () => {
     ],
   }), /HTTP 202/);
   assert.ok(calls.some((url) => url.endsWith(`/services/${ids.api}/deploys/dep-api/cancel`)));
+});
+
+test('cancels accepted hooks when the release is superseded during multi-service handoff', async () => {
+  const calls = [];
+  let verificationCount = 0;
+  await assert.rejects(deployAndWait({
+    commit: 'abc', apiKey: 'token', deploymentEnvironment: 'production', databaseRuntimeUrl: 'postgresql://runtime',
+    databaseRuntimePoolUrl: 'postgresql://pool',
+    services: [
+      { name: 'api', hook: hook(ids.api, 'x') },
+      { name: 'web', hook: hook(ids.web, 'y') },
+    ],
+    verifyCandidate: async () => {
+      verificationCount += 1;
+      if (verificationCount === 3) throw new Error('release superseded');
+    },
+    fetchImpl: async (input, init) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.includes('/env-vars/')) {
+        return new Response(JSON.stringify(init?.method === 'PUT' ? {} : { value: 'postgresql://previous' }), { status: 200 });
+      }
+      if (url.includes('/deploys?limit=1')) return new Response('[{"status":"live"}]', { status: 200 });
+      if (new URL(url).pathname.match(/^\/v1\/services\/srv-[^/]+$/)) return identityResponse(input);
+      if (url.endsWith('/cancel')) return new Response('{}', { status: 200 });
+      if (new URL(url).pathname.startsWith('/deploy/')) return new Response('{"id":"dep-api"}', { status: 200 });
+      throw new Error(`unexpected call ${url}`);
+    },
+  }), /release superseded/);
+  assert.equal(calls.filter((url) => new URL(url).pathname.startsWith('/deploy/')).length, 1);
+  assert.ok(calls.some((url) => url.endsWith(`/services/${ids.api}/deploys/dep-api/cancel`)));
+});
+
+test('cancels an accepted deploy when the release is superseded during Render polling', async () => {
+  const calls = [];
+  let verificationCount = 0;
+  let statusLookups = 0;
+  await assert.rejects(deployAndWait({
+    commit: 'abc', apiKey: 'token', deploymentEnvironment: 'production', databaseRuntimeUrl: 'postgresql://runtime',
+    databaseRuntimePoolUrl: 'postgresql://pool', pollDelayMs: 0, maxPolls: 2,
+    services: [{ name: 'api', hook: hook(ids.api, 'x') }],
+    verifyCandidate: async () => {
+      verificationCount += 1;
+      if (verificationCount === 4) throw new Error('release superseded while building');
+    },
+    fetchImpl: async (input, init) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.includes('/env-vars/')) {
+        return new Response(JSON.stringify(init?.method === 'PUT' ? {} : { value: 'postgresql://previous' }), { status: 200 });
+      }
+      if (url.includes('/deploys?limit=1')) return new Response('[{"status":"live"}]', { status: 200 });
+      if (new URL(url).pathname.match(/^\/v1\/services\/srv-[^/]+$/)) return identityResponse(input);
+      if (url.endsWith('/cancel')) return new Response('{}', { status: 200 });
+      if (new URL(url).pathname.startsWith('/deploy/')) return new Response('{"id":"dep-api"}', { status: 200 });
+      if (url.includes('/deploys/dep-api')) {
+        statusLookups += 1;
+        return new Response('{"status":"build_in_progress"}', { status: 200 });
+      }
+      throw new Error(`unexpected call ${url}`);
+    },
+  }), /superseded while building/);
+  assert.equal(statusLookups, 1);
+  assert.ok(calls.some((url) => url.endsWith(`/services/${ids.api}/deploys/dep-api/cancel`)));
+});
+
+test('rechecks the release immediately before accepting a live Render status', async () => {
+  const calls = [];
+  let verificationCount = 0;
+  await assert.rejects(deployAndWait({
+    commit: 'abc', apiKey: 'token', deploymentEnvironment: 'production', databaseRuntimeUrl: 'postgresql://runtime',
+    databaseRuntimePoolUrl: 'postgresql://pool', pollDelayMs: 0, maxPolls: 1,
+    services: [{ name: 'api', hook: hook(ids.api, 'x') }],
+    verifyCandidate: async () => {
+      verificationCount += 1;
+      if (verificationCount === 4) throw new Error('release superseded before live acceptance');
+    },
+    fetchImpl: async (input, init) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.includes('/env-vars/')) {
+        return new Response(JSON.stringify(init?.method === 'PUT' ? {} : { value: 'postgresql://previous' }), { status: 200 });
+      }
+      if (url.includes('/deploys?limit=1')) return new Response('[{"status":"live"}]', { status: 200 });
+      if (new URL(url).pathname.match(/^\/v1\/services\/srv-[^/]+$/)) return identityResponse(input);
+      if (url.endsWith('/cancel')) return new Response('{}', { status: 200 });
+      if (new URL(url).pathname.startsWith('/deploy/')) return new Response('{"id":"dep-api"}', { status: 200 });
+      if (url.includes('/deploys/dep-api')) return new Response('{"status":"live"}', { status: 200 });
+      throw new Error(`unexpected call ${url}`);
+    },
+  }), /superseded before live acceptance/);
+  assert.ok(calls.some((url) => url.endsWith(`/services/${ids.api}/deploys/dep-api/cancel`)));
+});
+
+test('fails loudly when Render does not accept cancellation of a stale deploy', async () => {
+  let verificationCount = 0;
+  await assert.rejects(deployAndWait({
+    commit: 'abc', apiKey: 'token', deploymentEnvironment: 'production', databaseRuntimeUrl: 'postgresql://runtime',
+    databaseRuntimePoolUrl: 'postgresql://pool',
+    services: [
+      { name: 'api', hook: hook(ids.api, 'x') },
+      { name: 'web', hook: hook(ids.web, 'y') },
+    ],
+    verifyCandidate: async () => {
+      verificationCount += 1;
+      if (verificationCount === 3) throw new Error('release superseded');
+    },
+    fetchImpl: async (input, init) => {
+      const url = String(input);
+      if (url.includes('/env-vars/')) {
+        return new Response(JSON.stringify(init?.method === 'PUT' ? {} : { value: 'postgresql://previous' }), { status: 200 });
+      }
+      if (url.includes('/deploys?limit=1')) return new Response('[{"status":"live"}]', { status: 200 });
+      if (new URL(url).pathname.match(/^\/v1\/services\/srv-[^/]+$/)) return identityResponse(input);
+      if (url.endsWith('/cancel')) return new Response('{}', { status: 409 });
+      if (new URL(url).pathname.startsWith('/deploy/')) return new Response('{"id":"dep-api"}', { status: 200 });
+      throw new Error(`unexpected call ${url}`);
+    },
+  }), /cancellation was incomplete/);
 });
 
 test('does not switch credentials while any target has an active deploy', async () => {

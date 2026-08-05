@@ -6,6 +6,8 @@ name: CD — Production
 # update the live services is through these explicit deploy hooks. The workflow
 # rehearses every pending Prisma migration, applies it with the owner credential,
 # configures/verifies the restricted runtime credential, and only then deploys.
+# It is triggered only by a successful same-repository push CI run and checks out
+# that CI-certified SHA; direct push/manual production bypasses are not allowed.
 #
 # Owner configuration (one-time):
 #   Secrets: PROD_DATABASE_OWNER_URL, PROD_DATABASE_RUNTIME_URL,
@@ -28,9 +30,10 @@ name: CD — Production
 # rollback — ship a forward migration instead.
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main, master]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -40,11 +43,35 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+  RELEASE_BRANCH: ${{ github.event.workflow_run.head_branch }}
   PROD_API_BASE_URL: ${{ vars.PROD_API_BASE_URL || 'https://api.ali.kg' }}
   PROD_WEB_BASE_URL: ${{ vars.PROD_WEB_BASE_URL || 'https://ali.kg' }}
 
 jobs:
+  authorize-release:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      contains(fromJSON('["main","master"]'), github.event.workflow_run.head_branch)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: Reject a stale or superseded release candidate
+        env:
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_HEAD_TOKEN: ${{ github.token }}
+        run: node scripts/verify-github-release-head.mjs
+
   migration-rehearsal:
+    needs: authorize-release
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -67,6 +94,9 @@ jobs:
       AUTH_REFRESH_ROTATION_GRACE_ENABLED: 'false'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
@@ -90,6 +120,7 @@ jobs:
             npm run db:configure-runtime-role -w @alistore/api
 
   release-preflight:
+    needs: authorize-release
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -117,6 +148,9 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
@@ -139,7 +173,11 @@ jobs:
         env:
           NODE_ENV: production
           DATABASE_OWNER_URL: ${{ secrets.PROD_DATABASE_OWNER_URL }}
-        run: npm run db:deploy -w @alistore/api
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_HEAD_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/verify-github-release-head.mjs
+          npm run db:deploy -w @alistore/api
       - name: Configure and verify the production runtime role
         env:
           NODE_ENV: production
@@ -154,11 +192,17 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
       - name: Deploy the exact tested commit and wait for all services
         env:
+          GITHUB_SHA: ${{ env.RELEASE_SHA }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_HEAD_TOKEN: ${{ github.token }}
           DEPLOY_ENVIRONMENT: production
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_DEPLOY_HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API_PROD }}
@@ -176,6 +220,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
       - name: Wait for production health endpoints
         run: |
           set -euo pipefail

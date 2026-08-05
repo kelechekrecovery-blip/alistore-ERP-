@@ -1,4 +1,5 @@
 import { pathToFileURL } from 'node:url';
+import { verifyGitHubReleaseHead } from './verify-github-release-head.mjs';
 
 const SUCCESS = new Set(['live']);
 const FAILURE = new Set(['build_failed', 'update_failed', 'canceled', 'deactivated']);
@@ -30,7 +31,7 @@ export function serviceIdFromHook(hook) {
 
 export async function deployAndWait({
   services, commit, apiKey, deploymentEnvironment, databaseRuntimeUrl, databaseRuntimePoolUrl, databaseBackupUrl,
-  fetchImpl = fetch, pollDelayMs = 15_000, maxPolls = 120,
+  fetchImpl = fetch, verifyCandidate = async () => {}, pollDelayMs = 15_000, maxPolls = 120,
 }) {
   if (!commit || !apiKey || !databaseRuntimeUrl) {
     throw new Error('GITHUB_SHA, RENDER_API_KEY and DATABASE_RUNTIME_URL are required');
@@ -82,6 +83,9 @@ export async function deployAndWait({
     const status = item?.deploy?.status ?? item?.status;
     if (status && !TERMINAL.has(status)) throw new Error(`Render ${target.logicalName} already has an active deploy`);
   }
+  // A newer CI run may complete while this serialized workflow waits on an
+  // environment approval or Render preflight. Recheck at the mutation boundary.
+  await verifyCandidate();
   const changes = targets.flatMap((target) => {
     if (target.logicalName === 'api') return [{ serviceId: target.serviceId, key: 'DATABASE_URL', value: databaseRuntimePoolUrl ?? databaseRuntimeUrl }];
     if (target.logicalName === 'worker') return [{ serviceId: target.serviceId, key: 'DATABASE_URL', value: databaseRuntimeUrl }];
@@ -115,6 +119,9 @@ export async function deployAndWait({
   const deploys = [];
   try {
     for (const { logicalName: name, hook, serviceId } of targets) {
+      // If a newer certified SHA appears during the multi-service handoff,
+      // abort and cancel any hooks already accepted for this older release.
+      await verifyCandidate();
       const hookUrl = new URL(hook);
       hookUrl.searchParams.set('ref', commit);
       const response = await fetchImpl(hookUrl, { method: 'POST', redirect: 'error' });
@@ -131,6 +138,7 @@ export async function deployAndWait({
     for (const deploy of deploys) {
       let completed = false;
       for (let poll = 0; poll < maxPolls; poll += 1) {
+        await verifyCandidate();
         const response = await fetchImpl(
           `https://api.render.com/v1/services/${encodeURIComponent(deploy.serviceId)}/deploys/${encodeURIComponent(deploy.deployId)}`,
           { headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' }, redirect: 'error' },
@@ -139,6 +147,9 @@ export async function deployAndWait({
         const payload = await response.json();
         const status = payload?.status ?? payload?.deploy?.status;
         if (SUCCESS.has(status)) {
+          // The status lookup itself is a network race boundary. Do not accept
+          // an older release as live if the protected branch moved meanwhile.
+          await verifyCandidate();
           process.stdout.write(`Render ${deploy.name} deploy ${deploy.deployId} is live.\n`);
           completed = true;
           break;
@@ -149,10 +160,16 @@ export async function deployAndWait({
       if (!completed) throw new Error(`Timed out waiting for Render ${deploy.name} deploy ${deploy.deployId}`);
     }
   } catch (error) {
-    await Promise.allSettled(deploys.map((deploy) => fetchImpl(
-      `https://api.render.com/v1/services/${deploy.serviceId}/deploys/${deploy.deployId}/cancel`,
-      { method: 'POST', headers: { Authorization: `Bearer ${apiKey}` }, redirect: 'error' },
-    )));
+    const cancellations = await Promise.allSettled(deploys.map(async (deploy) => {
+      const response = await fetchImpl(
+        `https://api.render.com/v1/services/${deploy.serviceId}/deploys/${deploy.deployId}/cancel`,
+        { method: 'POST', headers: { Authorization: `Bearer ${apiKey}` }, redirect: 'error' },
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    }));
+    if (cancellations.some(({ status }) => status === 'rejected')) {
+      throw new Error(`Render deployment failed and cancellation was incomplete: ${error.message}`);
+    }
     throw error;
   }
 }
@@ -184,6 +201,14 @@ async function readEnvironmentVariable(fetchImpl, apiKey, serviceId, key) {
 
 const invokedPath = process.argv[1] ? pathToFileURL(process.argv[1]).href : '';
 if (import.meta.url === invokedPath) {
+  const verifyCandidate = process.env.DEPLOY_ENVIRONMENT === 'production'
+    ? () => verifyGitHubReleaseHead({
+      repository: process.env.RELEASE_REPOSITORY,
+      branch: process.env.RELEASE_BRANCH,
+      releaseSha: process.env.RELEASE_SHA,
+      token: process.env.RELEASE_HEAD_TOKEN,
+    })
+    : async () => {};
   deployAndWait({
     commit: process.env.GITHUB_SHA,
     apiKey: process.env.RENDER_API_KEY,
@@ -191,6 +216,7 @@ if (import.meta.url === invokedPath) {
     databaseRuntimeUrl: process.env.DATABASE_RUNTIME_URL,
     databaseRuntimePoolUrl: process.env.DATABASE_RUNTIME_POOL_URL,
     databaseBackupUrl: process.env.DATABASE_BACKUP_URL,
+    verifyCandidate,
     services: [
       { name: 'api', hook: process.env.RENDER_DEPLOY_HOOK_API },
       { name: 'web', hook: process.env.RENDER_DEPLOY_HOOK_WEB },
