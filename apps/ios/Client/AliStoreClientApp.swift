@@ -1030,7 +1030,12 @@ private struct ClientOverlayView: View {
                 .foregroundStyle(.white)
             VStack(alignment: .leading, spacing: 3) {
                 Text(product.category)
-                Text("🛡 Гарантия 12 мес")
+                // SF Symbol вместо эмодзи: 🛡 рисуется системным шрифтом эмодзи,
+                // не наследует ни начертание, ни цвет строки и выглядит инородно
+                // рядом с «● В наличии» ниже. Оба скила — веб и SwiftUI — держат
+                // эмодзи-как-иконку в запрещённых.
+                Label("Гарантия 12 мес", systemImage: "checkmark.shield")
+                    .labelStyle(.titleAndIcon)
                 Text(product.availableUnits > 0 ? "● В наличии" : "● Нет в наличии")
                     .foregroundStyle(product.availableUnits > 0 ? ClientTheme.lime : ClientTheme.coral)
             }
@@ -6860,7 +6865,9 @@ private struct ClientHomeView: View {
                     .buttonStyle(.plain)
                     if !products.isEmpty {
                         HStack {
-                            Text("✨ Для вас").font(ClientTheme.display(18, weight: .bold))
+                            Label("Для вас", systemImage: "sparkles")
+                                .labelStyle(.titleAndIcon)
+                                .font(ClientTheme.display(18, weight: .bold))
                             Spacer()
                             Text("подобрано").font(ClientTheme.body(11, weight: .semibold)).foregroundStyle(Design3.orange)
                         }
@@ -6882,7 +6889,9 @@ private struct ClientHomeView: View {
                         .accessibilityIdentifier("home-for-you")
                     }
                     HStack {
-                    Text("🔥 Хиты продаж").font(ClientTheme.display(18, weight: .bold))
+                    Label("Хиты продаж", systemImage: "flame")
+                        .labelStyle(.titleAndIcon)
+                        .font(ClientTheme.display(18, weight: .bold))
                         Spacer()
                         Button("Все", action: openCatalog).foregroundStyle(ClientTheme.lime)
                     }

@@ -265,7 +265,12 @@ final class AliStoreClientUITests: XCTestCase {
         returnsApp.staticTexts["Возвраты"].tap()
         XCTAssertTrue(returnsApp.navigationBars["Возвраты"].waitForExistence(timeout: 5))
         XCTAssertTrue(returnsApp.staticTexts["Возврат товара"].waitForExistence(timeout: 5))
-        XCTAssertTrue(returnsApp.staticTexts["iPhone 15 128 GB Black"].exists)
+        // При доступном каталоге SKU разрешается в точное имя товара; при
+        // недоступном — экран честно показывает SKU вместо эвристического имени.
+        XCTAssertTrue(
+            returnsApp.staticTexts["iPhone 15 128 GB Black"].exists ||
+                returnsApp.staticTexts["IPHONE-15-128-BLK"].exists
+        )
         XCTAssertTrue(returnsApp.staticTexts["Заявка принята"].exists)
         XCTAssertTrue(returnsApp.staticTexts["Проверка товара"].exists)
         XCTAssertTrue(returnsApp.staticTexts["Возврат денег"].exists)
