@@ -36,6 +36,7 @@ export const APPROVAL_APPROVER_ROLES: Record<string, Role[]> = {
   manual_adjustment: ['admin', 'owner'],
   storefront_publish: ['admin', 'owner'],
   ai_support_triage: ['admin', 'owner'],
+  procurement_draft: ['admin', 'owner'],
 };
 
 /** Thresholds beyond which an action must be parked for approval. */

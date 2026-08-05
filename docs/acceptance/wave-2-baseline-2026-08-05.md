@@ -25,6 +25,8 @@ Owner Copilot read-only tool contract: **3 suites / 13 tests passed** for insigh
 
 Procurement bridge: `buildReorderDraft` is pure and requires explicit supplier, location, idempotency key and human-entered unit costs. Its 3 tests pass; it filters non-urgent recommendations and fails closed instead of creating a purchase order or mutating stock.
 
+Approval integration: `procurement_draft` is a four-eyes admin/owner action. The approved executor creates the draft PO and emits `purchase_order.created` in the same transaction; malformed rows fail before any write. Approval bridge tests: **2 suites / 6 tests passed**.
+
 The provider contract confirms that `PAYMENT_PROVIDER=none` exposes cash-on-delivery while online payment fails closed with `online_payments_unavailable`; unknown providers are rejected.
 
 The first attempt was blocked by a transient PostgreSQL advisory lock (`P1002`) from another local worker. After the worker exited, the same command completed successfully; no application assertion failed.

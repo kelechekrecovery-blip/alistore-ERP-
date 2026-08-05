@@ -13,7 +13,7 @@ import { StaffAuthService } from '../staff-auth/staff-auth.service';
 
 /** A dangerous action captured for approval (Approval Rules Matrix). */
 export interface ApprovalRequest {
-  action: string; // refund | discount | write_off | quarantine_write_off | price | debt | stock_adjust | delete | pii
+  action: string; // refund | discount | write_off | quarantine_write_off | price | debt | stock_adjust | procurement_draft | delete | pii
   requester: string;
   reason: string;
   payload?: Record<string, unknown>;
@@ -39,6 +39,7 @@ export const FOUR_EYES_ACTIONS: readonly string[] = [
   'campaign_budget',
   'storefront_publish',
   'ai_support_triage',
+  'procurement_draft',
   'refund',
   'quarantine_write_off',
   'exchange',

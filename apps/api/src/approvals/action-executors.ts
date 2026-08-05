@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { AuditInput } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ValidationError } from '../common/errors';
@@ -11,6 +12,50 @@ import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
 import { adjustQuantityValuationOnTx } from '../inventory/inventory-valuation';
 import { publishStorefrontRevisionOnTx } from '../storefront/storefront-publish';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
+import { resolveActiveStorePoint } from '../common/store-point-identity';
+
+/** procurement_draft — create a draft PO only after a separate approval decision. */
+const procurement_draft: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
+  const idempotencyKey = String(payload['idempotencyKey'] ?? '').trim();
+  const supplierId = String(payload['supplierId'] ?? '').trim();
+  const requestedLocation = String(payload['location'] ?? '').trim();
+  const note = typeof payload['note'] === 'string' ? payload['note'].trim() : null;
+  const rawItems = payload['items'];
+  if (!idempotencyKey || !supplierId || !requestedLocation || !Array.isArray(rawItems) || rawItems.length < 1 || rawItems.length > 100) {
+    throw new ValidationError('procurement_draft_snapshot_invalid', 'Снимок закупочного draft повреждён');
+  }
+  const items = rawItems.map((raw) => ({
+    productId: String((raw as Record<string, unknown>)['productId'] ?? '').trim(),
+    qty: Number((raw as Record<string, unknown>)['qty']),
+    unitCost: Number((raw as Record<string, unknown>)['unitCost']),
+  }));
+  if (items.some((item) => !item.productId || !Number.isSafeInteger(item.qty) || item.qty < 1 || !Number.isSafeInteger(item.unitCost) || item.unitCost < 0)
+    || new Set(items.map((item) => item.productId)).size !== items.length) {
+    throw new ValidationError('procurement_draft_snapshot_invalid', 'Строки закупочного draft повреждены');
+  }
+  const location = (await resolveActiveStorePoint(tx, requestedLocation, 'Склад назначения не соответствует активной точке')).inventoryLocation;
+  const [supplier, products] = await Promise.all([
+    tx.supplier.findUnique({ where: { id: supplierId } }),
+    tx.product.findMany({ where: { id: { in: items.map((item) => item.productId) }, archived: false }, select: { id: true, sku: true, _count: { select: { bundleComponents: true } } } }),
+  ]);
+  if (!supplier) throw new ValidationError('supplier_not_found', `Поставщик ${supplierId} не найден`);
+  if (products.length !== items.length) throw new ValidationError('purchase_order_product_not_found', 'Один или несколько товаров не найдены');
+  const bundle = products.find((product) => product._count.bundleComponents > 0);
+  if (bundle) throw new ValidationError('purchase_order_virtual_bundle_forbidden', `Виртуальный набор ${bundle.sku} нельзя оприходовать напрямую`);
+  const number = `PO-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${randomUUID().slice(0, 6).toUpperCase()}`;
+  const order = await tx.purchaseOrder.create({
+    data: {
+      number, idempotencyKey, supplierId, location, note, createdBy: approver,
+      items: { create: items.map((item) => ({ productId: item.productId, orderedQty: item.qty, unitCost: item.unitCost })) },
+    },
+  });
+  events.push({
+    type: EventType.PurchaseOrderCreated,
+    actor: approver,
+    payload: { purchaseOrderId: order.id, number, supplierId, location, items: items.length, approvalId, source: 'ai.reorder' },
+    refs: [order.id, supplierId, approvalId, ...items.map((item) => item.productId)],
+  });
+};
 
 const manual_adjustment: ActionExecutor = async (tx, payload, approver, approvalId, events) => {
   const documentNumber = String(payload['documentNumber'] ?? '').trim();
@@ -854,6 +899,7 @@ export const ACTION_EXECUTORS: Record<string, ActionExecutor> = {
   manual_adjustment,
   storefront_publish,
   ai_support_triage,
+  procurement_draft,
 };
 
 export const ACTION_REJECTION_EXECUTORS: Record<string, ActionRejectionExecutor> = {
