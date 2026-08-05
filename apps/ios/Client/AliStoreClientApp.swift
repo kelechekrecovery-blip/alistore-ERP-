@@ -1745,6 +1745,14 @@ private struct CartView: View {
     @State private var isRetryingPayment = false
     @State private var retryErrorMessage: String?
     @State private var queuedOffline = false
+    /// Явное согласие с офертой и обработкой персональных данных.
+    ///
+    /// На вебе это обязательная галочка, без которой заказ не отправляется, и
+    /// сервер по ней ставит `piiConsentAt`. В iOS стояла лишь фраза «нажимая,
+    /// вы соглашаетесь»: согласие подразумевалось, флаг на сервер не уходил, и
+    /// отметки о согласии у заказа не появлялось. Два канала одного магазина
+    /// не могут собирать согласие по-разному.
+    @State private var piiConsent = false
     @State private var checkoutStep: ClientCheckoutStep = .delivery
     @State private var showingOrderStatus = false
     @State private var showingCheckout = UITestBootstrap.startsAtCheckout
@@ -2138,10 +2146,27 @@ private struct CartView: View {
             .padding(16)
             .glass(radius: 14)
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(ClientTheme.line))
-            Text("Нажимая «Подтвердить заказ», вы соглашаетесь с условиями продажи и политикой возврата AliStore.")
-                .font(ClientTheme.body(11))
-                .foregroundStyle(ClientTheme.muted)
-                .lineSpacing(3)
+            Button {
+                piiConsent.toggle()
+            } label: {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: piiConsent ? "checkmark.square.fill" : "square")
+                        .font(.system(size: 18))
+                        .foregroundStyle(piiConsent ? ClientTheme.lime : ClientTheme.muted)
+                    Text("Согласен с условиями публичной оферты и обработкой персональных данных")
+                        .font(ClientTheme.body(12))
+                        .foregroundStyle(Design3.textBright)
+                        .multilineTextAlignment(.leading)
+                        .lineSpacing(3)
+                    Spacer(minLength: 0)
+                }
+                .padding(12)
+                .glass(radius: 12)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("checkout-pii-consent")
+            .accessibilityAddTraits(piiConsent ? [.isButton, .isSelected] : .isButton)
         }
     }
 
@@ -2203,7 +2228,10 @@ private struct CartView: View {
                 return !giftCardCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             }
             return !paymentMethod.isEmpty
-        case .review: return !lines.isEmpty
+        // Без явного согласия заказ не уходит — как на вебе. Раньше согласие
+        // подразумевалось нажатием, и человек мог оформить заказ, не увидев
+        // условий вовсе.
+        case .review: return !lines.isEmpty && piiConsent
         }
     }
 
@@ -2265,7 +2293,10 @@ private struct CartView: View {
             deliverySlotId: fulfillment == "courier" ? selectedDeliverySlot?.id : nil,
             deliverySlot: fulfillment == "pickup"
                 ? pickupPoints.first(where: { $0.id == selectedStorePointId })?.hours
-                : selectedDeliverySlot.map { slotLabel($0) }
+                : selectedDeliverySlot.map { slotLabel($0) },
+            // Согласие подтверждено галочкой на шаге подтверждения; сервер по
+            // нему ставит `piiConsentAt`, как и для веба.
+            piiConsent: piiConsent
         )
         let idempotencyKey = UUID().uuidString
         guard await giftCardCanCoverOrder() else { return }
@@ -2646,10 +2677,14 @@ private struct ClientOrderStatusView: View {
     /// server-reported status without inventing timestamps.
     private var timelineSteps: [OrderTimelineStep] {
         if let ledger {
-            return OrderTimelineBuilder.build(events: ledger)
+            // Со статусом, а не только по леджеру: отменённый и возвращённый
+            // заказ продолжал подсвечивать «Собираем заказ», и подсветка
+            // читалась как обещание, что заказ едет.
+            return OrderTimelineBuilder.build(events: ledger, status: order.status)
         }
+        let terminal = OrderTimelineBuilder.terminalOutcome(status: order.status) != nil
         return OrderTimelineBuilder.stepTitles.enumerated().map { index, title in
-            OrderTimelineStep(title: title, isDone: index < currentIndex, isCurrent: index == currentIndex, time: nil)
+            OrderTimelineStep(title: title, isDone: index < currentIndex, isCurrent: !terminal && index == currentIndex, time: nil)
         }
     }
 
@@ -2679,6 +2714,19 @@ private struct ClientOrderStatusView: View {
                                 .foregroundStyle(ClientTheme.muted)
                         }
                         Spacer()
+                    }
+                    // Терминальный исход называем словами. Одного погашенного
+                    // таймлайна мало: покупатель видит незавершённую цепочку и
+                    // не понимает, заказ застрял или его отменили. Заголовок
+                    // берём из модели, а не из сырого `status` вроде «refunded».
+                    if let outcome = OrderTimelineBuilder.terminalOutcome(status: order.status) {
+                        Text(outcome.title)
+                            .font(ClientTheme.body(13, weight: .bold))
+                            .foregroundStyle(ClientTheme.coral)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 12)
+                            .background(ClientTheme.coral.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
                     }
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(timelineSteps.enumerated()), id: \.offset) { index, step in
@@ -6630,7 +6678,9 @@ private struct CatalogView: View {
         var result = products.filter { product in
             let matchesQuery = SmartSearch.matches(query, fields: [product.name, product.category, product.sku])
             let matchesCategory = selectedCategory.isEmpty || product.category == selectedCategory
-            let matchesStock = !stockOnly || product.availableUnits > 0
+            // «Только в наличии» отсекало и товар «под заказ», хотя его тоже
+            // можно купить. Фильтр про возможность купить, а не про остаток.
+            let matchesStock = !stockOnly || product.availability.buyable
             return matchesQuery && matchesCategory && matchesStock
         }
         switch selectedSort {
@@ -6987,13 +7037,28 @@ private struct NativeProductCard: View {
     @Binding var cart: [String: Int]
     @Binding var favorites: Set<String>
 
+    // Карточка смотрела только на `availableUnits > 0`, и товар «под заказ» —
+    // остатка нет, но магазин его привезёт — читался как «нет в наличии»:
+    // покупатель терял товар, который ему готовы продать. Сервер отдаёт
+    // разобранное наличие (`availabilityKind`/`orderable`/`leadTimeDays`), и
+    // теперь экран читает именно его.
+    private var availability: ProductAvailability { product.availability }
+
     private var availabilityText: String {
-        product.availableUnits > 0
-            ? (product.availableUnits < 5 ? "Осталось \(product.availableUnits) шт" : "В наличии")
-            : "Нет в наличии"
+        switch availability.kind {
+        case .inStock:
+            return product.availableUnits < 5 ? "Осталось \(product.availableUnits) шт" : "В наличии"
+        case .toOrder:
+            if let days = availability.leadTimeDays { return "Под заказ · \(days) дн" }
+            return "Под заказ"
+        case .unavailable:
+            return "Нет в наличии"
+        }
     }
     private var isFavorite: Bool { favorites.contains(product.id) }
-    private var isInStock: Bool { product.availableUnits > 0 }
+    /// Можно ли положить в корзину. Решает сервер (`orderable`), а не остаток:
+    /// у товара «под заказ» остаток нулевой, но купить его можно.
+    private var isInStock: Bool { availability.buyable }
 
     private func toggleFavorite() {
         if isFavorite { favorites.remove(product.id) } else { favorites.insert(product.id) }
@@ -7010,6 +7075,14 @@ private struct NativeProductCard: View {
             }
             Text(product.name).font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white).lineLimit(2).frame(minHeight: 38, alignment: .top)
             Text(Money.som(product.price)).font(ClientTheme.display(16, weight: .black)).foregroundStyle(.white)
+            // Платёж в рассрочку — то, чем в Кыргызстане меряют покупку техники:
+            // «2 075 сом/мес» решает быстрее, чем «24 900 сом». Цифру считает
+            // сервер по договорным условиям владельца; клиент её только
+            // показывает и никогда не выводит сам.
+            if let installment = product.installment {
+                Text("от \(Money.som(installment.monthlySom))/мес · \(installment.label)")
+                    .font(ClientTheme.body(10)).foregroundStyle(ClientTheme.lime).lineLimit(1)
+            }
             Text(availabilityText)
                 .font(ClientTheme.body(10)).foregroundStyle(isInStock ? ClientTheme.muted : Design3.danger)
             // Кнопка товара без остатка называлась «Уведомить» и была навсегда
@@ -7017,7 +7090,7 @@ private struct NativeProductCard: View {
             // ничего. Обещание уведомления сервер выполнить не может: листа
             // ожидания в API нет, экран WaitlistView живёт под `#if DEBUG`.
             // Кнопка теперь говорит только то, что правда: товара нет.
-            Button { addToCart() } label: { Text(isInStock ? "В корзину" : "Нет в наличии").font(ClientTheme.body(12, weight: .bold)).frame(maxWidth: .infinity).frame(height: 38).background(isInStock ? ClientTheme.lime : ClientTheme.line, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(isInStock ? Color.black : Design3.textDisabled) }.disabled(!isInStock)
+            Button { addToCart() } label: { Text(availability.isToOrder ? "Заказать" : isInStock ? "В корзину" : "Нет в наличии").font(ClientTheme.body(12, weight: .bold)).frame(maxWidth: .infinity).frame(height: 38).background(isInStock ? ClientTheme.lime : ClientTheme.line, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(isInStock ? Color.black : Design3.textDisabled) }.disabled(!isInStock)
         }
         .padding(10)
         .glass(radius: 16)
@@ -7069,6 +7142,20 @@ private struct ProductDetail: View {
 
     private var displayProduct: Product { detail?.product ?? product }
 
+    /// Три состояния наличия вместо двух: склад, «под заказ» и недоступен.
+    private var detailAvailabilityBadge: String {
+        let availability = displayProduct.availability
+        switch availability.kind {
+        case .inStock:
+            return "В НАЛИЧИИ"
+        case .toOrder:
+            if let days = availability.leadTimeDays { return "ПОД ЗАКАЗ · \(days) ДН" }
+            return "ПОД ЗАКАЗ"
+        case .unavailable:
+            return "НЕТ В НАЛИЧИИ"
+        }
+    }
+
     private var displayVariants: [Product] {
         let variants = detail?.variants ?? []
         return variants.isEmpty ? [displayProduct] : variants
@@ -7095,17 +7182,46 @@ private struct ProductDetail: View {
                     .padding(14)
                 }
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(displayProduct.availableUnits > 0 ? "В НАЛИЧИИ" : "НЕТ В НАЛИЧИИ")
+                    // Бейдж читал только остаток, и товар «под заказ» —
+                    // остатка нет, но магазин привезёт — объявлялся отсутствующим.
+                    Text(detailAvailabilityBadge)
                         .font(Design3.mono(11, .bold))
-                        .foregroundStyle(displayProduct.availableUnits > 0 ? ClientTheme.lime : ClientTheme.coral)
+                        .foregroundStyle(displayProduct.availability.kind == .unavailable ? ClientTheme.coral : ClientTheme.lime)
                     Text(displayProduct.name).font(ClientTheme.display(22, weight: .black)).foregroundStyle(.white)
                     Text(Money.som(displayProduct.price))
                         .font(ClientTheme.display(26, weight: .black)).foregroundStyle(.white)
-                    // Разряды здесь были отключены явно (`.grouping(.never)`), из-за чего
-                    // под ценой «39 900 сом» стояло «3325 сом» — тот же экран печатал
-                    // деньги двумя разными способами.
-                    Text("или \(Money.som(displayProduct.price / 12)) × 12 мес")
-                        .font(ClientTheme.body(13)).foregroundStyle(ClientTheme.lime)
+                    // Здесь стояло «или \(price / 12) × 12 мес» — рассрочка,
+                    // придуманная клиентом. Двенадцать месяцев брались из
+                    // воздуха: у партнёров разные сроки и потолки (Payda — до
+                    // 100 000 сом), деление нацело округляло вниз, так что
+                    // двенадцать таких платежей были меньше цены, и провайдера
+                    // экран не называл вовсе. Теперь ступени считает сервер по
+                    // договорным условиям владельца, а клиент их показывает.
+                    if !displayProduct.installmentSteps.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Рассрочка 0%")
+                                .font(ClientTheme.body(13, weight: .semibold)).foregroundStyle(.white)
+                            ForEach(displayProduct.installmentSteps) { step in
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Text("\(Money.som(step.monthlySom))/мес")
+                                        .font(ClientTheme.display(15, weight: .bold))
+                                        .foregroundStyle(ClientTheme.lime)
+                                    Text("\(step.months) мес · \(step.providers.joined(separator: ", "))")
+                                        .font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                                    Spacer(minLength: 0)
+                                }
+                            }
+                            Text("Оформляется в магазине при получении заказа.")
+                                .font(ClientTheme.body(11)).foregroundStyle(Design3.textMuted)
+                        }
+                        .padding(12)
+                        .glass(radius: 12)
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+                    }
+                    if let bonus = displayProduct.bonusPoints, bonus > 0 {
+                        Text("Начислим \(Money.som(bonus).replacingOccurrences(of: " сом", with: "")) бонусов за покупку")
+                            .font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
+                    }
                     HStack(spacing: 8) {
                         ForEach(displayVariants) { variant in
                             if variant.id == displayProduct.id {
@@ -7162,9 +7278,13 @@ private struct ProductDetail: View {
                         }
                     }
                     Button {
-                        cart[displayProduct.id] = min(displayProduct.availableUnits, (cart[displayProduct.id] ?? 0) + 1)
+                        // У товара «под заказ» остаток нулевой, и `min` с ним
+                        // не давал положить в корзину ничего. Потолок берём из
+                        // общего правила корзины, как это делает веб.
+                        let ceiling = displayProduct.availability.isToOrder ? 10 : displayProduct.availableUnits
+                        cart[displayProduct.id] = min(ceiling, (cart[displayProduct.id] ?? 0) + 1)
                     } label: {
-                        Text(displayProduct.availableUnits > 0 ? "Добавить в корзину" : "Нет в наличии")
+                        Text(displayProduct.availability.isToOrder ? "Заказать" : displayProduct.availability.buyable ? "Добавить в корзину" : "Нет в наличии")
                             .font(ClientTheme.body(15, weight: .bold)).foregroundStyle(.black)
                             .frame(maxWidth: .infinity).frame(height: 50)
                             .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))

@@ -61,6 +61,12 @@ export class CatalogSearchQueryDto {
   offset = 0;
 }
 
+export class InstallmentStepDto {
+  @ApiProperty({ example: 12 }) months!: number;
+  @ApiProperty({ example: 2075, description: 'Наименьший платёж на этой ступени, сом.' }) monthlySom!: number;
+  @ApiProperty({ example: ['O!Market', 'ZERO'], description: 'Где эту ступень оформить.' }) providers!: string[];
+}
+
 export class InstallmentOfferDto {
   @ApiProperty({ example: 'omarket' }) id!: string;
   @ApiProperty({ example: 'O!Market' }) label!: string;
@@ -77,6 +83,25 @@ export class CatalogProductDto {
    */
   @ApiPropertyOptional({ type: () => InstallmentOfferDto, nullable: true })
   installment?: InstallmentOfferDto | null;
+
+  /**
+   * Ступени срока — «12 мес — X, 6 мес — Y, 3 мес — Z», одна строка на срок.
+   * Карточке каталога хватает лучшего платежа, а карточке товара нужна вилка:
+   * покупатель выбирает срок, а провайдеры перечислены внутри ступени — они
+   * важны ему только тем, где подписывать.
+   */
+  @ApiPropertyOptional({ type: () => [InstallmentStepDto] })
+  installmentSteps?: InstallmentStepDto[];
+
+  /**
+   * Сколько бонусов начислит покупка этого товара.
+   *
+   * Считается той же функцией, что и реальное начисление в заказе
+   * (`customers/loyalty-ledger.ts loyaltyEarnAmount`), — обещание на витрине
+   * обязано совпасть с тем, что покупатель потом получит.
+   */
+  @ApiPropertyOptional({ example: 249 })
+  bonusPoints?: number;
 
   @ApiProperty() id!: string;
   @ApiProperty() sku!: string;

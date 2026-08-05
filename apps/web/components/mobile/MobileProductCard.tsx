@@ -92,6 +92,10 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
         </Link>
         <div className="mt-1.5 font-display text-[16px] font-extrabold text-white">{som(product.price)}</div>
         {product.installment && <div className="mt-1 text-[10px] text-lime">от {som(product.installment.monthlySom)}/мес · {product.installment.label}</div>}
+        {/* Бонус считает сервер той же функцией, что потом начислит заказ. */}
+        {typeof product.bonusPoints === 'number' && product.bonusPoints > 0 && (
+          <div className="mt-0.5 text-[10px] text-subtle">+{product.bonusPoints.toLocaleString('ru-RU')} бонусов</div>
+        )}
         <div className="mt-0.5 text-[10px] text-subtle">
           {inStock ? (
             `${product.availableUnits} в наличии`
@@ -114,7 +118,11 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
                   : 'bg-surface-3 text-faint'
             }`}
           >
-            {added ? 'Добавлено ✓' : inStock ? 'В корзину' : toOrder ? 'Заказать' : 'Под заказ'}
+            {/* Последняя ветка — недоступный товар, и она говорила «Под заказ»,
+                противореча строке «Нет в наличии» прямо над кнопкой и обещая
+                заказ, которого сервер не примет. Ветка «под заказ» уже разобрана
+                выше по `toOrder`. */}
+            {added ? 'Добавлено' : inStock ? 'В корзину' : toOrder ? 'Заказать' : 'Нет в наличии'}
           </button>
           {showCompare && (
             <button

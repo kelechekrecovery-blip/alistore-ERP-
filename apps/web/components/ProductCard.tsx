@@ -121,6 +121,14 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
             от {som(product.installment.monthlySom)}/мес · {product.installment.label}
           </div>
         )}
+        {/* Бонус за покупку. Цифру даёт сервер той же функцией, что потом
+            реально начислит заказ, — иначе карточка обещала бы одно, а
+            кабинет показывал другое. */}
+        {typeof product.bonusPoints === 'number' && product.bonusPoints > 0 && (
+          <div className={`mt-1 text-[11px] ${design3 ? 'text-white/45' : 'text-faint'}`}>
+            +{product.bonusPoints.toLocaleString('ru-RU')} бонусов
+          </div>
+        )}
         {!product.installment && typeof product.attrs?.financingText === 'string' && <div className={`mt-1 text-[11px] ${design3 ? 'text-[#c6ff3d]' : 'text-faint'}`}>{product.attrs.financingText}</div>}
         <div className="mt-auto flex gap-1.5 pt-3">
           <button type="button" disabled={!buyable} aria-describedby={!buyable && toOrder ? `availability-${product.id}` : undefined} onClick={addToCart} className={`flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[8px] text-xs font-bold transition disabled:cursor-not-allowed disabled:bg-linen disabled:text-faint ${added ? 'bg-success text-white' : 'bg-coral text-white hover:bg-deep'}`}>

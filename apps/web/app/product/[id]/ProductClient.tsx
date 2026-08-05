@@ -228,7 +228,39 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               <div className="mt-7 font-display text-4xl font-extrabold text-white">
                 {som(product.price)}
               </div>
-              {typeof product.attrs?.financingText === "string" && <div className="mt-2 text-sm text-[#c6ff3d]">{product.attrs.financingText}</div>}
+              {/* Вилка сроков, а не один назначенный платёж: покупатель сам
+                  выбирает, за сколько месяцев ему удобно. Все ступени считает
+                  сервер по договорным условиям владельца — витрина не имеет
+                  права придумать финансовое условие.
+                  Оформляют рассрочку в магазине: публичного API у партнёров
+                  (Payda/Оптима, O!Market/O!Bank, ZERO/А Банк, M+) нет. */}
+              {product.installmentSteps && product.installmentSteps.length > 0 && (
+                <div className="mt-4 rounded-[14px] border border-white/10 bg-white/[.03] p-4">
+                  <div className="text-[13px] font-semibold text-white">Рассрочка 0%</div>
+                  <div className="mt-2.5 flex flex-wrap gap-2">
+                    {product.installmentSteps.map((step) => (
+                      <div
+                        key={step.months}
+                        className="rounded-[10px] border border-white/10 bg-white/[.04] px-3 py-2"
+                      >
+                        <div className="font-display text-[15px] font-bold text-[#c6ff3d]">
+                          {som(step.monthlySom)}<span className="text-[11px] font-medium text-white/45">/мес</span>
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-white/45">{step.months} мес · {step.providers.join(', ')}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2.5 text-[11px] text-white/45">
+                    Оформляется в магазине при получении заказа.
+                  </div>
+                </div>
+              )}
+              {typeof product.bonusPoints === "number" && product.bonusPoints > 0 && (
+                <div className="mt-3 text-sm text-white/55">
+                  Начислим <span className="font-semibold text-white">{product.bonusPoints.toLocaleString("ru-RU")}</span> бонусов за покупку
+                </div>
+              )}
+              {!product.installmentSteps?.length && typeof product.attrs?.financingText === "string" && <div className="mt-2 text-sm text-[#c6ff3d]">{product.attrs.financingText}</div>}
               {inStock ? (
                 <div className="mt-5 flex items-center gap-2 text-sm font-semibold text-success">
                   <span className="h-2 w-2 rounded-full bg-success shadow-[0_0_10px_#2e7d46]" />

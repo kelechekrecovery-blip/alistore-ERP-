@@ -2,7 +2,8 @@ import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { ForbiddenError, ValidationError } from '../common/errors';
-import { bestInstallmentOffer, type InstallmentPlan } from './installments';
+import { bestInstallmentOffer, installmentLadder, type InstallmentPlan } from './installments';
+import { loyaltyEarnAmount } from '../customers/loyalty-ledger';
 import { SettingsService } from '../settings/settings.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -182,7 +183,7 @@ export class CatalogService {
         orderBy: [{ name: 'asc' }], take: 12, include: this.stockCountInclude(),
       }),
     ]);
-    const enriched = await this.enrichInstallments(await this.enrichReviews([product, ...variants, ...related].map((item) => this.toCatalogProduct(item))));
+    const enriched = await this.enrichOffers(await this.enrichReviews([product, ...variants, ...related].map((item) => this.toCatalogProduct(item))));
     const [main, ...rest] = enriched;
     return { product: main, variants: rest.slice(0, variants.length), related: rest.slice(variants.length) };
   }
@@ -283,7 +284,7 @@ export class CatalogService {
       total: response.estimatedTotalHits ?? response.totalHits ?? ordered.length,
       limit: query.limit,
       offset: query.offset,
-      items: await this.enrichInstallments(await this.enrichReviews(ordered)),
+      items: await this.enrichOffers(await this.enrichReviews(ordered)),
     };
   }
 
@@ -309,7 +310,7 @@ export class CatalogService {
         total: sorted.length,
         limit: query.limit,
         offset: query.offset,
-        items: await this.enrichInstallments(await this.enrichReviews(sorted.slice(query.offset, query.offset + query.limit))),
+        items: await this.enrichOffers(await this.enrichReviews(sorted.slice(query.offset, query.offset + query.limit))),
       };
     }
     const [total, products] = await this.prisma.$transaction([
@@ -329,7 +330,7 @@ export class CatalogService {
       total,
       limit: query.limit,
       offset: query.offset,
-      items: await this.enrichInstallments(await this.enrichReviews(products.map((product) => this.toCatalogProduct(product)))),
+      items: await this.enrichOffers(await this.enrichReviews(products.map((product) => this.toCatalogProduct(product)))),
     };
   }
 
@@ -446,19 +447,37 @@ export class CatalogService {
       'installment.mplus.months', 'installment.mplus.markup_bps', 'installment.mplus.limit_som',
     ]);
     return [
-      { id: 'payda', label: 'Payda', months: values['installment.payda.months'], markupBps: values['installment.payda.markup_bps'], limitSom: values['installment.payda.limit_som'] },
-      { id: 'omarket', label: 'O!Market', months: values['installment.omarket.months'], markupBps: values['installment.omarket.markup_bps'], limitSom: values['installment.omarket.limit_som'] },
-      { id: 'zero', label: 'ZERO', months: values['installment.zero.months'], markupBps: values['installment.zero.markup_bps'], limitSom: values['installment.zero.limit_som'] },
-      { id: 'mplus', label: 'M+', months: values['installment.mplus.months'], markupBps: values['installment.mplus.markup_bps'], limitSom: values['installment.mplus.limit_som'] },
+      { id: 'payda', label: 'Payda', maxMonths: values['installment.payda.months'], markupBps: values['installment.payda.markup_bps'], limitSom: values['installment.payda.limit_som'] },
+      { id: 'omarket', label: 'O!Market', maxMonths: values['installment.omarket.months'], markupBps: values['installment.omarket.markup_bps'], limitSom: values['installment.omarket.limit_som'] },
+      { id: 'zero', label: 'ZERO', maxMonths: values['installment.zero.months'], markupBps: values['installment.zero.markup_bps'], limitSom: values['installment.zero.limit_som'] },
+      { id: 'mplus', label: 'M+', maxMonths: values['installment.mplus.months'], markupBps: values['installment.mplus.markup_bps'], limitSom: values['installment.mplus.limit_som'] },
     ];
   }
 
-  /** «от N сом/мес» на карточке: платёж считает сервер, не вёрстка. */
-  private async enrichInstallments(items: CatalogProductDto[]): Promise<CatalogProductDto[]> {
+  /**
+   * «от N сом/мес» и бонусы на карточке: обе цифры считает сервер, не вёрстка.
+   *
+   * Рассрочка — по договорным условиям владельца, бонус — той же функцией,
+   * что потом реально начислит заказ. Витрина не имеет права ни придумать
+   * финансовое условие, ни пообещать бонус, которого не будет.
+   */
+  private async enrichOffers(items: CatalogProductDto[]): Promise<CatalogProductDto[]> {
     if (items.length === 0) return items;
-    const plans = await this.installmentPlans();
-    if (plans.every((plan) => plan.months <= 0)) return items;
-    return items.map((item) => ({ ...item, installment: bestInstallmentOffer(item.price, plans) }));
+    const [plans, earnRateBps] = await Promise.all([
+      this.installmentPlans(),
+      this.settings ? this.settings.value('loyalty.earn_rate_bps') : Promise.resolve(undefined),
+    ]);
+    const anyPlan = plans.some((plan) => plan.maxMonths > 0);
+    if (!anyPlan && earnRateBps === undefined) return items;
+    return items.map((item) => {
+      const steps = anyPlan ? installmentLadder(item.price, plans) : [];
+      return {
+        ...item,
+        installment: anyPlan ? bestInstallmentOffer(item.price, plans) : null,
+        installmentSteps: steps,
+        bonusPoints: earnRateBps === undefined ? undefined : loyaltyEarnAmount(item.price, earnRateBps),
+      };
+    });
   }
 
   private async enrichReviews(items: CatalogProductDto[]): Promise<CatalogProductDto[]> {
