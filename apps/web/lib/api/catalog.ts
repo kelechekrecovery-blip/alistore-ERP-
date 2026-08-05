@@ -1,5 +1,21 @@
 import { API_BASE, postAuthJson } from './http';
 
+export interface InstallmentOffer {
+  id: string;
+  label: string;
+  months: number;
+  monthlySom: number;
+  totalSom: number;
+}
+
+export interface InstallmentStep {
+  months: number;
+  /** Наименьший платёж на этой ступени. */
+  monthlySom: number;
+  /** Где эту ступень можно оформить. */
+  providers: string[];
+}
+
 export interface CatalogProduct {
   id: string;
   sku: string;
@@ -26,13 +42,15 @@ export interface CatalogProduct {
    * настройках): срок, потолок суммы и наценка магазина. `null` или отсутствие
    * поля — рассрочка недоступна, и витрина молчит, а не придумывает цифру.
    */
-  installment?: {
-    id: string;
-    label: string;
-    months: number;
-    monthlySom: number;
-    totalSom: number;
-  } | null;
+  installment?: InstallmentOffer | null;
+  /** Ступени срока — вилка для карточки товара, одна строка на срок. */
+  installmentSteps?: InstallmentStep[];
+  /**
+   * Сколько бонусов начислит покупка. Считает сервер той же функцией, что и
+   * реальное начисление в заказе, — обещание витрины обязано совпасть с тем,
+   * что покупатель получит.
+   */
+  bonusPoints?: number;
   updatedAt?: string;
 }
 

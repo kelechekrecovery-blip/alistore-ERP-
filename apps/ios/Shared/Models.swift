@@ -65,6 +65,43 @@ public struct ProductAvailability: Sendable, Equatable {
     }
 }
 
+/// Ступень рассрочки: один срок, наименьший платёж на нём и список партнёров,
+/// у которых её можно оформить.
+///
+/// Считает сервер по договорным условиям владельца (`installment.*` в
+/// настройках API). Клиент только показывает: придумывать финансовое условие
+/// на витрине нельзя — это обещание, за которое отвечает магазин.
+public struct InstallmentStep: Decodable, Sendable, Identifiable, Equatable {
+    public let months: Int
+    public let monthlySom: Int
+    public let providers: [String]
+
+    public var id: Int { months }
+
+    public init(months: Int, monthlySom: Int, providers: [String]) {
+        self.months = months
+        self.monthlySom = monthlySom
+        self.providers = providers
+    }
+}
+
+/// Лучшее предложение рассрочки — то, что показывает карточка в списке.
+public struct InstallmentOffer: Decodable, Sendable, Equatable {
+    public let id: String
+    public let label: String
+    public let months: Int
+    public let monthlySom: Int
+    public let totalSom: Int
+
+    public init(id: String, label: String, months: Int, monthlySom: Int, totalSom: Int) {
+        self.id = id
+        self.label = label
+        self.months = months
+        self.monthlySom = monthlySom
+        self.totalSom = totalSom
+    }
+}
+
 public struct Product: Decodable, Identifiable, Sendable {
     public let id: String
     public let sku: String
@@ -78,8 +115,15 @@ public struct Product: Decodable, Identifiable, Sendable {
     public let availabilityKind: String?
     public let leadTimeDays: Int?
     public let estimatedDeliveryDate: Date?
+    /// Лучшая рассрочка для этой цены — «от N сом/мес» на карточке.
+    public let installment: InstallmentOffer?
+    /// Вилка сроков для карточки товара. Пусто — рассрочка недоступна.
+    public let installmentSteps: [InstallmentStep]
+    /// Сколько бонусов начислит покупка. Считает сервер той же функцией, что и
+    /// реальное начисление в заказе.
+    public let bonusPoints: Int?
 
-    public init(id: String, sku: String, name: String, price: Int, category: String, availableUnits: Int, attrs: ProductAttributes? = nil, supplyMode: String? = nil, orderable: Bool? = nil, availabilityKind: String? = nil, leadTimeDays: Int? = nil, estimatedDeliveryDate: Date? = nil) {
+    public init(id: String, sku: String, name: String, price: Int, category: String, availableUnits: Int, attrs: ProductAttributes? = nil, supplyMode: String? = nil, orderable: Bool? = nil, availabilityKind: String? = nil, leadTimeDays: Int? = nil, estimatedDeliveryDate: Date? = nil, installment: InstallmentOffer? = nil, installmentSteps: [InstallmentStep] = [], bonusPoints: Int? = nil) {
         self.id = id
         self.sku = sku
         self.name = name
@@ -92,6 +136,9 @@ public struct Product: Decodable, Identifiable, Sendable {
         self.availabilityKind = availabilityKind
         self.leadTimeDays = leadTimeDays
         self.estimatedDeliveryDate = estimatedDeliveryDate
+        self.installment = installment
+        self.installmentSteps = installmentSteps
+        self.bonusPoints = bonusPoints
     }
 
     public init(from decoder: Decoder) throws {
@@ -109,6 +156,9 @@ public struct Product: Decodable, Identifiable, Sendable {
         availabilityKind = try? container.decodeIfPresent(String.self, forKey: .availabilityKind)
         leadTimeDays = try? container.decodeIfPresent(Int.self, forKey: .leadTimeDays)
         estimatedDeliveryDate = try? container.decodeIfPresent(Date.self, forKey: .estimatedDeliveryDate)
+        installment = try? container.decodeIfPresent(InstallmentOffer.self, forKey: .installment)
+        installmentSteps = (try? container.decodeIfPresent([InstallmentStep].self, forKey: .installmentSteps)) ?? []
+        bonusPoints = try? container.decodeIfPresent(Int.self, forKey: .bonusPoints)
     }
 
     /// Наличие в разобранном виде. Поля `availabilityKind`/`orderable`/`leadTimeDays`
@@ -143,6 +193,7 @@ public struct Product: Decodable, Identifiable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, sku, name, price, category, availableUnits, attrs
         case supplyMode, orderable, availabilityKind, leadTimeDays, estimatedDeliveryDate
+        case installment, installmentSteps, bonusPoints
     }
 }
 

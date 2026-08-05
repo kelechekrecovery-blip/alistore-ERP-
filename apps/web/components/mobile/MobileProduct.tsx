@@ -129,7 +129,31 @@ export default function MobileProduct({
               </span>
             )}
           </div>
-          {typeof attrs.financingText === "string" && <div className="mt-1.5 text-[13px] text-lime">{attrs.financingText}</div>}
+          {/* Вилка сроков, а не один назначенный платёж: покупатель выбирает,
+              за сколько месяцев ему удобно. Ступени считает сервер по
+              договорным условиям владельца — витрина не имеет права придумать
+              финансовое условие. Оформляют рассрочку в магазине: публичного API
+              у партнёров нет. */}
+          {product.installmentSteps && product.installmentSteps.length > 0 && (
+            <div className="mt-3 rounded-[14px] border border-surface-3 bg-surface-2 p-3.5">
+              <div className="text-[13px] font-semibold text-white">Рассрочка 0%</div>
+              <div className="mt-2 space-y-1.5">
+                {product.installmentSteps.map((step) => (
+                  <div key={step.months} className="flex items-baseline gap-2">
+                    <span className="font-display text-[15px] font-bold text-lime">{som(step.monthlySom)}</span>
+                    <span className="text-[11px] text-subtle">/мес · {step.months} мес · {step.providers.join(", ")}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 text-[11px] text-muted">Оформляется в магазине при получении заказа.</div>
+            </div>
+          )}
+          {typeof product.bonusPoints === "number" && product.bonusPoints > 0 && (
+            <div className="mt-2 text-[12px] text-subtle">
+              Начислим <span className="font-semibold text-white">{product.bonusPoints.toLocaleString("ru-RU")}</span> бонусов за покупку
+            </div>
+          )}
+          {!product.installmentSteps?.length && typeof attrs.financingText === "string" && <div className="mt-1.5 text-[13px] text-lime">{attrs.financingText}</div>}
 
           {/* add to cart */}
           <div className="mt-4 flex gap-2">

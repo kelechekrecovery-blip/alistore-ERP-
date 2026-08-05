@@ -63,12 +63,24 @@ export async function redeemLoyaltyOnTx(
   return input.requested;
 }
 
+/**
+ * Сколько бонусов даст покупка на эту сумму.
+ *
+ * Вынесено из `earnLoyaltyOnTx` намеренно: витрина обещает бонус на карточке
+ * товара, и обещание обязано совпасть с тем, что потом реально начислит заказ.
+ * Пока формула жила в одном месте, её копия на витрине разошлась бы при первом
+ * же изменении округления — и покупатель получил бы меньше обещанного.
+ */
+export function loyaltyEarnAmount(paidTotal: number, earnRateBps?: number): number {
+  return Math.floor((Math.max(0, paidTotal) * (earnRateBps ?? DEFAULT_EARN_RATE_BPS)) / 10_000);
+}
+
 export async function earnLoyaltyOnTx(
   tx: Prisma.TransactionClient,
   input: { customerId: string; orderId: string; paidTotal: number; paymentId?: string; actor: string; earnRateBps?: number },
   events: AuditInput[],
 ): Promise<number> {
-  const amount = Math.floor((Math.max(0, input.paidTotal) * (input.earnRateBps ?? DEFAULT_EARN_RATE_BPS)) / 10_000);
+  const amount = loyaltyEarnAmount(input.paidTotal, input.earnRateBps);
   if (amount <= 0) return 0;
   await lockCustomerLoyalty(tx, input.customerId);
   const sourceRef = `loyalty:earn:${input.orderId}`;
