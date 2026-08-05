@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { access, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ConfigService } from '@nestjs/config';
@@ -16,6 +16,8 @@ import { AuthzService } from '../src/authz/authz.service';
 describe('Evidence Vault (integration)', () => {
   let prisma: PrismaService;
   let evidence: EvidenceService;
+  let audit: AuditService;
+  let media: MediaService;
   let dir: string;
   let seq = 0;
 
@@ -27,10 +29,11 @@ describe('Evidence Vault (integration)', () => {
       get: (key: string) =>
         ({ MEDIA_LOCAL_DIR: dir, MEDIA_PUBLIC_BASE: '/uploads' } as Record<string, string>)[key],
     } as unknown as ConfigService;
-    const media = new MediaService(new LocalDiskStorage(config));
+    media = new MediaService(new LocalDiskStorage(config));
+    audit = new AuditService(prisma);
     evidence = new EvidenceService(
       prisma,
-      new AuditService(prisma),
+      audit,
       media,
       { can: async () => true } as unknown as AuthzService,
       new MediaCleanupService(prisma, media),
@@ -74,6 +77,12 @@ describe('Evidence Vault (integration)', () => {
         background: { r: 250, g: 90, b: 40 },
       },
     }).png().toBuffer();
+  }
+
+  function deferred() {
+    let resolve!: () => void;
+    const promise = new Promise<void>((done) => { resolve = done; });
+    return { promise, resolve };
   }
 
   async function movement() {
@@ -273,5 +282,69 @@ describe('Evidence Vault (integration)', () => {
       .rejects.toMatchObject({ message: 'evidence_owner_mismatch' });
     await expect(evidence.assertCustomerOwnsEntity(owner.id, 'inventory', 'any'))
       .rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('removes a prepared customer upload when deletion commits before retention', async () => {
+    const owner = await prisma.customer.create({
+      data: { phone: `+996702EV${seq++}`, name: 'Deleted evidence owner' },
+    });
+    const ticket = await prisma.supportTicket.create({
+      data: {
+        customerId: owner.id,
+        channel: 'web',
+        subject: 'Deletion race evidence',
+        priority: 'normal',
+        sla: new Date(Date.now() + 60_000),
+      },
+    });
+    const atTransaction = deferred();
+    const resumeTransaction = deferred();
+    const originalTransaction = audit.transaction.bind(audit);
+    const transaction = jest.spyOn(audit, 'transaction').mockImplementationOnce(async (fn) => {
+      atTransaction.resolve();
+      await resumeTransaction.promise;
+      return originalTransaction(fn);
+    });
+    let storedKey: string | undefined;
+    const originalStore = media.storePreparedImage.bind(media);
+    const store = jest.spyOn(media, 'storePreparedImage').mockImplementationOnce(async (...args) => {
+      const asset = await originalStore(...args);
+      storedKey = asset.key;
+      return asset;
+    });
+    const idempotencyKey = `evidence-delete-race-${seq++}`;
+
+    try {
+      const upload = evidence.attachImage(
+        await pngBuffer(),
+        {
+          entityType: 'support',
+          entityId: ticket.id,
+          label: 'customer_attachment',
+          actor: owner.id,
+        },
+        false,
+        idempotencyKey,
+        owner.id,
+      );
+      await atTransaction.promise;
+      expect(storedKey).toBeTruthy();
+      await prisma.customer.update({
+        where: { id: owner.id },
+        data: { phone: `deleted:${owner.id}`, name: 'Удалённый пользователь' },
+      });
+      resumeTransaction.resolve();
+
+      await expect(upload).rejects.toMatchObject({ code: 'customer_session_revoked' });
+      expect(await prisma.evidenceUpload.count({
+        where: { idempotencyKey },
+      })).toBe(0);
+      expect(await prisma.auditEvent.count({ where: { actor: owner.id } })).toBe(0);
+      await expect(access(join(dir, storedKey!))).rejects.toMatchObject({ code: 'ENOENT' });
+    } finally {
+      resumeTransaction.resolve();
+      transaction.mockRestore();
+      store.mockRestore();
+    }
   });
 });

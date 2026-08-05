@@ -103,7 +103,7 @@ export class EvidenceController {
     const quarantineEvidence = dto.entityType === 'quarantine' && dto.label?.trim() === 'quarantine_diagnosis';
     const exchangeEvidence = dto.entityType === 'exchange' && dto.label?.trim() === 'exchange_condition';
     const trustedStaffEvidence = custodyEvidence || quarantineEvidence || exchangeEvidence;
-    let guestCustomerId: string | undefined;
+    let evidenceCustomerId: string | undefined;
     if (user?.typ === 'staff') {
       const staff = await this.staffAuth.me(user.customerId);
       if (dto.entityType === 'shift') {
@@ -116,13 +116,22 @@ export class EvidenceController {
       if (exchangeEvidence) await this.evidence.assertStaffCanAttachExchange(user.customerId, dto.entityId);
     } else {
       if (custodyEvidence || exchangeEvidence) throw new ForbiddenException('staff_evidence_only');
-      guestCustomerId = user?.typ === 'customer'
-        ? undefined
+      evidenceCustomerId = user?.typ === 'customer'
+        ? user.customerId
         : (await requireActiveGuestCapability(this.prisma, capability, 'evidence:write')).sub;
-      const customerId = user?.customerId ?? guestCustomerId!;
-      await this.evidence.assertCustomerOwnsEntity(customerId, dto.entityType, dto.entityId);
+      await this.evidence.assertCustomerOwnsEntity(
+        evidenceCustomerId,
+        dto.entityType,
+        dto.entityId,
+      );
     }
-    const actor = user?.typ === 'staff' ? `staff:${user.customerId}` : user?.customerId ?? guestCustomerId!;
-    return this.evidence.attachImage(file.buffer, { ...dto, actor }, trustedStaffEvidence && user?.typ === 'staff', key);
+    const actor = user?.typ === 'staff' ? `staff:${user.customerId}` : evidenceCustomerId!;
+    return this.evidence.attachImage(
+      file.buffer,
+      { ...dto, actor },
+      trustedStaffEvidence && user?.typ === 'staff',
+      key,
+      evidenceCustomerId,
+    );
   }
 }

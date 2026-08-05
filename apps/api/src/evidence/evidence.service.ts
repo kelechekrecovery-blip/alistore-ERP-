@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EvidenceEntityType, EvidenceImageDto } from './evidence.dto';
 import { AuthzService } from '../authz/authz.service';
 import { decideEvidenceRetention } from './evidence-retention.policy';
+import { lockActiveCustomerOnTx } from '../auth/customer-session-state';
 
 export interface EvidenceAttachment {
   entityType: EvidenceEntityType;
@@ -33,6 +34,7 @@ export class EvidenceService {
     dto: EvidenceImageDto,
     trustedStaffEvidence = false,
     idempotencyKey?: string,
+    ownerCustomerId?: string,
   ): Promise<EvidenceAttachment> {
     await this.assertEntityExists(dto.entityType, dto.entityId);
     const key = idempotencyKey?.trim() || undefined;
@@ -52,7 +54,12 @@ export class EvidenceService {
     });
 
     if (key) {
-      const existing = await this.prisma.evidenceUpload.findUnique({ where: { idempotencyKey: key } });
+      const existing = ownerCustomerId
+        ? await this.prisma.$transaction(async (tx) => {
+            await lockActiveCustomerOnTx(tx, ownerCustomerId);
+            return tx.evidenceUpload.findUnique({ where: { idempotencyKey: key } });
+          })
+        : await this.prisma.evidenceUpload.findUnique({ where: { idempotencyKey: key } });
       if (existing) {
         if (existing.fingerprint !== fingerprint) {
           throw new ConflictError('idempotency_key_reused', 'Idempotency-Key уже использован для другого файла');
@@ -78,6 +85,12 @@ export class EvidenceService {
     let replayed = false;
     try {
       const result = await this.audit.transaction(async (tx) => {
+        if (ownerCustomerId) {
+          // Customer lifecycle must be the first durable lock. If deletion won
+          // after authorization/storage preparation, the catch path removes the
+          // uploaded object and no EvidenceUpload/ledger row is retained.
+          await lockActiveCustomerOnTx(tx, ownerCustomerId);
+        }
         if (key) {
           // Serialize requests for the same key before the unique insert. Two
           // clients may upload the bytes concurrently after a network timeout.
