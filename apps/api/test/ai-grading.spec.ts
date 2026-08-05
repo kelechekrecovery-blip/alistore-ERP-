@@ -1,4 +1,5 @@
 import { GradingService } from '../src/ai/grading.service';
+import { ValidationError } from '../src/common/errors';
 import {
   buildPhotoGradingMessages,
   gradePhotosByRules,
@@ -60,6 +61,21 @@ describe('photo grading OpenRouter helpers', () => {
       if (oldKey === undefined) delete process.env.AI_PROVIDER_KEY;
       else process.env.AI_PROVIDER_KEY = oldKey;
       global.fetch = oldFetch;
+    }
+  });
+
+  it('surfaces a blocked image URL as a generic validation error', async () => {
+    const oldKey = process.env.AI_PROVIDER_KEY;
+    process.env.AI_PROVIDER_KEY = 'test-key';
+    try {
+      await expect(new GradingService().grade({
+        photos: [{ url: 'https://169.254.169.254/latest/meta-data', label: 'front' }],
+      })).rejects.toMatchObject<Partial<ValidationError>>({
+        code: 'ai_image_url_not_allowed',
+      });
+    } finally {
+      if (oldKey === undefined) delete process.env.AI_PROVIDER_KEY;
+      else process.env.AI_PROVIDER_KEY = oldKey;
     }
   });
 });

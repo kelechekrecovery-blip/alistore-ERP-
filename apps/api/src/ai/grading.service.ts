@@ -9,7 +9,8 @@ import {
   PhotoGradingResult,
   PHOTO_GRADING_SCHEMA,
 } from './grading';
-import { resolvePhotoImages } from './llm/image-resolver';
+import { ValidationError } from '../common/errors';
+import { ImagePolicyError, resolvePhotoImages } from './llm/image-resolver';
 import type { LlmClient } from './llm/llm-client';
 import { resolveLlmClient } from './llm/llm.factory';
 
@@ -61,6 +62,12 @@ export class GradingService {
       }
       return await this.gradeFromLabels(input, client);
     } catch (err) {
+      if (err instanceof ImagePolicyError) {
+        throw new ValidationError(
+          'ai_image_url_not_allowed',
+          'Источник изображения не разрешён политикой безопасности',
+        );
+      }
       this.logger.warn(`AI photo grading failed, using rule fallback: ${String(err)}`);
       return { ...fallback, source: `${fallback.source} (fallback)` };
     }

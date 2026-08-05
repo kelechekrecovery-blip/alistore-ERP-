@@ -20,7 +20,7 @@ export class GradingController {
   @ApiOperation({
     summary: 'Фото-грейдинг Б/У устройства — keyless rules или vision/LLM при ключе',
     description:
-      'Для реального vision-анализа передавайте photos[].url (http(s) или локальный /uploads-путь) — грейдинг читает пиксели. ' +
+      'Для vision-анализа передавайте photos[].url из разрешённого HTTPS origin или локального /uploads-пути. ' +
       'Резолв по evidenceId пока не поддержан: фото без url оцениваются по меткам/анкете, иначе — keyless rules.',
   })
   @ApiOkResponse({ description: '{ source, grade, confidence, defects, notes, recommendedChecks }.' })

@@ -144,6 +144,25 @@ describe('Reports and AI RBAC', () => {
       });
   });
 
+  it('returns a generic 422 for a forbidden vision URL without fetching it', async () => {
+    const oldKey = process.env.AI_PROVIDER_KEY;
+    process.env.AI_PROVIDER_KEY = 'test-key';
+    try {
+      await request(app.getHttpServer())
+        .post('/ai/grade-photos')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ photos: [{ url: 'https://169.254.169.254/latest/meta-data', label: 'front' }] })
+        .expect(422)
+        .expect((response) => {
+          expect(response.body).toMatchObject({ code: 'ai_image_url_not_allowed' });
+          expect(JSON.stringify(response.body)).not.toContain('169.254.169.254');
+        });
+    } finally {
+      if (oldKey === undefined) delete process.env.AI_PROVIDER_KEY;
+      else process.env.AI_PROVIDER_KEY = oldKey;
+    }
+  });
+
   it('blocks reports and financial AI insights while the caller has an open drawer', async () => {
     await prisma.cashShift.create({
       data: { staffId: adminId, point: 'BISHKEK-1', openCash: 5_000 },

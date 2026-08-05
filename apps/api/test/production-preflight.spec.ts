@@ -80,6 +80,19 @@ describe('Production preflight report', () => {
     ).toBe('ready');
   });
 
+  it('accepts disabled or exact HTTPS AI image origins and blocks unsafe entries', () => {
+    const imageOriginCheck = (value?: string) =>
+      buildProductionPreflightReport((name) => (
+        name === 'AI_IMAGE_ALLOWED_ORIGINS' ? value : undefined
+      )).checks.find((check) => check.id === 'ai_image_origins');
+
+    expect(imageOriginCheck()?.status).toBe('ready');
+    expect(imageOriginCheck('https://cdn.ali.kg,https://images.ali.kg')?.status).toBe('ready');
+    expect(imageOriginCheck('http://cdn.ali.kg')?.status).toBe('unsafe');
+    expect(imageOriginCheck('https://cdn.ali.kg/uploads')?.status).toBe('unsafe');
+    expect(imageOriginCheck('https://user:secret@cdn.ali.kg')?.status).toBe('unsafe');
+  });
+
   it('keeps live production blocked while the refund adapter is not implemented', () => {
     const strongSecret = '0123456789abcdef0123456789abcdef';
     const report = buildProductionPreflightReport((name) =>

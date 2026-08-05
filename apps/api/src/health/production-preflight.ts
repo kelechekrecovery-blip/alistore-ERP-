@@ -241,6 +241,29 @@ const CHECKS: CheckDefinition[] = [
     },
   },
   {
+    id: 'ai_image_origins',
+    area: 'security',
+    title: 'AI image origin allowlist is safe',
+    requiredEnv: [],
+    note: 'Leave AI_IMAGE_ALLOWED_ORIGINS empty to disable remote grading, or configure exact comma-separated HTTPS origins without paths or credentials.',
+    evaluate: (env) => {
+      const configured = env('AI_IMAGE_ALLOWED_ORIGINS')?.trim();
+      if (!configured) return 'ready';
+      try {
+        const origins = configured.split(',').map((entry) => entry.trim()).filter(Boolean);
+        if (origins.length === 0) return 'ready';
+        return origins.every((entry) => {
+          const parsed = new URL(entry);
+          return parsed.protocol === 'https:' &&
+            !parsed.username && !parsed.password && !parsed.search && !parsed.hash &&
+            parsed.pathname === '/' && parsed.origin === entry.replace(/\/$/, '');
+        }) ? 'ready' : 'unsafe';
+      } catch {
+        return 'unsafe';
+      }
+    },
+  },
+  {
     id: 'bullmq_runtime',
     area: 'jobs',
     title: 'BullMQ Redis runtime configured',
