@@ -28,6 +28,7 @@ import {
 import type { AuthPrincipal, JwtPayload } from './jwt.strategy';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
 import { normalizePhone } from './phone-normalization';
+import { isActiveCustomerPhone } from './customer-session-state';
 
 export interface AuthTokens {
   accessToken: string;
@@ -152,9 +153,20 @@ export class AuthService implements OnModuleInit {
     if (!payload.sub || !['customer', 'staff'].includes(payload.typ)) {
       throw new ValidationError('access_token_invalid', 'Недействительный access-токен');
     }
+    let phone = payload.phone;
+    if (payload.typ === 'customer') {
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: payload.sub },
+        select: { phone: true },
+      });
+      if (!customer || !isActiveCustomerPhone(customer.phone)) {
+        throw new ValidationError('customer_session_revoked', 'Сессия клиента отозвана');
+      }
+      phone = customer.phone;
+    }
     return {
       customerId: payload.sub,
-      phone: payload.phone,
+      phone,
       typ: payload.typ,
       role: payload.role,
     };
@@ -561,10 +573,28 @@ export class AuthService implements OnModuleInit {
       return this.authenticateReviewLogin(phone, code, reviewLogin.code, reviewLogin.customerId);
     }
 
+    // Pin an existing identity before claiming the OTP. Without this pin,
+    // deletion could tombstone the old row after the claim commits but before
+    // the issuance transaction starts; a phone lookup would then create a new
+    // Customer and incorrectly reuse the pre-deletion OTP for that fresh ID.
+    const existingBeforeClaim = await this.prisma.customer.findFirst({
+      where: { phone: { in: [phone, phone.slice(1)] } },
+      select: { id: true },
+    });
     const challenge = await this.claimPhoneOtp(phone, code, 'login', challengeId);
     return this.prisma.$transaction(async (tx) => {
+      let customer = existingBeforeClaim
+        ? await this.lockActiveCustomerSessionOnTx(tx, existingBeforeClaim.id)
+        : await this.customerByCanonicalPhoneOnTx(tx, phone, true);
+      if (!existingBeforeClaim) {
+        customer = await this.lockActiveCustomerSessionOnTx(tx, customer.id);
+      } else if (customer.phone !== phone) {
+        customer = await tx.customer.update({
+          where: { id: customer.id },
+          data: { phone },
+        });
+      }
       await this.consumeClaimOnTx(tx, challenge.id);
-      const customer = await this.customerByCanonicalPhoneOnTx(tx, phone, true);
       return this.issueTokens(customer.id, customer.phone, tx);
     });
   }
@@ -735,11 +765,12 @@ export class AuthService implements OnModuleInit {
     const phone = normalizePhone(rawPhone);
     const challenge = await this.claimPhoneOtp(phone, code, 'recovery', challengeId);
     return this.prisma.$transaction(async (tx) => {
-      await this.consumeClaimOnTx(tx, challenge.id);
       const customer = await this.customerByCanonicalPhoneOnTx(tx, phone, false);
       if (!customer) {
         throw new ValidationError('customer_not_found', 'Аккаунт не найден');
       }
+      await this.lockActiveCustomerSessionOnTx(tx, customer.id);
+      await this.consumeClaimOnTx(tx, challenge.id);
       await tx.refreshToken.updateMany({
         where: { customerId: customer.id, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -910,6 +941,17 @@ export class AuthService implements OnModuleInit {
           );
         }
 
+        // Existing accounts take the authoritative customer lock before the OTP
+        // row. Deletion uses the same Customer → OTP/identity order, preventing
+        // a delete/login deadlock. A missing customer is created only after the
+        // OTP is proven, so invalid attempts cannot create accounts.
+        const existingCustomer = await tx.customer.findFirst({
+          where: { phone: { in: [phone, legacyPhone] } },
+        });
+        if (existingCustomer) {
+          await this.lockActiveCustomerSessionOnTx(tx, existingCustomer.id);
+        }
+
         const pinnedId = dto.challengeId ?? null;
         const claimed = await tx.$queryRaw<ClaimedOtp[]>`
           UPDATE "OtpChallenge" SET attempts = attempts + 1
@@ -958,7 +1000,14 @@ export class AuthService implements OnModuleInit {
           );
         }
 
-        const customer = await this.customerByCanonicalPhoneOnTx(tx, phone, true);
+        const customer = existingCustomer
+          ? existingCustomer.phone === phone
+            ? existingCustomer
+            : await tx.customer.update({
+                where: { id: existingCustomer.id },
+                data: { phone },
+              })
+          : await tx.customer.create({ data: { phone, name: '' } });
         await tx.customerIdentity.create({
           data: {
             customerId: customer.id,
@@ -1204,7 +1253,19 @@ export class AuthService implements OnModuleInit {
   async refresh(refreshToken: string): Promise<AuthTokens> {
     const tokenHash = this.hashToken(refreshToken);
     const graceEnabled = this.refreshRotationGraceEnabled();
+    const candidate = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash },
+      select: { customerId: true },
+    });
+    if (!candidate) {
+      throw new ValidationError('refresh_invalid', 'Refresh-токен недействителен');
+    }
     const outcome = await this.prisma.$transaction(async (tx) => {
+      const customer = await this.lockActiveCustomerSessionOnTx(
+        tx,
+        candidate.customerId,
+        'refresh_invalid',
+      );
       const locked = await tx.$queryRaw<Array<{
         id: string;
         customerId: string;
@@ -1227,18 +1288,15 @@ export class AuthService implements OnModuleInit {
       }
 
       const record = locked[0];
+      if (record.customerId !== customer.id) {
+        throw new ValidationError('refresh_invalid', 'Refresh-токен недействителен');
+      }
       const now = new Date();
       if (record.expiresAt < now) {
         throw new ValidationError('refresh_invalid', 'Refresh-токен недействителен');
       }
       if (record.revokedAt) {
         if (graceEnabled && record.withinRotationGrace) {
-          const customer = await tx.customer.findUnique({
-            where: { id: record.customerId },
-          });
-          if (!customer) {
-            throw new ValidationError('customer_not_found', 'Клиент не найден');
-          }
           const tokens = await this.issueDerivedRefreshTokens(
             customer.id,
             customer.phone,
@@ -1266,12 +1324,6 @@ export class AuthService implements OnModuleInit {
             "rotatedAt" = (NOW() AT TIME ZONE 'UTC')
         WHERE id = ${record.id}
       `;
-      const customer = await tx.customer.findUnique({
-        where: { id: record.customerId },
-      });
-      if (!customer) {
-        throw new ValidationError('customer_not_found', 'Клиент не найден');
-      }
       return {
         kind: 'rotated' as const,
         tokens: graceEnabled
@@ -1368,15 +1420,19 @@ export class AuthService implements OnModuleInit {
 
   private async issueTokens(
     customerId: string,
-    phone: string,
-    db: Pick<Prisma.TransactionClient, 'refreshToken'> = this.prisma,
+    _phone: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<AuthTokens> {
+    if (!tx) {
+      return this.prisma.$transaction((inner) => this.issueTokens(customerId, _phone, inner));
+    }
+    const customer = await this.lockActiveCustomerSessionOnTx(tx, customerId);
     const accessToken = await this.jwt.signAsync(
-      { sub: customerId, phone, typ: 'customer' },
+      { sub: customerId, phone: customer.phone, typ: 'customer' },
       { expiresIn: ACCESS_TTL },
     );
     const refreshToken = randomBytes(32).toString('base64url');
-    await db.refreshToken.create({
+    await tx.refreshToken.create({
       data: {
         customerId,
         tokenHash: this.hashToken(refreshToken),
@@ -1384,6 +1440,24 @@ export class AuthService implements OnModuleInit {
       },
     });
     return { accessToken, refreshToken, tokenType: 'Bearer', expiresIn: ACCESS_TTL };
+  }
+
+  /**
+   * Serializes every customer credential issuance with account deletion. If
+   * issuance wins, deletion waits and revokes the new refresh row; if deletion
+   * wins, issuance wakes up to a tombstone and fails closed.
+   */
+  private async lockActiveCustomerSessionOnTx(
+    tx: Prisma.TransactionClient,
+    customerId: string,
+    errorCode = 'customer_session_revoked',
+  ): Promise<Customer> {
+    await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${customerId} FOR UPDATE`;
+    const customer = await tx.customer.findUnique({ where: { id: customerId } });
+    if (!customer || !isActiveCustomerPhone(customer.phone)) {
+      throw new ValidationError(errorCode, 'Сессия клиента отозвана');
+    }
+    return customer;
   }
 
   private async issueDerivedRefreshTokens(

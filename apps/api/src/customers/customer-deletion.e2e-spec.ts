@@ -13,6 +13,7 @@ import { OTP_SENDER } from '../auth/otp-sender';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { CustomersModule } from './customers.module';
+import { CustomersService } from './customers.service';
 import { issueGuestCheckoutCapability, requireActiveGuestCapability } from '../auth/guest-capability';
 
 /**
@@ -26,6 +27,7 @@ describe('Customer account deletion and export', () => {
   let prisma: PrismaService;
   let jwt: JwtService;
   let auth: AuthService;
+  let customers: CustomersService;
   const run = `${Date.now()}${Math.floor(Math.random() * 10_000)}`.slice(-8);
 
   beforeAll(async () => {
@@ -47,6 +49,7 @@ describe('Customer account deletion and export', () => {
     prisma = moduleRef.get(PrismaService);
     jwt = moduleRef.get(JwtService);
     auth = moduleRef.get(AuthService);
+    customers = moduleRef.get(CustomersService);
   });
 
   afterAll(async () => app.close());
@@ -61,8 +64,51 @@ describe('Customer account deletion and export', () => {
     return jwt.sign({ sub: value.id, typ: 'customer', phone: value.phone });
   }
 
+  function deferred() {
+    let resolve!: () => void;
+    const promise = new Promise<void>((done) => { resolve = done; });
+    return { promise, resolve };
+  }
+
+  async function waitForDeleteCommitOrLock(customerId: string) {
+    // A separate pg client is intentional: the app test pool is capped at two
+    // connections, both occupied by the forced race below.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Client } = require('pg');
+    const observer = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+    await observer.connect();
+    try {
+      const deadline = Date.now() + 5_000;
+      for (;;) {
+        const observed = await observer.query(`
+          SELECT
+            EXISTS (
+              SELECT 1 FROM "Customer"
+              WHERE id = $1 AND phone = $2
+            ) AS deleted,
+            EXISTS (
+              SELECT 1 FROM pg_stat_activity
+              WHERE pid <> pg_backend_pid()
+                AND datname = current_database()
+                AND state = 'active'
+                AND wait_event_type = 'Lock'
+                AND query LIKE '%FROM "Customer"%FOR UPDATE%'
+            ) AS blocked
+        `, [customerId, `deleted:${customerId}`]);
+        if (observed.rows[0]?.deleted || observed.rows[0]?.blocked) return;
+        if (Date.now() >= deadline) {
+          throw new Error(`deletion did not commit or wait on Customer ${customerId}`);
+        }
+        await new Promise<void>((done) => setImmediate(done));
+      }
+    } finally {
+      await observer.end();
+    }
+  }
+
   it('anonymizes PII, erases addresses/identities and revokes every session', async () => {
     const owner = await customer('11', true);
+    const ownerAccessToken = token(owner);
     const preDeletionGuestCapability = issueGuestCheckoutCapability(owner.id);
     await prisma.customerAddress.create({
       data: { customerId: owner.id, title: 'Дом', text: 'Бишкек, Чуй 1' },
@@ -112,7 +158,7 @@ describe('Customer account deletion and export', () => {
 
     await request(app.getHttpServer())
       .delete('/customers/me')
-      .set('Authorization', `Bearer ${token(owner)}`)
+      .set('Authorization', `Bearer ${ownerAccessToken}`)
       .expect(200)
       .expect(({ body }) => expect(body).toEqual({ id: owner.id, deleted: true }));
 
@@ -147,11 +193,29 @@ describe('Customer account deletion and export', () => {
         .rejects.toThrow('guest_capability_revoked');
     }
 
-    // repeat deletion is an idempotent no-op (no second ledger event)
+    // Account deletion is a session-revocation boundary: a signed access JWT
+    // issued before deletion must fail on both HTTP and non-HTTP transports.
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${ownerAccessToken}`)
+      .expect(401)
+      .expect(({ body }) => expect(body).toMatchObject({
+        statusCode: 401,
+        message: 'customer_session_revoked',
+      }));
+    await request(app.getHttpServer())
+      .get('/customers/me/export')
+      .set('Authorization', `Bearer ${ownerAccessToken}`)
+      .expect(401);
+    await expect(auth.verifyAccessToken(ownerAccessToken)).rejects.toThrow();
+
+    // Idempotency remains a service invariant, but an already-revoked HTTP
+    // session cannot invoke it a second time.
     await request(app.getHttpServer())
       .delete('/customers/me')
-      .set('Authorization', `Bearer ${token(owner)}`)
-      .expect(200);
+      .set('Authorization', `Bearer ${ownerAccessToken}`)
+      .expect(401);
+    await expect(customers.deleteAccount(owner.id)).resolves.toEqual({ id: owner.id, deleted: true });
     expect(await prisma.auditEvent.count({ where: { type: 'customer.deleted', refs: { has: owner.id } } })).toBe(1);
   });
 
@@ -173,6 +237,193 @@ describe('Customer account deletion and export', () => {
     expect(fresh!.id).not.toBe(owner.id);
     const oldRow = await prisma.customer.findUnique({ where: { id: owner.id } });
     expect(oldRow!.phone).toBe(`deleted:${owner.id}`);
+  });
+
+  it('rejects both access and refresh credentials after account deletion', async () => {
+    const owner = await customer('12');
+    const challenge = await auth.requestOtp(owner.phone);
+    const session = await auth.verifyOtp(owner.phone, challenge.devCode!, challenge.challengeId);
+
+    await request(app.getHttpServer())
+      .get('/customers/me/settings')
+      .set('Authorization', `Bearer ${session.accessToken}`)
+      .expect(200);
+    await request(app.getHttpServer())
+      .delete('/customers/me')
+      .set('Authorization', `Bearer ${session.accessToken}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .get('/customers/me/settings')
+      .set('Authorization', `Bearer ${session.accessToken}`)
+      .expect(401);
+    await expect(auth.refresh(session.refreshToken)).rejects.toMatchObject({
+      code: expect.stringMatching(/^refresh_(?:invalid|reused)$/u),
+    });
+    expect(await prisma.refreshToken.count({
+      where: { customerId: owner.id, revokedAt: null },
+    })).toBe(0);
+  });
+
+  it('never leaves credentials live when login issuance races account deletion', async () => {
+    const owner = await customer('13');
+    const challenge = await auth.requestOtp(owner.phone);
+    const atIssue = deferred();
+    const resumeIssue = deferred();
+    const authJwt = (auth as unknown as { jwt: JwtService }).jwt;
+    const originalSignAsync = authJwt.signAsync.bind(authJwt);
+    const sign = jest.spyOn(authJwt, 'signAsync').mockImplementationOnce(async (payload, options) => {
+      atIssue.resolve();
+      await resumeIssue.promise;
+      return originalSignAsync(payload, options);
+    });
+
+    try {
+      const issuance = auth.verifyOtp(owner.phone, challenge.devCode!, challenge.challengeId);
+      await Promise.race([
+        atIssue.promise,
+        issuance.then(
+          () => Promise.reject(new Error('credential issuance completed before the sign gate')),
+          (error) => Promise.reject(error),
+        ),
+      ]);
+      const deletion = customers.deleteAccount(owner.id);
+      await waitForDeleteCommitOrLock(owner.id);
+      resumeIssue.resolve();
+
+      const [issued, deleted] = await Promise.allSettled([issuance, deletion]);
+      expect(issued).toMatchObject({ status: 'fulfilled' });
+      expect(deleted).toMatchObject({ status: 'fulfilled' });
+      expect(await prisma.customer.findUniqueOrThrow({ where: { id: owner.id } }))
+        .toMatchObject({ phone: `deleted:${owner.id}` });
+      expect(await prisma.refreshToken.count({
+        where: { customerId: owner.id, revokedAt: null },
+      })).toBe(0);
+
+      if (issued.status === 'fulfilled') {
+        await request(app.getHttpServer())
+          .get('/customers/me/settings')
+          .set('Authorization', `Bearer ${issued.value.accessToken}`)
+          .expect(401);
+      }
+    } finally {
+      resumeIssue.resolve();
+      sign.mockRestore();
+    }
+  });
+
+  it('rejects issuance when account deletion obtains the customer lock first', async () => {
+    const owner = await customer('15');
+    const challenge = await auth.requestOtp(owner.phone);
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Client } = require('pg');
+    const blocker = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+    await blocker.connect();
+    let transactionOpen = false;
+    try {
+      await blocker.query('BEGIN');
+      transactionOpen = true;
+      await blocker.query('SELECT id FROM "Customer" WHERE id = $1 FOR UPDATE', [owner.id]);
+
+      const deletion = customers.deleteAccount(owner.id);
+      await waitForDeleteCommitOrLock(owner.id);
+      const issuance = auth.verifyOtp(owner.phone, challenge.devCode!, challenge.challengeId);
+      await blocker.query('COMMIT');
+      transactionOpen = false;
+
+      await expect(deletion).resolves.toEqual({ id: owner.id, deleted: true });
+      await expect(issuance).rejects.toMatchObject({
+        code: expect.stringMatching(/^(?:customer_session_revoked|otp_invalid)$/u),
+      });
+      expect(await prisma.refreshToken.count({
+        where: { customerId: owner.id, revokedAt: null },
+      })).toBe(0);
+    } finally {
+      if (transactionOpen) await blocker.query('ROLLBACK');
+      await blocker.end();
+    }
+  });
+
+  it('does not reuse a claimed pre-deletion OTP for a fresh customer id', async () => {
+    const owner = await customer('16');
+    const challenge = await auth.requestOtp(owner.phone);
+    const atTransactionGap = deferred();
+    const resumeTransaction = deferred();
+    const originalTransaction = prisma.$transaction.bind(prisma);
+    const transaction = jest.spyOn(prisma as any, '$transaction').mockImplementationOnce(
+      async (...args: any[]) => {
+        atTransactionGap.resolve();
+        await resumeTransaction.promise;
+        return (originalTransaction as any)(...args);
+      },
+    );
+
+    try {
+      const issuance = auth.verifyOtp(owner.phone, challenge.devCode!, challenge.challengeId);
+      await atTransactionGap.promise;
+      await expect(customers.deleteAccount(owner.id)).resolves.toEqual({ id: owner.id, deleted: true });
+      resumeTransaction.resolve();
+
+      await expect(issuance).rejects.toMatchObject({ code: 'customer_session_revoked' });
+      expect(await prisma.customer.count({ where: { phone: owner.phone } })).toBe(0);
+      expect(await prisma.refreshToken.count({
+        where: { customerId: owner.id, revokedAt: null },
+      })).toBe(0);
+    } finally {
+      resumeTransaction.resolve();
+      transaction.mockRestore();
+    }
+  });
+
+  it('revokes the rotated child when refresh wins a race with account deletion', async () => {
+    const owner = await customer('14');
+    const challenge = await auth.requestOtp(owner.phone);
+    const session = await auth.verifyOtp(owner.phone, challenge.devCode!, challenge.challengeId);
+    const atIssue = deferred();
+    const resumeIssue = deferred();
+    const authJwt = (auth as unknown as { jwt: JwtService }).jwt;
+    const originalSignAsync = authJwt.signAsync.bind(authJwt);
+    const sign = jest.spyOn(authJwt, 'signAsync').mockImplementationOnce(async (payload, options) => {
+      atIssue.resolve();
+      await resumeIssue.promise;
+      return originalSignAsync(payload, options);
+    });
+
+    try {
+      const refresh = auth.refresh(session.refreshToken);
+      await Promise.race([
+        atIssue.promise,
+        refresh.then(
+          () => Promise.reject(new Error('refresh completed before the sign gate')),
+          (error) => Promise.reject(error),
+        ),
+      ]);
+      const deletion = customers.deleteAccount(owner.id);
+      await waitForDeleteCommitOrLock(owner.id);
+      resumeIssue.resolve();
+
+      const [rotated, deleted] = await Promise.allSettled([refresh, deletion]);
+      expect(rotated).toMatchObject({ status: 'fulfilled' });
+      expect(deleted).toMatchObject({ status: 'fulfilled' });
+      expect(await prisma.refreshToken.count({
+        where: { customerId: owner.id, revokedAt: null },
+      })).toBe(0);
+      expect(await prisma.refreshToken.count({
+        where: { customerId: owner.id, rotatedAt: { not: null } },
+      })).toBe(0);
+      if (rotated.status === 'fulfilled') {
+        await request(app.getHttpServer())
+          .get('/auth/me')
+          .set('Authorization', `Bearer ${rotated.value.accessToken}`)
+          .expect(401);
+        await expect(auth.refresh(rotated.value.refreshToken)).rejects.toMatchObject({
+          code: expect.stringMatching(/^refresh_(?:invalid|reused)$/u),
+        });
+      }
+    } finally {
+      resumeIssue.resolve();
+      sign.mockRestore();
+    }
   });
 
   // Переименование `customer.phone` в `deleted:<id>` освобождает номер, но не стирает

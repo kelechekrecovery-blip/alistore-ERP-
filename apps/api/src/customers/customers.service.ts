@@ -13,6 +13,10 @@ import { warrantyCoverage } from './warranty-coverage';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
 import { revokeTelegramAgentAccessOnTx } from '../telegram-agent/telegram-agent-revocation';
 import { normalizePhone } from '../auth/phone-normalization';
+import {
+  deletedCustomerPhone,
+  isActiveCustomerPhone,
+} from '../auth/customer-session-state';
 import { createHash } from 'crypto';
 
 /**
@@ -424,7 +428,7 @@ export class CustomersService {
         where: { id: customerId },
         data: {
           name: DELETED_CUSTOMER_NAME,
-          phone: deletedPhone(customerId),
+          phone: deletedCustomerPhone(customerId),
           guestCreateKeyHash: null,
           guestCreateRequestHash: null,
           guestCreateExpiresAt: null,
@@ -443,6 +447,10 @@ export class CustomersService {
       await tx.refreshToken.updateMany({
         where: { customerId, revokedAt: null },
         data: { revokedAt: new Date() },
+      });
+      await tx.refreshToken.updateMany({
+        where: { customerId, rotatedAt: { not: null } },
+        data: { rotatedAt: null },
       });
       // Имя клиента — независимая копия в публичном отзыве (`ProductReview`),
       // оно оставалось видимым в интернете после удаления аккаунта. Обезличиваем.
@@ -547,7 +555,6 @@ function requiredText(value: string, label: string): string {
 }
 
 const DELETED_CUSTOMER_NAME = 'Удалённый пользователь';
-const DELETED_PHONE_PREFIX = 'deleted:';
 const GUEST_CUSTOMER_REPLAY_TTL_MS = 30 * 60 * 1000;
 const GUEST_CUSTOMER_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -568,13 +575,8 @@ function replayGuestCustomer(
   return { customer, expiresAt: customer.guestCreateExpiresAt };
 }
 
-/** Unique non-reversible phone placeholder; frees the real phone for re-registration. */
-function deletedPhone(customerId: string): string {
-  return `${DELETED_PHONE_PREFIX}${customerId}`;
-}
-
 function isAnonymized(customer: Customer): boolean {
-  return customer.phone.startsWith(DELETED_PHONE_PREFIX);
+  return !isActiveCustomerPhone(customer.phone);
 }
 
 function normalizeAddress(dto: CreateCustomerAddressDto) {

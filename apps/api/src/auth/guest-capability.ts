@@ -1,6 +1,7 @@
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { sign, verify } from 'jsonwebtoken';
 import { resolveJwtSecretFromEnv } from './jwt-secret';
+import { isActiveCustomerPhone } from './customer-session-state';
 
 export type GuestCapabilityScope =
   | 'orders:create'
@@ -126,7 +127,7 @@ export async function requireActiveGuestCapability(
 ): Promise<GuestCapabilityClaims> {
   const claims = requireGuestCapability(token, scope, customerId, entity);
   const customer = await prisma.customer.findUnique({ where: { id: claims.sub }, select: { phone: true } });
-  if (!customer || customer.phone.startsWith('deleted:')) {
+  if (!customer || !isActiveCustomerPhone(customer.phone)) {
     throw new UnauthorizedException('guest_capability_revoked');
   }
   return claims;
