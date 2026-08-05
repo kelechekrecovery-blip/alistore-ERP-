@@ -1,7 +1,7 @@
 # AliStore AI Executive OS — Phase 0 Baseline
 
 Дата снимка: 2026-08-05
-Git SHA evidence through: `5aafc884`
+Git SHA evidence through: `3152221e`
 Статус решения: **REVISE — переход к production rollout запрещён до закрытия P0**.
 
 ## Scope
@@ -19,9 +19,10 @@ Status: REVISE
 
 Summary: локальная программная основа AliStore сильная и собирается, но система не
 доказана как production-ready. Auth/account, support retry, AI image SSRF и
-production dependency HIGH, guest identity response-loss, mobile/TG retry и
-staff checkout contracts закрыты проверяемыми slices. Остаются camera/Event
-Ledger/approval security gaps, а также внешняя сертификация платежей,
+production dependency HIGH, guest identity response-loss, mobile/TG retry,
+staff checkout contracts и destructive-DML Event Ledger trigger закрыты
+проверяемыми slices. Остаются camera, database-role/Event Ledger,
+approval security gaps, а также внешняя сертификация платежей,
 фискализации, каналов, камер и физических устройств. Все четыре App Store
 submission ожидают review.
 
@@ -37,7 +38,7 @@ reviews. Live production credentials, реальные провайдеры, к�
 
 ## Evidence
 
-- VERIFIED: 151 Prisma models, 78 enums, 158 migrations, 72 API controllers, 62 Nest modules, 43 Web pages, 103 API spec files, 45 Playwright specs, 70 Swift files и 98 Kotlin files.
+- VERIFIED: 151 Prisma models, 78 enums, 159 migrations, 72 API controllers, 62 Nest modules, 43 Web pages, 103 API spec files, 45 Playwright specs, 70 Swift files и 98 Kotlin files.
 - VERIFIED: `npm run api:build` — PASS.
 - VERIFIED: `npm run build -w @alistore/web` — PASS, 45 Next.js routes generated; storefront `no-store` fetch корректно оставил `/` dynamic.
 - VERIFIED: isolated auth/preflight/RBAC/outbox run — 4 suites, 179/179 tests PASS.
@@ -59,6 +60,12 @@ reviews. Live production credentials, реальные провайдеры, к�
   API/Web production builds and mobile typecheck PASS; mobile production audit 0.
 - VERIFIED: independent architecture, TypeScript, security and product/release
   reviews returned APPROVE for `5aafc884` with no HIGH/CRITICAL findings.
+- VERIFIED: commit `3152221e` installs an unconditional PostgreSQL statement
+  trigger that rejects `AuditEvent` UPDATE, DELETE and TRUNCATE with SQLSTATE
+  55000 while preserving INSERT/compensating INSERT.
+- VERIFIED: fresh-schema migration probe, direct migrated-DB tamper probes and
+  ledger/invariant/POS/reports regression 33/33 PASS; architecture, database and
+  adversarial security reviews APPROVE the bounded trigger slice.
 - VERIFIED: production dependency audit — 0 vulnerabilities after compatible
   per-consumer resolution; legacy glob/coverage and Socket.IO runtime tests PASS.
 - VERIFIED: iOS unit/contract 164/164 and UI E2E 47/47 PASS across Client,
@@ -86,13 +93,15 @@ reviews. Live production credentials, реальные провайдеры, к�
 | iOS | PARTIAL | 4 SwiftUI targets at repository build 6; unit/contract 164/164, UI 47/47 and strict signing/metadata preflight PASS | Pending ASC submissions use build 5; fresh physical-device SIWA is unverified | Do not replace build 5 while under review; physical-device auth smoke and post-review readback |
 | Web | PARTIAL | Production build PASS, 45 routes; guest checkout/TG/trade-in terminal errors and retry attempts have 5/5 focused contract tests; 45 Playwright specs exist | Worktree contains unrelated uncommitted UI changes; full E2E not rerun | Separate/commit UI work, then full route audit, a11y, cross-browser and visual regression |
 | E2E | PARTIAL | Auth/account 55/55, customer/support 13/13, guest identity/RBAC/deletion 55/55, POS/inventory/ledger 58/58 and service/auth 33/33 isolated gates PASS; Web/mobile retry contracts 6/6 PASS | Targeted checks do not prove whole ecosystem; no repeated full-suite flake run on current SHA | Run full isolated API twice, full Playwright, reconciled ecosystem, native UI and failure injection |
-| Security | PARTIAL | JWT/OTP/storage guards, hardened image resolver, exhaustive account deletion tests and production audit 0; independent reviews APPROVE completed slices | Camera metadata policy, DB-enforced Event Ledger immutability, approval ownership and cross-writer phone consistency remain open; phone-existence response is an accepted rate-limited privacy risk | Close camera schema/retention, AuditEvent immutability, approval lifecycle and phone-writer consistency; full secret/container/IDOR scan |
+| Security | PARTIAL | JWT/OTP/storage guards, hardened image resolver, exhaustive account deletion tests, production audit 0; PostgreSQL rejects AuditEvent UPDATE/DELETE/TRUNCATE with 55000; independent reviews APPROVE completed slices | Runtime/migrator/backup still share owner-level Render DB identity, so owner can disable the trigger; forged/missing events, camera policy, approval ownership and cross-writer phone consistency remain open | Split DB roles and add live ACL/postdeploy/restore probes; then close camera schema, approval lifecycle and phone-writer consistency |
 | App Store | BLOCKED_EXTERNAL | All four `1.0.0` build-5 versions verified WAITING_FOR_REVIEW; strict signing/metadata preflight and reviewer logins PASS; iOS UI 47/47 | Apple review, Unlisted distribution and fresh physical-iPad SIWA remain external | Do not replace build 5; monitor review; physical SIWA smoke and distribution decision |
 
 ## Blockers
 
 - VERIFIED: camera payload privacy relies on caller-provided arbitrary JSON and a keyword heuristic (`apps/api/src/camera-gateway/camera-gateway.dto.ts`).
-- VERIFIED: `AuditEvent` is described as append-only but the database role can update/delete it; immutability is convention, not DB enforcement.
+- VERIFIED: `AuditEvent` destructive DML is now blocked by a DB trigger, but the
+  current Render runtime identity is also the table owner and can disable/drop it;
+  credential-level immutability and restore evidence remain open.
 - VERIFIED: approval status has only requested/approved/rejected; no atomic claim,
   expiry or cancellation ownership protects concurrent execution.
 - VERIFIED: the temporary absent-key compatibility path intentionally preserves
@@ -120,7 +129,7 @@ reviews. Live production credentials, реальные провайдеры, к�
 - Priority: P0
 - Dependencies: None
 - Acceptance: camera payloads/retention are server-derived and typed; Event Ledger
-  is DB-immutable; approvals have atomic ownership/expiry/cancel; all customer writers
+  trigger and runtime ACL prevent destructive DML; approvals have atomic ownership/expiry/cancel; all customer writers
   converge on canonical identity; production audit remains 0 high/critical.
 - Rollback: keep camera ingest and approval-backed automation disabled behind kill switches.
 - Kill criterion: metadata policy bypass, ledger rewrite, double execution or identity split remains.
@@ -159,6 +168,8 @@ reviews. Live production credentials, реальные провайдеры, к�
 - VERIFIED: current guest identity gate passed 12/12 suites and 55/55 tests;
   Web retry/error contracts 5/5; mobile retry contract 1/1; mobile typecheck and
   production dependency audit passed.
+- VERIFIED: Event Ledger trigger migration/tamper probe passed; focused
+  ledger/invariant/POS/reports gate passed 4/4 suites and 33/33 tests.
 - VERIFIED: isolated gates passed for auth/account 55/55, customer/support 13/13,
   POS/inventory/ledger 58/58, service/auth 33/33, auth/preflight/RBAC/outbox
   179/179 and authz/AI/camera 13/13.
