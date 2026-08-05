@@ -16,6 +16,7 @@ import { OutboxService } from '../outbox/outbox.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
 import { paymentAccountCode, postAccountingEntryOnTx, postPaymentEntryOnTx } from '../finance/accounting-journal';
 import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
+import { lockActiveCustomerOnTx } from '../auth/customer-session-state';
 import {
   assertOrderLineSupplyReceived,
   assertOrderReservationCoverageOnTx,
@@ -38,6 +39,7 @@ interface PaymentTender {
 interface PaymentContext {
   staffId?: string;
   idempotencyKey?: string;
+  customerId?: string;
 }
 
 @Injectable()
@@ -425,11 +427,7 @@ export class PaymentsService {
   }
 
   async payForCustomer(customerId: string, dto: PayDto, actor: string) {
-    const order = await this.prisma.order.findFirst({ where: { id: dto.orderId, customerId }, select: { id: true } });
-    if (!order) {
-      throw new ValidationError('order_not_found', `Заказ ${dto.orderId} не найден`);
-    }
-    return this.pay(dto, actor);
+    return this.pay(dto, actor, { customerId });
   }
 
   async pay(dto: PayDto, actor: string, context: PaymentContext = {}) {
@@ -437,14 +435,20 @@ export class PaymentsService {
     // Provider transaction ids and staff idempotency keys both replay the exact
     // original movement. Changed reuse is rejected instead of returning a false success.
     if (idempotencyKey) {
-      const existing = await this.prisma.payment.findUnique({
-        where: { idempotencyKey },
-      });
+      const existing = context.customerId
+        ? await this.prisma.$transaction(async (tx) => {
+            await lockActiveCustomerOnTx(tx, context.customerId!);
+            const order = await tx.order.findFirst({
+              where: { id: dto.orderId, customerId: context.customerId },
+              select: { id: true },
+            });
+            if (!order) throw new ValidationError('order_not_found', `Заказ ${dto.orderId} не найден`);
+            return tx.payment.findUnique({ where: { idempotencyKey } });
+          })
+        : await this.prisma.payment.findUnique({ where: { idempotencyKey } });
       if (existing) {
         this.assertPaymentReplay(existing, dto, dto.orderId);
-        const order = await this.prisma.order.findUnique({
-          where: { id: existing.orderId ?? dto.orderId },
-        });
+        const order = await this.prisma.order.findUnique({ where: { id: existing.orderId ?? dto.orderId } });
         return { order, payment: existing, idempotent: true };
       }
     }
@@ -511,9 +515,17 @@ export class PaymentsService {
 
     // Split retries dedupe by the first command key; the batch transaction is all-or-nothing.
     if (idempotencyKeys[0]) {
-      const existing = await this.prisma.payment.findUnique({
-        where: { idempotencyKey: idempotencyKeys[0] },
-      });
+      const existing = context.customerId
+        ? await this.prisma.$transaction(async (tx) => {
+            await lockActiveCustomerOnTx(tx, context.customerId!);
+            const order = await tx.order.findFirst({
+              where: { id: dto.orderId, customerId: context.customerId },
+              select: { id: true },
+            });
+            if (!order) throw new ValidationError('order_not_found', `Заказ ${dto.orderId} не найден`);
+            return tx.payment.findUnique({ where: { idempotencyKey: idempotencyKeys[0] } });
+          })
+        : await this.prisma.payment.findUnique({ where: { idempotencyKey: idempotencyKeys[0] } });
       if (existing) {
         this.assertPaymentReplay(existing, tenders[0], dto.orderId);
         const [order, payments] = await Promise.all([
@@ -530,11 +542,12 @@ export class PaymentsService {
     if (tenders.some((payment) => payment.method === 'gift_card') && this.orders) {
       const order = await this.prisma.order.findUnique({ where: { id: dto.orderId } });
       if (order?.status === 'created' || order?.status === 'confirmed') {
-        await this.orders.fulfill(order.id, actor);
+        await this.orders.fulfill(order.id, actor, context.customerId);
       }
     }
 
     return this.audit.transaction(async (tx) => {
+      if (context.customerId) await lockActiveCustomerOnTx(tx, context.customerId);
       // Serialize concurrent payments on the same order — accessory-only orders have no
       // IMEI unit for sellOnTx to lock, so without this two full payments could race,
       // both create Payment rows and both flip the order to paid. Row-lock first (mirror
@@ -546,6 +559,9 @@ export class PaymentsService {
         include: { items: true, storePoint: { select: { inventoryLocation: true } } },
       });
       if (!order) {
+        throw new ValidationError('order_not_found', `Заказ ${dto.orderId} не найден`);
+      }
+      if (context.customerId && order.customerId !== context.customerId) {
         throw new ValidationError('order_not_found', `Заказ ${dto.orderId} не найден`);
       }
       if (order.isDemo) {

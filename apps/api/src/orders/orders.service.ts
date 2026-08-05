@@ -1378,14 +1378,18 @@ export class OrdersService {
    * A serialized line with qty>1 is normalized to one unit per line (like POS), so
    * every physical device is tracked individually. Insufficient stock → 409.
    */
-  async fulfill(orderId: string, actor: string) {
+  async fulfill(orderId: string, actor: string, customerId?: string) {
     return this.audit.transaction(async (tx) => {
+      if (customerId) await lockActiveCustomerOnTx(tx, customerId);
       await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({
         where: { id: orderId },
         include: { items: true },
       });
       if (!order) {
+        throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
+      }
+      if (customerId && order.customerId !== customerId) {
         throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
       }
       this.assertNotDemo(order);

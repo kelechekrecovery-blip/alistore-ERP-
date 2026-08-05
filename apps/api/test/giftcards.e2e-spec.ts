@@ -14,6 +14,7 @@ import { SANDBOX_WEBHOOK_SECRET, signedSandboxWebhook } from './helpers/sandbox-
 
 describe('Gift cards / store credit (integration)', () => {
   let prisma: PrismaService;
+  let audit: AuditService;
   let orders: OrdersService;
   let payments: PaymentsService;
   let giftcards: GiftcardsService;
@@ -24,7 +25,7 @@ describe('Gift cards / store credit (integration)', () => {
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
-    const audit = new AuditService(prisma);
+    audit = new AuditService(prisma);
     const units = new UnitsService(prisma);
     const approvals = new ApprovalsService(prisma, audit);
     orders = new OrdersService(prisma, audit, units);
@@ -102,6 +103,12 @@ describe('Gift cards / store credit (integration)', () => {
 
   function webhook(payload: PaymentWebhookDto) {
     return intents.webhook(payload, signedSandboxWebhook(payload));
+  }
+
+  function deferred() {
+    let resolve!: () => void;
+    const promise = new Promise<void>((done) => { resolve = done; });
+    return { promise, resolve };
   }
 
   async function reservedOrder(total = 100000) {
@@ -267,6 +274,127 @@ describe('Gift cards / store credit (integration)', () => {
     }, attacker.id)).rejects.toMatchObject({ code: 'order_not_found' });
     expect(await prisma.payment.count({ where: { orderId: owner.order.id } })).toBe(0);
     expect(await prisma.giftCard.findUnique({ where: { code: card.code } })).toMatchObject({ balance: 30000 });
+  });
+
+  it('does not debit a gift card when deletion commits before the payment transaction', async () => {
+    const { order, customer } = await reservedOrder(30000);
+    const card = await giftcards.issue({ code: 'gc-delete-race', amount: 30000 }, 'cashier');
+    const atTransaction = deferred();
+    const resumeTransaction = deferred();
+    const originalTransaction = audit.transaction.bind(audit);
+    const transaction = jest.spyOn(audit, 'transaction').mockImplementationOnce(async (fn) => {
+      atTransaction.resolve();
+      await resumeTransaction.promise;
+      return originalTransaction(fn);
+    });
+
+    try {
+      const payment = payments.payForCustomer(customer.id, {
+        orderId: order.id,
+        method: 'gift_card',
+        amount: 30000,
+        giftCardCode: card.code,
+      }, customer.id);
+      await atTransaction.promise;
+      await prisma.customer.update({
+        where: { id: customer.id },
+        data: { phone: `deleted:${customer.id}`, name: 'Удалённый пользователь' },
+      });
+      resumeTransaction.resolve();
+
+      await expect(payment).rejects.toMatchObject({ code: 'customer_session_revoked' });
+      expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
+      expect(await prisma.giftCard.findUniqueOrThrow({ where: { id: card.id } }))
+        .toMatchObject({ balance: 30000, status: 'active' });
+      expect(await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
+        .toMatchObject({ status: 'reserved' });
+      expect(await prisma.auditEvent.count({ where: { type: 'giftcard.redeemed' } })).toBe(0);
+    } finally {
+      resumeTransaction.resolve();
+      transaction.mockRestore();
+    }
+  });
+
+  it('rejects a customer gift-card replay after account deletion', async () => {
+    const { order, customer } = await reservedOrder(30000);
+    const card = await giftcards.issue({ code: 'gc-deleted-replay', amount: 30000 }, 'cashier');
+    const dto = {
+      orderId: order.id,
+      method: 'gift_card' as const,
+      amount: 30000,
+      giftCardCode: card.code,
+    };
+
+    await payments.payForCustomer(customer.id, dto, customer.id);
+    await prisma.customer.update({
+      where: { id: customer.id },
+      data: { phone: `deleted:${customer.id}`, name: 'Удалённый пользователь' },
+    });
+
+    await expect(payments.payForCustomer(customer.id, dto, customer.id))
+      .rejects.toMatchObject({ code: 'customer_session_revoked' });
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { type: 'giftcard.redeemed' } })).toBe(1);
+  });
+
+  it('continues a verified provider payment after the customer is deleted', async () => {
+    const { order, customer } = await reservedOrder(30000);
+    await prisma.customer.update({
+      where: { id: customer.id },
+      data: { phone: `deleted:${customer.id}`, name: 'Удалённый пользователь' },
+    });
+    const payload: PaymentWebhookDto = {
+      orderId: order.id,
+      method: 'card',
+      amount: 30000,
+      txnId: `provider-after-delete-${runTag}-${seq}`,
+      status: 'succeeded',
+      actor: 'provider',
+    };
+
+    await expect(webhook(payload)).resolves.toMatchObject({
+      order: { id: order.id, status: 'paid' },
+    });
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(1);
+  });
+
+  it('rejects payment after deletion wins between customer-fenced fulfill and debit', async () => {
+    const { order, customer } = await webOrder(30000);
+    const card = await giftcards.issue({ code: 'gc-delete-after-fulfill', amount: 30000 }, 'cashier');
+    const fulfilled = deferred();
+    const resumePayment = deferred();
+    const originalFulfill = orders.fulfill.bind(orders);
+    const fulfill = jest.spyOn(orders, 'fulfill').mockImplementationOnce(async (...args) => {
+      const result = await originalFulfill(...args);
+      fulfilled.resolve();
+      await resumePayment.promise;
+      return result;
+    });
+
+    try {
+      const payment = payments.payForCustomer(customer.id, {
+        orderId: order.id,
+        method: 'gift_card',
+        amount: 30000,
+        giftCardCode: card.code,
+      }, customer.id);
+      await fulfilled.promise;
+      await prisma.customer.update({
+        where: { id: customer.id },
+        data: { phone: `deleted:${customer.id}`, name: 'Удалённый пользователь' },
+      });
+      resumePayment.resolve();
+
+      await expect(payment).rejects.toMatchObject({ code: 'customer_session_revoked' });
+      expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(0);
+      expect(await prisma.giftCard.findUniqueOrThrow({ where: { id: card.id } }))
+        .toMatchObject({ balance: 30000, status: 'active' });
+      expect(await prisma.order.findUniqueOrThrow({ where: { id: order.id } }))
+        .toMatchObject({ status: 'reserved' });
+    } finally {
+      resumePayment.resolve();
+      fulfill.mockRestore();
+    }
   });
 
   it('is race-safe: two concurrent redemptions cannot over-draw one card', async () => {
