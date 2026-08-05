@@ -125,7 +125,10 @@ describe('Observability status dashboard', () => {
     });
     await prisma.$executeRaw`
       UPDATE "WorkerHeartbeat"
-      SET "lastSeenAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 hour'
+      -- Keep the assertion away from the exact-second boundary: the API
+      -- intentionally truncates age to whole seconds, so a 1-hour interval
+      -- can legitimately be observed as 3599 during the same tick.
+      SET "lastSeenAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 hour 5 seconds'
       WHERE "id" = ${`jest-stale-${RUN}`}
     `;
 
