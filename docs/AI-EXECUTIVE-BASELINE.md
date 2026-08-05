@@ -1,7 +1,7 @@
 # AliStore AI Executive OS — Phase 0 Baseline
 
 Дата снимка: 2026-08-05
-Git SHA evidence through: `2260d217`
+Git SHA evidence through: `5d4f3bb6`
 Статус решения: **REVISE — переход к production rollout запрещён до закрытия P0**.
 
 ## Scope
@@ -73,6 +73,11 @@ reviews. Live production credentials, реальные провайдеры, к�
   rows fail closed through migration backfill + DB CHECK; staff reconciliation
   remains independent. Fresh 162-migration rehearsal, API build and return gate:
   5 suites, 56/56 PASS; code, TypeScript and security reviews APPROVE.
+- VERIFIED: commit `5d4f3bb6` fences customer supply-order cancellation,
+  refund allocation, receivable, supply, ledger and outbox mutations from
+  account deletion across fast replay, main transaction and unique fallback.
+  API build and cancellation gate: 2 suites, 28/28 PASS; independent code,
+  TypeScript and security reviews APPROVE.
 - VERIFIED: customer/support canonical identity and concurrency — 2 suites,
   13/13 tests PASS on isolated PostgreSQL.
 - VERIFIED: anonymous POS walk-in identity regression closed with a DB-atomic
@@ -130,7 +135,7 @@ reviews. Live production credentials, реальные провайдеры, к�
 | Auth | PARTIAL | 127/127 auth/customer/realtime gate plus 68/68 email/social/push privacy gate PASS; stale credentials, OTP/refresh issuance, profile writes, owned identity artifacts and local realtime are deletion-fenced | Боевой SMS/Apple/Telegram, fresh-device SIWA, remaining customer-domain writers and multi-replica realtime depend on further code/external evidence | Fence remaining customer-domain mutations; physical iPad fresh enrollment and production SMS clean-session E2E; normalize auth events |
 | Registration | PARTIAL | OTP and social enrollment converge on canonical customer identity; plus/no-plus/legacy/concurrency tests PASS | Production signup still depends on SMS; consent/version capture at signup is incomplete | Physical registration→logout→login test; persist consent/policy versions |
 | RBAC | PARTIAL | Casbin guard и серверная approval matrix; isolated RBAC/authz tests PASS | Требуемые AI-роли и canonical `manager` не существуют; approval lifecycle не имеет claim/expiry/cancel ownership; один consent endpoint не rechecks active staff | Спроектировать AI capability roles; добавить claim/expiry/cancel и concurrency tests; закрыть active-staff gap; прогнать deny matrix |
-| Orders | PARTIAL | Transactional order creation/reservation/state machine and ledger; fresh/replayed order and return creation are deletion-fenced; return replay is owner-bound and request-hashed; guest identity, order and payment attempts are independently replay-safe; return gate 56/56 PASS | Cancellation and payment flows still need the same lifecycle fence; full create→reserve→pay/COD→fulfill→return ecosystem and installed-client adoption are not yet proven | Fence cancellation/payment intents/gift-card pay; then full money/reconciliation E2E before removing missing-key compatibility |
+| Orders | PARTIAL | Transactional order creation/reservation/state machine and ledger; order creation, supply cancellation and return creation/replay are deletion-fenced; cancellation financial/supply effects are atomic; return replay is owner-bound and request-hashed; return 56/56 and cancellation 28/28 PASS | Payment flows still need the same lifecycle fence; full create→reserve→pay/COD→fulfill→return ecosystem and installed-client adoption are not yet proven | Fence payment intents/gift-card pay; then full money/reconciliation E2E before removing missing-key compatibility |
 | Payments | BLOCKED_EXTERNAL | Provider-neutral ports, refund approvals, webhook/idempotency tests; `production-payment-gateway.provider.ts` fail-closed | Production gateway намеренно не активирован; фискальный чек отсутствует | Выбрать cash/COD pilot или сертифицированный provider; live signed webhook/refund reconciliation; OFD/KKM |
 | Inventory | PARTIAL | IMEI/quantity locks, reservation, valuation, quarantine and ledger paths in API; POS/inventory 58/58 and service/auth 33/33 gates PASS | Scanner/physical store flow and complete supply reconciliation are not certified | Exact-once procurement→receipt→sale→repair/return; physical scanner and stock-count UAT |
 | Delivery | BLOCKED_EXTERNAL | Courier assignment, deletion-fenced evidence retention, COD handover and offline queues implemented; courier E2E specs существуют | Live push/maps/camera/network and physical COD handover не сертифицированы | Physical-device run with offline restart, evidence upload, failure→redispatch and cash reconciliation |
@@ -140,7 +145,7 @@ reviews. Live production credentials, реальные провайдеры, к�
 | Cameras | PARTIAL | Edge enrollment, hashed secrets, idempotent metadata ingest, global kill switch and retention purge; isolated camera tests PASS | `value` — arbitrary JSON; privacy label caller-controlled; нет EZVIZ/ONVIF/RTSP adapter, per-camera kill switch и legal decision | Typed per-event schemas, server-derived TTL/privacy, local gateway adapter and physical privacy UAT; face recognition запрещено |
 | iOS | PARTIAL | 4 SwiftUI targets at repository build 6; unit/contract 164/164, UI 47/47 and strict signing/metadata preflight PASS | Pending ASC submissions use build 5; fresh physical-device SIWA is unverified | Do not replace build 5 while under review; physical-device auth smoke and post-review readback |
 | Web | PARTIAL | Production build PASS, 45 routes; guest checkout/TG/trade-in terminal errors and retry attempts have 5/5 focused contract tests; 45 Playwright specs exist | Worktree contains unrelated uncommitted UI changes; full E2E not rerun | Separate/commit UI work, then full route audit, a11y, cross-browser and visual regression |
-| E2E | PARTIAL | Current auth/customer/realtime gates 127/127 and 68/68 PASS; returns 56/56, evidence deletion/cleanup 18/18, customer/support 13/13, guest identity/RBAC/deletion 55/55, POS/inventory/ledger 58/58 and service/auth 33/33 gates PASS | Targeted checks do not prove the whole ecosystem; multi-replica realtime, full Playwright and native-device flows remain unverified | Run full isolated API twice, full Playwright, reconciled ecosystem, native UI, Redis multi-replica and failure injection |
+| E2E | PARTIAL | Current auth/customer/realtime gates 127/127 and 68/68 PASS; cancellations 28/28, returns 56/56, evidence deletion/cleanup 18/18, customer/support 13/13, guest identity/RBAC/deletion 55/55, POS/inventory/ledger 58/58 and service/auth 33/33 gates PASS | Targeted checks do not prove the whole ecosystem; multi-replica realtime, full Playwright and native-device flows remain unverified | Run full isolated API twice, full Playwright, reconciled ecosystem, native UI, Redis multi-replica and failure injection |
 | Security | PARTIAL | JWT/OTP/storage guards, production audit 0; customer evidence objects cannot survive a tombstone-first retention race; PostgreSQL trigger + startup/cron guards separate owner/runtime/backup capabilities; ACL/pg_dump rehearsals and independent reviews APPROVE | Role split is not yet applied in live Render; private runners/protected environments, staging JWT rotation and restore drill lack live evidence; forged/missing events and approval/camera risks remain | Provision credentials/runners in safe order, rotate staging JWT, run staging→production CD and restore drill; then close authenticity, camera and approval lifecycle |
 | App Store | BLOCKED_EXTERNAL | All four `1.0.0` build-5 versions verified WAITING_FOR_REVIEW; strict signing/metadata preflight and reviewer logins PASS; iOS UI 47/47 | Apple review, Unlisted distribution and fresh physical-iPad SIWA remain external | Do not replace build 5; monitor review; physical SIWA smoke and distribution decision |
 
@@ -242,6 +247,8 @@ reviews. Live production credentials, реальные провайдеры, к�
 - VERIFIED: return lifecycle gate passed fresh 162 migrations, API build, 5/5
   suites and 56/56 tests, including tombstone races, legacy fail-closed replay
   and successful staff continuation.
+- VERIFIED: cancellation lifecycle gate passed API build, 2/2 suites and 28/28
+  tests, including tombstone-first zero-effects and post-delete replay rejection.
 - VERIFIED: `git diff --check` passed before documentation edits.
 - UNKNOWN: full ecosystem, native physical and live external gates remain required.
 
