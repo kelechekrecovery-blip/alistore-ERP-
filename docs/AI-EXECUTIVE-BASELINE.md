@@ -45,6 +45,11 @@ reviews. Live production credentials, реальные провайдеры, к�
 - VERIFIED: isolated authz/AI/camera run — 3 suites, 13/13 tests PASS.
 - VERIFIED: auth/account release gate — 5 suites, 55/55 tests PASS (OTP,
   recovery, refresh replay/theft, social enrollment, staff sessions, export/delete).
+- VERIFIED: commits `c6638eeb` and `e0c7ec5e` make deletion an immediate
+  credential boundary: stale HTTP/WebSocket-handshake JWTs fail, refresh and
+  login issuance serialize with deletion, address/profile/consent writes cannot
+  cross the deletion commit, and established customer realtime delivery is
+  fenced from staff delivery. Focused isolated gate: 9 suites, 127/127 PASS.
 - VERIFIED: customer/support canonical identity and concurrency — 2 suites,
   13/13 tests PASS on isolated PostgreSQL.
 - VERIFIED: anonymous POS walk-in identity regression closed with a DB-atomic
@@ -99,7 +104,7 @@ reviews. Live production credentials, реальные провайдеры, к�
 
 | Область | Статус | Доказательство | Риск | Следующий шаг |
 |---|---|---|---|---|
-| Auth | PARTIAL | 55/55 isolated auth/account tests PASS; canonical phone identity, OTP/recovery, refresh replay/theft, social enrollment, logout and account deletion are fail-closed | Боевой SMS/Apple/Telegram и fresh-device SIWA зависят от external credentials/device; customer auth events ещё не нормализованы | Physical iPad fresh enrollment and production SMS clean-session E2E; normalize auth event taxonomy |
+| Auth | PARTIAL | 127/127 focused auth/customer/realtime tests PASS; stale access/refresh, deletion-first and issuance-first OTP/refresh races, post-guard profile writes and established customer realtime are fail-closed | Боевой SMS/Apple/Telegram, fresh-device SIWA, remaining customer-domain writers and multi-replica realtime depend on further code/external evidence | Fence remaining customer-domain mutations; physical iPad fresh enrollment and production SMS clean-session E2E; normalize auth events |
 | Registration | PARTIAL | OTP and social enrollment converge on canonical customer identity; plus/no-plus/legacy/concurrency tests PASS | Production signup still depends on SMS; consent/version capture at signup is incomplete | Physical registration→logout→login test; persist consent/policy versions |
 | RBAC | PARTIAL | Casbin guard и серверная approval matrix; isolated RBAC/authz tests PASS | Требуемые AI-роли и canonical `manager` не существуют; approval lifecycle не имеет claim/expiry/cancel ownership; один consent endpoint не rechecks active staff | Спроектировать AI capability roles; добавить claim/expiry/cancel и concurrency tests; закрыть active-staff gap; прогнать deny matrix |
 | Orders | PARTIAL | Transactional order creation/reservation/state machine and ledger; guest identity, order and payment attempts are independently replay-safe; mobile routes guest capability and customer JWT to separate endpoints; staff resolver is authenticated; 55/55 API and 6/6 client contract tests PASS | Full create→reserve→pay/COD→fulfill→return ecosystem and installed-client adoption are not yet proven | Roll out migration→compatibility API→clients; instrument adoption, then full money/reconciliation E2E before removing missing-key compatibility |
@@ -112,7 +117,7 @@ reviews. Live production credentials, реальные провайдеры, к�
 | Cameras | PARTIAL | Edge enrollment, hashed secrets, idempotent metadata ingest, global kill switch and retention purge; isolated camera tests PASS | `value` — arbitrary JSON; privacy label caller-controlled; нет EZVIZ/ONVIF/RTSP adapter, per-camera kill switch и legal decision | Typed per-event schemas, server-derived TTL/privacy, local gateway adapter and physical privacy UAT; face recognition запрещено |
 | iOS | PARTIAL | 4 SwiftUI targets at repository build 6; unit/contract 164/164, UI 47/47 and strict signing/metadata preflight PASS | Pending ASC submissions use build 5; fresh physical-device SIWA is unverified | Do not replace build 5 while under review; physical-device auth smoke and post-review readback |
 | Web | PARTIAL | Production build PASS, 45 routes; guest checkout/TG/trade-in terminal errors and retry attempts have 5/5 focused contract tests; 45 Playwright specs exist | Worktree contains unrelated uncommitted UI changes; full E2E not rerun | Separate/commit UI work, then full route audit, a11y, cross-browser and visual regression |
-| E2E | PARTIAL | Auth/account 55/55, customer/support 13/13, guest identity/RBAC/deletion 55/55, POS/inventory/ledger 58/58 and service/auth 33/33 isolated gates PASS; Web/mobile retry contracts 6/6 PASS | Targeted checks do not prove whole ecosystem; no repeated full-suite flake run on current SHA | Run full isolated API twice, full Playwright, reconciled ecosystem, native UI and failure injection |
+| E2E | PARTIAL | Current auth/customer/realtime gate 127/127 PASS; prior customer/support 13/13, guest identity/RBAC/deletion 55/55, POS/inventory/ledger 58/58 and service/auth 33/33 gates PASS; Web/mobile retry contracts 6/6 PASS | Targeted checks do not prove the whole ecosystem; multi-replica realtime, full Playwright and native-device flows remain unverified | Run full isolated API twice, full Playwright, reconciled ecosystem, native UI, Redis multi-replica and failure injection |
 | Security | PARTIAL | JWT/OTP/storage guards, production audit 0; PostgreSQL trigger + startup/cron guards separate owner/runtime/backup capabilities; 159-migration ACL/pg_dump rehearsal and independent database/security/code reviews APPROVE | Role split is not yet applied in live Render; private runners/protected environments, staging JWT rotation and restore drill lack live evidence; forged/missing events and approval/camera risks remain | Provision credentials/runners in safe order, rotate staging JWT, run staging→production CD and restore drill; then close authenticity, camera and approval lifecycle |
 | App Store | BLOCKED_EXTERNAL | All four `1.0.0` build-5 versions verified WAITING_FOR_REVIEW; strict signing/metadata preflight and reviewer logins PASS; iOS UI 47/47 | Apple review, Unlisted distribution and fresh physical-iPad SIWA remain external | Do not replace build 5; monitor review; physical SIWA smoke and distribution decision |
 
@@ -130,7 +135,12 @@ reviews. Live production credentials, реальные провайдеры, к�
   expiry or cancellation ownership protects concurrent execution.
 - VERIFIED: the temporary absent-key compatibility path intentionally preserves
   one-shot behavior for installed clients; removal requires adoption telemetry.
-- VERIFIED: remaining auth/customer writers still need one explicit shared-lock/P2002 contract audit.
+- VERIFIED: profile/address/settings/consent writers are fenced from account
+  deletion, but order/support/return/trade-in/warranty/B2B/protection/evidence/
+  payment customer writers still need the same explicit transaction-boundary audit.
+- BLOCKED_EXTERNAL: realtime now fails closed without a bound Socket.IO server
+  and protects local established sockets; multi-replica rooms, worker emission
+  and cluster disconnect still require a Redis adapter/emitter and staging topology proof.
 - UNKNOWN: certified payment/fiscal providers, SMS/social credentials, object storage, alerts, camera/legal approval, physical devices/POS hardware and App Store review.
 
 ## Dissent
