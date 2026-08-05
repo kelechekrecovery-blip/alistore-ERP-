@@ -62,7 +62,7 @@ export async function uploadEvidenceImages(input: {
   idempotencyKeyPrefix?: string;
 }): Promise<EvidenceAttachment[]> {
   const results: EvidenceAttachment[] = [];
-  for (const [index, file] of input.files.entries()) {
+  for (const file of input.files) {
     results.push(await uploadEvidenceImage({
       file,
       entityType: input.entityType,
@@ -72,9 +72,17 @@ export async function uploadEvidenceImages(input: {
       accessToken: input.accessToken,
       guestCapability: input.guestCapability,
       idempotencyKey: input.idempotencyKeyPrefix
-        ? `${input.idempotencyKeyPrefix}:${index}`
+        ? await evidenceFileIdempotencyKey(input.idempotencyKeyPrefix, file)
         : undefined,
     }));
   }
   return results;
+}
+
+async function evidenceFileIdempotencyKey(prefix: string, file: File): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+  const contentHash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  const key = `${prefix}:${contentHash}`;
+  if (key.length > 128) throw new Error('Evidence idempotency key exceeds 128 characters');
+  return key;
 }

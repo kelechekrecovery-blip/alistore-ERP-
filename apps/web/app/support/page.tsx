@@ -73,12 +73,14 @@ export default function SupportPage() {
         actor: 'customer_app',
       } as const;
       let ticket: SupportTicket;
+      let authenticatedIdempotencyKey: string | undefined;
       if (user) {
         const fingerprint = JSON.stringify(ticketInput);
         if (authenticatedAttempt.current?.fingerprint !== fingerprint) {
           authenticatedAttempt.current = { fingerprint, idempotencyKey: crypto.randomUUID() };
         }
         const idempotencyKey = authenticatedAttempt.current.idempotencyKey;
+        authenticatedIdempotencyKey = idempotencyKey;
         ticket = await authed((accessToken) => openSupportTicket(ticketInput, { accessToken, idempotencyKey }));
       } else {
         ticket = await openSupportTicket(ticketInput, { guestCapability: guest!.guestCapability });
@@ -90,6 +92,9 @@ export default function SupportPage() {
             entityId: ticket.id,
             label: 'support_attachment',
             actor: customerId,
+            ...(authenticatedIdempotencyKey
+              ? { idempotencyKeyPrefix: `support:${authenticatedIdempotencyKey}` }
+              : {}),
             ...(user
               ? { accessToken: await authed(async (token) => token) }
               : { guestCapability: guest!.guestCapability }),
