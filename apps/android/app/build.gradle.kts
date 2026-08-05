@@ -14,6 +14,15 @@ val releaseRequested = gradle.startParameter.taskNames.any { requestedTask ->
 val firebaseConfigured = file("google-services.json").isFile
 if (firebaseConfigured) apply(plugin = "com.google.gms.google-services")
 require(!releaseRequested || firebaseConfigured) { "Client Release requires apps/android/app/google-services.json" }
+val googleWebClientId = providers.gradleProperty("GOOGLE_WEB_CLIENT_ID")
+    .orElse(providers.environmentVariable("GOOGLE_WEB_CLIENT_ID"))
+    .orNull
+    ?.trim()
+    .orEmpty()
+require(!releaseRequested || googleWebClientId.isNotBlank()) {
+    "Client Release requires GOOGLE_WEB_CLIENT_ID (Gradle property or environment variable)"
+}
+val escapedGoogleWebClientId = googleWebClientId.replace("\\", "\\\\").replace("\"", "\\\"")
 
 android {
     namespace = "kg.alistore.client"
@@ -25,6 +34,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "PAYMENT_RETURN_URL", "\"alistore://payment-return\"")
         buildConfigField("boolean", "FCM_CONFIGURED", firebaseConfigured.toString())
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$escapedGoogleWebClientId\"")
     }
 
     buildTypes {
@@ -64,6 +74,9 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.activity.compose)
   implementation(libs.androidx.biometric)
+  implementation(libs.androidx.credentials)
+  implementation(libs.androidx.credentials.play.services.auth)
+  implementation(libs.googleid)
   implementation(platform(libs.firebase.bom))
   implementation(libs.firebase.messaging)
 
@@ -78,5 +91,6 @@ dependencies {
   androidTestImplementation(libs.androidx.test.ext.junit)
   androidTestImplementation(libs.androidx.test.runner)
   androidTestImplementation(libs.androidx.test.rules)
+  testImplementation(libs.junit)
   implementation(project(":core"))
 }

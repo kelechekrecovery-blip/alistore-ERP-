@@ -50,6 +50,20 @@ data class PendingMutation(
 
 data class AuthTokens(val accessToken: String, val refreshToken: String)
 
+data class GoogleIdentityCredential(val identityToken: String, val nonce: String)
+
+interface GoogleSignInProvider {
+  suspend fun signIn(): GoogleIdentityCredential
+  suspend fun clearCredentialState()
+}
+
+sealed interface SocialAuthResult {
+  data class Authenticated(val tokens: AuthTokens) : SocialAuthResult
+  data class EnrollmentRequired(val enrollmentToken: String, val expiresInSeconds: Int) : SocialAuthResult
+}
+
+enum class SocialProvider { GOOGLE }
+
 data class AuthUser(val customerId: String, val phone: String?, val type: String)
 
 data class OtpChallenge(val devCode: String?, val challengeId: String? = null)

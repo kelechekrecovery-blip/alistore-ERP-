@@ -32,6 +32,9 @@ class MainActivity : FragmentActivity() {
       ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
     }
     enableEdgeToEdge()
+    val googleSignInProvider = BuildConfig.GOOGLE_WEB_CLIENT_ID
+      .takeIf(String::isNotBlank)
+      ?.let { GoogleCredentialSignInProvider(this, it) }
     setContent {
       AliStoreApp(
         role = AppRole.CLIENT,
@@ -40,6 +43,7 @@ class MainActivity : FragmentActivity() {
         deepLinkRevision = deepLinkRevision,
         clientPushRegistrar = if (BuildConfig.FCM_CONFIGURED) FirebaseClientPushRegistrar(applicationContext, BuildConfig.API_BASE_URL) else null,
         paymentReturnBaseUrl = BuildConfig.PAYMENT_RETURN_URL,
+        googleSignInProvider = googleSignInProvider,
       )
     }
   }
