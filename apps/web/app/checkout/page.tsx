@@ -27,6 +27,7 @@ import {
 } from '@/lib/api';
 import { fetchProduct } from '@/lib/api/catalog';
 import { loadAttribution } from '@/lib/attribution';
+import { fetchPublicOffer } from '@/lib/api/legal';
 import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
 import { guestOrderLink, saveGuestOrderAccess } from '@/lib/guest-order-access';
@@ -146,6 +147,18 @@ export default function CheckoutPage() {
   const [giftError, setGiftError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [piiConsent, setPiiConsent] = useState(false);
+  // Пока владелец не опубликовал оферту, ссылаться на неё в согласии нельзя:
+  // покупатель подтверждал бы условия документа, которого нет. Согласие на
+  // обработку персональных данных при этом остаётся — эта политика опубликована.
+  const [offerPublished, setOfferPublished] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void fetchPublicOffer().then((offer) => {
+      if (alive) setOfferPublished(offer.published);
+    });
+    return () => { alive = false; };
+  }, []);
   const [done, setDone] = useState<DoneState | null>(null);
   // Заказ, который сервер уже создал, а следующий вызов (подарочная карта или
   // платёжный intent) упал. Он существует на сервере — покупатель обязан уйти
@@ -765,10 +778,19 @@ export default function CheckoutPage() {
                 className="mt-0.5 h-4 w-4 shrink-0 accent-lime"
               />
               <span className="text-[13px] leading-5 text-bright">
-                Согласен с условиями{' '}
-                <Link href="/oferta" target="_blank" rel="noreferrer" className="text-lime underline">публичной оферты</Link>
-                {' '}и{' '}
-                <Link href="/privacy" target="_blank" rel="noreferrer" className="text-lime underline">обработкой персональных данных</Link>
+                {offerPublished ? (
+                  <>
+                    Согласен с условиями{' '}
+                    <Link href="/oferta" target="_blank" rel="noreferrer" className="text-lime underline">публичной оферты</Link>
+                    {' '}и{' '}
+                    <Link href="/privacy" target="_blank" rel="noreferrer" className="text-lime underline">обработкой персональных данных</Link>
+                  </>
+                ) : (
+                  <>
+                    Согласен с{' '}
+                    <Link href="/privacy" target="_blank" rel="noreferrer" className="text-lime underline">обработкой персональных данных</Link>
+                  </>
+                )}
               </span>
             </label>
             {error && <p className="mt-3 text-sm text-danger-soft">{error}</p>}

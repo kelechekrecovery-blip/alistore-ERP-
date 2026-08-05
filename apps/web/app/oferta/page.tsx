@@ -2,16 +2,22 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SiteHeader } from '@/components/SiteHeader';
+import { fetchPublicOffer } from '@/lib/api/legal';
 
-export const metadata: Metadata = {
-  title: 'Публичная оферта — AliStore',
-  description: 'Договор публичной оферты AliStore.',
-  // Пока документ состоит из плейсхолдеров ([Предмет договора], [Реквизиты], [Дата]),
-  // он не должен попадать в поиск как действующая оферта магазина. Баннер «ЧЕРНОВИК»
-  // предупреждает человека, а noindex — поисковик. Снять оба разом, когда владелец
-  // даст финальный текст и реквизиты.
-  robots: { index: false, follow: false },
-};
+/**
+ * noindex ровно до публикации: заготовка не должна попадать в поиск как
+ * действующая оферта магазина, а настоящий документ — должен.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const { published } = await fetchPublicOffer();
+  return {
+    title: 'Публичная оферта — AliStore',
+    description: published
+      ? 'Договор публичной оферты AliStore.'
+      : 'Договор публичной оферты AliStore готовится к публикации.',
+    robots: published ? { index: true, follow: true } : { index: false, follow: false },
+  };
+}
 
 const SECTIONS: Array<{ title: string; body: string[] }> = [
   {
@@ -76,12 +82,44 @@ const SECTIONS: Array<{ title: string; body: string[] }> = [
   },
 ];
 
-export default function OfertaPage() {
+/**
+ * Текст оферты владелец вставляет в ERP (`legal.offer_text`).
+ *
+ * Разработчик его не пишет: здесь реквизиты компании, которые нельзя ни
+ * выдумать, ни зашить в код. Пока документа нет, страница честно говорит об
+ * этом и показывает шаблон разделов как план — а не выдаёт его за действующий
+ * договор. `SECTIONS` остаётся именно как план.
+ */
+export default async function OfertaPage() {
+  const { text, published } = await fetchPublicOffer();
+
+  if (published) {
+    return (
+      <div className="min-h-screen bg-[#0b0a08] text-[#e5dcd3]">
+        <SiteHeader variant="design3" />
+        <main className="mx-auto max-w-[1100px] px-5 py-12">
+          <div className="text-xs text-white/40">
+            <Link href="/">Главная</Link> / Публичная оферта
+          </div>
+          <h1 className="mt-5 break-words text-3xl font-extrabold leading-tight text-white sm:text-[38px]">Публичная оферта</h1>
+          {/* Документ печатаем как есть, абзацами: владелец вставляет готовый
+              текст, и переписывать его вёрсткой нельзя. */}
+          {text.split(/\n{2,}/).map((paragraph, index) => (
+            <p key={index} className="mt-4 max-w-[75ch] whitespace-pre-line text-base leading-7 text-white/70">
+              {paragraph}
+            </p>
+          ))}
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0b0a08] text-[#e5dcd3]">
       <SiteHeader variant="design3" />
       <div className="border-b border-[#e5b23c]/40 bg-[#e5b23c]/10 px-5 py-3 text-center text-sm font-bold text-[#e5b23c]">
-        ЧЕРНОВИК — текст требует проверки юристом
+        Документ готовится — действующей оферты пока нет
       </div>
       <main className="mx-auto max-w-[1100px] px-5 py-12">
         <div className="text-xs text-white/40">
@@ -89,8 +127,9 @@ export default function OfertaPage() {
         </div>
         <h1 className="mt-5 break-words text-3xl font-extrabold leading-tight text-white sm:text-[38px]">Публичная оферта</h1>
         <p className="mt-3 max-w-[75ch] text-sm text-white/50">
-          Редакция от [Дата]. Настоящий документ размещён в ознакомительных целях и не является
-          окончательной версией.
+          Текст договора ещё не опубликован. Ниже — план разделов будущего документа;
+          он не является офертой и не создаёт обязательств. Условия конкретной покупки
+          уточняйте у продавца до оплаты.
         </p>
         {SECTIONS.map((section) => (
           <section key={section.title} className="mt-10">

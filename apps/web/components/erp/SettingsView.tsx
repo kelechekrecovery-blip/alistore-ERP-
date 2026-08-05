@@ -12,11 +12,16 @@ const GROUPS: { id: BusinessSetting['group']; title: string; note: string }[] = 
   { id: 'tradein', title: 'Trade-in', note: 'Экономика выкупа Б/У.' },
   { id: 'warranty', title: 'Гарантия', note: 'Печатается в гарантийном талоне.' },
   { id: 'loyalty', title: 'Бонусы', note: 'Начисление за покупку.' },
+  { id: 'legal', title: 'Юридические документы', note: 'Текст пишет юрист, а не разработчик. Пусто — документ на витрине не опубликован.' },
 ];
 
 /** Human form of a stored integer: bps read as percent, everything else as-is. */
 function display(setting: BusinessSetting): string {
   if (setting.kind === 'url') return setting.value === '' ? 'не задан' : 'загружен';
+  if (setting.kind === 'text') {
+    const length = String(setting.value).length;
+    return length === 0 ? 'не опубликован' : `${length.toLocaleString('ru-RU')} символов`;
+  }
   const numeric = Number(setting.value);
   if (setting.kind === 'bps') return `${(numeric / 100).toFixed(2).replace(/\.?0+$/, '')}%`;
   return `${numeric.toLocaleString('ru-RU')} ${setting.unit}`;
@@ -142,7 +147,12 @@ export function SettingsView({ accessToken, canEdit }: { accessToken: string; ca
                         <span className="rounded-chip bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-subtle">{display(setting)}</span>
                         {setting.overridden
                           ? <span className="rounded-chip bg-lime/15 px-2 py-0.5 text-[10px] font-semibold text-lime">изменён</span>
-                          : <span className="rounded-chip bg-surface-2 px-2 py-0.5 text-[10px] text-subtle">по умолчанию {setting.fallback}</span>}
+                          : <span className="rounded-chip bg-surface-2 px-2 py-0.5 text-[10px] text-subtle">
+                              {/* У строковых параметров дефолт — пустота, и
+                                  «по умолчанию » с пустым хвостом читается как
+                                  сломанная вёрстка. Называем состояние словом. */}
+                              {setting.kind === 'url' || setting.kind === 'text' ? 'не заполнен' : `по умолчанию ${setting.fallback}`}
+                            </span>}
                       </div>
                       <p className="mt-1 text-[11px] leading-4 text-muted">{setting.hint}</p>
                       {setting.updatedAt && (
@@ -155,7 +165,28 @@ export function SettingsView({ accessToken, canEdit }: { accessToken: string; ca
                         просить владельца вписать сюда путь руками значило бы
                         заставить его сначала где-то захостить файл. Даём
                         загрузку и превью: видно, что именно уедет на витрину. */}
-                    {setting.kind === 'url' ? (
+                    {setting.kind === 'text' ? (
+                      // Документ — не строка в 28 пикселей: даём поле, в которое
+                      // реально видно, что вставлено, и сохраняем явной кнопкой.
+                      <div className="flex flex-col items-stretch gap-2 md:w-[420px]">
+                        <textarea
+                          aria-label={setting.label}
+                          value={draft}
+                          rows={10}
+                          disabled={!canEdit || busy === setting.key}
+                          onChange={(event) => setDrafts({ ...drafts, [setting.key]: event.target.value })}
+                          className="w-full rounded-[7px] border border-surface-3 bg-surface-2 p-2.5 text-[12px] leading-5 text-white outline-none focus:border-coral disabled:opacity-50"
+                        />
+                        <button
+                          type="button"
+                          disabled={!canEdit || !dirty || busy === setting.key}
+                          onClick={() => void save(setting)}
+                          className="h-9 rounded-[7px] bg-coral px-3 text-xs font-bold text-white disabled:bg-surface-2 disabled:text-subtle"
+                        >
+                          {busy === setting.key ? '…' : 'Опубликовать'}
+                        </button>
+                      </div>
+                    ) : setting.kind === 'url' ? (
                       <div className="flex items-center gap-2">
                         {setting.value !== '' && (
                           // eslint-disable-next-line @next/next/no-img-element
