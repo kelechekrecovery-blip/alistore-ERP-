@@ -21,6 +21,8 @@ struct StaffScannerView: View {
     let session: StaffSession
     @Binding private var mode: StaffScannerMode
     @State private var buybackChecks: Set<Int> = []
+    /// Заявка, созданная приёмкой — её номер показываем над загрузкой фото.
+    @State private var createdTradeIn: TradeInView?
     @State private var entityType = "order"
     @State private var entityId = ""
     @State private var label = "operation_photo"
@@ -136,38 +138,51 @@ struct StaffScannerView: View {
                     .accessibilityIdentifier("staff-buyback-check-\(index)")
                 }
             }
-            Button("К договору купли-продажи →") {
-                mode = .evidence
-                entityType = "tradein"
-                // `entityId` намеренно не подставляем.
-                //
-                // Раньше сюда писалось «tradein-draft» — идентификатор, которого
-                // не существует. Он проходил проверку «поле не пустое», кнопка
-                // загрузки становилась активной, и оператор снимал паспорт
-                // продавца и все четыре ракурса, чтобы получить отказ сервера:
-                // сущности с таким id нет. Никакой trade-in при этом не
-                // создавался. Пустое поле честнее: оператор вводит номер
-                // реальной заявки, а `disabled` на пустом значении не даёт
-                // отправить фото в никуда.
-                //
-                // Создание самой заявки из скупки — отдельная задача: она пишет
-                // цену в договор, а цену здесь пока никто не вводит.
-                // Договор скупки начинается с паспорта продавца — метка PII, чтобы
-                // фото попало под срок хранения, а не осело в базе навсегда.
-                label = "passport_front"
+            // Заявку теперь заводит сам экран приёмки, а не оператор руками.
+            //
+            // Раньше отсюда шли прямо в Evidence Vault с пустым `entityId`:
+            // оператор должен был откуда-то знать номер заявки, которой ещё не
+            // существовало. Приёмка создаёт её на сервере (там же считается цена
+            // и пишется договор) и возвращает настоящий id — фото крепятся к нему.
+            NavigationLink {
+                StaffBuybackIntakeView(session: session) { created in
+                    createdTradeIn = created
+                    entityId = created.id
+                    entityType = "tradein"
+                    // Договор скупки начинается с паспорта продавца — метка PII,
+                    // чтобы фото попало под срок хранения, а не осело навсегда.
+                    label = "passport_front"
+                    mode = .evidence
+                }
+            } label: {
+                Text("К договору купли-продажи →")
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(buybackChecks.count >= 3 ? .white : secondaryText)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(buybackChecks.count >= 3 ? coral : surfaceSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
-            .font(.headline.weight(.bold))
-            .buttonStyle(.plain)
-            .foregroundStyle(buybackChecks.count >= 3 ? .white : secondaryText)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(buybackChecks.count >= 3 ? coral : surfaceSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .accessibilityIdentifier("staff-buyback-to-contract")
             .disabled(buybackChecks.count < 3)
         }
     }
 
     private var evidenceSection: some View {
         VStack(alignment: .leading, spacing: 14) {
+            // Номер созданной заявки и цена — чтобы оператор видел, к чему
+            // крепит фото, и мог сверить сумму с тем, что говорит продавцу.
+            if let createdTradeIn {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Заявка №\(createdTradeIn.id.suffix(8))")
+                        .font(.subheadline.weight(.bold)).foregroundStyle(Design3.lime)
+                    Text("\(createdTradeIn.model) · \(createdTradeIn.price) сом к выплате")
+                        .font(.caption).foregroundStyle(secondaryText)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .accessibilityIdentifier("staff-buyback-created")
+            }
             VStack(alignment: .leading, spacing: 12) {
                 Text("Evidence Vault")
                     .font(.headline.weight(.black))

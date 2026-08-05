@@ -115,7 +115,8 @@
     "contest:demo": "node scripts/contest-demo/server.mjs",
     "contest:site": "node scripts/contest-site/server.mjs",
     "contest:site:test": "node --test scripts/__tests__/contest-site.test.mjs",
-    "site:keepalive:test": "node --test scripts/__tests__/keep-site-up.test.mjs"
+    "site:keepalive:test": "node --test scripts/__tests__/keep-site-up.test.mjs",
+    "api:local": "node scripts/run-local-api.mjs"
   },
   "engines": {
     "node": ">=20"
