@@ -36,7 +36,7 @@ Required for a production-ready report:
 - Telegram: `TELEGRAM_BOT_TOKEN`, webhook URL/secret, callback QA.
 - WhatsApp: `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, webhook verify token.
 - Apple login: `APPLE_CLIENT_ID` plus Apple callback/client configuration.
-- Google login: create a Web OAuth 2.0 client in Google Cloud, allow JavaScript origins `https://ali.kg` and `https://www.ali.kg`, set that public ID as `GOOGLE_WEB_CLIENT_ID`, and include every accepted Web/iOS/Android client ID in comma-separated `GOOGLE_CLIENT_ID`. This Google Identity Services ID-token flow does not use a client secret.
+- Google login: create one Web OAuth client for the backend plus native OAuth clients for bundle/package `kg.alistore.client`. Allow web origins `https://ali.kg` and `https://www.ali.kg`; use the Web ID as `GOOGLE_WEB_CLIENT_ID` and include it plus every accepted native ID in comma-separated API `GOOGLE_CLIENT_ID`. iOS release also needs `GOOGLE_IOS_CLIENT_ID` and its `GOOGLE_IOS_REVERSED_CLIENT_ID`; Android Client release needs the same Web ID as build input `GOOGLE_WEB_CLIENT_ID` and OAuth fingerprints for debug/upload/Play App Signing certificates. No client secret belongs in any app or repository.
 - Campaign delivery: `NOTIFICATION_TRANSPORT=channels` with Novu, SMTP, Expo Push, Telegram, or WhatsApp credentials.
 - Native Android Staff push: `FCM_SERVICE_ACCOUNT_JSON` (or the mounted `FCM_SERVICE_ACCOUNT_KEY_PATH`), ignored app `google-services.json`, and `FCM_PROVIDER_CERTIFIED=false` until physical-device delivery/routing passes. iOS still requires APNs credentials and device certification; Expo remains legacy compatibility only.
 - Media: S3/MinIO values for production Evidence Vault storage.
@@ -81,7 +81,7 @@ Before setting the strict gate to green, verify live callbacks:
 - Telegram bot receives webhook updates and opens `/tg` with valid signed initData.
 - WhatsApp Cloud API can send a template/test message and validate the webhook token.
 - Apple Sign in returns an identity token accepted by `POST /auth/social/apple`.
-- Google Sign-In returns an ID token accepted by `POST /auth/v2/social/google`; an existing linked account opens immediately, while a new account reaches the shared phone OTP confirmation and cannot finish without a valid SMS code.
+- Google Sign-In on web, physical iOS and physical Android returns an ID token accepted by `POST /auth/v2/social/google`; verify account-picker cancellation, an existing linked account, and a new account reaching the shared phone OTP confirmation. The new account must not finish without the SMS code, and the memory-only enrollment must disappear after cancellation/app restart.
 - Campaign delivery sends through the selected channel transport without fallback logs.
 - Native Android Staff obtains an FCM token, binds it to the active staff JWT through `POST /notifications/push-tokens`, receives a task notification and opens its scoped deep link. Native iOS separately proves APNs registration and delivery.
 - Sentry/GlitchTip receives a controlled test error from the production API.

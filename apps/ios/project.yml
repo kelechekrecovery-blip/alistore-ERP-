@@ -22,6 +22,10 @@ settings:
     # Отдельно от developmentLanguage: build-переменная, на которую ссылается
     # `CFBundleDevelopmentRegion` в четырёх Info.plist.
     DEVELOPMENT_LANGUAGE: ru
+packages:
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS.git
+    exactVersion: 9.2.0
 targets:
   AliStoreCore:
     type: framework
@@ -37,6 +41,10 @@ targets:
     sources: [Client, Branding]
     dependencies:
       - target: AliStoreCore
+      - package: GoogleSignIn
+        product: GoogleSignIn
+      - package: GoogleSignIn
+        product: GoogleSignInSwift
     info:
       path: Client/Info.plist
       properties:
@@ -52,9 +60,13 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         API_BASE_URL: $(API_BASE_URL)
         PAYMENT_RETURN_URL: $(PAYMENT_RETURN_URL)
+        GIDClientID: $(GOOGLE_IOS_CLIENT_ID)
+        GIDServerClientID: $(GOOGLE_WEB_CLIENT_ID)
         CFBundleURLTypes:
           - CFBundleURLName: kg.alistore.client
             CFBundleURLSchemes: [alistore]
+          - CFBundleURLName: Google Sign-In
+            CFBundleURLSchemes: [$(GOOGLE_IOS_REVERSED_CLIENT_ID)]
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSFaceIDUsageDescription: Быстрый и защищённый вход в AliStore
@@ -80,6 +92,12 @@ targets:
         PAYMENT_RETURN_URL: alistore://payment-return
         API_BASE_URL: http://127.0.0.1:4000/api
         APS_ENVIRONMENT: development
+        # Невалидные явные значения держат Google-кнопку скрытой в локальной
+        # сборке без OAuth-конфигурации. Release archive получает реальные
+        # значения только через защищённое окружение и проходит preflight.
+        GOOGLE_IOS_CLIENT_ID: google-sign-in-not-configured
+        GOOGLE_WEB_CLIENT_ID: google-sign-in-not-configured
+        GOOGLE_IOS_REVERSED_CLIENT_ID: google-sign-in-not-configured
       configs:
         Release:
           API_BASE_URL: $(ALISTORE_API_BASE_URL)

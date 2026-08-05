@@ -41,6 +41,8 @@ AliStoreCourier, AliStorePOS.
 
 If --env-file is omitted and apps/ios/.env.production exists, it is loaded.
 Required: ALISTORE_API_BASE_URL (production HTTPS), DEVELOPMENT_TEAM.
+AliStoreClient additionally requires GOOGLE_IOS_CLIENT_ID,
+GOOGLE_IOS_REVERSED_CLIENT_ID and GOOGLE_WEB_CLIENT_ID.
 Optional: IOS_ALLOW_PROVISIONING_UPDATE=true to let Xcode create/download
 profiles, IOS_SKIP_XCODEGEN=true to skip regenerating the Xcode project.
 USAGE
@@ -88,6 +90,20 @@ else
   done
 fi
 
+if [[ " $requested_schemes " == *" AliStoreClient "* ]]; then
+  google_ios_client_id="${GOOGLE_IOS_CLIENT_ID:-}"
+  google_ios_reversed_client_id="${GOOGLE_IOS_REVERSED_CLIENT_ID:-}"
+  google_web_client_id="${GOOGLE_WEB_CLIENT_ID:-}"
+  google_client_pattern='^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$'
+  [[ "$google_ios_client_id" =~ $google_client_pattern ]] \
+    || fail 'GOOGLE_IOS_CLIENT_ID must be a valid Google OAuth iOS client ID for kg.alistore.client'
+  [[ "$google_web_client_id" =~ $google_client_pattern ]] \
+    || fail 'GOOGLE_WEB_CLIENT_ID must be a valid Google OAuth Web client ID'
+  expected_reversed_client_id="$(printf '%s\n' "$google_ios_client_id" | awk -F. '{for (i=NF; i>1; i--) printf "%s.", $i; print $1}')"
+  [[ "$google_ios_reversed_client_id" == "$expected_reversed_client_id" ]] \
+    || fail 'GOOGLE_IOS_REVERSED_CLIENT_ID must be the dot-reversed GOOGLE_IOS_CLIENT_ID'
+fi
+
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 
 if [[ "${IOS_SKIP_XCODEGEN:-}" != "true" ]]; then
@@ -112,6 +128,13 @@ for scheme in $requested_schemes; do
     DEVELOPMENT_TEAM="$team_id"
     ALISTORE_API_BASE_URL="$api_base"
   )
+  if [[ "$scheme" == "AliStoreClient" ]]; then
+    archive_args+=(
+      GOOGLE_IOS_CLIENT_ID="$google_ios_client_id"
+      GOOGLE_IOS_REVERSED_CLIENT_ID="$google_ios_reversed_client_id"
+      GOOGLE_WEB_CLIENT_ID="$google_web_client_id"
+    )
+  fi
   if [[ "${IOS_ALLOW_PROVISIONING_UPDATE:-}" == "true" ]]; then
     archive_args+=(-allowProvisioningUpdates)
   fi

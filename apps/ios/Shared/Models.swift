@@ -452,6 +452,29 @@ public struct AppleSocialLogin: Encodable, Sendable {
     }
 }
 
+/// Тело `POST auth/v2/social/google`.
+///
+/// Google Identity Services возвращает ID token отдельно от одноразового nonce.
+/// Сервер проверяет подпись/`aud` токена и требует точного совпадения nonce с
+/// claim токена, поэтому клиент передаёт исходную строку без хеширования или
+/// другого преобразования.
+public struct GoogleSocialLogin: Encodable, Sendable {
+    public let identityToken: String
+    public let nonce: String
+
+    public init(identityToken: String, nonce: String) {
+        self.identityToken = identityToken
+        self.nonce = nonce
+    }
+}
+
+/// Провайдер, чью неподтверждённую identity пользователь сейчас связывает с
+/// обязательным телефонным аккаунтом AliStore.
+public enum CustomerSocialProvider: String, Sendable, Equatable {
+    case apple
+    case google
+}
+
 public enum CustomerSocialAuthResult: Decodable, Sendable {
     case authenticated(CustomerAuthTokens)
     case enrollmentRequired(enrollmentToken: String, expiresIn: Int)

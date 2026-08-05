@@ -2,7 +2,7 @@ import AliStoreCore
 import Foundation
 import XCTest
 
-/// Контракт входа через Apple со стороны клиента.
+/// Контракт нативного социального входа со стороны клиента.
 ///
 /// Проверяем отправленный запрос, а не установленную сессию: под
 /// `CODE_SIGNING_ALLOWED=NO` Keychain недоступен. Ломается же здесь именно
@@ -153,6 +153,122 @@ final class CustomerSocialLoginTests: XCTestCase {
 
         XCTAssertEqual(SocialLoginMockURLProtocol.requestCount(for: "/api/auth/v2/social/apple"), 0)
         XCTAssertNotNil(store.errorMessage)
+    }
+
+    func testGoogleLoginPostsIdentityTokenAndRawNonceAndAuthenticates() async {
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/v2/social/google", status: 200, body: """
+        {"status":"authenticated","accessToken":"google-access","refreshToken":"google-refresh","tokenType":"Bearer","expiresIn":"15m"}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/me", status: 200, body: """
+        {"customerId":"google-customer","phone":"+996700123456","typ":"customer"}
+        """)
+        let store = makeStore()
+
+        await store.signInWithGoogle(identityToken: "google.id.token", nonce: "raw-google-nonce")
+
+        let request = SocialLoginMockURLProtocol.request(for: "/api/auth/v2/social/google")
+        XCTAssertEqual(request?.httpMethod, "POST")
+        let body = SocialLoginMockURLProtocol.jsonBody(for: "/api/auth/v2/social/google")
+        XCTAssertEqual(body?["identityToken"], "google.id.token")
+        XCTAssertEqual(body?["nonce"], "raw-google-nonce")
+        XCTAssertEqual(store.session?.customerId, "google-customer")
+        XCTAssertFalse(store.requiresSocialPhoneEnrollment)
+    }
+
+    func testUnknownGoogleIdentityCompletesCommonPhoneOtpEnrollment() async {
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/v2/social/google", status: 200, body: """
+        {"status":"enrollment_required","enrollmentToken":"google-enrollment-token-1234567890","expiresIn":600}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/otp/request", status: 201, body: """
+        {"challengeId":"google-phone-challenge","devCode":"123456"}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/v2/social/enrollment/complete", status: 200, body: """
+        {"status":"authenticated","accessToken":"google-new-access","refreshToken":"google-new-refresh","tokenType":"Bearer","expiresIn":"15m"}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/me", status: 200, body: """
+        {"customerId":"google-new-customer","phone":"+996700123456","typ":"customer"}
+        """)
+        let store = makeStore()
+
+        await store.signInWithGoogle(identityToken: "google-new-token", nonce: "raw-nonce")
+        XCTAssertEqual(store.socialEnrollmentProvider, .google)
+        XCTAssertTrue(store.requiresSocialPhoneEnrollment)
+        XCTAssertTrue(store.requiresGooglePhoneEnrollment)
+        XCTAssertFalse(store.requiresApplePhoneEnrollment)
+
+        let issued = await store.requestOTP(phone: "+996700123456")
+        XCTAssertTrue(issued)
+        await store.completeSocialEnrollment(phone: "+996700123456", code: "123456")
+
+        let body = SocialLoginMockURLProtocol.jsonBody(for: "/api/auth/v2/social/enrollment/complete")
+        XCTAssertEqual(body?["enrollmentToken"], "google-enrollment-token-1234567890")
+        XCTAssertEqual(body?["challengeId"], "google-phone-challenge")
+        XCTAssertEqual(store.session?.customerId, "google-new-customer")
+        XCTAssertNil(store.socialEnrollmentProvider)
+    }
+
+    func testGoogleEnrollmentRetryKeepsMemoryTokenAndCancelClearsIt() async {
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/v2/social/google", status: 200, body: """
+        {"status":"enrollment_required","enrollmentToken":"google-enrollment-token-1234567890","expiresIn":600}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/v2/social/enrollment/complete", status: 422, body: """
+        {"message":"Неверный код"}
+        """)
+        let store = makeStore()
+
+        await store.signInWithGoogle(identityToken: "google-token", nonce: "raw-nonce")
+        await store.completeSocialEnrollment(phone: "+996700123456", code: "000000")
+        XCTAssertEqual(store.socialEnrollmentProvider, .google)
+        XCTAssertNotNil(store.errorMessage)
+
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/v2/social/enrollment/complete", status: 200, body: """
+        {"status":"authenticated","accessToken":"retried-access","refreshToken":"retried-refresh","tokenType":"Bearer","expiresIn":"15m"}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/me", status: 200, body: """
+        {"customerId":"retry-customer","phone":"+996700123456","typ":"customer"}
+        """)
+        await store.completeSocialEnrollment(phone: "+996700123456", code: "123456")
+        XCTAssertEqual(store.session?.customerId, "retry-customer")
+
+        let cancelStore = makeStore()
+        await cancelStore.signInWithGoogle(identityToken: "google-token-2", nonce: "raw-nonce-2")
+        cancelStore.cancelSocialEnrollment()
+        XCTAssertNil(cancelStore.socialEnrollmentProvider)
+        await cancelStore.completeSocialEnrollment(phone: "+996700123456", code: "123456")
+        XCTAssertEqual(
+            SocialLoginMockURLProtocol.requestCount(for: "/api/auth/v2/social/enrollment/complete"),
+            2
+        )
+        XCTAssertNotNil(cancelStore.errorMessage)
+    }
+
+    func testGoogleEmptyTokenOrNonceDoesNotUseNetwork() async {
+        let store = makeStore()
+
+        await store.signInWithGoogle(identityToken: "", nonce: "raw-nonce")
+        await store.signInWithGoogle(identityToken: "google-token", nonce: "   ")
+
+        XCTAssertEqual(SocialLoginMockURLProtocol.requestCount(for: "/api/auth/v2/social/google"), 0)
+        XCTAssertNotNil(store.errorMessage)
+    }
+
+    func testStartingAnotherProviderReplacesEnrollmentState() async {
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/v2/social/apple", status: 200, body: """
+        {"status":"enrollment_required","enrollmentToken":"apple-enrollment-token-1234567890","expiresIn":600}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/v2/social/google", status: 200, body: """
+        {"status":"enrollment_required","enrollmentToken":"google-enrollment-token-1234567890","expiresIn":300}
+        """)
+        let store = makeStore()
+
+        await store.signInWithApple(identityToken: "apple-token", nonce: "apple-nonce", name: nil)
+        XCTAssertEqual(store.socialEnrollmentProvider, .apple)
+        await store.signInWithGoogle(identityToken: "google-token", nonce: "google-nonce")
+
+        XCTAssertEqual(store.socialEnrollmentProvider, .google)
+        XCTAssertTrue(store.requiresGooglePhoneEnrollment)
+        XCTAssertNil(store.appleEnrollmentExpiresAt)
+        XCTAssertNotNil(store.googleEnrollmentExpiresAt)
     }
 
     private func makeStore() -> CustomerAuthStore {

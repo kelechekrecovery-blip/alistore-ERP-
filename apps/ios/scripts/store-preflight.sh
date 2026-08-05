@@ -38,6 +38,7 @@ If --env-file is omitted and apps/ios/.env.production exists, that file is loade
 Use --strict-asc to verify the App Store Connect API key against Apple's API.
 Use --strict-signing to verify an Apple Distribution identity plus an App Store
 provisioning profile for each of the four bundle ids.
+Google OAuth configuration is required only for AliStoreClient.
 USAGE
       exit 0
       ;;
@@ -91,6 +92,9 @@ team_id="${DEVELOPMENT_TEAM:-${APPLE_DEVELOPMENT_TEAM:-}}"
 asc_key_path="${ASC_API_KEY_PATH:-}"
 asc_key_id="${ASC_KEY_ID:-}"
 issuer_id="${ASC_ISSUER_ID:-}"
+google_ios_client_id="${GOOGLE_IOS_CLIENT_ID:-}"
+google_ios_reversed_client_id="${GOOGLE_IOS_REVERSED_CLIENT_ID:-}"
+google_web_client_id="${GOOGLE_WEB_CLIENT_ID:-}"
 
 [[ -n "$api_base" ]] || fail 'ALISTORE_API_BASE_URL is required'
 [[ "$api_base" == https://* ]] || fail 'ALISTORE_API_BASE_URL must use HTTPS'
@@ -99,6 +103,15 @@ case "$api_base" in
     fail 'ALISTORE_API_BASE_URL points to a local, staging, sandbox, or development endpoint'
     ;;
 esac
+
+google_client_pattern='^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$'
+[[ "$google_ios_client_id" =~ $google_client_pattern ]] \
+  || fail 'GOOGLE_IOS_CLIENT_ID must be a valid Google OAuth iOS client ID for kg.alistore.client'
+[[ "$google_web_client_id" =~ $google_client_pattern ]] \
+  || fail 'GOOGLE_WEB_CLIENT_ID must be a valid Google OAuth Web client ID'
+expected_reversed_client_id="$(printf '%s\n' "$google_ios_client_id" | awk -F. '{for (i=NF; i>1; i--) printf "%s.", $i; print $1}')"
+[[ "$google_ios_reversed_client_id" == "$expected_reversed_client_id" ]] \
+  || fail 'GOOGLE_IOS_REVERSED_CLIENT_ID must be the dot-reversed GOOGLE_IOS_CLIENT_ID'
 
 if [[ "$strict_asc" == "1" ]]; then
   [[ -n "$asc_key_path" ]] || fail 'ASC_API_KEY_PATH is required for App Store Connect submission'
@@ -201,7 +214,10 @@ for entry in \
   settings="$(DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}" \
     xcodebuild -project "$ios_root/AliStoreNative.xcodeproj" \
     -scheme "$scheme" -configuration Release -showBuildSettings \
-    DEVELOPMENT_TEAM="$team_id" ALISTORE_API_BASE_URL="$api_base" 2>/dev/null)" \
+    DEVELOPMENT_TEAM="$team_id" ALISTORE_API_BASE_URL="$api_base" \
+    GOOGLE_IOS_CLIENT_ID="$google_ios_client_id" \
+    GOOGLE_IOS_REVERSED_CLIENT_ID="$google_ios_reversed_client_id" \
+    GOOGLE_WEB_CLIENT_ID="$google_web_client_id" 2>/dev/null)" \
     || fail "xcodebuild could not resolve Release settings for $scheme"
 
   resolved_api="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*API_BASE_URL$/ {print $2; exit}')"
@@ -218,6 +234,18 @@ for entry in \
   resolved_build_number="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*CURRENT_PROJECT_VERSION$/ {print $2; exit}')"
   [[ "$resolved_build_number" == "$expected_build_number" ]] \
     || fail "$scheme: Release CURRENT_PROJECT_VERSION must resolve to $expected_build_number"
+
+  if [[ "$scheme" == "AliStoreClient" ]]; then
+    resolved_google_ios_client_id="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*GOOGLE_IOS_CLIENT_ID$/ {print $2; exit}')"
+    resolved_google_web_client_id="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*GOOGLE_WEB_CLIENT_ID$/ {print $2; exit}')"
+    resolved_google_reversed_client_id="$(printf '%s\n' "$settings" | awk -F' = ' '$1 ~ /^[[:space:]]*GOOGLE_IOS_REVERSED_CLIENT_ID$/ {print $2; exit}')"
+    [[ "$resolved_google_ios_client_id" == "$google_ios_client_id" ]] \
+      || fail 'AliStoreClient: GIDClientID did not resolve from GOOGLE_IOS_CLIENT_ID'
+    [[ "$resolved_google_web_client_id" == "$google_web_client_id" ]] \
+      || fail 'AliStoreClient: GIDServerClientID did not resolve from GOOGLE_WEB_CLIENT_ID'
+    [[ "$resolved_google_reversed_client_id" == "$google_ios_reversed_client_id" ]] \
+      || fail 'AliStoreClient: Google callback URL scheme did not resolve from GOOGLE_IOS_REVERSED_CLIENT_ID'
+  fi
 
   printf 'store-preflight: %s — HTTPS API, bundle id %s, AppIcon, production APNs, %s (%s)\n' \
     "$scheme" "$resolved_bundle_id" "$resolved_marketing_version" "$resolved_build_number"

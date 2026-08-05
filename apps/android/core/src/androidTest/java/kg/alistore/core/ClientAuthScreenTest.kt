@@ -1,6 +1,9 @@
 package kg.alistore.core
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -32,7 +35,7 @@ class ClientAuthScreenTest {
     val manager = AuthSessionManager(UiAuthGateway(), UiSessionStore())
     compose.setContent {
       MaterialTheme {
-        ClientAccount(AuthState.Guest, manager, {}, 0, 0)
+        ClientAccount(AuthState.Guest, manager, {}, 0, 0, {})
       }
     }
 
@@ -52,7 +55,7 @@ class ClientAuthScreenTest {
     var signedIn: AuthState? = null
     compose.setContent {
       MaterialTheme {
-        ClientAccount(AuthState.Guest, manager, { signedIn = it }, 0, 0)
+        ClientAccount(AuthState.Guest, manager, { signedIn = it }, 0, 0, {})
       }
     }
 
@@ -68,6 +71,58 @@ class ClientAuthScreenTest {
 
     assertEquals(listOf("user@example.com"), api.emailRequests)
     assertEquals(listOf("user@example.com" to "123456"), api.emailVerifications)
+  }
+
+  @Test
+  fun newGoogleCustomerConfirmsPhoneWithoutRealAccountPicker() {
+    val api = UiAuthGateway().apply {
+      googleResult = SocialAuthResult.EnrollmentRequired("memory-ticket", 600)
+    }
+    val manager = AuthSessionManager(api, UiSessionStore())
+    var state: AuthState by mutableStateOf(AuthState.Guest)
+    val provider = object : GoogleSignInProvider {
+      override suspend fun signIn() = GoogleIdentityCredential("google-token", "raw-nonce")
+      override suspend fun clearCredentialState() = Unit
+    }
+    compose.setContent {
+      MaterialTheme {
+        ClientAccount(state, manager, { state = it }, 0, 0, {}, googleSignInProvider = provider)
+      }
+    }
+
+    compose.onNodeWithTag("auth-google").assertIsDisplayed().performClick()
+    compose.waitUntil(5_000) { state is AuthState.SocialEnrollment }
+    compose.onNodeWithTag("social-enrollment-phone").performTextReplacement("+996700123456")
+    compose.onNodeWithTag("social-enrollment-action").assertIsEnabled().performClick()
+    compose.waitUntil(5_000) {
+      runCatching { compose.onNodeWithTag("social-enrollment-code").fetchSemanticsNode() }.isSuccess
+    }
+    compose.onNodeWithTag("social-enrollment-resend").assertIsNotEnabled()
+    compose.onNodeWithTag("social-enrollment-change-phone").performClick()
+    compose.onNodeWithTag("social-enrollment-phone").performTextReplacement("+996700123456")
+    compose.onNodeWithTag("social-enrollment-action").performClick()
+    compose.waitUntil(5_000) {
+      runCatching { compose.onNodeWithTag("social-enrollment-code").fetchSemanticsNode() }.isSuccess
+    }
+    compose.onNodeWithTag("social-enrollment-action").performClick()
+    compose.waitUntil(5_000) { state is AuthState.SignedIn }
+
+    assertEquals("google-token" to "raw-nonce", api.googleLoginCall)
+    assertEquals(listOf("memory-ticket"), api.completedEnrollmentTickets)
+  }
+
+  @Test
+  fun expiredGoogleEnrollmentReturnsToFreshSignIn() {
+    val manager = AuthSessionManager(UiAuthGateway(), UiSessionStore())
+    var state: AuthState by mutableStateOf(AuthState.SocialEnrollment(SocialProvider.GOOGLE, 0L))
+    compose.setContent {
+      MaterialTheme { ClientAccount(state, manager, { state = it }, 0, 0, {}) }
+    }
+
+    compose.onNodeWithText("Срок подтверждения истёк").assertIsDisplayed()
+    compose.onNodeWithTag("social-enrollment-cancel").assertTextContains("Вернуться ко входу").performClick()
+
+    compose.waitUntil(5_000) { state == AuthState.Guest }
   }
 
   @Test
@@ -97,14 +152,17 @@ class ClientAuthScreenTest {
   fun signedInAccountShowsIdentityAndLogout() {
     val tokens = AuthTokens("access", "refresh")
     val state = AuthState.SignedIn(AuthUser("customer-1", "+996700123456", "customer"), tokens)
+    var logoutRequest: AuthState.SignedIn? = null
     compose.setContent {
       MaterialTheme {
-        ClientAccount(state, AuthSessionManager(UiAuthGateway(), UiSessionStore(tokens)), {}, 2, 1)
+        ClientAccount(state, AuthSessionManager(UiAuthGateway(), UiSessionStore(tokens)), {}, 2, 1, { logoutRequest = it })
       }
     }
 
     compose.onNodeWithTag("account-title").assertIsDisplayed()
-    compose.onNodeWithTag("auth-logout").assertIsDisplayed().assertTextContains("Выйти")
+    compose.onNodeWithTag("auth-logout").assertIsDisplayed().assertTextContains("Выйти").performClick()
+    compose.waitUntil(5_000) { logoutRequest != null }
+    assertEquals(state, logoutRequest)
   }
 
   @Test
@@ -362,6 +420,9 @@ private class UiAuthGateway : AuthGateway {
   val emailVerifications = mutableListOf<Pair<String, String>>()
   val emailAttachRequests = mutableListOf<String>()
   val emailAttachConfirms = mutableListOf<Pair<String, String>>()
+  var googleResult: SocialAuthResult = SocialAuthResult.Authenticated(AuthTokens("access", "refresh"))
+  var googleLoginCall: Pair<String, String>? = null
+  val completedEnrollmentTickets = mutableListOf<String>()
 
   override suspend fun requestOtp(phone: String) = OtpChallenge("123456")
   override suspend fun verifyOtp(phone: String, code: String, challengeId: String?) =
@@ -394,6 +455,19 @@ private class UiAuthGateway : AuthGateway {
   override suspend fun refresh(refreshToken: String) = AuthTokens("access", "refresh")
   override suspend fun me(accessToken: String) = AuthUser("customer-1", "+996700123456", "customer")
   override suspend fun logout(refreshToken: String) = Unit
+  override suspend fun googleLogin(identityToken: String, nonce: String): SocialAuthResult {
+    googleLoginCall = identityToken to nonce
+    return googleResult
+  }
+  override suspend fun completeSocialEnrollment(
+    enrollmentToken: String,
+    phone: String,
+    code: String,
+    challengeId: String?,
+  ): AuthTokens {
+    completedEnrollmentTickets += enrollmentToken
+    return AuthTokens("access", "refresh")
+  }
 }
 
 private class UiOrdersGateway(private val result: List<CustomerOrder>) : CustomerOrdersGateway {

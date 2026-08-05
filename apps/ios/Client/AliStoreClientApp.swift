@@ -2,7 +2,10 @@
 // swiftlint:disable file_length type_body_length function_body_length line_length
 import AliStoreCore
 import AuthenticationServices
+import GoogleSignIn
+import GoogleSignInSwift
 import PhotosUI
+import Security
 import SwiftData
 import SwiftUI
 import UIKit
@@ -287,6 +290,37 @@ private enum LoginChannel: String, CaseIterable {
     var title: String { self == .phone ? "Телефон" : "Почта" }
 }
 
+private enum GoogleSignInNonce {
+    /// 256 бит из SecRandomCopyBytes, представленные hex без modulo bias.
+    static func random() -> String {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        let status = bytes.withUnsafeMutableBytes { buffer -> OSStatus in
+            guard let baseAddress = buffer.baseAddress else { return errSecParam }
+            return SecRandomCopyBytes(kSecRandomDefault, buffer.count, baseAddress)
+        }
+        guard status == errSecSuccess else {
+            fatalError("SecRandomCopyBytes failed with OSStatus \(status)")
+        }
+        return bytes.map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+@MainActor
+private enum GoogleCustomerSession {
+    /// Удаляет только локальную Google-сессию. OAuth grant остаётся связанным:
+    /// отзыв доступа (`disconnect`) относится к unlink/delete, а не к logout.
+    static func signOut() {
+        GIDSignIn.sharedInstance.signOut()
+    }
+
+    /// Google Keychain очищается синхронно до первого suspension point.
+    /// Поэтому сетевой timeout customer logout не может оставить SDK-сессию.
+    static func logout(_ auth: CustomerAuthStore) async {
+        signOut()
+        await auth.logout()
+    }
+}
+
 private struct ClientLoginView: View {
     @Bindable var auth: CustomerAuthStore
     let onGuest: () -> Void
@@ -312,7 +346,7 @@ private struct ClientLoginView: View {
                         .frame(width: 60, height: 60)
                         .background(ClientTheme.coral, in: RoundedRectangle(cornerRadius: 17))
                         .padding(.bottom, 24)
-                    Text(auth.requiresApplePhoneEnrollment ? "Подтвердите номер телефона" : "Войти или создать аккаунт")
+                    Text(auth.requiresSocialPhoneEnrollment ? "Подтвердите номер телефона" : "Войти или создать аккаунт")
                         .font(ClientTheme.display(30, weight: .black))
                         .foregroundStyle(.white)
                     Text(subtitle)
@@ -320,11 +354,11 @@ private struct ClientLoginView: View {
                         .foregroundStyle(ClientTheme.muted)
                         .lineSpacing(4)
                         .padding(.top, 10)
-                    if !auth.requiresApplePhoneEnrollment {
+                    if !auth.requiresSocialPhoneEnrollment {
                         channelSwitcher
                             .padding(.top, 22)
                     } else {
-                        Text("Apple подтвердил вашу личность. Телефон нужен как основной номер аккаунта для заказов, доставки и восстановления доступа.")
+                        Text("\(socialProviderName) подтвердил вашу личность. Телефон нужен как основной номер аккаунта для заказов, доставки и восстановления доступа.")
                             .font(ClientTheme.body(13))
                             .foregroundStyle(ClientTheme.muted)
                             .lineSpacing(3)
@@ -378,9 +412,9 @@ private struct ClientLoginView: View {
                     }
                     Button {
                         Task {
-                            if auth.requiresApplePhoneEnrollment {
+                            if auth.requiresSocialPhoneEnrollment {
                                 if requested {
-                                    await auth.completeAppleEnrollment(
+                                    await auth.completeSocialEnrollment(
                                         phone: normalizedPhone,
                                         code: code.filter(\.isNumber)
                                     )
@@ -451,18 +485,15 @@ private struct ClientLoginView: View {
                     // Apple ниже кода, а не вместо него: телефон остаётся первичным
                     // идентификатором, без него не работают доставка и COD. Apple —
                     // быстрый вход для тех, у кого аккаунт уже связан.
-                    if auth.requiresApplePhoneEnrollment {
-                        Button("Отменить регистрацию через Apple") {
-                            auth.cancelAppleEnrollment()
-                            requested = false
-                            code = ""
-                            resendAvailableAt = nil
+                    if auth.requiresSocialPhoneEnrollment {
+                        Button("Отменить регистрацию через \(socialProviderName)") {
+                            cancelSocialEnrollment()
                         }
                         .font(ClientTheme.body(13))
                         .foregroundStyle(ClientTheme.muted)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 14)
-                        .accessibilityIdentifier("client-apple-enrollment-cancel")
+                        .accessibilityIdentifier("client-social-enrollment-cancel")
                     } else {
                         SignInWithAppleButton(.signIn) { request in
                             let raw = AppleSignInNonce.random()
@@ -478,10 +509,23 @@ private struct ClientLoginView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 13))
                         .padding(.top, 12)
                         .accessibilityIdentifier("client-apple-signin")
+
+                        if googleSignInConfigured {
+                            GoogleSignInButton(
+                                scheme: .dark,
+                                style: .wide,
+                                state: auth.isLoading ? .disabled : .normal,
+                                action: startGoogleSignIn
+                            )
+                            .frame(height: 50)
+                            .disabled(auth.isLoading)
+                            .padding(.top, 12)
+                            .accessibilityIdentifier("client-google-signin")
+                        }
                     }
 
                     Button("Продолжить как гость →") {
-                        auth.cancelAppleEnrollment()
+                        cancelSocialEnrollment()
                         onGuest()
                     }
                         .font(ClientTheme.body(13))
@@ -544,16 +588,95 @@ private struct ClientLoginView: View {
                 nonce: AppleSignInNonce.hashed(appleRawNonce),
                 name: fullName
             )
-            if auth.requiresApplePhoneEnrollment {
-                channel = .phone
-                requested = false
-                code = ""
-                resendAvailableAt = nil
-            }
+            if auth.requiresSocialPhoneEnrollment { resetSocialEnrollmentEntry() }
         case .failure(let error):
             // Отмену пользователем не показываем как ошибку: он просто передумал.
             if (error as? ASAuthorizationError)?.code == .canceled { return }
             auth.reportSignInFailure(error.localizedDescription)
+        }
+    }
+
+    private func startGoogleSignIn() {
+        guard googleSignInConfigured else {
+            auth.reportSignInFailure("Вход через Google пока не настроен")
+            return
+        }
+        guard let presentingViewController = googlePresentingViewController else {
+            auth.reportSignInFailure("Не удалось открыть вход через Google. Попробуйте ещё раз.")
+            return
+        }
+
+        // Google 9.2 помещает переданный nonce в ID token без преобразования.
+        // На сервер уходит та же исходная одноразовая строка — не SHA-256.
+        let rawNonce = GoogleSignInNonce.random()
+        GIDSignIn.sharedInstance.signIn(
+            withPresenting: presentingViewController,
+            hint: nil,
+            additionalScopes: nil,
+            nonce: rawNonce
+        ) { result, error in
+            // GIDSignInResult/ NSError не объявлены Sendable. Извлекаем только
+            // неизменяемые значения до перехода на MainActor.
+            let identityToken = result?.user.idToken?.tokenString
+            let nsError = error as NSError?
+            let errorDomain = nsError?.domain
+            let errorCode = nsError?.code
+            let errorMessage = nsError?.localizedDescription
+            Task { @MainActor in
+                if let errorMessage {
+                    // kGIDSignInErrorCodeCanceled из публичного Google SDK.
+                    if errorDomain == kGIDSignInErrorDomain && errorCode == -5 { return }
+                    auth.reportSignInFailure(errorMessage)
+                    return
+                }
+                guard let identityToken, !identityToken.isEmpty else {
+                    auth.reportSignInFailure("Google не вернул токен входа")
+                    return
+                }
+                await auth.signInWithGoogle(identityToken: identityToken, nonce: rawNonce)
+                if auth.requiresSocialPhoneEnrollment { resetSocialEnrollmentEntry() }
+            }
+        }
+    }
+
+    private func resetSocialEnrollmentEntry() {
+        channel = .phone
+        requested = false
+        code = ""
+        resendAvailableAt = nil
+    }
+
+    private func cancelSocialEnrollment() {
+        let cancelsGoogle = auth.socialEnrollmentProvider == .google
+        auth.cancelSocialEnrollment()
+        if cancelsGoogle { GoogleCustomerSession.signOut() }
+        resetSocialEnrollmentEntry()
+    }
+
+    private var googlePresentingViewController: UIViewController? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+        guard var controller = scene?.windows.first(where: \.isKeyWindow)?.rootViewController else {
+            return nil
+        }
+        while let presented = controller.presentedViewController { controller = presented }
+        return controller
+    }
+
+    private var googleSignInConfigured: Bool {
+        let iosClientID = Bundle.main.object(forInfoDictionaryKey: "GIDClientID") as? String
+        let serverClientID = Bundle.main.object(forInfoDictionaryKey: "GIDServerClientID") as? String
+        return [iosClientID, serverClientID].allSatisfy {
+            $0?.range(of: #"^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$"#,
+                     options: .regularExpression) != nil
+        }
+    }
+
+    private var socialProviderName: String {
+        switch auth.socialEnrollmentProvider {
+        case .apple: return "Apple"
+        case .google: return "Google"
+        case nil: return "Провайдер входа"
         }
     }
 
@@ -589,7 +712,7 @@ private struct ClientLoginView: View {
     }
 
     private var subtitle: String {
-        if auth.requiresApplePhoneEnrollment {
+        if auth.requiresSocialPhoneEnrollment {
             return requested
                 ? "Введите код из SMS, чтобы завершить создание или привязку аккаунта."
                 : "Введите основной номер телефона. Мы отправим код подтверждения."
@@ -600,7 +723,7 @@ private struct ClientLoginView: View {
     }
 
     private var actionTitle: String {
-        if requested { return auth.requiresApplePhoneEnrollment ? "Завершить регистрацию" : "Войти" }
+        if requested { return auth.requiresSocialPhoneEnrollment ? "Завершить регистрацию" : "Войти" }
         return channel == .phone ? "Получить код по SMS" : "Получить код на почту"
     }
 
@@ -1285,7 +1408,18 @@ private struct ClientRootView: View {
                                 onOpenSupport: { overlay = .support }
                             )
                         case .account:
-                            AccountView(environment: environment, auth: auth, pushStatus: pushStatus, orderRefreshRevision: orderRefreshRevision, products: products, cart: $cart, onEnablePush: enablePush, onLogout: { guestMode = false })
+                            AccountView(
+                                environment: environment,
+                                auth: auth,
+                                pushStatus: pushStatus,
+                                orderRefreshRevision: orderRefreshRevision,
+                                products: products,
+                                cart: $cart,
+                                onEnablePush: enablePush,
+                                onLogout: {
+                                    guestMode = false
+                                }
+                            )
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1303,7 +1437,18 @@ private struct ClientRootView: View {
 #endif
         .overlay {
             if auth.requiresQuickUnlock, let session = auth.session {
-                QuickUnlockView(title: "AliStore", username: session.phone, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: { Task { await auth.logout(); guestMode = false } })
+                QuickUnlockView(
+                    title: "AliStore",
+                    username: session.phone,
+                    pinService: auth.quickUnlockService,
+                    onUnlocked: auth.unlock,
+                    onLogout: {
+                        Task {
+                            await GoogleCustomerSession.logout(auth)
+                            guestMode = false
+                        }
+                    }
+                )
             }
         }
         .fullScreenCover(item: $overlay) { screen in
@@ -1340,6 +1485,9 @@ private struct ClientRootView: View {
             _ = await (restore, catalog)
         }
         .onOpenURL { url in
+            // Google SDK должен первым получить свой OAuth callback. Платёжные
+            // alistore:// и universal links обрабатываются AliStore ниже.
+            if GIDSignIn.sharedInstance.handle(url) { return }
             let customScheme = url.scheme == "alistore" && url.host == "payment-return"
             let httpsLink = url.scheme == "https" &&
                 (url.host == "ali.kg" || url.host == "www.ali.kg") &&
@@ -4571,7 +4719,7 @@ private struct AccountView: View {
 
         Button {
             Task {
-                await auth.logout()
+                await GoogleCustomerSession.logout(auth)
                 onLogout()
             }
         } label: {
@@ -4618,11 +4766,14 @@ private struct AccountView: View {
     @MainActor
     private func deleteAccount() async {
         guard let token = auth.session?.accessToken else { return }
+        // Удаление начинается с сети. Очищаем Google раньше DELETE, чтобы
+        // timeout/termination не оставили стороннюю сессию на устройстве.
+        GoogleCustomerSession.signOut()
         isDeletingAccount = true
         accountDataError = nil
         do {
             let _: DeleteAccountResponse = try await APIClient(baseURL: environment.apiBaseURL).delete("customers/me", token: token)
-            await auth.logout()
+            await GoogleCustomerSession.logout(auth)
             onLogout()
         } catch is CancellationError {
             isDeletingAccount = false

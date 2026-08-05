@@ -4,6 +4,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -131,6 +132,79 @@ class AuthSessionManagerTest {
   }
 
   @Test
+  fun existingGoogleIdentitySignsInAndPersistsSession() = runTest {
+    val store = FakeStore()
+    val api = FakeAuthGateway().apply {
+      googleResult = SocialAuthResult.Authenticated(AuthTokens("google-access", "google-refresh"))
+    }
+
+    val state = AuthSessionManager(api, store).loginWithGoogle(
+      GoogleIdentityCredential("google-id-token", "raw-nonce"),
+    )
+
+    assertTrue(state is AuthState.SignedIn)
+    assertEquals("google-id-token" to "raw-nonce", api.googleLoginCall)
+    assertEquals(AuthTokens("google-access", "google-refresh"), store.tokens)
+  }
+
+  @Test
+  fun newGoogleIdentityCompletesPhoneEnrollmentWithMemoryOnlyTicket() = runTest {
+    val store = FakeStore()
+    val api = FakeAuthGateway().apply {
+      googleResult = SocialAuthResult.EnrollmentRequired("memory-ticket", 600)
+      socialEnrollmentTokens = AuthTokens("enrolled-access", "enrolled-refresh")
+    }
+    val manager = AuthSessionManager(api, store)
+
+    val enrollment = manager.loginWithGoogle(GoogleIdentityCredential("google-id-token", "raw-nonce"))
+    assertTrue(enrollment is AuthState.SocialEnrollment)
+    assertEquals(SocialProvider.GOOGLE, (enrollment as AuthState.SocialEnrollment).provider)
+    assertNull(store.tokens)
+
+    manager.requestSocialEnrollmentOtp(" +996 700-12-34-56 ")
+    val signedIn = manager.completeSocialEnrollment("+996700123456", " 123456 ")
+
+    assertTrue(signedIn is AuthState.SignedIn)
+    assertEquals(
+      listOf(SocialEnrollmentCall("memory-ticket", "+996700123456", "123456", "phone-challenge")),
+      api.socialEnrollmentCalls,
+    )
+    assertEquals(AuthTokens("enrolled-access", "enrolled-refresh"), store.tokens)
+  }
+
+  @Test
+  fun cancellingGoogleEnrollmentDestroysTicket() = runTest {
+    val api = FakeAuthGateway().apply {
+      googleResult = SocialAuthResult.EnrollmentRequired("memory-ticket", 600)
+    }
+    val manager = AuthSessionManager(api, FakeStore())
+    manager.loginWithGoogle(GoogleIdentityCredential("token", "nonce"))
+
+    assertEquals(AuthState.Guest, manager.cancelSocialEnrollment())
+    val result = manager.completeSocialEnrollment("+996700123456", "123456")
+
+    assertTrue(result is AuthState.Failed)
+    assertTrue(api.socialEnrollmentCalls.isEmpty())
+  }
+
+  @Test
+  fun expiredGoogleEnrollmentDestroysMemoryTicket() = runTest {
+    var clock = 1_000L
+    val api = FakeAuthGateway().apply {
+      googleResult = SocialAuthResult.EnrollmentRequired("memory-ticket", 10)
+    }
+    val manager = AuthSessionManager(api, FakeStore(), nowMillis = { clock })
+    val state = manager.loginWithGoogle(GoogleIdentityCredential("token", "nonce")) as AuthState.SocialEnrollment
+    assertEquals(11_000L, state.expiresAtMillis)
+
+    clock = 11_000L
+    val error = runCatching { manager.requestSocialEnrollmentOtp("+996700123456") }.exceptionOrNull()
+
+    assertTrue(error?.message.orEmpty().contains("истёк"))
+    assertTrue(api.socialEnrollmentCalls.isEmpty())
+  }
+
+  @Test
   fun logoutClearsLocalSessionEvenWhenServerUnavailable() = runTest {
     val store = FakeStore(AuthTokens("access", "refresh"))
     val api = FakeAuthGateway().apply { logoutFailure = ApiException(503, "offline") }
@@ -142,6 +216,33 @@ class AuthSessionManagerTest {
     assertEquals(AuthState.Guest, state)
     assertNull(store.tokens)
     assertEquals(listOf("refresh"), api.logoutCalls)
+  }
+
+  @Test
+  fun logoutAlsoClearsGoogleCredentialState() = runTest {
+    val tokens = AuthTokens("access", "refresh")
+    val provider = FakeGoogleSignInProvider()
+    val manager = AuthSessionManager(FakeAuthGateway(), FakeStore(tokens), provider)
+    val signedIn = AuthState.SignedIn(AuthUser("customer-1", "+996700123456", "customer"), tokens)
+
+    assertEquals(AuthState.Guest, manager.logout(signedIn))
+
+    assertEquals(1, provider.clearCalls)
+  }
+
+  @Test
+  fun logoutCancellationStillClearsCredentialsAndIsRethrown() = runTest {
+    val tokens = AuthTokens("access", "refresh")
+    val api = FakeAuthGateway().apply { logoutFailure = CancellationException("cancelled") }
+    val provider = FakeGoogleSignInProvider()
+    val manager = AuthSessionManager(api, FakeStore(tokens), provider)
+    val signedIn = AuthState.SignedIn(AuthUser("customer-1", "+996700123456", "customer"), tokens)
+
+    assertEquals(AuthState.Guest, manager.beginLogout())
+    val cancellation = runCatching { manager.finishLogout(signedIn) }.exceptionOrNull()
+
+    assertTrue(cancellation is CancellationException)
+    assertEquals(1, provider.clearCalls)
   }
 
   @Test
@@ -302,6 +403,10 @@ private class FakeAuthGateway : AuthGateway {
   val meStarted = CompletableDeferred<Unit>()
   var logoutGate: CompletableDeferred<Unit>? = null
   val logoutStarted = CompletableDeferred<Unit>()
+  var googleResult: SocialAuthResult = SocialAuthResult.Authenticated(verifiedTokens)
+  var googleLoginCall: Pair<String, String>? = null
+  var socialEnrollmentTokens = verifiedTokens
+  val socialEnrollmentCalls = mutableListOf<SocialEnrollmentCall>()
 
   override suspend fun requestOtp(phone: String): OtpChallenge {
     requestedPhone = phone
@@ -360,4 +465,32 @@ private class FakeAuthGateway : AuthGateway {
     logoutGate?.await()
     logoutFailure?.let { throw it }
   }
+
+  override suspend fun googleLogin(identityToken: String, nonce: String): SocialAuthResult {
+    googleLoginCall = identityToken to nonce
+    return googleResult
+  }
+
+  override suspend fun completeSocialEnrollment(
+    enrollmentToken: String,
+    phone: String,
+    code: String,
+    challengeId: String?,
+  ): AuthTokens {
+    socialEnrollmentCalls += SocialEnrollmentCall(enrollmentToken, phone, code, challengeId)
+    return socialEnrollmentTokens
+  }
+}
+
+private data class SocialEnrollmentCall(
+  val enrollmentToken: String,
+  val phone: String,
+  val code: String,
+  val challengeId: String?,
+)
+
+private class FakeGoogleSignInProvider : GoogleSignInProvider {
+  var clearCalls = 0
+  override suspend fun signIn() = GoogleIdentityCredential("token", "nonce")
+  override suspend fun clearCredentialState() { clearCalls += 1 }
 }

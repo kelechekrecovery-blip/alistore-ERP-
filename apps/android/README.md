@@ -49,6 +49,7 @@ variable of the same name. Nothing is stored in the repository.
 | `ALISTORE_KEY_ALIAS` | Key alias inside the keystore |
 | `ALISTORE_KEY_PASSWORD` | Key password |
 | `ALISTORE_VERSION_CODE` | Optional shared version code, default `1` |
+| `GOOGLE_WEB_CLIENT_ID` | Public OAuth 2.0 Web client ID used by native Google Sign-In (`:app` release only) |
 
 If any of them is missing, a release task fails during configuration with an explicit
 message and no artifact is produced. Debug tasks are unaffected and keep working
@@ -102,10 +103,15 @@ release without one.
 Still owner-owned and outstanding for the store release: an encrypted offline
 backup of the generated upload keystore and Play Console app-signing enrollment.
 
-The Client authenticates through phone OTP, stores the access/refresh pair encrypted
+The Client authenticates through phone OTP or native Google Sign-In, stores the access/refresh pair encrypted
 with Android Keystore, refreshes an expired access token during process restore, and
 revokes the refresh session on logout. Dev OTP autofill appears only when the API
 explicitly returns `devCode`; production builds rely on the configured SMS provider.
+Google Sign-In uses Credential Manager with a fresh 32-byte raw nonce. Existing linked
+identities receive a session; a new identity must complete the same phone OTP enrollment
+before any token is persisted. `GOOGLE_WEB_CLIENT_ID` is public and is compiled into
+`BuildConfig`; the enrollment ticket stays memory-only and logout clears Credential
+Manager state.
 
 The Client cart enforces catalog stock caps and submits pickup/courier checkout through
 the customer JWT with a stable idempotency key. Prices, availability and the resulting
