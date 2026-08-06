@@ -24,6 +24,14 @@ export interface BusinessSession {
 @Injectable()
 export class BusinessAuthService {
   private static readonly MIN_PASSWORD = 10;
+  /**
+   * Хэш заведомо недостижимого пароля — для выравнивания времени ответа.
+   *
+   * Значение постоянное: пересчитывать его на каждый вход значило бы платить
+   * стоимость argon2 дважды там, где логин существует.
+   */
+  private static readonly DUMMY_HASH =
+    '$argon2id$v=19$m=65536,t=3,p=4$c2FtZS10aW1pbmctcGFkZGluZw$3sPXBLmOYAaLNPDPHKcTBiUZLIvfB1IbCwzhSCa3M1o';
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -77,8 +85,17 @@ export class BusinessAuthService {
       where: { username: username.trim().toLowerCase() },
       include: { seller: { select: { id: true, name: true, active: true } } },
     });
-    if (!user || !user.active || !user.seller.active) throw denied;
-    if (!(await argon2.verify(user.passwordHash, password))) throw denied;
+
+    // Хэш проверяем ВСЕГДА, даже когда логина нет.
+    //
+    // `argon2` намеренно медленный, и раньше он считался только для
+    // существующего логина: несуществующий отвечал сразу после индексированного
+    // поиска. По задержке было видно, какие магазины подключены, — форма входа
+    // работала справочником. Сравнение с фиктивным хэшем выравнивает время;
+    // текст отказа и так один на все причины.
+    const hash = user?.passwordHash ?? BusinessAuthService.DUMMY_HASH;
+    const passwordOk = await argon2.verify(hash, password).catch(() => false);
+    if (!user || !user.active || !user.seller.active || !passwordOk) throw denied;
     return {
       typ: 'seller',
       userId: user.id,

@@ -37,6 +37,37 @@ export interface SettingView extends SettingDefinition {
 
 @Injectable()
 export class SettingsService {
+  /**
+   * Кэш прочитанных значений.
+   *
+   * Каталог читает 17 ключей на КАЖДЫЙ запрос — два похода в базу там, где
+   * значения меняются раз в месяц. Инвалидация явная, в `set()`: владелец
+   * поменял наценку и тут же видит её на витрине, без ожидания TTL.
+   *
+   * TTL — только подстраховка на случай, если значение изменят мимо `set()`
+   * (миграцией, вручную в базе). Он не основной механизм.
+   *
+   * Безопасность проверена отдельно: транзакционный путь заказа читает
+   * `loyalty.earn_rate_bps` своим запросом в момент проведения, не отсюда, —
+   * начисление не может разойтись с тем, что показано на витрине по кэшу.
+   */
+  private static readonly CACHE_TTL_MS = 30_000;
+  private cache = new Map<string, { value: number | string; expiresAt: number }>();
+
+  private cached(key: string): number | string | undefined {
+    const hit = this.cache.get(key);
+    if (!hit) return undefined;
+    if (hit.expiresAt <= Date.now()) {
+      this.cache.delete(key);
+      return undefined;
+    }
+    return hit.value;
+  }
+
+  private remember(key: string, value: number | string): void {
+    this.cache.set(key, { value, expiresAt: Date.now() + SettingsService.CACHE_TTL_MS });
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -55,10 +86,18 @@ export class SettingsService {
     if (isTextSetting(definition)) {
       throw new ValidationError('invalid_setting_value', `${definition.label}: читайте через text()`);
     }
+    const hit = this.cached(key);
+    if (typeof hit === 'number') return hit;
     const row = await this.prisma.setting.findUnique({ where: { key } });
-    if (!row) return Number(definition.fallback);
+    if (!row) {
+      const fallback = Number(definition.fallback);
+      this.remember(key, fallback);
+      return fallback;
+    }
     try {
-      return parseSettingValue(definition, row.value);
+      const parsed = parseSettingValue(definition, row.value);
+      this.remember(key, parsed);
+      return parsed;
     } catch {
       console.warn(`[settings] значение ключа ${key} отброшено как невалидное, действует дефолт`);
       return Number(definition.fallback);
@@ -77,6 +116,14 @@ export class SettingsService {
     if (!isTextSetting(definition)) {
       throw new ValidationError('invalid_setting_value', `${definition.label}: читайте через value()`);
     }
+    // Ссылочные и текстовые параметры НЕ кэшируем намеренно.
+    //
+    // Выигрыш от кэша дал числовой блок: 12 ключей рассрочки читаются одним
+    // запросом на каждое обращение к каталогу. Документы и QR читаются при
+    // рендере страницы и Prisma склеивает их в один запрос — экономии почти
+    // нет, а цена высока: значение, изменённое мимо `set()` (миграцией, SQL,
+    // тестом), продолжало бы отдаваться старым, и «я опубликовал оферту, а её
+    // нет» стало бы загадкой на полминуты.
     const row = await this.prisma.setting.findUnique({ where: { key } });
     if (!row) return String(definition.fallback);
     try {
@@ -149,6 +196,9 @@ export class SettingsService {
     const next: number | string = isTextSetting(definition)
       ? parseSettingText(definition, rawValue)
       : parseSettingValue(definition, rawValue);
+    // Кэш чистим сразу: владелец, поменявший наценку, обязан увидеть её на
+    // витрине следующим же запросом, а не через TTL.
+    this.cache.delete(key);
 
     return this.audit.transaction(async (tx) => {
       const existing = await tx.setting.findUnique({ where: { key } });
@@ -160,6 +210,7 @@ export class SettingsService {
         create: { key, value: String(next), updatedBy: actor },
         update: { value: String(next), updatedBy: actor },
       });
+      this.cache.delete(key);
       const result: SettingView = {
         ...definition,
         value: next,

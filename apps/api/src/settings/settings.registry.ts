@@ -577,7 +577,11 @@ export function parseSettingText(definition: SettingDefinition, raw: string): st
   // Проверка адреса — только для `url`. У `text` содержимое произвольное:
   // это документ, который владелец вставляет целиком, вместе с переносами.
   if (definition.kind === 'url') {
-    const allowed = value.startsWith('/') || value.startsWith('https://');
+    // `//host/qr.png` и `\\host\qr.png` начинаются со слэша, но относительным
+    // путём не являются: браузер уходит по ним на сторонний сервер. Для
+    // платёжного QR это подмена реквизитов на карточке товара.
+    const protocolRelative = /^[/\\]{2}/.test(value);
+    const allowed = !protocolRelative && (value.startsWith('/') || value.startsWith('https://'));
     if (!allowed) {
       throw new ValidationError(
         'invalid_setting_value',

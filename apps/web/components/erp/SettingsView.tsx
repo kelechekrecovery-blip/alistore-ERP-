@@ -198,7 +198,7 @@ export function SettingsView({ accessToken, canEdit }: { accessToken: string; ca
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={String(setting.value)}
-                            alt={`QR ${setting.label}`}
+                            alt={setting.label}
                             className="h-14 w-14 rounded-[7px] border border-surface-3 bg-white object-contain p-1"
                           />
                         )}
@@ -207,8 +207,14 @@ export function SettingsView({ accessToken, canEdit }: { accessToken: string; ca
                           <input
                             type="file"
                             accept="image/*"
-                            className="hidden"
-                            aria-label={setting.label}
+                            // `hidden` делает поле display:none — оно выпадает из
+                            // порядка табуляции и из дерева доступности целиком.
+                            // Загрузить QR с клавиатуры было невозможно вовсе, а
+                            // другого пути в интерфейсе нет. Клип оставляет поле
+                            // фокусируемым, оставаясь невидимым (тот же приём уже
+                            // применён в SiteHeader).
+                            className="sr-only"
+                            aria-label={`Загрузить QR: ${setting.label}`}
                             disabled={!canEdit || busy === setting.key}
                             onChange={(event) => {
                               const file = event.target.files?.[0];

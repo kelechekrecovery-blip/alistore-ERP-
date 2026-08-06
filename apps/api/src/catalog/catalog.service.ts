@@ -186,7 +186,7 @@ export class CatalogService {
         orderBy: [{ name: 'asc' }], take: 12, include: this.stockCountInclude(),
       }),
     ]);
-    const enriched = await this.enrichOffers(await this.enrichSellers(await this.enrichReviews([product, ...variants, ...related].map((item) => this.toCatalogProduct(item)))));
+    const enriched = await this.enrichAll([product, ...variants, ...related].map((item) => this.toCatalogProduct(item)));
     const [main, ...rest] = enriched;
     return { product: main, variants: rest.slice(0, variants.length), related: rest.slice(variants.length) };
   }
@@ -197,12 +197,14 @@ export class CatalogService {
       where: { id: { in: ids }, archived: false },
       include: this.stockCountInclude(),
     });
-    const enrichedProducts = await this.enrichSellers(products.map((product) => this.toCatalogProduct(product)));
-    const byId = new Map(enrichedProducts.map((product) => [product.id, product]));
+    const byId = new Map(products.map((product) => [product.id, this.toCatalogProduct(product)]));
     const ordered = ids
       .map((id) => byId.get(id))
       .filter((product): product is CatalogProductDto => Boolean(product));
-    return this.enrichReviews(ordered);
+    // Через полное обогащение: раньше подборка на главной показывала карточку
+    // без рассрочки и бонусов, а тот же товар в каталоге — с ними. Одна и та же
+    // позиция выглядела по-разному в зависимости от того, откуда на неё смотрят.
+    return this.enrichAll(ordered);
   }
 
   async reindex(maintenanceToken?: string): Promise<CatalogReindexResponseDto> {
@@ -216,9 +218,14 @@ export class CatalogService {
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
       include: this.stockCountInclude(),
     });
-    const documents = products.map((product) => ({
-      ...this.toCatalogProduct(product),
-      archived: product.archived,
+    // Через `enrichSellers` — это третий путь каталога, где сырой `sellerId`
+    // уходил наружу. Первые два (`search`/`product`, затем `curated`/`delta`)
+    // чинились по одному, каждый раз «а вот здесь-то безопасно». Индекс
+    // Meilisearch — сторонний сервис, и внутренний ключ ему не нужен.
+    const enriched = await this.enrichSellers(products.map((product) => this.toCatalogProduct(product)));
+    const documents = enriched.map((item, index) => ({
+      ...item,
+      archived: products[index].archived,
     }));
 
     await index.updateSettings({
@@ -288,7 +295,7 @@ export class CatalogService {
       total: response.estimatedTotalHits ?? response.totalHits ?? ordered.length,
       limit: query.limit,
       offset: query.offset,
-      items: await this.enrichOffers(await this.enrichSellers(await this.enrichReviews(ordered))),
+      items: await this.enrichAll(ordered),
     };
   }
 
@@ -314,7 +321,7 @@ export class CatalogService {
         total: sorted.length,
         limit: query.limit,
         offset: query.offset,
-        items: await this.enrichOffers(await this.enrichSellers(await this.enrichReviews(sorted.slice(query.offset, query.offset + query.limit)))),
+        items: await this.enrichAll(sorted.slice(query.offset, query.offset + query.limit)),
       };
     }
     const [total, products] = await this.prisma.$transaction([
@@ -334,7 +341,7 @@ export class CatalogService {
       total,
       limit: query.limit,
       offset: query.offset,
-      items: await this.enrichOffers(await this.enrichSellers(await this.enrichReviews(products.map((product) => this.toCatalogProduct(product))))),
+      items: await this.enrichAll(products.map((product) => this.toCatalogProduct(product))),
     };
   }
 
@@ -526,6 +533,43 @@ export class CatalogService {
    * каждую свою карточку «AliStore» — навязывать шум там, где покупателю и так
    * ясно, у кого он покупает; метка нужна ровно тогда, когда продавец другой.
    */
+  /**
+   * Все три обогащения разом — отзывы, продавец, рассрочка с бонусами.
+   *
+   * Проходы читают и пишут непересекающиеся поля, поэтому ждать их по очереди
+   * незачем: раньше страница платила сумму трёх ожиданий базы вместо самого
+   * долгого из них.
+   *
+   * Сливать наивным спредом нельзя. `enrichSellers` намеренно вырезает
+   * `sellerId`, а два других считались от исходного массива, где он ещё есть, —
+   * спред целиком вернул бы внутренний ключ наружу. Поэтому берём результат
+   * продавцов за основу и докидываем только конкретные поля.
+   */
+  private async enrichAll(items: CatalogProductDto[]): Promise<CatalogProductDto[]> {
+    if (items.length === 0) return items;
+    const [reviewed, withSellers, offered] = await Promise.all([
+      this.enrichReviews(items),
+      this.enrichSellers(items),
+      this.enrichOffers(items),
+    ]);
+    // Переносим только те поля, которые действительно появились. Безусловное
+    // присваивание создавало ключ со значением `undefined` там, где раньше его
+    // не было вовсе, — и набор полей публичной проекции менялся молча. Это
+    // ловит `product-supply-mode.e2e-spec`, и ловит справедливо.
+    const carry = <T extends CatalogProductDto>(target: T, source: CatalogProductDto, keys: readonly (keyof CatalogProductDto)[]): T => {
+      for (const key of keys) {
+        if (key in source) (target as Record<string, unknown>)[key as string] = source[key];
+      }
+      return target;
+    };
+    return withSellers.map((base, index) => {
+      const merged = { ...base };
+      carry(merged, reviewed[index], ['reviewCount', 'avgRating']);
+      carry(merged, offered[index], ['installment', 'installmentSteps', 'installmentProviders', 'bonusPoints']);
+      return merged;
+    });
+  }
+
   private async enrichSellers(items: CatalogProductDto[]): Promise<CatalogProductDto[]> {
     if (items.length === 0) return items;
     const ids = [...new Set(items.map((item) => item.sellerId).filter((id): id is string => Boolean(id)))];

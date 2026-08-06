@@ -253,7 +253,14 @@
 
   /* Dark storefront copy must remain readable at the small sizes used by the
      handoff. These opacity utilities were originally tuned for atmosphere,
-     but several fell below WCAG AA against the dark shell. */
+     but several fell below WCAG AA against the dark shell.
+
+     ВАЖНО: правится только шкала Tailwind. `/48` и `/12` в неё не входят и
+     компилируются в НОЛЬ правил — элемент молча наследует цвет родителя. Я
+     однажды «поднял контраст» заменой /45 → /48 и вместо этого убрал цвет
+     вовсе: на экране «Товар не найден» текст стал 1.16:1, то есть невидимым.
+     Менять здесь значения — можно; менять класс на внешкальный — нельзя. */
+  .text-white\/30 { color: rgba(255, 255, 255, 0.58) !important; }
   .text-white\/35 { color: rgba(255, 255, 255, 0.60) !important; }
   .text-white\/40 { color: rgba(255, 255, 255, 0.60) !important; }
   .text-white\/45 { color: rgba(255, 255, 255, 0.65) !important; }

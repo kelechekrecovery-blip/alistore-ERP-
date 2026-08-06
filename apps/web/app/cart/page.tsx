@@ -66,7 +66,7 @@ export default function CartPage() {
           <h1 className="mt-3 font-display text-4xl font-bold text-white sm:text-5xl">
             Корзина
           </h1>
-          <p className="mt-3 text-white/48">
+          <p className="mt-3 text-white/45">
             Проверьте товары, примените промокод и переходите к оформлению.
           </p>
 
@@ -79,7 +79,7 @@ export default function CartPage() {
                   <ShoppingBag size={30} />
                 </span>
                 <h2 className="mt-5 text-2xl font-bold text-white">Корзина пуста</h2>
-                <p className="mt-2 text-white/48">
+                <p className="mt-2 text-white/45">
                   Добавьте технику из каталога AliStore.
                 </p>
                 <Link
@@ -140,7 +140,7 @@ export default function CartPage() {
                         <button
                           type="button"
                           onClick={() => remove(item.id)}
-                          className="flex items-center gap-1.5 text-xs text-white/48 hover:text-[#ff9a6e]"
+                          className="flex items-center gap-1.5 text-xs text-white/45 hover:text-[#ff9a6e]"
                         >
                           <Trash2 size={14} /> Удалить
                         </button>
@@ -217,7 +217,7 @@ export default function CartPage() {
               {items.length > 0 && (
                 <aside className="h-fit rounded-[16px] border border-white/10 bg-gradient-to-br from-white/[.08] to-white/[.02] p-6 shadow-[0_12px_30px_rgba(0,0,0,.35)] lg:sticky lg:top-24">
                   <h2 className="text-xl font-bold text-white">Ваш заказ</h2>
-                  <div className="mt-5 grid gap-3 text-sm text-white/48">
+                  <div className="mt-5 grid gap-3 text-sm text-white/45">
                     <SummaryRow
                       label={`Товары (${items.reduce((sum, item) => sum + item.qty, 0)})`}
                       value={som(subtotal)}
@@ -251,7 +251,7 @@ export default function CartPage() {
                   >
                     Перейти к оформлению
                   </Link>
-                  <div className="mt-5 flex items-start gap-3 text-xs leading-5 text-white/48">
+                  <div className="mt-5 flex items-start gap-3 text-xs leading-5 text-white/45">
                     <ShieldCheck
                       className="mt-0.5 shrink-0 text-success"
                       size={16}

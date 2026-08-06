@@ -51,6 +51,15 @@ describe('текстовые параметры (QR провайдеров ра�
     expect(() => parseSettingText(definition, 'data:image/png;base64,AAAA')).toThrow(ValidationError);
   });
 
+  it('отвергает //host — это чужой хост, а не относительный путь', () => {
+    // `//attacker.example/qr.png` начинается со слэша и проходил проверку
+    // «относительный путь». Браузер трактует его как protocol-relative и уходит
+    // на сторонний сервер — то есть подменённый платёжный QR на карточке товара.
+    const definition = settingDefinition(QR_KEY);
+    expect(() => parseSettingText(definition, '//attacker.example/qr.png')).toThrow(ValidationError);
+    expect(() => parseSettingText(definition, '\\\\attacker.example/qr.png')).toThrow(ValidationError);
+  });
+
   it('отвергает http:// — смешанный контент на https-витрине не загрузится', () => {
     const definition = settingDefinition(QR_KEY);
     expect(() => parseSettingText(definition, 'http://cdn.example.com/qr.png')).toThrow(ValidationError);
