@@ -496,25 +496,6 @@ function LoginForm() {
     }
   }
 
-  async function loginGoogle(identityToken: string, nonce: string) {
-    if (busy || !googleEnabled) return;
-    setError(null);
-    setBusy(true);
-    try {
-      const result = await googleLogin(identityToken, nonce);
-      if (result.status === 'authenticated') {
-        setSocialEnrollmentToken(null);
-        router.push(next);
-        return;
-      }
-      startSocialEnrollment('google', result.enrollmentToken);
-    } catch {
-      setError('Не удалось войти через Google.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
   /**
    * Общий шаг для Apple и Telegram: провайдер подтвердил личность, но телефона у
    * аккаунта ещё нет. Экран переключается на ввод номера — привязка завершится
