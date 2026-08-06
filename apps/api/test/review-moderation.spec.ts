@@ -15,7 +15,10 @@ function makeProducts(moderate: Verdict) {
     productReview: { create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'rev1', ...data })) },
   };
   const prisma = {
-    product: { findUnique: jest.fn().mockResolvedValue({ id: 'p1', sku: 'SKU1', archived: false }) },
+    product: {
+      findUnique: jest.fn().mockResolvedValue({ id: 'p1', sku: 'SKU1', archived: false, published: true }),
+      findFirst: jest.fn().mockResolvedValue({ id: 'p1', sku: 'SKU1', archived: false, published: true }),
+    },
     order: { findFirst: jest.fn().mockResolvedValue({ id: 'o1', customer: { name: 'Иван', phone: '+996700000000' } }) },
     productReview: { findUnique: jest.fn().mockResolvedValue(null) },
   };

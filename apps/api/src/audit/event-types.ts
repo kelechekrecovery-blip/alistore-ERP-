@@ -159,6 +159,8 @@ export const EventType = {
   ApprovalRejected: 'approval.rejected',
   // misc
   ProductCreated: 'product.created',
+  ProductPublished: 'product.published',
+  ProductMediaUpdated: 'product.media_updated',
   ProductUpdated: 'product.updated',
   PriceChanged: 'price.changed',
   ProductCostChanged: 'product.cost_changed',

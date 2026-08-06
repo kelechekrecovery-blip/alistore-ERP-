@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { MediaStorage, StoredObject } from '../media-storage';
 
@@ -39,5 +39,9 @@ export class LocalDiskStorage implements MediaStorage {
 
   async getReadUrl(key: string): Promise<string> {
     return `${this.publicBase}/${key}`;
+  }
+
+  async exists(key: string): Promise<boolean> {
+    return access(join(this.dir, key)).then(() => true).catch(() => false);
   }
 }

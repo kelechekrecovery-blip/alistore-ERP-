@@ -16,6 +16,9 @@ import {
   ProductListQueryDto,
   UpdateProductDto,
 } from './products.dto';
+import { assessProductMedia } from './product-media-gate';
+import { PUBLIC_PRODUCT_FILTER } from './public-product';
+import { MediaService } from '../media/media.service';
 
 /** Price change beyond ±15% needs approval (Approval Rules Matrix). */
 const PRICE_APPROVAL_THRESHOLD_PCT = 15;
@@ -76,6 +79,7 @@ export class ProductsService {
     private readonly audit: AuditService,
     private readonly approvals: ApprovalsService,
     @Optional() private readonly moderation?: ModerationService,
+    @Optional() private readonly media?: MediaService,
   ) {}
 
   get(id: string) {
@@ -242,6 +246,36 @@ export class ProductsService {
     });
   }
 
+  async publish(id: string, requester: string) {
+    return this.audit.transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`product-publish:${id}`}))`;
+      const current = await tx.product.findUnique({
+        where: { id },
+        include: this.stockCountInclude(),
+      });
+      if (!current || current.archived) {
+        throw new ValidationError('product_not_found', `Товар ${id} не найден`);
+      }
+      const { attrs, readiness } = await this.verifiedProductMedia(current.attrs);
+      if (current.published) return { result: this.toAdminProduct(current), events: [] };
+
+      const product = await tx.product.update({
+        where: { id },
+        data: { published: true, attrs: attrs as Prisma.InputJsonValue },
+        include: this.stockCountInclude(),
+      });
+      return {
+        result: this.toAdminProduct(product),
+        events: [{
+          type: EventType.ProductPublished,
+          actor: requester,
+          payload: { productId: product.id, sku: product.sku, imageCount: readiness.imageCount, mediaKeys: readiness.mediaKeys },
+          refs: [product.id, product.sku, ...readiness.mediaKeys],
+        }],
+      };
+    });
+  }
+
   async update(productId: string, dto: UpdateProductDto, requester: string) {
     const product = await this.prisma.product.findUnique({ where: { id: productId } });
     if (!product) {
@@ -337,6 +371,21 @@ export class ProductsService {
     if (dto.attrs !== undefined) data.attrs = dto.attrs as Prisma.InputJsonValue;
 
     return this.audit.transaction(async (tx) => {
+      let beforeMediaKeys = assessProductMedia(product.attrs).mediaKeys;
+      let afterMediaKeys = dto.attrs === undefined ? beforeMediaKeys : assessProductMedia(dto.attrs).mediaKeys;
+      if (dto.attrs !== undefined) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`product-publish:${productId}`}))`;
+        const publication = await tx.product.findUnique({ where: { id: productId }, select: { published: true, attrs: true } });
+        if (!publication) throw new ValidationError('product_not_found', `Товар ${productId} не найден`);
+        beforeMediaKeys = assessProductMedia(publication.attrs).mediaKeys;
+        if (publication.published && this.mediaPresentationChanged(publication.attrs, dto.attrs)) {
+          const verified = await this.verifiedProductMedia(dto.attrs);
+          data.attrs = verified.attrs as Prisma.InputJsonValue;
+          afterMediaKeys = verified.readiness.mediaKeys;
+        } else {
+          afterMediaKeys = assessProductMedia(dto.attrs).mediaKeys;
+        }
+      }
       if (dto.bundleComponents !== undefined) {
         const inFlightOrderLines = await tx.orderItem.count({
           where: {
@@ -388,6 +437,16 @@ export class ProductsService {
           refs: [productId, product.sku],
         },
       ];
+      if (dto.attrs !== undefined) {
+        if (JSON.stringify(beforeMediaKeys) !== JSON.stringify(afterMediaKeys)) {
+          events.push({
+            type: EventType.ProductMediaUpdated,
+            actor: requester,
+            payload: { productId, sku: product.sku, from: beforeMediaKeys, to: afterMediaKeys },
+            refs: [productId, product.sku, ...new Set([...beforeMediaKeys, ...afterMediaKeys])],
+          });
+        }
+      }
       // Срок поставки — это обещание, которое видит покупатель, а в срезе 3 по нему
       // поедут заказы поставщику. ProductUpdated пишет только имена изменённых
       // ключей, поэтому «кто и когда растянул срок с 7 дней до 180» по нему не
@@ -453,8 +512,8 @@ export class ProductsService {
   }
 
   async reviews(productId: string) {
-    const product = await this.prisma.product.findUnique({ where: { id: productId } });
-    if (!product || product.archived) {
+    const product = await this.prisma.product.findFirst({ where: { id: productId, ...PUBLIC_PRODUCT_FILTER } });
+    if (!product) {
       throw new ValidationError('product_not_found', `Товар ${productId} не найден`);
     }
 
@@ -492,8 +551,8 @@ export class ProductsService {
       throw new ForbiddenError('customer_token_required', 'Отзывы оставляют только клиенты');
     }
 
-    const product = await this.prisma.product.findUnique({ where: { id: productId } });
-    if (!product || product.archived) {
+    const product = await this.prisma.product.findFirst({ where: { id: productId, ...PUBLIC_PRODUCT_FILTER } });
+    if (!product) {
       throw new ValidationError('product_not_found', `Товар ${productId} не найден`);
     }
 
@@ -696,6 +755,7 @@ export class ProductsService {
       supplyLeadDays: product.supplyLeadDays,
       supplierId: product.supplierId,
       attrs: product.attrs,
+      published: product.published,
       bundleComponents: product.bundleComponents.map((component) => ({
         productId: component.componentProductId,
         sku: component.componentProduct.sku,
@@ -704,6 +764,51 @@ export class ProductsService {
       })),
       archived: product.archived,
       availableUnits: this.availableUnits(product),
+    };
+  }
+
+  private mediaPresentationChanged(before: unknown, after: unknown) {
+    const presentation = (value: unknown) => {
+      const attrs = value && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {};
+      return JSON.stringify({
+        imageKey: attrs.imageKey ?? null,
+        mediaKeys: attrs.mediaKeys ?? null,
+        imageUrl: attrs.imageUrl ?? null,
+        image: attrs.image ?? null,
+        media: attrs.media ?? null,
+      });
+    };
+    return presentation(before) !== presentation(after);
+  }
+
+  private async verifiedProductMedia(attrs: unknown) {
+    const readiness = assessProductMedia(attrs);
+    if (!readiness.ready) {
+      throw new ValidationError('product_media_required', readiness.reasons[0]);
+    }
+    if (!this.media) {
+      throw new ValidationError('product_media_verification_unavailable', 'Проверка медиатеки временно недоступна');
+    }
+    const stored = await Promise.all(readiness.mediaKeys.map((key) => this.media!.hasApprovedProductImage(key)));
+    if (stored.some((exists) => !exists)) {
+      throw new ValidationError('product_media_not_found', 'Фото не найдено в медиатеке AliStore — загрузите его повторно');
+    }
+    const urls = await Promise.all(readiness.mediaKeys.map((key) => this.media!.getReadUrl(key)));
+    const record = attrs && typeof attrs === 'object' && !Array.isArray(attrs)
+      ? attrs as Record<string, unknown>
+      : {};
+    return {
+      readiness,
+      attrs: {
+        ...record,
+        imageKey: readiness.mediaKeys[0],
+        mediaKeys: readiness.mediaKeys,
+        imageUrl: urls[0],
+        image: urls[0],
+        media: urls,
+      },
     };
   }
 

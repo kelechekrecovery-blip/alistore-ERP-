@@ -102,4 +102,9 @@ export class MediaService {
   async getReadUrl(key: string): Promise<string> {
     return this.storage.getReadUrl(key);
   }
+
+  async hasApprovedProductImage(key: string): Promise<boolean> {
+    if (!/^media\/[0-9a-f-]{36}\.webp$/i.test(key)) return false;
+    return this.storage.exists(key);
+  }
 }

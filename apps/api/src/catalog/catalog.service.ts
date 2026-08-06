@@ -6,6 +6,7 @@ import { bestInstallmentOffer, installmentLadder, type InstallmentPlan } from '.
 import { loyaltyEarnAmount } from '../customers/loyalty-ledger';
 import { SettingsService } from '../settings/settings.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PUBLIC_PRODUCT_FILTER } from '../products/public-product';
 import {
   CatalogDeltaQueryDto,
   CatalogDeltaResponseDto,
@@ -109,19 +110,9 @@ export class CatalogService {
 
   async search(query: CatalogSearchQueryDto): Promise<CatalogSearchResponseDto> {
     const normalized = this.normalizeQuery(query);
-
-    if (normalized.q && this.meiliHost()) {
-      try {
-        return await this.searchMeili(normalized);
-      } catch {
-        return this.searchPostgres(
-          normalized,
-          'postgres_fallback',
-          'meilisearch_unavailable',
-        );
-      }
-    }
-
+    // PostgreSQL remains the read source until product publication and every
+    // later edit have a durable Meilisearch upsert worker. Otherwise a freshly
+    // published SKU is invisible for text queries until a manual full reindex.
     return this.searchPostgres(normalized, 'postgres');
   }
 
@@ -167,23 +158,23 @@ export class CatalogService {
 
   async categories(): Promise<Array<{ category: string; count: number }>> {
     const rows = await this.prisma.product.groupBy({
-      by: ['category'], where: { archived: false, published: true }, orderBy: { category: 'asc' }, _count: { _all: true },
+      by: ['category'], where: PUBLIC_PRODUCT_FILTER, orderBy: { category: 'asc' }, _count: { _all: true },
     });
     return rows.map((row) => ({ category: row.category, count: row._count._all }));
   }
 
   async product(id: string) {
     const product = await this.prisma.product.findFirst({
-      where: { id, archived: false, published: true }, include: this.stockCountInclude(),
+      where: { id, ...PUBLIC_PRODUCT_FILTER }, include: this.stockCountInclude(),
     });
     if (!product) throw new ValidationError('catalog_product_not_found', `Товар ${id} не найден`);
     const [variants, related] = await Promise.all([
       product.variantGroup ? this.prisma.product.findMany({
-        where: { archived: false, published: true, variantGroup: product.variantGroup, id: { not: id } },
+        where: { ...PUBLIC_PRODUCT_FILTER, variantGroup: product.variantGroup, id: { not: id } },
         orderBy: [{ price: 'asc' }, { name: 'asc' }], include: this.stockCountInclude(),
       }) : [],
       this.prisma.product.findMany({
-        where: { archived: false, published: true, category: product.category, id: { not: id } },
+        where: { ...PUBLIC_PRODUCT_FILTER, category: product.category, id: { not: id } },
         orderBy: [{ name: 'asc' }], take: 12, include: this.stockCountInclude(),
       }),
     ]);
@@ -195,7 +186,7 @@ export class CatalogService {
   async curated(ids: string[]): Promise<CatalogProductDto[]> {
     if (ids.length === 0) return [];
     const products = await this.prisma.product.findMany({
-      where: { id: { in: ids }, archived: false, published: true },
+      where: { id: { in: ids }, ...PUBLIC_PRODUCT_FILTER },
       include: this.stockCountInclude(),
     });
     const byId = new Map(products.map((product) => [product.id, this.toCatalogProduct(product)]));
@@ -215,7 +206,7 @@ export class CatalogService {
     const index = client.index(indexName);
 
     const products = await this.prisma.product.findMany({
-      where: { archived: false, published: true },
+      where: PUBLIC_PRODUCT_FILTER,
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
       include: this.stockCountInclude(),
     });
@@ -351,8 +342,7 @@ export class CatalogService {
   ): Prisma.ProductWhereInput {
     const q = query.q?.trim();
     return {
-      archived: false,
-      published: true,
+      ...PUBLIC_PRODUCT_FILTER,
       ...(query.category ? { category: query.category } : {}),
       ...(q
         ? {

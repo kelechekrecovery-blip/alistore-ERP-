@@ -83,6 +83,7 @@ describe('B2B wholesale quotes', () => {
         cost: 80_000,
         category: 'phones',
         attrs: {},
+        published: true,
       },
     });
   }
@@ -171,6 +172,24 @@ describe('B2B wholesale quotes', () => {
     });
     expect(event?.actor).toBe(buyer.customer.id);
     expect(event?.payload).toMatchObject({ listTotal: 500_000, paymentIntent: 'invoice' });
+  });
+
+  it('does not quote a draft product even when the customer knows its SKU', async () => {
+    const buyer = await customerFixture();
+    const draft = await prisma.product.create({
+      data: { sku: `B2B-${RUN}-DRAFT`, name: 'Hidden draft', price: 1, cost: 1, category: 'phones', attrs: {}, published: false },
+    });
+    await request(app.getHttpServer())
+      .put('/b2b/profile')
+      .set('Authorization', `Bearer ${buyer.token}`)
+      .send({ companyName: 'ОсОО Draft Probe', taxId: '12345678901234', contactName: 'Алина', billingAddress: 'Бишкек' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .post('/b2b/quotes')
+      .set('Authorization', `Bearer ${buyer.token}`)
+      .send({ paymentIntent: 'invoice', fulfillmentType: 'delivery', deliveryAddress: 'Бишкек', items: [{ sku: draft.sku, qty: 1 }] })
+      .expect(422)
+      .expect(({ body }) => expect(body.code).toBe('b2b_product_not_found'));
   });
 
   it('exposes the queue to sales staff but reserves quote decisions for senior staff', async () => {

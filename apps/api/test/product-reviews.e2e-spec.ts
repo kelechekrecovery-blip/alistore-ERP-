@@ -73,6 +73,7 @@ describe('Product reviews', () => {
         cost: 80000,
         category: 'phones',
         attrs: {},
+        published: true,
       },
     });
     const order = await prisma.order.create({

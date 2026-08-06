@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
+import { PUBLIC_PRODUCT_FILTER } from '../products/public-product';
 import {
   CreateB2BQuoteDto,
   UpdateB2BQuoteDto,
@@ -78,7 +79,7 @@ export class B2BService {
 
     const skus = [...new Set(dto.items.map((item) => item.sku.trim()))];
     const products = await this.prisma.product.findMany({
-      where: { sku: { in: skus }, archived: false },
+      where: { sku: { in: skus }, ...PUBLIC_PRODUCT_FILTER },
     });
     const bySku = new Map(products.map((product) => [product.sku, product]));
     const missing = skus.filter((sku) => !bySku.has(sku));

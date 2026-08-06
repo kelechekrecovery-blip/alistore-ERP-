@@ -31,6 +31,7 @@ import {
 } from '../inventory/order-inventory-sale';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
 import { resolveActiveStorePoint } from '../common/store-point-identity';
+import { PUBLIC_PRODUCT_FILTER } from '../products/public-product';
 
 /** Reservation lifetime — every reservation must have expiresAt (invariant #7). */
 const RESERVATION_TTL_MS = 30 * 60 * 1000; // 30 минут
@@ -454,7 +455,7 @@ export class OrdersService {
     for (const item of dto.items) quantities.set(item.sku, (quantities.get(item.sku) ?? 0) + item.qty);
     const skus = [...quantities.keys()];
     const products = await this.prisma.product.findMany({
-      where: { sku: { in: skus }, archived: false },
+      where: { sku: { in: skus }, ...PUBLIC_PRODUCT_FILTER },
       include: {
         units: { where: { status: 'in_stock', location: storePoint.inventoryLocation }, select: { id: true } },
         balances: { where: { location: storePoint.inventoryLocation }, select: { onHand: true, reserved: true } },

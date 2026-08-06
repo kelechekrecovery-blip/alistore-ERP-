@@ -9,6 +9,7 @@ export interface MediaStorage {
   put(key: string, body: Buffer, contentType: string, signal?: AbortSignal): Promise<StoredObject>;
   delete(key: string): Promise<void>;
   getReadUrl(key: string): Promise<string>;
+  exists(key: string): Promise<boolean>;
 }
 
 export const MEDIA_STORAGE = Symbol('MEDIA_STORAGE');

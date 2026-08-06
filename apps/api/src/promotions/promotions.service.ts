@@ -6,6 +6,7 @@ import { ConflictError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePromotionDto, PromotionQuoteDto, UpdatePromotionDto } from './promotions.dto';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
+import { PUBLIC_PRODUCT_FILTER } from '../products/public-product';
 
 export interface PromotionLine {
   productId: string;
@@ -170,7 +171,7 @@ export class PromotionsService {
     const quantities = new Map<string, number>();
     for (const item of input) quantities.set(item.sku, (quantities.get(item.sku) ?? 0) + item.qty);
     const products = await this.prisma.product.findMany({
-      where: { sku: { in: [...quantities.keys()] }, archived: false },
+      where: { sku: { in: [...quantities.keys()] }, ...PUBLIC_PRODUCT_FILTER },
       select: { id: true, sku: true, category: true, price: true },
     });
     if (products.length !== quantities.size) throw new ValidationError('promo_product_not_found', 'Один из товаров больше недоступен');

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { MediaStorage, StoredObject } from '../media-storage';
 
@@ -66,5 +66,16 @@ export class S3Storage implements MediaStorage {
       new GetObjectCommand({ Bucket: this.bucket, Key: key }),
       { expiresIn: this.evidenceUrlTtl },
     );
+  }
+
+  async exists(key: string): Promise<boolean> {
+    try {
+      const object = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+      return object.ContentType === 'image/webp';
+    } catch (error) {
+      const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+      if (status === 404) return false;
+      throw error;
+    }
   }
 }

@@ -17,6 +17,7 @@ describe('Guest order-scoped status and receipt access', () => {
   const run = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   let customerId = '';
   let productId = '';
+  let draftProductId = '';
   let pointId = '';
   let fulfillmentLocation = '';
   const orderIds: string[] = [];
@@ -54,6 +55,7 @@ describe('Guest order-scoped status and receipt access', () => {
       await prisma.inventoryBalance.deleteMany({ where: { productId } });
       await prisma.product.deleteMany({ where: { id: productId } });
     }
+    if (draftProductId) await prisma.product.deleteMany({ where: { id: draftProductId } });
     if (customerId) await prisma.customer.deleteMany({ where: { id: customerId } });
     if (pointId) await prisma.storePoint.deleteMany({ where: { id: pointId } });
     await app.close();
@@ -65,7 +67,7 @@ describe('Guest order-scoped status and receipt access', () => {
     const product = await prisma.product.create({
       data: {
         sku: `GUEST-${run}`.toUpperCase(), name: 'Guest receipt phone', price: 25_000, cost: 20_000,
-        category: 'phones', attrs: {}, trackingMode: 'quantity', balances: { create: { location: fulfillmentLocation, onHand: 5 } },
+        category: 'phones', attrs: {}, published: true, trackingMode: 'quantity', balances: { create: { location: fulfillmentLocation, onHand: 5 } },
       },
     });
     productId = product.id;
@@ -90,6 +92,16 @@ describe('Guest order-scoped status and receipt access', () => {
     expect(created.body.piiConsentAt).toBeTruthy();
     const capability = created.body.guestAccess.capability as string;
     expect(capability.split('.')).toHaveLength(3);
+
+    const draft = await prisma.product.create({
+      data: { sku: `GUEST-DRAFT-${run}`.toUpperCase(), name: 'Hidden checkout draft', price: 1, cost: 1, category: 'phones', attrs: {}, published: false },
+    });
+    draftProductId = draft.id;
+    await request(app.getHttpServer()).post('/orders')
+      .set('x-guest-capability', checkoutCapability).set('Idempotency-Key', `guest-order-draft-${run}`)
+      .send({ ...orderPayload, items: [{ sku: draft.sku, qty: 1, price: 1 }], piiConsent: true })
+      .expect(422)
+      .expect(({ body }) => expect(body.code).toBe('product_not_found'));
 
     const otherOrder = await prisma.order.create({ data: { customerId: customer.id, channel: 'web', total: 100, items: { create: [{ sku: product.sku, qty: 1, price: 100 }] } } });
     orderIds.push(otherOrder.id);
