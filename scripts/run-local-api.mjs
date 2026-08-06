@@ -14,7 +14,7 @@
  * задаётся явно, а не наследуется.
  */
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -55,8 +55,21 @@ execFileSync('node', ['scripts/postdeploy-indexes.mjs'], {
 });
 
 const entry = join(apiDir, 'dist', 'main.js');
-if (!existsSync(entry)) {
-  console.log('[local-api] собираю API');
+// Проверка «файл существует» пропускала пересборку после правки исходников:
+// поднимался вчерашний сервер без новых маршрутов, и молча — человек искал
+// причину в коде, которого в процессе не было. Сравниваем со свежестью src.
+function newestMtime(dir) {
+  let newest = 0;
+  for (const entryName of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entryName.name);
+    const stamp = entryName.isDirectory() ? newestMtime(full) : statSync(full).mtimeMs;
+    if (stamp > newest) newest = stamp;
+  }
+  return newest;
+}
+const builtAt = existsSync(entry) ? statSync(entry).mtimeMs : 0;
+if (builtAt < newestMtime(join(apiDir, 'src'))) {
+  console.log('[local-api] исходники новее сборки — пересобираю API');
   execFileSync('npm', ['run', 'api:build'], { cwd: root, stdio: 'inherit' });
 }
 
@@ -80,4 +93,6 @@ const child = spawn(process.execPath, [entry], {
 });
 process.on('SIGINT', () => child.kill('SIGINT'));
 process.on('SIGTERM', () => child.kill('SIGTERM'));
-child.on('exit', (code) => process.exit(code ?? 0));
+// `code === null` означает завершение по сигналу или креш — выдавать это за
+// успешный выход значит спрятать падение от того, кто запустил скрипт.
+child.on('exit', (code, signal) => process.exit(code ?? (signal ? 1 : 0)));

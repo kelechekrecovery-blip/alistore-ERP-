@@ -101,6 +101,27 @@ describe('AliStore Business: владение товаром и изоляция
     await expect(sellers.assertOwns(a.id, house.id)).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('дельта-синк не отдаёт внутренний идентификатор продавца', async () => {
+    // `delta()` — основной путь синхронизации web и POS, дёргается регулярно и
+    // публично. Он строил DTO напрямую, минуя обогащение, и отдавал сырой
+    // `sellerId` анонимному запросу.
+    const partner = await seedSeller('Партнёр');
+    await seedProduct('SELLER-D-1', partner.id);
+    const delta = await catalog.delta({ since: new Date(Date.now() - 60_000).toISOString() } as never);
+    const item = delta.changed.find((row) => row.sku === 'SELLER-D-1');
+    expect(item).toBeDefined();
+    expect('sellerId' in (item as object)).toBe(false);
+    expect(item?.seller).toEqual({ id: partner.id, name: 'Партнёр' });
+  });
+
+  it('подборка витрины не отдаёт внутренний идентификатор продавца', async () => {
+    const partner = await seedSeller('Партнёр');
+    const product = await seedProduct('SELLER-C-1', partner.id);
+    const curated = await catalog.curated([product.id]);
+    expect('sellerId' in (curated[0] as object)).toBe(false);
+    expect(curated[0]?.seller).toEqual({ id: partner.id, name: 'Партнёр' });
+  });
+
   it('владелец AliStore не ограничен продавцом, сотрудник магазина ограничен', () => {
     // Один резолвер решает область видимости для всех запросов: `null` значит
     // «без ограничения», строка — «только этот продавец».

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { som } from '@/lib/format';
+import { ApiError } from '@/lib/api/http';
 import {
   businessLogin,
   clearBusinessSession,
@@ -123,6 +124,11 @@ function LoginForm({ onSuccess }: { onSuccess: (session: BusinessSession) => voi
   );
 }
 
+/** Токен живёт 8 часов без обновления: 401 значит «войдите заново», а не «сбой». */
+function isExpiredSession(cause: unknown): boolean {
+  return cause instanceof ApiError && (cause.status === 401 || cause.status === 403);
+}
+
 function Assortment({ session, onSignOut }: { session: BusinessSession; onSignOut: () => void }) {
   const [rows, setRows] = useState<BusinessProduct[] | null>(null);
   const [error, setError] = useState('');
@@ -135,6 +141,10 @@ function Assortment({ session, onSignOut }: { session: BusinessSession; onSignOu
       setRows(await fetchBusinessProducts(session.accessToken));
       setError('');
     } catch (cause) {
+      // Протухшая сессия — не ошибка загрузки. Раньше партнёр, вернувшийся на
+      // следующий день, получал шапку и красную плашку без списка и без формы
+      // входа — и так при каждой перезагрузке, пока сам не нажмёт «Выйти».
+      if (isExpiredSession(cause)) { onSignOut(); return; }
       // Уже загруженные строки не стираем. Раньше неудачный рефреш после
       // успешного сохранения обнулял таблицу: партнёр видел зелёное «цена
       // сохранена» и тут же пустой экран с ошибкой — выглядело как поломка
@@ -157,14 +167,25 @@ function Assortment({ session, onSignOut }: { session: BusinessSession; onSignOu
     setError('');
     try {
       await updateBusinessPrice(session.accessToken, row.id, next);
-      setDrafts((current) => { const copy = { ...current }; delete copy[row.id]; return copy; });
+      // Черновик убираем, только если человек не успел исправить его, пока
+      // летел запрос. Безусловное удаление стирало новые цифры, которых сервер
+      // не видел, — и человек не узнавал, что его правка пропала.
+      setDrafts((current) => {
+        if (current[row.id] !== draft) return current;
+        const copy = { ...current };
+        delete copy[row.id];
+        return copy;
+      });
       setToast(`${row.name} — цена сохранена`);
       window.setTimeout(() => setToast(''), 2600);
       await load();
     } catch (cause) {
+      if (isExpiredSession(cause)) { onSignOut(); return; }
       setError(cause instanceof Error ? cause.message : 'Цена не сохранена');
     } finally {
-      setBusy('');
+      // Снимаем блокировку только со своей строки: общий скаляр позволял
+      // второму сохранению разблокировать кнопку первого, ещё летящего.
+      setBusy((current) => (current === row.id ? '' : current));
     }
   }
 

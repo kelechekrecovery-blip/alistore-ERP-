@@ -153,7 +153,10 @@ export class CatalogService {
     return {
       cursor: new Date().toISOString(),
       since: query.since?.trim() || undefined,
-      changed: active.map((product) => this.toCatalogProduct(product)),
+      // Через `enrichSellers` — иначе сырой `sellerId` уходил анонимному
+      // запросу: `delta` это основной путь синхронизации web и POS, он
+      // дёргается регулярно и публично.
+      changed: await this.enrichSellers(active.map((product) => this.toCatalogProduct(product))),
       removed,
       totalChanged: active.length,
       totalRemoved: removed.length,
@@ -194,7 +197,8 @@ export class CatalogService {
       where: { id: { in: ids }, archived: false },
       include: this.stockCountInclude(),
     });
-    const byId = new Map(products.map((product) => [product.id, this.toCatalogProduct(product)]));
+    const enrichedProducts = await this.enrichSellers(products.map((product) => this.toCatalogProduct(product)));
+    const byId = new Map(enrichedProducts.map((product) => [product.id, product]));
     const ordered = ids
       .map((id) => byId.get(id))
       .filter((product): product is CatalogProductDto => Boolean(product));

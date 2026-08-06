@@ -61,7 +61,9 @@ test('партнёр входит, видит только свои позици
     where: { type: 'price.changed', refs: { has: mine.product.id } },
     orderBy: { ts: 'desc' },
   });
-  expect(event?.actor).toBe(`seller:${alfa.seller.id}`);
+  // Актор называет и магазин, и конкретный логин внутри него.
+  expect(event?.actor).toContain(`seller:${alfa.seller.id}`);
+  expect(event?.actor).toContain('user:');
   expect(event?.payload).toMatchObject({ previousPrice: 18_900, price: 17_500 });
 });
 

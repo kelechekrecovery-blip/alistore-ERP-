@@ -41,6 +41,15 @@ export class BusinessProductsService {
    * своими экранами. Пускать сюда staff-токен значило бы завести второй путь к
    * тем же данным с другими проверками — а два пути расходятся всегда.
    */
+  /** Кто именно сделал правку: магазин плюс конкретный логин внутри него. */
+  private actorOf(principal: AuthPrincipal, sellerId: string): string {
+    const userId = principal.customerId;
+    // `seller:<id>` называл только магазин, а логинов у него может быть
+    // несколько — комментарий обещал ответ на «кто уронил цену», а леджер
+    // отвечал лишь «чей магазин». Пишем обоих.
+    return userId ? `seller:${sellerId}:user:${userId}` : `seller:${sellerId}`;
+  }
+
   private scopeOf(principal: AuthPrincipal): string {
     if (principal.typ !== 'seller') {
       throw new ForbiddenException('Кабинет доступен только магазину-партнёру');
@@ -93,7 +102,7 @@ export class BusinessProductsService {
         events: [
           {
             type: EventType.PriceChanged,
-            actor: `seller:${sellerId}`,
+            actor: this.actorOf(principal, sellerId),
             // Ссылка на товар живёт в `refs` — это единственное поле, по
             // которому леджер ищется. `entityId` здесь молча отбрасывался
             // (`AuditInput` его не знает), и «кто уронил цену на эту позицию»
