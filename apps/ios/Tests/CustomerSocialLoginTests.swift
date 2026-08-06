@@ -10,6 +10,52 @@ import XCTest
 /// в токен, и любое расхождение даёт «nonce mismatch» уже на проде.
 @MainActor
 final class CustomerSocialLoginTests: XCTestCase {
+    func testOrdinaryLogoutSignsOutWithoutDisconnectingProviderGrant() {
+        var signOutCalls = 0
+        let disconnectCalls = 0
+
+        SocialIdentitySessionCleanup.logout {
+            signOutCalls += 1
+        }
+
+        XCTAssertEqual(signOutCalls, 1)
+        XCTAssertEqual(disconnectCalls, 0)
+    }
+
+    func testSuccessfulAccountDeletionDisconnectsAfterServerDeleteWithoutSigningOutFirst() async {
+        var events: [String] = []
+
+        let response = await SocialIdentitySessionCleanup.deleteAccount(
+            deleting: {
+                events.append("delete")
+                return "deleted"
+            },
+            disconnect: { completion in
+                events.append("disconnect")
+                // Provider revocation is best-effort after authoritative server
+                // deletion; its callback cannot roll the AliStore delete back.
+                completion(NSError(domain: "GoogleSignIn", code: -1))
+            }
+        )
+
+        XCTAssertEqual(response, "deleted")
+        XCTAssertEqual(events, ["delete", "disconnect"])
+    }
+
+    func testFailedServerDeletionKeepsProviderSessionConnected() async {
+        var disconnectCalls = 0
+
+        do {
+            let _: String = try await SocialIdentitySessionCleanup.deleteAccount(
+                deleting: { throw URLError(.notConnectedToInternet) },
+                disconnect: { _ in disconnectCalls += 1 }
+            )
+            XCTFail("Expected delete failure")
+        } catch {
+            XCTAssertEqual(disconnectCalls, 0)
+        }
+    }
+
     override func setUp() {
         super.setUp()
         SocialLoginMockURLProtocol.reset()

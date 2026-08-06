@@ -310,7 +310,9 @@ private enum GoogleCustomerSession {
     /// Удаляет только локальную Google-сессию. OAuth grant остаётся связанным:
     /// отзыв доступа (`disconnect`) относится к unlink/delete, а не к logout.
     static func signOut() {
-        GIDSignIn.sharedInstance.signOut()
+        SocialIdentitySessionCleanup.logout {
+            GIDSignIn.sharedInstance.signOut()
+        }
     }
 
     /// Google Keychain очищается синхронно до первого suspension point.
@@ -4766,14 +4768,18 @@ private struct AccountView: View {
     @MainActor
     private func deleteAccount() async {
         guard let token = auth.session?.accessToken else { return }
-        // Удаление начинается с сети. Очищаем Google раньше DELETE, чтобы
-        // timeout/termination не оставили стороннюю сессию на устройстве.
-        GoogleCustomerSession.signOut()
         isDeletingAccount = true
         accountDataError = nil
         do {
-            let _: DeleteAccountResponse = try await APIClient(baseURL: environment.apiBaseURL).delete("customers/me", token: token)
-            await GoogleCustomerSession.logout(auth)
+            let _: DeleteAccountResponse = try await SocialIdentitySessionCleanup.deleteAccount(
+                deleting: {
+                    try await APIClient(baseURL: environment.apiBaseURL).delete("customers/me", token: token)
+                },
+                disconnect: { completion in
+                    GIDSignIn.sharedInstance.disconnect(completion: completion)
+                }
+            )
+            await auth.logout()
             onLogout()
         } catch is CancellationError {
             isDeletingAccount = false
