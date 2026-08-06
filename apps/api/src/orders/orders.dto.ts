@@ -104,8 +104,8 @@ export class CreateOrderDto {
   @Min(0)
   loyaltyPoints?: number;
 
-  @ApiPropertyOptional({
-    description: 'Storefront consent to the public offer and personal-data processing; when true the service stamps piiConsentAt.',
+  @ApiProperty({
+    description: 'Required and must be true for storefront checkout. Confirms personal-data processing and stamps piiConsentAt.',
     example: true,
   })
   @IsOptional()

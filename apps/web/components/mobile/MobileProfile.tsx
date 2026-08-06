@@ -45,6 +45,7 @@ export default function MobileProfile({
   orders,
   ordersError = '',
   loyalty,
+  loyaltyError = false,
   onLogout,
 }: {
   phone: string;
@@ -52,6 +53,7 @@ export default function MobileProfile({
   /** Текст отказа загрузки заказов; пустая строка — отказа не было. */
   ordersError?: string;
   loyalty: CustomerLoyalty | null;
+  loyaltyError?: boolean;
   onLogout: () => void;
 }) {
   const levelLabel = loyalty?.level ?? '...';
@@ -77,12 +79,12 @@ export default function MobileProfile({
         <div className="mb-3.5 rounded-[16px] border border-surface-3 bg-gradient-to-br from-surface-3 to-surface-2 p-4">
           <div className="mb-2 flex justify-between text-[13px]">
             <span className="text-bright">Уровень {levelLabel}</span>
-            <span className="font-mono text-lime">{loyalty ? `${loyalty.balance.toLocaleString('ru-RU')} бонусов` : 'Загрузка...'}</span>
+            <span className="font-mono text-lime">{loyalty ? `${loyalty.balance.toLocaleString('ru-RU')} бонусов` : loyaltyError ? 'Ошибка загрузки' : 'Загрузка...'}</span>
           </div>
           <div className="h-[7px] overflow-hidden rounded-full bg-ink-dark">
             <div className="h-full rounded-full bg-gradient-to-r from-lime to-[#8FD40F]" style={{ width: loyalty ? `${Math.max(4, Math.min(100, 100 - loyalty.nextLevelSpend / 1000))}%` : '4%' }} />
           </div>
-          <div className="mt-1.5 text-[11px] text-subtle">{loyalty ? `До следующего уровня осталось ${som(loyalty.nextLevelSpend)}` : 'Загружаем программу лояльности'}</div>
+          <div className="mt-1.5 text-[11px] text-subtle">{loyalty ? `До следующего уровня осталось ${som(loyalty.nextLevelSpend)}` : loyaltyError ? 'Не удалось загрузить программу лояльности' : 'Загружаем программу лояльности'}</div>
         </div>
 
         {/* menu */}
@@ -112,6 +114,14 @@ export default function MobileProfile({
           <>
             <div className="mb-2 mt-5 font-display text-[15px] font-bold text-white">Мои заказы</div>
             <div className="rounded-[14px] border border-surface-3 bg-surface-2 px-4 py-4 text-center text-[12px] text-muted">Загрузка…</div>
+          </>
+        ) : orders.length === 0 ? (
+          <>
+            <div className="mb-2 mt-5 font-display text-[15px] font-bold text-white">Мои заказы</div>
+            <div className="rounded-[14px] border border-surface-3 bg-surface-2 px-4 py-4 text-center">
+              <p className="text-[13px] text-white">Заказов пока нет</p>
+              <Link href="/catalog" className="mt-2 inline-block text-[12px] text-lime">Перейти в каталог</Link>
+            </div>
           </>
         ) : null}
         {!ordersError && orders && orders.length > 0 && (

@@ -54,3 +54,31 @@ test('customer account data is shared by API, web cabinet and checkout', async (
   const storedAddress = await prisma.customerAddress.findFirstOrThrow({ where: { customerId: customer.id } });
   expect(storedAddress).toMatchObject({ text: 'Бишкек, улица Синхронизации 7', isPrimary: true });
 });
+
+test('mobile account distinguishes empty orders from loyalty failure', async ({ page }) => {
+  await resetDb();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const phone = '+996700940002';
+  const customer = await prisma.customer.create({ data: { phone, name: 'Mobile empty state' } });
+  const auth = {
+    accessToken: sign(
+      { sub: customer.id, phone: customer.phone, typ: 'customer' },
+      'dev-secret-alistore-local',
+      { expiresIn: '1h' },
+    ),
+    refreshToken: 'mobile-account-state-refresh',
+  };
+  await page.addInitScript((tokens) => localStorage.setItem('alistore.auth.v1', JSON.stringify(tokens)), auth);
+  await page.route('**/customers/me/loyalty', (route) => route.fulfill({
+    status: 503,
+    contentType: 'application/json',
+    body: JSON.stringify({ statusCode: 503, code: 'loyalty_unavailable', message: 'temporary outage' }),
+  }));
+
+  await page.goto('/account');
+  const mobileAccount = page.locator('.md\\:hidden');
+  await expect(mobileAccount.getByText('Заказов пока нет', { exact: true })).toBeVisible();
+  await expect(mobileAccount.getByText('Ошибка загрузки', { exact: true })).toBeVisible();
+  await expect(mobileAccount.getByText('Не удалось загрузить программу лояльности', { exact: true })).toBeVisible();
+  await expect(mobileAccount.getByText('Загрузка...', { exact: true })).toHaveCount(0);
+});

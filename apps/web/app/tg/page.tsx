@@ -94,6 +94,7 @@ export default function TelegramMiniAppPage() {
   const [error, setError] = useState('');
   const [done, setDone] = useState<DoneState | null>(null);
   const [storePoint, setStorePoint] = useState<StorePoint | null>(null);
+  const [piiConsent, setPiiConsent] = useState(false);
 
   useEffect(() => {
     void fetchPaymentMethods().then((result) => setServerPayment(result));
@@ -227,7 +228,7 @@ export default function TelegramMiniAppPage() {
   }
 
   async function placeOrder() {
-    if (cart.length === 0 || !phoneValid || !storePoint) return;
+    if (cart.length === 0 || !phoneValid || !storePoint || !piiConsent) return;
     setBusy(true);
     setError('');
     try {
@@ -236,6 +237,7 @@ export default function TelegramMiniAppPage() {
         fulfillmentType: 'pickup' as const,
         storePointId: storePoint.id,
         deliverySlot: storePoint.hours,
+        piiConsent: true,
         total: subtotal,
         items: cart.map((line) => ({ sku: line.sku, qty: line.qty, price: line.price })),
       };
@@ -259,6 +261,7 @@ export default function TelegramMiniAppPage() {
       if (payment === 'cash') {
         setDone({ order });
         setCart([]);
+        setPiiConsent(false);
         return;
       }
       const intentKey = crypto.randomUUID();
@@ -268,6 +271,7 @@ export default function TelegramMiniAppPage() {
         : await createPaymentIntent({ ...intentInput, actor: 'telegram_mini_app' }, guestCapability!, intentKey);
       setDone({ order: { ...order, status: intent.orderStatus }, intent });
       setCart([]);
+      setPiiConsent(false);
     } catch {
       setError('Не удалось оформить заказ. Попробуйте ещё раз.');
     } finally {
@@ -455,6 +459,7 @@ export default function TelegramMiniAppPage() {
           name={name}
           payment={payment}
           paymentChoices={paymentChoices}
+          piiConsent={piiConsent}
           busy={busy}
           error={error}
           phoneValid={phoneValid}
@@ -463,6 +468,7 @@ export default function TelegramMiniAppPage() {
           onPhone={setPhone}
           onName={setName}
           onPayment={setPayment}
+          onPiiConsent={setPiiConsent}
           onQty={setQty}
           onPlace={() => void placeOrder()}
         />
@@ -488,6 +494,7 @@ function Checkout({
   phone,
   name,
   payment,
+  piiConsent,
   busy,
   error,
   phoneValid,
@@ -496,6 +503,7 @@ function Checkout({
   onPhone,
   onName,
   onPayment,
+  onPiiConsent,
   onQty,
   onPlace,
 }: {
@@ -504,6 +512,7 @@ function Checkout({
   phone: string;
   name: string;
   payment: PaymentChoice;
+  piiConsent: boolean;
   /** Что сервер реально умеет провести; пустой список = только при получении. */
   paymentChoices: [PaymentChoice, string][];
   busy: boolean;
@@ -514,6 +523,7 @@ function Checkout({
   onPhone: (value: string) => void;
   onName: (value: string) => void;
   onPayment: (value: PaymentChoice) => void;
+  onPiiConsent: (value: boolean) => void;
   onQty: (id: string, qty: number) => void;
   onPlace: () => void;
 }) {
@@ -577,10 +587,22 @@ function Checkout({
           <span className="font-display text-xl font-extrabold text-lime">{som(subtotal)}</span>
         </div>
       </div>
+      <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[14px] border border-surface-3 bg-surface-2 p-4">
+        <input
+          type="checkbox"
+          checked={piiConsent}
+          onChange={(event) => onPiiConsent(event.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-lime"
+        />
+        <span className="text-xs leading-5 text-bright">
+          Согласен с условиями <Link href="/oferta" target="_blank" rel="noreferrer" className="text-lime underline">публичной оферты</Link>
+          {' '}и <Link href="/privacy" target="_blank" rel="noreferrer" className="text-lime underline">обработкой персональных данных</Link>
+        </span>
+      </label>
       {error && <p className="mt-3 text-sm text-danger-soft">{error}</p>}
       <button
         type="button"
-        disabled={busy || !phoneValid || cart.length === 0 || !storePoint}
+        disabled={busy || !phoneValid || cart.length === 0 || !storePoint || !piiConsent}
         onClick={onPlace}
         className="mt-4 w-full rounded-[14px] bg-lime py-3.5 text-sm font-bold text-lime-ink disabled:bg-line disabled:text-faint"
       >

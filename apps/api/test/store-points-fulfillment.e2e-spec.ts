@@ -82,7 +82,7 @@ describe('Store point fulfillment contract', () => {
     const customer = await prisma.customer.create({ data: { phone, name: 'Fulfillment customer' } });
     customerId = customer.id;
     const customerToken = sign({ sub: customer.id, typ: 'customer', phone }, process.env.JWT_SECRET ?? 'dev-insecure-change-me', { expiresIn: '15m' });
-    const base = { channel: 'web', fulfillmentType: 'pickup', total: 1, items: [{ sku: localProduct.sku, qty: 1, price: 1 }] };
+    const base = { channel: 'web', fulfillmentType: 'pickup', piiConsent: true, total: 1, items: [{ sku: localProduct.sku, qty: 1, price: 1 }] };
 
     await request(app.getHttpServer()).post('/orders/mine').set('Authorization', `Bearer ${customerToken}`).set('Idempotency-Key', `unknown-${run}`).send({ ...base, storePointId: 'unknown-point' }).expect(422);
     await request(app.getHttpServer()).post('/orders/mine').set('Authorization', `Bearer ${customerToken}`).set('Idempotency-Key', `wrong-location-${run}`).send({ ...base, storePointId: 'alistore-bishkek-1' }).expect(409);
@@ -145,7 +145,7 @@ describe('Store point fulfillment contract', () => {
     });
     productIds.push(deliveryProduct.id);
     const exactAddress = 'Бишкек, ул. Токтогула 125/1, кв. 42, домофон 17';
-    const delivery = await request(app.getHttpServer()).post('/orders/mine').set('Authorization', `Bearer ${customerToken}`).set('Idempotency-Key', `delivery-${run}`).send({ channel: 'web', fulfillmentType: 'courier', storePointId: deliveryPoint.id, deliveryAddress: exactAddress, total: 1, items: [{ sku: deliveryProduct.sku, qty: 1, price: 1 }] }).expect(201);
+    const delivery = await request(app.getHttpServer()).post('/orders/mine').set('Authorization', `Bearer ${customerToken}`).set('Idempotency-Key', `delivery-${run}`).send({ channel: 'web', fulfillmentType: 'courier', storePointId: deliveryPoint.id, deliveryAddress: exactAddress, piiConsent: true, total: 1, items: [{ sku: deliveryProduct.sku, qty: 1, price: 1 }] }).expect(201);
     orderIds.push(delivery.body.id);
     expect(delivery.body.deliveryAddress).toBe(exactAddress);
   });

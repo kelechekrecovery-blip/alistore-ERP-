@@ -19,6 +19,10 @@ describe('describeAuthError', () => {
     expect(describeAuthError(new ApiError(503, 'x', 'sms_gateway_unreachable'), 'резерв')).toContain('SMS-шлюз недоступен');
     expect(describeAuthError(new ApiError(503, 'x', 'sms_gateway_rejected'), 'резерв')).toContain('не принял отправку');
     expect(describeAuthError(new ApiError(503, 'x', 'production_sms_provider_not_activated'), 'резерв')).toContain('SMS-вход временно недоступен');
+    expect(describeAuthError(new ApiError(422, 'x', 'phone_invalid'), 'резерв')).toContain('номер телефона');
+    expect(describeAuthError(new ApiError(422, 'x', 'social_enrollment_invalid'), 'резерв')).toContain('истекло');
+    expect(describeAuthError(new ApiError(409, 'x', 'social_identity_already_linked'), 'резерв')).toContain('другому профилю');
+    expect(describeAuthError(new ApiError(422, 'x', 'social_auth_replayed'), 'резерв')).toContain('уже использована');
   });
 
   it('falls back for unknown codes and non-ApiError values', () => {

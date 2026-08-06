@@ -70,12 +70,24 @@ describe('Guest order-scoped status and receipt access', () => {
     });
     productId = product.id;
     const checkoutCapability = issueGuestCheckoutCapability(customer.id);
+    const orderPayload = { customerId: customer.id, channel: 'web', fulfillmentType: 'courier', storePointId: pointId, deliveryAddress: 'Бишкек, ул. Киевская 10, кв. 5', total: 1, items: [{ sku: product.sku, qty: 1, price: 1 }] };
+    await request(app.getHttpServer()).post('/orders')
+      .set('x-guest-capability', checkoutCapability).set('Idempotency-Key', `guest-order-missing-consent-${run}`)
+      .send(orderPayload)
+      .expect(422)
+      .expect(({ body }) => expect(body.code).toBe('checkout_consent_required'));
+    await request(app.getHttpServer()).post('/orders')
+      .set('x-guest-capability', checkoutCapability).set('Idempotency-Key', `guest-order-false-consent-${run}`)
+      .send({ ...orderPayload, piiConsent: false })
+      .expect(422)
+      .expect(({ body }) => expect(body.code).toBe('checkout_consent_required'));
     const created = await request(app.getHttpServer()).post('/orders')
       .set('x-guest-capability', checkoutCapability).set('Idempotency-Key', `guest-order-${run}`)
-      .send({ customerId: customer.id, channel: 'web', fulfillmentType: 'courier', storePointId: pointId, deliveryAddress: 'Бишкек, ул. Киевская 10, кв. 5', total: 1, items: [{ sku: product.sku, qty: 1, price: 1 }] })
+      .send({ ...orderPayload, piiConsent: true })
       .expect(201);
     orderIds.push(created.body.id);
     expect(created.body.guestAccess).toMatchObject({ expiresIn: 604800 });
+    expect(created.body.piiConsentAt).toBeTruthy();
     const capability = created.body.guestAccess.capability as string;
     expect(capability.split('.')).toHaveLength(3);
 

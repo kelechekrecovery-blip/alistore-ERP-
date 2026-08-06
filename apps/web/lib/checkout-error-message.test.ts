@@ -36,7 +36,7 @@ describe('checkout surfaces the API error message, not the raw status', () => {
     stubFetch(409, { code: 'stock_conflict', message: 'Товара больше нет в наличии' });
 
     await expect(createOrder(
-      { customerId: 'c1', channel: 'web', total: 100, items: [{ sku: 'A', qty: 1, price: 100 }] },
+      { customerId: 'c1', channel: 'web', piiConsent: true, total: 100, items: [{ sku: 'A', qty: 1, price: 100 }] },
       'cap',
       'key-1',
     )).rejects.toThrow('Товара больше нет в наличии');

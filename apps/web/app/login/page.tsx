@@ -383,8 +383,7 @@ function LoginForm() {
       router.push(next);
     }
     catch (err) {
-      if (channel === 'email') setError(describeAuthError(err, 'Неверный или просроченный код.'));
-      else setError('Неверный или просроченный код.');
+      setError(describeAuthError(err, 'Не удалось подтвердить код. Проверьте связь и попробуйте ещё раз.'));
     } finally { setBusy(false); }
   }
 
@@ -400,8 +399,8 @@ function LoginForm() {
         return;
       }
       startSocialEnrollment('telegram', result.enrollmentToken);
-    } catch {
-      setError('Не удалось войти через Telegram.');
+    } catch (err) {
+      setError(describeAuthError(err, 'Не удалось войти через Telegram.'));
     } finally {
       setBusy(false);
     }
@@ -419,8 +418,8 @@ function LoginForm() {
         return;
       }
       startSocialEnrollment('telegram', result.enrollmentToken);
-    } catch {
-      setError('Не удалось войти через Telegram.');
+    } catch (err) {
+      setError(describeAuthError(err, 'Не удалось войти через Telegram.'));
     } finally {
       setBusy(false);
     }
@@ -452,8 +451,8 @@ function LoginForm() {
         return;
       }
       startSocialEnrollment('apple', result.enrollmentToken);
-    } catch {
-      setError('Не удалось войти через Apple.');
+    } catch (err) {
+      setError(describeAuthError(err, 'Не удалось войти через Apple.'));
     } finally {
       setBusy(false);
     }
@@ -471,8 +470,8 @@ function LoginForm() {
         return;
       }
       startSocialEnrollment('google', result.enrollmentToken);
-    } catch {
-      setError('Не удалось войти через Google.');
+    } catch (err) {
+      setError(describeAuthError(err, 'Не удалось войти через Google.'));
     } finally {
       setBusy(false);
     }

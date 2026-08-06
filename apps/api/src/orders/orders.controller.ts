@@ -224,8 +224,16 @@ export class OrdersController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: CreateMyOrderDto,
   ) {
+    requireStorefrontConsent(dto.piiConsent);
     return this.orders.createFromCatalog(
-      { ...dto, customerId: user.customerId, channel: dto.channel === 'web' ? 'web' : 'mobile' },
+      {
+        ...dto,
+        customerId: user.customerId,
+        // Telegram is a real customer storefront and must remain attributable.
+        // Privileged/internal-looking channels are still collapsed to mobile so
+        // a customer JWT cannot forge POS or staff analytics.
+        channel: dto.channel === 'web' ? 'web' : dto.channel === 'telegram' ? 'telegram' : 'mobile',
+      },
       user.customerId,
       idempotencyKey,
       true,
@@ -356,6 +364,7 @@ export class OrdersController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: CreateOrderDto,
   ) {
+    requireStorefrontConsent(dto.piiConsent);
     const guest = requireGuestCapability(capability, 'orders:create', dto.customerId);
     const order = await this.orders.createFromCatalog(dto, `guest:${guest.sub}`, idempotencyKey, false);
     const expiresIn = guestOrderCapabilityTtlSeconds();
@@ -412,4 +421,12 @@ export class OrdersController {
     }
     return this.orders.transition(id, dto.to, staffId);
   }
+}
+
+function requireStorefrontConsent(consent: boolean | undefined): void {
+  if (consent === true) return;
+  throw new ValidationError(
+    'checkout_consent_required',
+    'Подтвердите согласие с условиями обработки персональных данных',
+  );
 }

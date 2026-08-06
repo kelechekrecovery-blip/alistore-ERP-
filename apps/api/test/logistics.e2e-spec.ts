@@ -69,7 +69,19 @@ describe('Logistics zones, capacity and dispatch (integration + RBAC)', () => {
     const customerA = await prisma.customer.create({ data: { phone: `+996701${run}1`, name: 'A' } });
     const customerB = await prisma.customer.create({ data: { phone: `+996701${run}2`, name: 'B' } });
     const token = (id: string, phone: string) => sign({ sub: id, typ: 'customer', phone }, process.env.JWT_SECRET ?? 'dev-insecure-change-me', { expiresIn: '15m' });
-    const payload = { channel: 'web', fulfillmentType: 'courier', paymentMode: 'cod', storePointId: pointId, deliveryAddress: 'Бишкек, Киевская 95', deliverySlot: '10:00–12:00', deliveryZoneId: zone.body.id, deliverySlotId: slot.body.id, total: 1, items: [{ sku: product.sku, qty: 1, price: 1 }] };
+    const payload = { channel: 'web', fulfillmentType: 'courier', paymentMode: 'cod', storePointId: pointId, deliveryAddress: 'Бишкек, Киевская 95', deliverySlot: '10:00–12:00', deliveryZoneId: zone.body.id, deliverySlotId: slot.body.id, piiConsent: true, total: 1, items: [{ sku: product.sku, qty: 1, price: 1 }] };
+    await request(app.getHttpServer()).post('/orders/mine')
+      .set('Authorization', `Bearer ${token(customerA.id, customerA.phone)}`)
+      .set('Idempotency-Key', `order-missing-consent-${run}`)
+      .send({ ...payload, piiConsent: undefined })
+      .expect(422)
+      .expect(({ body }) => expect(body.code).toBe('checkout_consent_required'));
+    await request(app.getHttpServer()).post('/orders/mine')
+      .set('Authorization', `Bearer ${token(customerA.id, customerA.phone)}`)
+      .set('Idempotency-Key', `order-no-consent-${run}`)
+      .send({ ...payload, piiConsent: false })
+      .expect(422)
+      .expect(({ body }) => expect(body.code).toBe('checkout_consent_required'));
     await request(app.getHttpServer()).post('/orders/mine').set('Authorization', `Bearer ${token(customerA.id, customerA.phone)}`).set('Idempotency-Key', `order-pickup-spoof-${run}`).send({ ...payload, fulfillmentType: 'pickup' }).expect(422);
     const results = await Promise.all([
       request(app.getHttpServer()).post('/orders/mine').set('Authorization', `Bearer ${token(customerA.id, customerA.phone)}`).set('Idempotency-Key', `order-a-${run}`).send(payload),
