@@ -293,6 +293,16 @@ describe('Production preflight report', () => {
       expect(smsCheck({ ...gateway, SMS_GATEWAY_URL: '' })?.status).toBe('unsafe');
       expect(smsCheck({ ...gateway, SMS_GATEWAY_PASSWORD: '' })?.status).toBe('unsafe');
     });
+
+    it('не принимает production credentials, пока runtime sender остаётся заглушкой', () => {
+      expect(smsCheck({
+        SMS_PROVIDER: 'production',
+        SMS_API_URL: 'https://sms.provider.test',
+        SMS_API_KEY: 'configured-secret',
+        SMS_SENDER_ID: 'AliStore',
+        SMS_PROVIDER_CERTIFIED: 'true',
+      })?.status).toBe('unsafe');
+    });
   });
 
   /**

@@ -23,7 +23,7 @@ describe('External readiness report', () => {
     expect(JSON.stringify(report)).not.toContain('telegram-secret');
   });
 
-  it('returns ready when every blocking integration is configured or certified', () => {
+  it('never reports the unimplemented production SMS adapter as ready', () => {
     const env: Record<string, string> = {
       AI_PROVIDER_KEY: 'set',
       SMS_PROVIDER: 'production',
@@ -71,9 +71,16 @@ describe('External readiness report', () => {
 
     const report = buildExternalReadinessReport((name) => env[name]);
 
-    expect(report.status).toBe('ready');
-    expect(report.summary.blockingRemaining).toBe(0);
-    expect(report.nextActions).toEqual([]);
+    expect(report.status).toBe('blocked');
+    expect(report.summary.blockingRemaining).toBe(1);
+    expect(report.checks.find((check) => check.id === 'sms_provider')).toMatchObject({
+      status: 'manual_required',
+      blocking: true,
+      missingEnv: [],
+    });
+    expect(report.nextActions).toEqual([
+      expect.stringContaining('Production SMS/OTP provider'),
+    ]);
   });
 
   it('requires both Google token audiences and an explicit web client ID', () => {
@@ -134,6 +141,36 @@ describe('External readiness report', () => {
     // Секреты устройства не утекают в отчёт.
     expect(JSON.stringify(report)).not.toContain('device-secret');
     expect(JSON.stringify(report)).not.toContain('passphrase-secret');
+  });
+
+  it('keeps the Android bridge manual even if a certification marker is set', () => {
+    const values: Record<string, string> = {
+      SMS_PROVIDER: 'android_gateway',
+      SMS_GATEWAY_URL: 'https://api.sms-gate.app/3rdparty/v1',
+      SMS_GATEWAY_USERNAME: 'device-user',
+      SMS_GATEWAY_PASSWORD: 'device-secret',
+      SMS_GATEWAY_ENCRYPTION_PASSPHRASE: 'passphrase-secret',
+      SMS_PROVIDER_CERTIFIED: 'true',
+    };
+    expect(buildExternalReadinessReport((name) => values[name]).checks
+      .find((check) => check.id === 'sms_provider')).toMatchObject({
+      status: 'manual_required',
+      blocking: true,
+      missingEnv: [],
+    });
+  });
+
+  it('rejects credentials that do not match the selected SMS provider mode', () => {
+    const values: Record<string, string> = {
+      SMS_PROVIDER: 'production',
+      SMS_GATEWAY_URL: 'https://api.sms-gate.app/3rdparty/v1',
+      SMS_GATEWAY_USERNAME: 'device-user',
+      SMS_GATEWAY_PASSWORD: 'device-secret',
+      SMS_GATEWAY_ENCRYPTION_PASSPHRASE: 'passphrase-secret',
+      SMS_PROVIDER_CERTIFIED: 'true',
+    };
+    expect(buildExternalReadinessReport((name) => values[name]).checks
+      .find((check) => check.id === 'sms_provider')?.status).toBe('missing');
   });
 
   it('still reports SMS missing when neither a provider nor the bridge is configured', () => {
