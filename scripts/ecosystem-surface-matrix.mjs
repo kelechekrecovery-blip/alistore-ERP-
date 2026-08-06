@@ -112,6 +112,7 @@ export function collectInventory(projectRoot = root) {
     events: sorted([...eventObject.matchAll(/:\s*'([^']+)'/gu)].map((match) => match[1])),
     packageCommands: sorted(Object.keys(packageJson.scripts ?? {})),
     files: sorted(listFiles(authzRoot, () => true).map((file) => path.relative(projectRoot, file).split(path.sep).join('/'))),
+    executiveTraceabilitySource: read(projectRoot, 'docs/ECOSYSTEM-TRACEABILITY-MATRIX.md'),
   };
 }
 
@@ -130,6 +131,45 @@ function exactCoverage(requiredSurfaces, declaredSurfaces) {
 
 function issue(errors, code, message, rowId) {
   errors.push({ code, ...(rowId ? { rowId } : {}), message });
+}
+
+export function validateExecutiveTraceability(source, manifestIds) {
+  const errors = [];
+  const knownIds = new Set(manifestIds);
+  const tableRows = typeof source === 'string'
+    ? source.split(/\r?\n/u).filter((line) => /^\| (?!Handoff|---)/u.test(line))
+    : [];
+  const linkedIds = new Set();
+  let linkedRows = 0;
+  let nARows = 0;
+  for (const line of tableRows) {
+    const handoff = line.split('|')[1]?.trim() ?? '';
+    if (handoff.includes('N/A —')) {
+      nARows += 1;
+      continue;
+    }
+    const labels = [...handoff.matchAll(/\[([^\]]+)\]\(acceptance\/ecosystem-surface-matrix\.json\)/gu)]
+      .flatMap((match) => match[1].split(',').map((value) => value.trim()).filter(Boolean));
+    if (labels.length === 0) {
+      issue(errors, 'missing-executive-manifest-id', `Executive row must link manifest IDs or declare N/A: ${handoff}.`);
+      continue;
+    }
+    linkedRows += 1;
+    for (const id of labels) {
+      if (!knownIds.has(id)) {
+        issue(errors, 'unknown-executive-manifest-id', `Executive row links unknown manifest ID: ${id}.`);
+      } else {
+        linkedIds.add(id);
+      }
+    }
+  }
+  return {
+    rows: tableRows.length,
+    linkedRows,
+    nARows,
+    linkedIds: sorted(linkedIds),
+    errors,
+  };
 }
 
 export function validateManifest(manifest, inventory) {
@@ -159,26 +199,40 @@ export function validateManifest(manifest, inventory) {
     const descriptor = candidate && typeof candidate === 'object' && !Array.isArray(candidate) ? candidate : {};
     if (!knownApis.has(route)) issue(errors, 'unknown-api-effect-route', `Unknown classified API route: ${route}.`);
     if (!NON_READ_METHODS.has(route.split(' ', 1)[0])) issue(errors, 'read-route-api-effect', `GET routes do not need an apiEffects declaration: ${route}.`);
-    if (JSON.stringify(Object.keys(descriptor).sort()) !== JSON.stringify(['effect', 'ledger'])) {
-      issue(errors, 'invalid-api-effect-shape', `apiEffects.${route} must contain exactly effect and ledger.`);
+    const descriptorKeys = Object.keys(descriptor).sort();
+    if (![
+      JSON.stringify(['effect', 'ledger']),
+      JSON.stringify(['effect', 'gap', 'ledger']),
+    ].includes(JSON.stringify(descriptorKeys))) {
+      issue(errors, 'invalid-api-effect-shape', `apiEffects.${route} must contain effect, ledger, and optional gap.`);
     }
-    if (!['read-only', 'mutation'].includes(descriptor.effect)) {
+    if (!['read-only', 'mutation', 'critical-mutation'].includes(descriptor.effect)) {
       issue(errors, 'invalid-api-effect', `Invalid effect for ${route}: ${descriptor.effect}.`);
     }
     const routeLedger = Array.isArray(descriptor.ledger) ? descriptor.ledger : [];
+    const gap = descriptor.gap;
     if (!Array.isArray(descriptor.ledger) || routeLedger.some((value) => typeof value !== 'string' || value.trim() === '')) {
       issue(errors, 'invalid-api-effect-ledger', `apiEffects.${route}.ledger must be an array of non-empty event values.`);
     }
     for (const event of routeLedger) {
       if (!knownEvents.has(event)) issue(errors, 'unknown-ledger-event', `Unknown Ledger event in apiEffects.${route}: ${event}.`);
     }
-    if (descriptor.effect === 'mutation' && routeLedger.length === 0) {
-      issue(errors, 'mutation-effect-without-ledger', `Mutation classification requires a Ledger event: ${route}.`);
+    if (gap !== undefined && (typeof gap !== 'string' || gap.trim() === '')) {
+      issue(errors, 'invalid-api-effect-gap', `apiEffects.${route}.gap must be a non-empty string when present.`);
+    }
+    if (descriptor.effect === 'critical-mutation' && routeLedger.length === 0 && !gap) {
+      issue(errors, 'critical-effect-without-ledger-or-gap', `Critical mutation requires Ledger events or an explicit gap: ${route}.`);
+    }
+    if (descriptor.effect === 'mutation' && routeLedger.length > 0) {
+      issue(errors, 'non-critical-mutation-with-ledger', `Only critical-mutation routes may require Ledger events: ${route}.`);
     }
     if (descriptor.effect === 'read-only' && routeLedger.length > 0) {
       issue(errors, 'read-only-effect-with-ledger', `Read-only classification cannot claim Ledger events: ${route}.`);
     }
-    reviewedEffects.set(route, { effect: descriptor.effect, ledger: routeLedger });
+    if (descriptor.effect !== 'critical-mutation' && gap) {
+      issue(errors, 'non-critical-api-effect-gap', `Only critical-mutation routes may declare a gap: ${route}.`);
+    }
+    reviewedEffects.set(route, { effect: descriptor.effect, ledger: routeLedger, gap });
   }
   const usedEffects = new Set();
 
@@ -232,7 +286,10 @@ export function validateManifest(manifest, inventory) {
         continue;
       }
       usedEffects.add(route);
-      if (effect.effect !== 'mutation') continue;
+      if (effect.effect !== 'critical-mutation') continue;
+      if (effect.gap && (row.status !== 'blocked' || !blockers.includes(effect.gap))) {
+        issue(errors, 'unrepresented-critical-gap', `${route} gap must be copied into blockers on a blocked row.`, rowId);
+      }
       for (const event of effect.ledger) {
         requiredLedger.add(event);
         if (!ledger.includes(event)) {
@@ -249,6 +306,11 @@ export function validateManifest(manifest, inventory) {
   for (const route of reviewedEffects.keys()) {
     if (!usedEffects.has(route)) issue(errors, 'unused-api-effect', `apiEffects entry is not referenced by any row: ${route}.`);
   }
+  const executiveTraceability = validateExecutiveTraceability(
+    inventory.executiveTraceabilitySource,
+    rows.map((row) => row?.id).filter((id) => typeof id === 'string'),
+  );
+  errors.push(...executiveTraceability.errors);
 
   const declared = rows.map((row) => row?.surface).filter((surface) => typeof surface === 'string');
   const coverage = {
@@ -278,6 +340,10 @@ export function validateManifest(manifest, inventory) {
       acceptance: rows.reduce((count, row) => count + (Array.isArray(row?.acceptance) ? row.acceptance.length : 0), 0),
       apiEffects: reviewedEffects.size,
     },
+    criticalGaps: [...reviewedEffects.entries()]
+      .filter(([, effect]) => effect.gap)
+      .map(([api, effect]) => ({ api, gap: effect.gap })),
+    executiveTraceability,
     errors,
   };
 }

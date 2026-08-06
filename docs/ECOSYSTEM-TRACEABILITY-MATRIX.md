@@ -7,9 +7,11 @@ derived report at `.artifacts/ecosystem/surface-matrix-report.json`, or
 `npm run ecosystem:matrix:strict` to fail closed on invalid references or any unowned
 web/iOS/Android application surface. Manifest `ledger` values prove only that a reviewed
 row points to the canonical Event Ledger catalogue. The manifest's route-specific
-`apiEffects` classifies non-GET calls as `read-only` or `mutation`; mutation declarations
-name their required catalogue events and each row must match the exact union for its routes.
-Service-level emission is established by runtime acceptance evidence, not by this static matrix.
+`apiEffects` classifies non-GET calls as `read-only`, non-critical `mutation`, or
+`critical-mutation`. Only critical routes require catalogue events, and each row must match
+the exact union for its routes. A critical route with no canonical event must carry an exact
+gap on a `blocked` row; this records the defect without inventing evidence. Service-level
+emission is established by runtime acceptance evidence, not by this static matrix.
 
 Evidence snapshot: 2026-07-17. This is the execution index for the 23 committed
 handoffs. A row is `Accepted` only when routes/apps, authoritative API and models,
@@ -29,13 +31,13 @@ until each missing reference is restored or explicitly retired by the owner.
 
 | Handoff | Routes / apps | API, model and control evidence | Automated evidence | Status and remaining acceptance |
 |---|---|---|---|---|
-| API Data Contracts ([all reviewed surface IDs](acceptance/ecosystem-surface-matrix.json)) | all clients | typed Nest DTO/controllers, Prisma, Swagger, RBAC/Ledger suites | API integration suites | Partial: versioned contract and generated-client compatibility matrix missing |
+| API Data Contracts — N/A — cross-surface control | all clients | typed Nest DTO/controllers, Prisma, Swagger, RBAC/Ledger suites | API integration suites | Partial: versioned contract and generated-client compatibility matrix missing |
 | ERP 2.0 ([erp-command-center, erp-product-admin, erp-approvals, erp-ai-tools](acceptance/ecosystem-surface-matrix.json)) | `/erp` | reports, approvals, finance, products, warehouse, procurement, HR, logistics, service modules | module Playwright flows | Partial: every tab/state and visual baseline not accepted |
 | HR ([staff-workspace, ios-staff, android-staff](acceptance/ecosystem-surface-matrix.json)) | `/erp`, Staff iOS/Android | schedules, attendance, absence, handover, payroll; RBAC, commands, Ledger | API, browser, XCTest/Compose contracts | Partial: first-store UAT and physical push/device certification |
 | Order State Machine ([client-order-detail, client-order-status, guest-order-detail, storefront-checkout](acceptance/ecosystem-surface-matrix.json)) | API, account, Staff/Courier/POS | server transition table and transactional events | invariant/concurrency suites | MVP accepted; provider/failure ecosystem replay remains |
 | POS 2.0 ([pos-workspace, ios-pos, android-pos](acceptance/ecosystem-surface-matrix.json)) | `/pos`, POS iOS/Android | shifts, sale, split tender, approvals, receipt, return/exchange, offline replay | API/browser/native contracts | Partial: app-level native E2E and certified hardware |
-| Process Map 2.0 ([all operational surface IDs](acceptance/ecosystem-surface-matrix.json)) | cross-surface | domain services cover core purchase/operations spine | vertical suites | Partial: one reconciled cross-module process proof missing |
-| QA Test Scenarios ([all operational surface IDs](acceptance/ecosystem-surface-matrix.json)) | all | deterministic test DB and verification scripts | Jest, Playwright, XCTest, Compose | Partial: all-role ecosystem E2E, outage/load/DR and visual goldens missing |
+| Process Map 2.0 — N/A — cross-surface control | cross-surface | domain services cover core purchase/operations spine | vertical suites | Partial: one reconciled cross-module process proof missing |
+| QA Test Scenarios — N/A — cross-surface control | all | deterministic test DB and verification scripts | Jest, Playwright, XCTest, Compose | Partial: all-role ecosystem E2E, outage/load/DR and visual goldens missing |
 | Analytics ([erp-command-center, erp-ai-tools](acceptance/ecosystem-surface-matrix.json)) | `/erp` | reports, margin, KPI, revenue and insights | API/browser subsets | Partial: cohorts, retention, funnel, aging, delivery/supplier exports |
 | Security ([client-login, legal-privacy](acceptance/ecosystem-surface-matrix.json)) | API and protected web/apps | JWT ownership, RBAC, TOTP, capabilities, rate limits, signed webhooks | RBAC/IDOR/security suites | Partial: pentest, retention and access-review certification |
 | Procurement ([erp-command-center, warehouse-workspace](acceptance/ecosystem-surface-matrix.json)) | `/erp` | PO lifecycle, partial serialized receive, concurrency and Ledger | API + browser | MVP accepted; missort/completeness, supplier calendar, quantity receive remain |
@@ -50,7 +52,7 @@ until each missing reference is restored or explicitly retired by the owner.
 | Staff App 2.0 ([staff-workspace, ios-staff, android-staff](acceptance/ecosystem-surface-matrix.json)) | `/staff`, Staff iOS/Android | orders, tasks, customer, support/warranty, scanner/Evidence and attendance | browser/native contracts | Partial: visual acceptance, iOS XCUITest and physical push/scanner/camera |
 | Product management ([erp-product-admin, storefront-catalog, storefront-product-detail](acceptance/ecosystem-surface-matrix.json)) | `/admin/products`, `/erp`, storefront | CRUD, variants, bundles, stock modes, catalog/search | API/browser suites | Partial: preorder, publishing, pricing history and completeness policy |
 | Finance 2.0 ([erp-command-center, erp-approvals, returns-refunds, courier-cash, pos-workspace](acceptance/ecosystem-surface-matrix.json)) | `/erp` | expenses, approvals/payment, budgets/plan-fact and durable provider/POS/COD/refund settlement with disputed-variance resolution and Ledger close | exact/negative/disputed/replay/rollback API plus owner browser close | First-store software settlement accepted; live statement import/provider certification, cashflow, currency and export remain |
-| Ecosystem ([all operational surface IDs](acceptance/ecosystem-surface-matrix.json)) | all surfaces | common Nest/Postgres/Event Ledger | `ecosystem:verify` component gate | Partial: no reconciled all-role E2E, production or store certification |
+| Ecosystem — N/A — cross-surface control | all surfaces | common Nest/Postgres/Event Ledger | `ecosystem:verify` component gate | Partial: no reconciled all-role E2E, production or store certification |
 | Legal ([legal-offer, legal-privacy](acceptance/ecosystem-surface-matrix.json)) | account/ERP document primitives | documents, consent timestamps and data controls | API subsets | Partial: immutable policy versions, retention jobs, contracts and KG legal approval |
 
 ## Mandatory role journeys

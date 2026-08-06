@@ -42,7 +42,7 @@ const row = (overrides = {}) => ({
 const manifest = (...rows) => ({
   schemaVersion: 1,
   apiEffects: {
-    'POST /api/orders': { effect: 'mutation', ledger: ['order.created'] },
+    'POST /api/orders': { effect: 'critical-mutation', ledger: ['order.created'] },
   },
   rows,
 });
@@ -165,11 +165,57 @@ test('does not let one unrelated row-level event satisfy a different mutation ro
     ledger: ['order.created'],
   }));
   candidate.apiEffects['PATCH /api/orders/:id'] = {
-    effect: 'mutation',
+    effect: 'critical-mutation',
     ledger: ['order.updated'],
   };
   const codes = errorCodes(candidate, candidateInventory);
   assert.ok(codes.includes('missing-route-ledger'));
+});
+
+test('allows an explicitly reviewed non-critical mutation without Ledger', () => {
+  const candidateInventory = {
+    ...inventory,
+    webSurfaces: ['web:/'],
+    iosSurfaces: [],
+    androidSurfaces: [],
+    apiRoutes: [...inventory.apiRoutes, 'POST /api/customers'],
+  };
+  const candidate = manifest(row({
+    api: ['POST /api/customers'],
+    models: ['Product'],
+    ledger: [],
+  }));
+  candidate.apiEffects = {
+    'POST /api/customers': { effect: 'mutation', ledger: [] },
+  };
+  assert.equal(validateManifest(candidate, candidateInventory).valid, true);
+});
+
+test('requires a critical mutation without Ledger to be an exact blocked gap', () => {
+  const gap = 'Missing canonical security Ledger event for social authentication.';
+  const candidateInventory = {
+    ...inventory,
+    webSurfaces: ['web:/'],
+    iosSurfaces: [],
+    androidSurfaces: [],
+    apiRoutes: [...inventory.apiRoutes, 'POST /api/auth/v2/social/telegram'],
+  };
+  const candidate = manifest(row({
+    api: ['POST /api/auth/v2/social/telegram'],
+    ledger: [],
+    status: 'blocked',
+    blockers: [gap],
+  }));
+  candidate.apiEffects = {
+    'POST /api/auth/v2/social/telegram': {
+      effect: 'critical-mutation',
+      ledger: [],
+      gap,
+    },
+  };
+  assert.equal(validateManifest(candidate, candidateInventory).valid, true);
+  candidate.rows[0].blockers = ['Different blocker'];
+  assert.ok(errorCodes(candidate, candidateInventory).includes('unrepresented-critical-gap'));
 });
 
 test('accepts a complete, source-referenced manifest', () => {
@@ -228,36 +274,82 @@ test('load-bearing assessment and Telegram rows describe their implemented surfa
     'GET /api/auth/me',
     'GET /api/catalog/products',
     'GET /api/logistics/checkout-options',
+    'POST /api/auth/v2/social/telegram',
+    'POST /api/customers',
     'POST /api/orders',
     'POST /api/orders/mine',
     'POST /api/payments/intents',
     'POST /api/payments/intents/mine',
   ]);
   assert.deepEqual(telegram.models, [
-    'Customer', 'OnlinePaymentIntentCommand', 'Order', 'Payment', 'Product', 'StorePoint',
+    'Customer', 'CustomerIdentity', 'OnlinePaymentIntentCommand', 'Order', 'Payment', 'Product',
+    'RefreshToken', 'SocialEnrollment', 'StorePoint',
   ]);
   assert.deepEqual(telegram.ledger, ['order.created', 'order.reserved']);
   assert.equal(telegram.contour, 'storefront');
   assert.equal(telegram.owner, 'Commerce');
-  assert.equal(telegram.status, 'partial');
+  assert.equal(telegram.status, 'blocked');
+  assert.ok(telegram.blockers.some((value) => value.includes('social authentication')));
   assert.ok(telegram.blockers.some((value) => value.includes('Telegram production shell')));
   assert.ok(!telegram.api.some((value) => value.includes('telegram-agent')));
   assert.ok(!telegram.models.includes('TelegramAgentPairing'));
   assert.ok(!telegram.ledger.includes('telegram_agent.linked'));
 });
 
-test('every executive traceability row links manifest IDs or is explicitly documentation-only', () => {
-  const source = fs.readFileSync(
-    path.join(projectRoot, 'docs/ECOSYSTEM-TRACEABILITY-MATRIX.md'),
+test('high-risk route effects exactly match their controller/service lifecycle', () => {
+  const source = JSON.parse(fs.readFileSync(
+    path.join(projectRoot, 'docs/acceptance/ecosystem-surface-matrix.json'),
     'utf8',
-  );
-  const tableRows = source.split(/\r?\n/u).filter((line) => /^\| (?!Handoff|---)/u.test(line));
-  assert.equal(tableRows.length, 23);
-  for (const line of tableRows) {
-    assert.ok(
-      line.includes('(acceptance/ecosystem-surface-matrix.json)') ||
-        line.includes('N/A — documentation-only'),
-      `missing manifest link or N/A marker: ${line}`,
-    );
-  }
+  ));
+  assert.deepEqual(source.apiEffects['PATCH /api/approvals/:id/decide'], {
+    effect: 'critical-mutation',
+    ledger: ['approval.approved', 'approval.rejected'],
+  });
+  assert.deepEqual(source.apiEffects['POST /api/exchanges'], {
+    effect: 'critical-mutation',
+    ledger: ['approval.requested'],
+  });
+  assert.deepEqual(source.apiEffects['POST /api/refunds/:id/retry'], {
+    effect: 'critical-mutation',
+    ledger: [
+      'payment.refunded', 'refund.provider_pending', 'refund.provider_succeeded',
+      'refund.failed', 'refund.succeeded',
+    ],
+  });
+  assert.deepEqual(source.apiEffects['POST /api/tradeins'], {
+    effect: 'critical-mutation',
+    ledger: ['tradein.assessed', 'tradein.contracted'],
+  });
+  assert.deepEqual(source.apiEffects['POST /api/customers'], {
+    effect: 'mutation',
+    ledger: [],
+  });
+  assert.deepEqual(source.apiEffects['POST /api/auth/v2/social/telegram'], {
+    effect: 'critical-mutation',
+    ledger: [],
+    gap: 'No canonical Event Ledger event records Telegram social authentication or enrollment reservation.',
+  });
+});
+
+test('executive traceability validation rejects prose and unknown manifest IDs', () => {
+  const executiveTraceabilitySource = [
+    '| Handoff | Routes / apps | Evidence | Gate | Status |',
+    '|---|---|---|---|---|',
+    '| Bad ([all reviewed IDs](acceptance/ecosystem-surface-matrix.json)) | x | x | x | x |',
+    '| Unknown ([missing-id](acceptance/ecosystem-surface-matrix.json)) | x | x | x | x |',
+    '| Missing | x | x | x | x |',
+  ].join('\n');
+  const codes = errorCodes(manifest(row()), { ...inventory, executiveTraceabilitySource });
+  assert.ok(codes.includes('unknown-executive-manifest-id'));
+  assert.ok(codes.includes('missing-executive-manifest-id'));
+});
+
+test('every executive traceability row has validated manifest IDs or explicit N/A', () => {
+  const source = JSON.parse(fs.readFileSync(
+    path.join(projectRoot, 'docs/acceptance/ecosystem-surface-matrix.json'),
+    'utf8',
+  ));
+  const report = validateManifest(source, collectInventory(projectRoot));
+  assert.equal(report.executiveTraceability.rows, 23);
+  assert.equal(report.executiveTraceability.errors.length, 0);
 });
