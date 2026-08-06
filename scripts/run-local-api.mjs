@@ -70,6 +70,12 @@ const child = spawn(process.execPath, [entry], {
     PORT,
     NODE_ENV: 'development',
     NODE_PATH: './node_modules',
+    // Боевой список origin'ов наследуется из `.env` и не содержит локальную
+    // витрину — браузер резал каждый запрос по CORS, и кабинет молча не
+    // логинился. Задаём локальные явно, а не разрешаем всё: «origin: true»
+    // однажды переживёт копипасту в staging.
+    CORS_ORIGINS: process.env.LOCAL_API_CORS
+      ?? 'http://localhost:3400,http://127.0.0.1:3400,http://localhost:3000,http://127.0.0.1:3000',
   },
 });
 process.on('SIGINT', () => child.kill('SIGINT'));

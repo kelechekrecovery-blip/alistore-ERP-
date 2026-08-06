@@ -48,6 +48,7 @@ import { ProtectionModule } from './protection/protection.module';
 import { ProcurementModule } from './procurement/procurement.module';
 import { FinanceModule } from './finance/finance.module';
 import { StaffTasksModule } from './staff-tasks/staff-tasks.module';
+import { BusinessModule } from './business/business.module';
 import { SettingsModule } from './settings/settings.module';
 import { HrModule } from './hr/hr.module';
 import { LogisticsModule } from './logistics/logistics.module';
@@ -115,6 +116,7 @@ import { resolveRuntimeEnvFiles } from './config/runtime-env-files';
     FinanceModule,
     StaffTasksModule,
     SettingsModule,
+    BusinessModule,
     HrModule,
     LogisticsModule,
     ServiceCenterModule,
