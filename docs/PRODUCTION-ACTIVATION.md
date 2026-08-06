@@ -95,6 +95,15 @@ expected no-op on the already-migrated database. Never run a reverse, down, or
 destructive schema migration during rollback; preserve evidence and ship a
 forward repair after service recovery.
 
+The six supply feature flags have one approved, intentional mutation-retirement
+exception. Before deploying the evidence-binding migration, follow
+[Feature-flag mutation cutover](FEATURE-FLAG-CUTOVER.md). Production
+`db:deploy` requires a SHA-exact operator acknowledgement, drains the existing
+per-key locks across Prisma deployment, and verifies the boundary before
+release. A previous image remains read-compatible after this cutover but its
+feature-flag PATCH/DELETE path is intentionally unavailable; rollback control
+uses the audited current-image CLI documented there.
+
 ## 4. Provider QA
 
 Before setting the strict gate to green, verify live callbacks:

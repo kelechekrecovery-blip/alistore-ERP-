@@ -1,6 +1,6 @@
 # BACKLOG
 
-## GATE-0-READINESS-2026-08-06 — truth baseline candidate (review/commit pending)
+## GATE-0-READINESS-2026-08-06 — final integration candidate (strict acceptance pending)
 
 - Readiness now exposes 21 explicit rows and uses only `missing|configured|certified|blocked`
   per v2 row at `GET /health/integrations/v2`; `GET /health/integrations` remains the rolling-safe
@@ -17,9 +17,11 @@
   association on physical release builds; production-shaped backup/restore including Evidence;
   partner payout provider idempotency and statement reconciliation.
 - **Open P1 operations evidence:** Meilisearch rebuild/query/fallback/recovery certification.
-- **Acceptance boundary:** `docs/acceptance/gate-0-final-2026-08-06.md`. Until independent
-  code/TypeScript/security review and a reviewed commit exist, this item is a candidate and
-  must not be called accepted. No provider, hardware, physical-device, live Outbox health,
+- **Acceptance boundary:** the historical Task 6 record at
+  `docs/acceptance/gate-0-final-2026-08-06.md` is superseded by
+  `docs/acceptance/gate-0-final-fix-2026-08-07.md`. Gate 0 must not be called accepted until
+  the final candidate is independently reviewed, committed, and the trusted strict audit is
+  rerun from that exact clean SHA. No provider, hardware, physical-device, live Outbox health,
   production restore or pilot certification is claimed by local green tests.
 
 ## RUN-2026-08-04 — многоагентный аудит apps/web + apps/ios: что закрыто и что осталось

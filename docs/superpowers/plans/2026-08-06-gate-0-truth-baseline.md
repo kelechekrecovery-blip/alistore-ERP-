@@ -15,14 +15,17 @@
 - Do not claim provider, hardware, physical-device, production restore or pilot evidence that was not executed.
 - Keep `SettingsModule` numeric financial/business parameters unchanged.
 - Feature flags are allowlisted; unknown keys fail closed and are never persisted.
-- Existing supply environment flags remain compatible during migration.
+- Existing supply environment flags remain compatible for evaluation during migration.
 - Evaluation precedence is active database override, then legacy environment alias, then registry default.
 - Every new flag defaults to disabled; existing aliases retain their current effective value.
 - Provider credentials and certification markers remain deploy-owned environment/readiness state, not mutable feature flags.
 - Feature-flag mutations are owner-only, atomic with `feature_flag.changed`, and require a non-empty reason.
 - Public routes receive no feature-flag projection in Gate 0; only staff reports/owner management are exposed.
 - Source manifests are reviewed truth; derived reports live under ignored `.artifacts/`.
-- Migrations are additive and forward-only; application rollback must remain compatible with the new table.
+- Migrations are additive and forward-only. The approved feature-flag retirement
+  boundary keeps rollback reads compatible but intentionally rejects old-image
+  owner mutations behind a SHA-bound drain/freeze gate; the audited current
+  control CLI is the rollback mutation path. See `docs/FEATURE-FLAG-CUTOVER.md`.
 - Every task follows failing test → implementation → focused verification → self-review → atomic commit.
 
 ---
@@ -139,14 +142,20 @@
 
 **Interfaces:**
 - All six supply/to-order decisions call `FeatureFlagsService.isEnabled()`.
-- Supply operations reports the same evaluated state/source as the registry.
+- **Approved least-privilege security amendment (2026-08-07):** warehouse supply
+  operations exposes only the four decision booleans it needs and never registry
+  metadata/source. `GET /feature-flags` is the authoritative evaluated
+  state/source projection for the owner administration control plane (readable
+  only with `reports:read`; mutations remain owner-only).
 - ERP supports list, enable/disable with mandatory reason, and reset-to-deploy-default.
 - No customer/public client receives flag state in Gate 0.
 
 - [ ] Update tests first to require central evaluation, exact legacy env parity and immediate DB override/reset behavior.
 - [ ] Run focused API tests and confirm failure against direct environment reads.
 - [ ] Inject FeatureFlagsService into each flag-owning service and remove duplicate truthy parsers for migrated aliases.
-- [ ] Preserve behavior for deployments that only set legacy env aliases.
+- [ ] Preserve behavior for deployments that only set legacy env aliases; prove
+  the owner registry projection uses DB override → env → false while warehouse
+  receives only least-privilege booleans.
 - [ ] Add typed web client and owner UI with loading, error, permission, confirmation and mutation-failure states.
 - [ ] Add Playwright coverage proving a non-owner cannot mutate and an owner change is reflected without restart.
 - [ ] Run focused API/Web tests, TypeScript/build gates and `git diff --check`.
@@ -179,6 +188,7 @@
 - All six tasks have reviewed commits.
 - The executable surface matrix has no unknown owner or orphaned route/target.
 - Feature flags are typed, audited, server-owned and backward-compatible with legacy supply env aliases.
-- Migration and rollback policy is explicit and linked from authoritative runbooks.
+- Migration and rollback policy is explicit and linked from authoritative
+  runbooks, including the separately approved feature-flag mutation retirement.
 - Baseline and final evidence are SHA-bound and distinguish local software from external certification.
 - No provider, hardware, physical-device, production restore or pilot claim is marked accepted without live evidence.

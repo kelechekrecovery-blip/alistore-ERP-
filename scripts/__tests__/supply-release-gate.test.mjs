@@ -15,20 +15,24 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   FULL_PASS_REQUIRED_SUFFIXES,
+  SUPPLY_FEATURE_FLAGS,
   SUPPLY_LIFECYCLE_EVIDENCE,
   SUPPLY_LIFECYCLE_JOURNEYS,
   buildEvidenceManifest,
   deriveOverall,
+  evaluateSupplyFeatureFlagGate,
   gitSnapshot,
   loadPinnedCertificationPolicy,
   loadPinnedCertificationResults,
   requiredPassIds,
   runSupplyReleaseGateMain,
+  sanitizeSupplyGateChildEnvironment,
   sameCleanCommit,
   verifyCertificationArtifact,
 } from '../supply-release-gate.mjs';
 
 const cleanGit = { head: 'abc123', status: 'clean' };
+const disabledDatabaseOverrides = SUPPLY_FEATURE_FLAGS.map(({ key }) => ({ key, enabled: false }));
 
 function passingRequiredResults() {
   return [
@@ -45,6 +49,89 @@ test('required pass includes populated-schema migration upgrade and every execut
   assert.ok(FULL_PASS_REQUIRED_SUFFIXES.includes('playwright_cross_browser'));
   assert.ok(FULL_PASS_REQUIRED_SUFFIXES.includes('ios_ui'));
   assert.ok(FULL_PASS_REQUIRED_SUFFIXES.includes('android_ui'));
+});
+
+test('supply flag gate uses authoritative DB override over environment', () => {
+  const disabled = evaluateSupplyFeatureFlagGate({
+    databaseEstablished: true,
+    overrides: disabledDatabaseOverrides,
+    env: { TO_ORDER_CHECKOUT_ENABLED: 'true' },
+  });
+  assert.equal(disabled.status, 'PASS');
+  assert.deepEqual(
+    disabled.evidence.states.find((state) => state.key === 'supply.to_order_checkout'),
+    { key: 'supply.to_order_checkout', enabled: false, source: 'database' },
+  );
+
+  const enabled = evaluateSupplyFeatureFlagGate({
+    databaseEstablished: true,
+    overrides: disabledDatabaseOverrides.map((row) => (
+      row.key === 'supply.to_order_checkout' ? { ...row, enabled: true } : row
+    )),
+    env: { TO_ORDER_CHECKOUT_ENABLED: 'false' },
+  });
+  assert.equal(enabled.status, 'FAIL');
+});
+
+test('supply flag gate evaluates fallback but cannot authorize a separate target deployment from it', () => {
+  const environment = evaluateSupplyFeatureFlagGate({
+    databaseEstablished: true,
+    overrides: [],
+    env: { SUPPLY_CANCELLATION_ENABLED: 'true' },
+  });
+  assert.equal(environment.status, 'FAIL');
+  assert.deepEqual(
+    environment.evidence.states.find((state) => state.key === 'supply.cancellation'),
+    { key: 'supply.cancellation', enabled: true, source: 'environment' },
+  );
+
+  const safeDefault = evaluateSupplyFeatureFlagGate({
+    databaseEstablished: true,
+    overrides: [],
+    env: {},
+  });
+  assert.equal(safeDefault.status, 'FAIL');
+  assert.ok(safeDefault.evidence.states.every((state) => state.source === 'default'));
+  assert.match(safeDefault.detail, /not database-authoritative/);
+});
+
+test('supply flag gate cannot pass on env alone or malformed DB state and stays secret-safe', () => {
+  const secretUrl = 'postgresql://secret-user:secret-password@db.internal/alistore';
+  for (const assessment of [
+    evaluateSupplyFeatureFlagGate({
+      databaseEstablished: false,
+      overrides: [],
+      env: { TO_ORDER_CHECKOUT_ENABLED: 'false', DATABASE_URL: secretUrl },
+    }),
+    evaluateSupplyFeatureFlagGate({
+      databaseEstablished: true,
+      overrides: [{ key: 'supply.auto_refund', enabled: 'false' }],
+      env: { DATABASE_URL: secretUrl },
+    }),
+    evaluateSupplyFeatureFlagGate({
+      databaseEstablished: true,
+      overrides: [
+        { key: 'supply.auto_refund', enabled: false },
+        { key: 'supply.auto_refund', enabled: false },
+      ],
+      env: { DATABASE_URL: secretUrl },
+    }),
+  ]) {
+    assert.equal(assessment.status, 'FAIL');
+    assert.doesNotMatch(JSON.stringify(assessment), /secret-user|secret-password|db\.internal/);
+  }
+});
+
+test('release-gate subprocess environment excludes every database credential', () => {
+  const sanitized = sanitizeSupplyGateChildEnvironment({
+    PATH: '/trusted/bin',
+    SUPPLY_GATE_TARGET_DATABASE_URL: 'postgresql://target-secret',
+    DIRECT_DATABASE_URL: 'postgresql://direct-secret',
+    DATABASE_URL: 'postgresql://pooled-secret',
+    TEST_DATABASE_URL: 'postgresql://test-secret',
+    E2E_DATABASE_URL: 'postgresql://e2e-secret',
+  });
+  assert.deepEqual(sanitized, { PATH: '/trusted/bin' });
 });
 
 test('lifecycle evidence contract names every mandatory journey', () => {
@@ -194,7 +281,7 @@ test('claimant-controlled temporary config and self-signed key cannot become the
   }
 });
 
-test('clean committed pinned-policy fixture is accepted by trusted Git verification', () => {
+test('an otherwise-valid alternate repository cannot become the pinned policy trust root', () => {
   const cwd = mkdtempSync(path.join(tmpdir(), 'supply-gate-cert-config-'));
   try {
     const configDir = path.join(cwd, 'config');
@@ -215,9 +302,10 @@ test('clean committed pinned-policy fixture is accepted by trusted Git verificat
       '-c', 'user.email=supply-gate@example.invalid',
       'commit', '-q', '-m', 'pinned policy fixture',
     ], { cwd });
-    const { policy } = loadPinnedCertificationPolicy(cwd);
-    assert.equal(policy.targetEnvironment, 'production');
-    assert.equal(policy.issuerPublicKeyPath, 'supply-release-cert-issuer.pem');
+    assert.throws(
+      () => loadPinnedCertificationPolicy(cwd),
+      /Git does not match the tracked ecosystem toolchain lock/,
+    );
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }

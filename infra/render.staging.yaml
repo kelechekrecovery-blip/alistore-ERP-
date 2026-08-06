@@ -17,6 +17,13 @@ services:
         value: api
       - key: AUTH_RECOVERY_OTP_ENABLED
         value: "false"
+      # Staging runs NODE_ENV=production, so its one-time cutover rehearsal uses
+      # the same candidate-SHA acknowledgement as production. Set both for the
+      # migration release and remove them after the binding migration records.
+      - key: FEATURE_FLAG_CUTOVER_ACK
+        sync: false
+      - key: FEATURE_FLAG_CUTOVER_ACK_SHA
+        sync: false
       - key: DATABASE_URL
         fromDatabase: { name: alistore-postgres-staging, property: connectionString }
       - key: DIRECT_DATABASE_URL

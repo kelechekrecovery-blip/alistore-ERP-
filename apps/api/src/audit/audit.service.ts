@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 
 /** One append-only ledger entry to write inside a mutation transaction. */
 export interface AuditInput {
+  /** Optional caller-generated correlation id for atomically bound domain rows. */
+  id?: string;
   type: string;
   actor: string;
   payload: Record<string, unknown>;
@@ -43,6 +45,7 @@ export class AuditService {
       if (events.length > 0) {
         await tx.auditEvent.createMany({
           data: events.map((e) => ({
+            ...(e.id ? { id: e.id } : {}),
             type: e.type,
             actor: e.actor,
             payload: e.payload as Prisma.InputJsonValue,

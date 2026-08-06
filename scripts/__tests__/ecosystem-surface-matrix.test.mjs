@@ -353,3 +353,37 @@ test('every executive traceability row has validated manifest IDs or explicit N/
   assert.equal(report.executiveTraceability.rows, 23);
   assert.equal(report.executiveTraceability.errors.length, 0);
 });
+
+test('executive status claims never outrun linked manifest statuses', () => {
+  const source = JSON.parse(fs.readFileSync(
+    path.join(projectRoot, 'docs/acceptance/ecosystem-surface-matrix.json'),
+    'utf8',
+  ));
+  const statuses = new Map(source.rows.map(({ id, status }) => [id, status]));
+  const executive = fs.readFileSync(
+    path.join(projectRoot, 'docs/ECOSYSTEM-TRACEABILITY-MATRIX.md'),
+    'utf8',
+  );
+  const conflicts = [];
+  assert.equal(
+    executive.includes('zero `accepted` rows'),
+    source.rows.every(({ status }) => status !== 'accepted'),
+  );
+
+  for (const line of executive.split(/\r?\n/u).filter((candidate) => /^\| (?!Handoff|---)/u.test(candidate))) {
+    const cells = line.split('|').map((value) => value.trim());
+    const handoff = cells[1] ?? '';
+    const executiveStatus = cells[5] ?? '';
+    const ids = [...handoff.matchAll(/\[([^\]]+)\]\(acceptance\/ecosystem-surface-matrix\.json\)/gu)]
+      .flatMap((match) => match[1].split(',').map((value) => value.trim()).filter(Boolean));
+    const linkedStatuses = ids.map((id) => statuses.get(id));
+    if (/\baccepted\b/iu.test(executiveStatus) && linkedStatuses.some((status) => status !== 'accepted')) {
+      conflicts.push(`${handoff}: accepted claim exceeds linked manifest status`);
+    }
+    if (linkedStatuses.includes('blocked') && !/\bblocked\b/iu.test(executiveStatus)) {
+      conflicts.push(`${handoff}: blocked linked row is not disclosed`);
+    }
+  }
+
+  assert.deepEqual(conflicts, []);
+});

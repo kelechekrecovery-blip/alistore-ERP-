@@ -15,6 +15,20 @@ down, or destructive schema migrations during an incident or image rollback.
 Correct a bad schema/data change with a later, forward migration after the
 service is stable.
 
+### Approved Gate 0 control-plane retirement exception
+
+The feature-flag generation/evidence cutover is a separately staged retirement
+boundary approved on 2026-08-07. It is deliberately narrower than general
+application compatibility: previous images remain read/evaluation compatible,
+but their six feature-flag override mutations fail closed after the boundary.
+Production may apply it only through the SHA-bound drain/freeze gate and
+rollback-control procedure in
+[Feature-flag mutation cutover](FEATURE-FLAG-CUTOVER.md). The predeploy process
+holds the existing per-key mutation locks across Prisma deployment; rollback
+keeps previous-image feature-flag mutation routes closed and uses the reviewed
+current control CLI. This exception does not authorize any other breaking
+write contract or a destructive/reverse migration.
+
 This rule supersedes narrower historical wording. The header in
 `.github/workflows/cd-production.yml` prohibits reversing a *data-bearing*
 migration, but this contract prohibits every production schema rollback; the
@@ -30,7 +44,9 @@ shows that every deployed image can safely use the intermediate state.
 
 1. **Additive schema/index.** Add tables, nullable columns, optional relations,
    non-breaking indexes, or an expansion representation. Existing reads and
-   writes remain valid.
+   writes remain valid unless a separately reviewed retirement boundary names
+   the exact intentionally retired write contract and its executable freeze,
+   fallback control, and rollback procedure.
 2. **Compatible deploy.** Deploy code that tolerates both old and new rows and
    does not require the new field/value to exist. The production command remains
    `npm run db:deploy -w @alistore/api`, which uses `DIRECT_DATABASE_URL` in
@@ -71,6 +87,9 @@ the release evidence (without credentials or connection strings):
   reconciliation queries; synthetic empty-schema success is insufficient.
 - The compatibility matrix naming the prior image, candidate image, workers and
   integrations, their schema assumptions, and the image approved for rollback.
+  For the approved feature-flag retirement, it must explicitly record that the
+  previous image is read-only for owner flag control and name the current
+  control CLI as the rollback mutation path.
 
 After deployment, retain migration status/output, deployed image/revision,
 backfill result (or explicit `not applicable`), reconciliation query results,

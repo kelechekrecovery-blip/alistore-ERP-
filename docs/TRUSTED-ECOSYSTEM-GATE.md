@@ -2,11 +2,33 @@
 
 The audit and evidence recorder must execute the bootstrap bytes committed in `HEAD`, not the worktree copy and not an npm lifecycle command. The system Git invocation below has an empty environment, explicit repository paths, disabled replacement objects and disabled global/system configuration.
 
+`TRUSTED_WORK_TREE` and `TRUSTED_GIT_DIR` are explicit trust inputs and must describe the
+same selected checkout. For a linked worktree, set `TRUSTED_GIT_DIR` to its absolute
+administrative directory under the common repository's `.git/worktrees/` directory, not to
+the worktree's `.git` marker file. The committed bootstrap independently validates the marker,
+common directory and backpointer before Node starts, and requires the resolved common directory
+to match its pinned canonical repository anchor. An internally consistent alternate repository
+is therefore not an accepted trust root.
+
 ```bash
 TRUSTED_GIT_DIR=/Users/alistore/Desktop/alistore-erp/.git
 TRUSTED_WORK_TREE=/Users/alistore/Desktop/alistore-erp
+TRUSTED_COMMON_GIT_DIR=/Users/alistore/Desktop/alistore-erp/.git
 TRUSTED_BOOTSTRAP=$(/usr/bin/mktemp -t alistore-bootstrap)
 trap '/bin/rm -f "$TRUSTED_BOOTSTRAP"' EXIT HUP INT TERM
+
+RESOLVED_GIT_DIR=$(/usr/bin/env -i HOME="$HOME" LANG=C PATH=/usr/bin:/bin \
+  GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_NO_REPLACE_OBJECTS=1 \
+  /usr/bin/git -C "$TRUSTED_WORK_TREE" --no-replace-objects \
+  rev-parse --path-format=absolute --absolute-git-dir) || exit 1
+RESOLVED_COMMON_GIT_DIR=$(/usr/bin/env -i HOME="$HOME" LANG=C PATH=/usr/bin:/bin \
+  GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_NO_REPLACE_OBJECTS=1 \
+  /usr/bin/git --git-dir="$TRUSTED_GIT_DIR" --work-tree="$TRUSTED_WORK_TREE" \
+  --no-replace-objects rev-parse --path-format=absolute --git-common-dir) || exit 1
+if [ "$RESOLVED_GIT_DIR" != "$TRUSTED_GIT_DIR" ] || \
+   [ "$RESOLVED_COMMON_GIT_DIR" != "$TRUSTED_COMMON_GIT_DIR" ]; then
+  exit 1
+fi
 
 if ! /usr/bin/env -i HOME="$HOME" LANG=C PATH=/usr/bin:/bin \
   GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_NO_REPLACE_OBJECTS=1 \
@@ -16,7 +38,10 @@ if ! /usr/bin/env -i HOME="$HOME" LANG=C PATH=/usr/bin:/bin \
   exit 1
 fi
 
-/bin/sh "$TRUSTED_BOOTSTRAP" scripts/ecosystem-contract-audit.mjs
+(
+  cd "$TRUSTED_WORK_TREE"
+  /bin/sh "$TRUSTED_BOOTSTRAP" scripts/ecosystem-contract-audit.mjs
+)
 gate_status=$?
 /bin/rm -f "$TRUSTED_BOOTSTRAP"
 trap - EXIT HUP INT TERM

@@ -3146,12 +3146,15 @@ model ExchangeRequest {
 
 // Неизменяемо. Только append. Никаких update/delete. Источник правды.
 model AuditEvent {
-  id      String   @id @default(cuid())
-  type    String // order.* payment.* stock.* approval.* и т.д.
-  actor   String
-  ts      DateTime @default(now())
-  payload Json
-  refs    String[] // связанные id (orderId, imei, shiftId…)
+  id                            String                 @id @default(cuid())
+  type                          String // order.* payment.* stock.* approval.* и т.д.
+  actor                         String
+  ts                            DateTime               @default(now())
+  payload                       Json
+  refs                          String[] // связанные id (orderId, imei, shiftId…)
+  featureFlagOverrideEvidence   FeatureFlagOverride?   @relation("FeatureFlagOverrideEvidence")
+  featureFlagGenerationEvidence FeatureFlagGeneration? @relation("FeatureFlagGenerationEvidence")
+  featureFlagEvidenceConsumption FeatureFlagEvidenceConsumption? @relation("FeatureFlagEvidenceConsumption")
 
   @@index([type])
   @@index([actor])
@@ -3930,21 +3933,45 @@ model Setting {
 /// corresponding legacy environment alias and then to the registry's safe
 /// disabled default. Keys are validated by FeatureFlagsService before writes.
 model FeatureFlagOverride {
-  key       String   @id
-  enabled   Boolean
-  reason    String
-  updatedBy String
-  revision  Int      @default(1)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  key              String     @id
+  enabled          Boolean
+  reason           String
+  updatedBy        String
+  revision         Int        @default(1)
+  active           Boolean    @default(true)
+  evidenceEventId  String     @unique
+  evidenceRevision Int
+  evidenceVersion  Int        @default(2) @db.SmallInt
+  evidenceEvent    AuditEvent @relation("FeatureFlagOverrideEvidence", fields: [evidenceEventId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   @@index([updatedAt])
 }
 
 /// Persistent OCC generation independent from active override row existence.
 model FeatureFlagGeneration {
-  key       String   @id
+  key              String      @id
+  revision         Int
+  evidenceEventId  String?     @unique
+  evidenceRevision Int?
+  evidenceAction   String?
+  evidenceEvent    AuditEvent? @relation("FeatureFlagGenerationEvidence", fields: [evidenceEventId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedAt        DateTime    @default(now()) @updatedAt
+}
+
+/// Permanent, single-use binding between a feature-flag generation and its
+/// append-only AuditEvent. Rows are inserted only by the database mutation trigger.
+model FeatureFlagEvidenceConsumption {
+  eventId   String     @id
+  key       String
   revision  Int
-  updatedAt DateTime @default(now()) @updatedAt
+  action    String
+  version   Int        @db.SmallInt
+  transactionId String
+  createdAt DateTime   @default(now())
+  event     AuditEvent @relation("FeatureFlagEvidenceConsumption", fields: [eventId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([key, revision])
+  @@index([key, createdAt])
 }

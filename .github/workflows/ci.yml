@@ -70,7 +70,9 @@ jobs:
       - run: npm run prisma:generate -w @alistore/api
       - run: npm run test:refund-migration-upgrade -w @alistore/api
       - run: npm run test:feature-flag-generation-migration -w @alistore/api
+      - run: npm run test:feature-flag-cutover-gate -w @alistore/api
       - run: npm run db:deploy -w @alistore/api
+      - run: npm run test:feature-flag-control -w @alistore/api
       - run: npm run api:build
       - run: npm run build -w @alistore/web
       - name: API tests in an isolated per-run schema

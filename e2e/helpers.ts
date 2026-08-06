@@ -15,6 +15,7 @@ export const prisma = new PrismaClient({
 export const API_BASE = `http://127.0.0.1:${Number(process.env.E2E_API_PORT ?? 4200)}/api`;
 
 export async function resetDb() {
+  await clearFeatureFlagState();
   await prisma.storefrontContentRevision.deleteMany();
   await prisma.hrPayrollCommand.deleteMany();
   await prisma.hrPayrollLine.deleteMany();
@@ -131,6 +132,59 @@ export async function resetDb() {
   await prisma.accountingAccount.createMany({
     data: ACCOUNTING_ACCOUNT_SEED.map(({ code, name, type }) => ({ code, name, type })),
     skipDuplicates: true,
+  });
+}
+
+export async function clearFeatureFlagState() {
+  const [{ database }] = await prisma.$queryRaw<Array<{ database: string }>>`
+    SELECT current_database() AS database
+  `;
+  if (!database || !/(^|[_-])test($|[_-])/i.test(database)) {
+    throw new Error(
+      `Refusing feature-flag E2E cleanup outside an explicit test database: ${database ?? 'unknown'}`,
+    );
+  }
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(
+      'ALTER TABLE "FeatureFlagOverride" DISABLE TRIGGER "FeatureFlagOverride_00_require_current_image"',
+    );
+    await tx.$executeRawUnsafe(
+      'ALTER TABLE "FeatureFlagOverride" DISABLE TRIGGER "FeatureFlagOverride_10_prepare_revision"',
+    );
+    await tx.$executeRawUnsafe(
+      'ALTER TABLE "FeatureFlagOverride" DISABLE TRIGGER "FeatureFlagOverride_20_finish_mutation"',
+    );
+    await tx.$executeRawUnsafe(
+      'ALTER TABLE "FeatureFlagGeneration" DISABLE TRIGGER "FeatureFlagGeneration_00_prevent_destruction"',
+    );
+    await tx.$executeRawUnsafe(
+      'ALTER TABLE "FeatureFlagEvidenceConsumption" DISABLE TRIGGER "FeatureFlagEvidenceConsumption_00_guard_rows"',
+    );
+    await tx.$executeRawUnsafe(
+      'ALTER TABLE "AuditEvent" DISABLE TRIGGER "AuditEvent_90_protect_feature_flag_evidence"',
+    );
+    await tx.featureFlagOverride.deleteMany();
+    await tx.featureFlagGeneration.deleteMany();
+    await tx.$executeRawUnsafe('DELETE FROM "FeatureFlagEvidenceConsumption"');
+    await tx.auditEvent.deleteMany({ where: { type: 'feature_flag.changed' } });
+    await tx.$executeRawUnsafe(
+      'ALTER TABLE "AuditEvent" ENABLE TRIGGER "AuditEvent_90_protect_feature_flag_evidence"',
+    );
+    await tx.$executeRawUnsafe(
+      'ALTER TABLE "FeatureFlagEvidenceConsumption" ENABLE TRIGGER "FeatureFlagEvidenceConsumption_00_guard_rows"',
+    );
+    await tx.$executeRawUnsafe(
+      'ALTER TABLE "FeatureFlagGeneration" ENABLE TRIGGER "FeatureFlagGeneration_00_prevent_destruction"',
+    );
+    await tx.$executeRawUnsafe(
+      'ALTER TABLE "FeatureFlagOverride" ENABLE TRIGGER "FeatureFlagOverride_20_finish_mutation"',
+    );
+    await tx.$executeRawUnsafe(
+      'ALTER TABLE "FeatureFlagOverride" ENABLE TRIGGER "FeatureFlagOverride_10_prepare_revision"',
+    );
+    await tx.$executeRawUnsafe(
+      'ALTER TABLE "FeatureFlagOverride" ENABLE TRIGGER "FeatureFlagOverride_00_require_current_image"',
+    );
   });
 }
 

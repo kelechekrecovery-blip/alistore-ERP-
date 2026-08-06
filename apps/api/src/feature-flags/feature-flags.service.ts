@@ -1,6 +1,7 @@
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError } from '../common/errors';
@@ -42,6 +43,7 @@ interface EvaluatedValue {
 const featureFlagLockName = (key: FeatureFlagKey) => `feature-flag-override:${key}`;
 const featureFlagMutationSetting = 'alistore.feature_flag_mutation_contract';
 const featureFlagMutationContract = 'generation-v2';
+const featureFlagMutationIdSetting = 'alistore.feature_flag_mutation_id';
 
 @Injectable()
 export class FeatureFlagsService {
@@ -99,6 +101,8 @@ export class FeatureFlagsService {
       const existing = await tx.featureFlagOverride.findUnique({ where: { key: definition.key } });
       this.assertExpectedRevision(generation?.revision ?? null, expectedRevision);
       const before = this.evaluate(definition, existing);
+      const revision = (generation?.revision ?? 0) + 1;
+      const mutationId = randomUUID();
       const stored = await tx.featureFlagOverride.upsert({
         where: { key: definition.key },
         create: {
@@ -107,12 +111,18 @@ export class FeatureFlagsService {
           reason: normalizedReason,
           updatedBy: actor,
           active: true,
+          evidenceEventId: mutationId,
+          evidenceRevision: revision,
+          evidenceVersion: 2,
         },
         update: {
           enabled,
           reason: normalizedReason,
           updatedBy: actor,
           active: true,
+          evidenceEventId: mutationId,
+          evidenceRevision: revision,
+          evidenceVersion: 2,
         },
       });
       const nextGeneration = await tx.featureFlagGeneration.findUniqueOrThrow({
@@ -121,7 +131,15 @@ export class FeatureFlagsService {
       const after: EvaluatedValue = { enabled, source: 'database' };
       return {
         result: this.state(definition, stored, nextGeneration.revision),
-        events: [this.changedEvent(definition.key, normalizedReason, before, after, actor)],
+        events: [this.changedEvent(
+          definition.key,
+          normalizedReason,
+          before,
+          after,
+          actor,
+          mutationId,
+          nextGeneration.revision,
+        )],
       };
     });
   }
@@ -143,15 +161,31 @@ export class FeatureFlagsService {
       });
       const existing = await tx.featureFlagOverride.findUnique({ where: { key: definition.key } });
       this.assertExpectedRevision(generation?.revision ?? null, expectedRevision);
-      const before = this.evaluate(definition, existing);
       const after = this.evaluate(definition);
+      if (!existing) {
+        return {
+          result: this.state(definition, undefined, generation?.revision ?? null),
+          events: [],
+        };
+      }
+      const before = this.evaluate(definition, existing);
+      const mutationId = randomUUID();
+      await this.markMutationId(tx, mutationId);
       await tx.featureFlagOverride.deleteMany({ where: { key: definition.key } });
       const nextGeneration = await tx.featureFlagGeneration.findUnique({
         where: { key: definition.key },
       });
       return {
         result: this.state(definition, undefined, nextGeneration?.revision ?? null),
-        events: [this.changedEvent(definition.key, normalizedReason, before, after, actor)],
+        events: [this.changedEvent(
+          definition.key,
+          normalizedReason,
+          before,
+          after,
+          actor,
+          mutationId,
+          nextGeneration?.revision ?? 0,
+        )],
       };
     });
   }
@@ -224,17 +258,34 @@ export class FeatureFlagsService {
     }
   }
 
+  /** Bind a row-deleting reset to the AuditEvent inserted before commit. */
+  private async markMutationId(tx: Prisma.TransactionClient, mutationId: string): Promise<void> {
+    const [result] = await tx.$queryRaw<Array<{ mutationId: string }>>`
+      SELECT set_config(
+        ${featureFlagMutationIdSetting},
+        ${mutationId},
+        true
+      ) AS "mutationId"
+    `;
+    if (result?.mutationId !== mutationId) {
+      throw new Error('Feature flag mutation ID was not installed');
+    }
+  }
+
   private changedEvent(
     key: FeatureFlagKey,
     reason: string,
     before: EvaluatedValue,
     after: EvaluatedValue,
     actor: string,
+    mutationId: string,
+    revision: number,
   ) {
     return {
+      id: mutationId,
       type: EventType.FeatureFlagChanged,
       actor,
-      payload: { key, reason, before, after },
+      payload: { key, reason, mutationId, revision, before, after },
       refs: [key],
     };
   }

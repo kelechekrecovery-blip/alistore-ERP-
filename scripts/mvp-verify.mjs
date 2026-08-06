@@ -17,6 +17,7 @@ const steps = [
   ['Prisma client generate', 'npm', ['run', 'prisma:generate', '-w', '@alistore/api']],
   ['Refund migration upgrade path', 'npm', ['run', 'test:refund-migration-upgrade', '-w', '@alistore/api'], migrationEnv],
   ['Feature-flag generation migration path', 'npm', ['run', 'test:feature-flag-generation-migration', '-w', '@alistore/api'], migrationEnv],
+  ['Feature-flag cutover predeploy gate', 'npm', ['run', 'test:feature-flag-cutover-gate', '-w', '@alistore/api']],
   ['Inventory roll-forward migration upgrade path', 'npm', ['run', 'test:inventory-roll-forward-migration-upgrade', '-w', '@alistore/api'], migrationEnv],
   ['Exchange migration upgrade path', 'npm', ['run', 'test:exchange-migration-upgrade', '-w', '@alistore/api'], migrationEnv],
   ['Order payment-mode migration upgrade path', 'npm', ['run', 'test:order-payment-mode-migration-upgrade', '-w', '@alistore/api'], migrationEnv],
@@ -38,6 +39,7 @@ const steps = [
     migrationEnv,
   ],
   ['Test database post-deploy indexes', 'node', ['apps/api/scripts/postdeploy-indexes.mjs'], migrationEnv],
+  ['Feature-flag rollback control', 'npm', ['run', 'test:feature-flag-control', '-w', '@alistore/api'], migrationEnv],
   // Integration suites share one test database and must not clean fixtures concurrently.
   ['API Jest batches', 'node', ['scripts/run-api-test-batches.mjs'], testEnv],
 ];

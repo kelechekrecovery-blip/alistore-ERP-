@@ -82,6 +82,106 @@ export const SUPPLY_LIFECYCLE_EVIDENCE = Object.freeze({
   quarantine: ['supply-quarantine: quarantines and resolves serialized and quantity supply'],
 });
 
+export const SUPPLY_FEATURE_FLAGS = Object.freeze([
+  { key: 'supply.to_order_checkout', legacyEnv: 'TO_ORDER_CHECKOUT_ENABLED' },
+  { key: 'supply.cancellation', legacyEnv: 'SUPPLY_CANCELLATION_ENABLED' },
+  { key: 'supply.auto_refund', legacyEnv: 'SUPPLY_AUTO_REFUND_ENABLED' },
+  { key: 'supply.owner_resolution', legacyEnv: 'SUPPLY_OWNER_RESOLUTION_ENABLED' },
+  { key: 'supply.partial_handover', legacyEnv: 'SUPPLY_PARTIAL_HANDOVER_ENABLED' },
+  { key: 'supply.quarantine_conversion', legacyEnv: 'SUPPLY_QUARANTINE_CONVERSION_ENABLED' },
+]);
+
+export function sanitizeSupplyGateChildEnvironment(env) {
+  const sanitized = { ...env };
+  for (const name of [
+    'SUPPLY_GATE_TARGET_DATABASE_URL',
+    'DIRECT_DATABASE_URL',
+    'DATABASE_URL',
+    'TEST_DATABASE_URL',
+    'E2E_DATABASE_URL',
+  ]) delete sanitized[name];
+  return sanitized;
+}
+
+export function evaluateSupplyFeatureFlagGate({
+  databaseEstablished,
+  overrides,
+  env = {},
+}) {
+  const fail = (detail) => ({ status: 'FAIL', detail, evidence: { states: [] } });
+  if (!databaseEstablished) {
+    return fail('authoritative target database feature-flag state is unavailable');
+  }
+  if (!Array.isArray(overrides)) return fail('authoritative target database returned invalid state');
+  const allowed = new Set(SUPPLY_FEATURE_FLAGS.map(({ key }) => key));
+  const stored = new Map();
+  for (const row of overrides) {
+    if (
+      !row
+      || !allowed.has(row.key)
+      || typeof row.enabled !== 'boolean'
+      || stored.has(row.key)
+    ) {
+      return fail('authoritative target database returned invalid or conflicting state');
+    }
+    stored.set(row.key, row.enabled);
+  }
+  const states = SUPPLY_FEATURE_FLAGS.map((definition) => {
+    if (stored.has(definition.key)) {
+      return { key: definition.key, enabled: stored.get(definition.key), source: 'database' };
+    }
+    if (env[definition.legacyEnv] !== undefined) {
+      return {
+        key: definition.key,
+        enabled: String(env[definition.legacyEnv]).trim().toLowerCase() === 'true',
+        source: 'environment',
+      };
+    }
+    return { key: definition.key, enabled: false, source: 'default' };
+  });
+  const unsafe = states.filter(({ enabled }) => enabled);
+  const unbound = states.filter(({ source }) => source !== 'database');
+  const sourceCounts = Object.fromEntries(
+    ['database', 'environment', 'default'].map((source) => [
+      source,
+      states.filter((state) => state.source === source).length,
+    ]),
+  );
+  return {
+    status: unsafe.length === 0 && unbound.length === 0 ? 'PASS' : 'FAIL',
+    detail: unsafe.length > 0
+      ? `release-sensitive effective flags enabled: ${unsafe.map(({ key, source }) => `${key}(${source})`).join(', ')}`
+      : unbound.length > 0
+        ? `target deployment fallback is not database-authoritative: ${unbound.map(({ key, source }) => `${key}(${source})`).join(', ')}`
+        : `authoritative effective flags disabled (database=${sourceCounts.database}, environment=${sourceCounts.environment}, default=${sourceCounts.default})`,
+    evidence: { precedence: 'database>environment>default(false)', states },
+  };
+}
+
+export async function loadSupplyFeatureFlagOverrides(databaseUrl, cwd = root) {
+  if (!databaseUrl) throw new Error('target database URL is required');
+  const require = createRequire(import.meta.url);
+  const { Client } = require(require.resolve('pg', { paths: [path.join(cwd, 'apps/api'), cwd] }));
+  const client = new Client({
+    connectionString: databaseUrl,
+    connectionTimeoutMillis: 10_000,
+    query_timeout: 15_000,
+    statement_timeout: 15_000,
+  });
+  await client.connect();
+  try {
+    const result = await client.query(`
+      SELECT "key", "enabled"
+      FROM "FeatureFlagOverride"
+      WHERE "key" = ANY($1::TEXT[])
+      ORDER BY "key"
+    `, [SUPPLY_FEATURE_FLAGS.map(({ key }) => key)]);
+    return result.rows;
+  } finally {
+    await client.end();
+  }
+}
+
 export const certificationChecks = Object.freeze([
   ['payment_gateway', 'PAYMENT_PROVIDER_CERTIFIED'],
   ['refund_webhook', 'REFUND_WEBHOOK_CERTIFIED'],
@@ -399,6 +499,7 @@ export async function executeSupplyReleaseGate({
   const startedAt = new Date();
   const results = [];
   const commitSnapshots = [];
+  const childEnvironment = sanitizeSupplyGateChildEnvironment(env);
 
   function record(id, status, detail, command = null, evidence = undefined) {
     const row = { id, status, detail, command };
@@ -416,7 +517,7 @@ export async function executeSupplyReleaseGate({
     const result = spawnSync(command, commandArgs, {
       cwd,
       stdio: 'inherit',
-      env: { ...env, ...(options.env ?? {}) },
+      env: { ...childEnvironment, ...(options.env ?? {}) },
     });
     if (result.error?.code === 'ENOENT') {
       record(id, options.optional ? 'BLOCKED' : 'FAIL', `${command} is not installed`, printable);
@@ -441,7 +542,11 @@ export async function executeSupplyReleaseGate({
       record(id, 'BLOCKED', 'not probed in --plan mode', [command, ...commandArgs].join(' '));
       return false;
     }
-    const result = spawnSync(command, commandArgs, { cwd, encoding: 'utf8' });
+    const result = spawnSync(command, commandArgs, {
+      cwd,
+      encoding: 'utf8',
+      env: childEnvironment,
+    });
     if (result.status !== 0) {
       record(id, 'BLOCKED', `${command} prerequisite unavailable`);
       return false;
@@ -451,22 +556,35 @@ export async function executeSupplyReleaseGate({
     return true;
   }
 
-  function assertFeatureFlags(id) {
-    const featureFlags = [
-      'TO_ORDER_CHECKOUT_ENABLED',
-      'SUPPLY_CANCELLATION_ENABLED',
-      'SUPPLY_AUTO_REFUND_ENABLED',
-      'SUPPLY_OWNER_RESOLUTION_ENABLED',
-      'SUPPLY_PARTIAL_HANDOVER_ENABLED',
-      'SUPPLY_QUARANTINE_CONVERSION_ENABLED',
-    ];
-    const unsafe = featureFlags.filter((name) => env[name]?.trim().toLowerCase() === 'true');
+  async function assertFeatureFlags(id) {
+    if (planOnly) {
+      record(id, 'BLOCKED', 'authoritative target database not queried in --plan mode');
+      return;
+    }
+    const targetDatabaseUrl = env.SUPPLY_GATE_TARGET_DATABASE_URL
+      ?? env.DIRECT_DATABASE_URL
+      ?? env.DATABASE_URL;
+    let assessment;
+    try {
+      const overrides = await loadSupplyFeatureFlagOverrides(targetDatabaseUrl, cwd);
+      assessment = evaluateSupplyFeatureFlagGate({
+        databaseEstablished: true,
+        overrides,
+        env,
+      });
+    } catch {
+      assessment = evaluateSupplyFeatureFlagGate({
+        databaseEstablished: false,
+        overrides: [],
+        env,
+      });
+    }
     record(
       id,
-      unsafe.length === 0 ? 'PASS' : 'FAIL',
-      unsafe.length === 0
-        ? 'all release-sensitive supply flags are false/unset'
-        : `must remain false until explicit certified cutover: ${unsafe.join(', ')}`,
+      assessment.status,
+      assessment.detail,
+      'read-only authoritative target feature-flag registry query',
+      assessment.evidence,
     );
   }
 
@@ -545,8 +663,10 @@ export async function executeSupplyReleaseGate({
 
   async function runFullPass(passNumber, testUrl) {
     const prefix = `pass_${passNumber}`;
-    assertFeatureFlags(`${prefix}_supply_feature_flags`);
-    run(`${prefix}_prisma_validate`, 'npm', ['exec', '-w', '@alistore/api', '--', 'prisma', 'validate']);
+    await assertFeatureFlags(`${prefix}_supply_feature_flags`);
+    run(`${prefix}_prisma_validate`, 'npm', ['exec', '-w', '@alistore/api', '--', 'prisma', 'validate'], {
+      env: { DATABASE_URL: testUrl },
+    });
     run(`${prefix}_supply_migration_upgrade`, 'npm', ['run', 'test:supply-migration-upgrade', '-w', '@alistore/api'], {
       env: { TEST_DATABASE_URL: testUrl },
     });
@@ -578,8 +698,12 @@ export async function executeSupplyReleaseGate({
     run(`${prefix}_web_tests`, 'npm', ['run', 'test', '-w', '@alistore/web']);
     run(`${prefix}_web_build`, 'npm', ['run', 'build', '-w', '@alistore/web']);
     await isolatedPlaywright(prefix);
-    run(`${prefix}_production_preflight_strict`, 'npm', ['run', 'launch:preflight:strict']);
-    run(`${prefix}_production_readiness_strict`, 'npm', ['run', 'launch:readiness:strict']);
+    run(`${prefix}_production_preflight_strict`, 'npm', ['run', 'launch:preflight:strict'], {
+      env: env.DATABASE_URL ? { DATABASE_URL: env.DATABASE_URL } : {},
+    });
+    run(`${prefix}_production_readiness_strict`, 'npm', ['run', 'launch:readiness:strict'], {
+      env: env.DATABASE_URL ? { DATABASE_URL: env.DATABASE_URL } : {},
+    });
     run(`${prefix}_secret_scan`, 'gitleaks', ['dir', '--redact', '--no-banner', '.'], { optional: true });
     run(`${prefix}_dependency_scan`, 'osv-scanner', ['scan', 'source', '-r', '.'], { optional: true });
     if (skipNative) {

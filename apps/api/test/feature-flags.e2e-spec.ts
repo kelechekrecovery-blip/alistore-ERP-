@@ -43,6 +43,8 @@ type LedgerState = { enabled: boolean; source: 'database' | 'environment' | 'def
 type FeatureFlagEventPayload = {
   key: string;
   reason: string;
+  mutationId: string;
+  revision: number;
   before: LedgerState;
   after: LedgerState;
 };
@@ -89,7 +91,6 @@ describe('Feature flags (integration)', () => {
 
   afterAll(async () => {
     await clearFeatureFlagState();
-    await prisma.auditEvent.deleteMany({ where: { type: 'feature_flag.changed' } });
     await app.close();
     await prisma.$disconnect();
     for (const [name, value] of originalEnvironment) {
@@ -100,7 +101,6 @@ describe('Feature flags (integration)', () => {
 
   beforeEach(async () => {
     await clearFeatureFlagState();
-    await prisma.auditEvent.deleteMany({ where: { type: 'feature_flag.changed' } });
     for (const name of ENV_NAMES) delete process.env[name];
   });
 
@@ -181,8 +181,25 @@ describe('Feature flags (integration)', () => {
     expect(events[0].payload).toEqual({
       key: FeatureFlagKey.ToOrderCheckout,
       reason: 'Pause rollout after a checkout alert',
+      mutationId: events[0].id,
+      revision: 1,
       before: { enabled: true, source: 'environment' },
       after: { enabled: false, source: 'database' },
+    });
+    await expect(prisma.featureFlagOverride.findUnique({
+      where: { key: FeatureFlagKey.ToOrderCheckout },
+    })).resolves.toMatchObject({
+      evidenceEventId: events[0].id,
+      evidenceRevision: 1,
+      revision: 1,
+    });
+    await expect(prisma.featureFlagGeneration.findUnique({
+      where: { key: FeatureFlagKey.ToOrderCheckout },
+    })).resolves.toMatchObject({
+      evidenceEventId: events[0].id,
+      evidenceRevision: 1,
+      evidenceAction: 'set',
+      revision: 1,
     });
     expect(JSON.stringify(events[0].payload)).not.toContain('TO_ORDER_CHECKOUT_ENABLED');
   });
@@ -212,10 +229,6 @@ describe('Feature flags (integration)', () => {
     expect(await prisma.featureFlagOverride.findUnique({
       where: { key: FeatureFlagKey.Cancellation },
     })).toBeNull();
-    expect(await prisma.featureFlagGeneration.findUnique({
-      where: { key: FeatureFlagKey.Cancellation },
-    })).toMatchObject({ revision: 2 });
-
     const events = await prisma.auditEvent.findMany({
       where: { type: 'feature_flag.changed', refs: { has: FeatureFlagKey.Cancellation } },
       orderBy: { ts: 'asc' },
@@ -224,9 +237,59 @@ describe('Feature flags (integration)', () => {
     expect(events[1].payload).toEqual({
       key: FeatureFlagKey.Cancellation,
       reason: 'Restore deployment policy',
+      mutationId: events[1].id,
+      revision: 2,
       before: { enabled: false, source: 'database' },
       after: { enabled: true, source: 'environment' },
     });
+    expect(await prisma.featureFlagGeneration.findUnique({
+      where: { key: FeatureFlagKey.Cancellation },
+    })).toMatchObject({
+      evidenceEventId: events[1].id,
+      evidenceRevision: 2,
+      evidenceAction: 'reset',
+      revision: 2,
+    });
+  });
+
+  it('treats an already-absent reset as an idempotent no-op at null and retained generations', async () => {
+    const neverSetKey = FeatureFlagKey.PartialHandover;
+    const neverSetResponse = await request(app.getHttpServer())
+      .delete(`/feature-flags/${neverSetKey}`)
+      .set('Authorization', `Bearer ${tokens.owner}`)
+      .send({ reason: 'Confirm fallback without an override', expectedRevision: null })
+      .expect(200);
+    expect(neverSetResponse.body).toMatchObject({
+      key: neverSetKey,
+      overrideActive: false,
+      overrideRevision: null,
+      source: 'default',
+    });
+    expect(await prisma.featureFlagGeneration.findUnique({ where: { key: neverSetKey } })).toBeNull();
+    expect(await featureFlagEventPayloads(neverSetKey)).toHaveLength(0);
+
+    const retainedKey = FeatureFlagKey.AutoRefund;
+    const set = await flags.set(retainedKey, true, 'Create retained generation', 'owner-set', null);
+    const reset = await flags.reset(
+      retainedKey,
+      'Remove retained generation override',
+      'owner-reset',
+      set.overrideRevision,
+    );
+    const replayResponse = await request(app.getHttpServer())
+      .delete(`/feature-flags/${retainedKey}`)
+      .set('Authorization', `Bearer ${tokens.owner}`)
+      .send({ reason: 'Confirm retained-generation fallback', expectedRevision: reset.overrideRevision })
+      .expect(200);
+    expect(replayResponse.body).toMatchObject({
+      key: retainedKey,
+      overrideActive: false,
+      overrideRevision: 2,
+      source: 'default',
+    });
+    expect(await prisma.featureFlagGeneration.findUnique({ where: { key: retainedKey } }))
+      .toMatchObject({ revision: 2, evidenceAction: 'reset' });
+    expect(await featureFlagEventPayloads(retainedKey)).toHaveLength(2);
   });
 
   it('preserves a monotonic generation across reset/recreate and rejects stale ABA mutations', async () => {
@@ -265,6 +328,7 @@ describe('Feature flags (integration)', () => {
       where: { key },
       create: {
         key, enabled: false, reason: 'Tombstone-image insert', updatedBy: 'tombstone-image', active: false,
+        evidenceEventId: 'unreachable-tombstone-image-event', evidenceRevision: 2,
       },
       update: {
         reason: 'Tombstone-image reset', updatedBy: 'tombstone-image', active: false,
@@ -303,6 +367,8 @@ describe('Feature flags (integration)', () => {
         reason: 'Stale previous-image null create',
         updatedBy: 'previous-image',
         active: true,
+        evidenceEventId: 'unreachable-previous-image-event',
+        evidenceRevision: 3,
       },
       update: {
         enabled: false,
@@ -363,9 +429,6 @@ describe('Feature flags (integration)', () => {
   it('serializes concurrent set/reset mutations and prevents a stale reset deleting a newer override', async () => {
     const key = FeatureFlagKey.OwnerResolution;
     await flags.set(key, true, 'Initial override', 'owner-initial', null);
-    await prisma.auditEvent.deleteMany({
-      where: { type: 'feature_flag.changed', refs: { has: key } },
-    });
 
     const { results, settledWhileHeld } = await runBehindHeldFeatureFlagLock(key, [
       () => flags.set(key, false, 'Concurrent set', 'owner-set', 1),
@@ -378,9 +441,13 @@ describe('Feature flags (integration)', () => {
 
     const finalState = (await flags.list()).find((state) => state.key === key)!;
     const payloads = await featureFlagEventPayloads(key);
-    expect(payloads).toHaveLength(1);
-    expect(payloads[0].before).toEqual({ enabled: true, source: 'database' });
-    expect(payloads[0].after).toEqual({ enabled: finalState.enabled, source: finalState.source });
+    expect(payloads).toHaveLength(2);
+    const concurrentPayload = payloads.find((payload) => payload.reason.startsWith('Concurrent '));
+    expect(concurrentPayload?.before).toEqual({ enabled: true, source: 'database' });
+    expect(concurrentPayload?.after).toEqual({
+      enabled: finalState.enabled,
+      source: finalState.source,
+    });
   });
 
   it('rejects unknown keys and a missing or whitespace-only reason without persisting', async () => {
@@ -501,8 +568,46 @@ describe('Feature flags (integration)', () => {
           true
         ) AS marker
       `;
+      await tx.$executeRawUnsafe(
+        'ALTER TABLE "FeatureFlagOverride" DISABLE TRIGGER "FeatureFlagOverride_00_require_current_image"',
+      );
+      await tx.$executeRawUnsafe(
+        'ALTER TABLE "FeatureFlagOverride" DISABLE TRIGGER "FeatureFlagOverride_10_prepare_revision"',
+      );
+      await tx.$executeRawUnsafe(
+        'ALTER TABLE "FeatureFlagOverride" DISABLE TRIGGER "FeatureFlagOverride_20_finish_mutation"',
+      );
+      await tx.$executeRawUnsafe(
+        'ALTER TABLE "FeatureFlagGeneration" DISABLE TRIGGER "FeatureFlagGeneration_00_prevent_destruction"',
+      );
+      await tx.$executeRawUnsafe(
+        'ALTER TABLE "FeatureFlagEvidenceConsumption" DISABLE TRIGGER "FeatureFlagEvidenceConsumption_00_guard_rows"',
+      );
+      await tx.$executeRawUnsafe(
+        'ALTER TABLE "AuditEvent" DISABLE TRIGGER "AuditEvent_90_protect_feature_flag_evidence"',
+      );
       await tx.featureFlagOverride.deleteMany();
       await tx.featureFlagGeneration.deleteMany();
+      await tx.$executeRawUnsafe('DELETE FROM "FeatureFlagEvidenceConsumption"');
+      await tx.auditEvent.deleteMany({ where: { type: 'feature_flag.changed' } });
+      await tx.$executeRawUnsafe(
+        'ALTER TABLE "AuditEvent" ENABLE TRIGGER "AuditEvent_90_protect_feature_flag_evidence"',
+      );
+      await tx.$executeRawUnsafe(
+        'ALTER TABLE "FeatureFlagEvidenceConsumption" ENABLE TRIGGER "FeatureFlagEvidenceConsumption_00_guard_rows"',
+      );
+      await tx.$executeRawUnsafe(
+        'ALTER TABLE "FeatureFlagGeneration" ENABLE TRIGGER "FeatureFlagGeneration_00_prevent_destruction"',
+      );
+      await tx.$executeRawUnsafe(
+        'ALTER TABLE "FeatureFlagOverride" ENABLE TRIGGER "FeatureFlagOverride_20_finish_mutation"',
+      );
+      await tx.$executeRawUnsafe(
+        'ALTER TABLE "FeatureFlagOverride" ENABLE TRIGGER "FeatureFlagOverride_10_prepare_revision"',
+      );
+      await tx.$executeRawUnsafe(
+        'ALTER TABLE "FeatureFlagOverride" ENABLE TRIGGER "FeatureFlagOverride_00_require_current_image"',
+      );
     });
   }
 });
