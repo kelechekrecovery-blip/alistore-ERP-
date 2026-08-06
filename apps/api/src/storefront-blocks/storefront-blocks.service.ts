@@ -166,7 +166,7 @@ export class StorefrontBlocksService {
     if (dto.type === 'collection' && productIds.length === 0) throw new ValidationError('storefront_block_products_required', 'Подборка должна содержать товары');
     if (dto.type !== 'collection' && productIds.length > 0) throw new ValidationError('storefront_block_products_forbidden', 'Товары можно прикрепить только к подборке');
     if (productIds.length > 0) {
-      const count = await this.prisma.product.count({ where: { id: { in: productIds }, archived: false } });
+    const count = await this.prisma.product.count({ where: { id: { in: productIds }, archived: false, published: true } });
       if (count !== productIds.length) throw new ValidationError('storefront_block_product_invalid', 'Подборка содержит отсутствующий или архивный товар');
     }
     const ctaHref = optional(dto.ctaHref);

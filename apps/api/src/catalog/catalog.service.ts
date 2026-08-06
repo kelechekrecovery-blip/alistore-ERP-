@@ -128,7 +128,7 @@ export class CatalogService {
   async delta(query: CatalogDeltaQueryDto): Promise<CatalogDeltaResponseDto> {
     const limit = Math.min(Math.max(query.limit ?? 500, 1), 500);
     const since = parseSince(query.since);
-    const where: Prisma.ProductWhereInput = since
+    const changedWhere: Prisma.ProductWhereInput = since
       ? {
           OR: [
             { updatedAt: { gt: since } },
@@ -137,6 +137,7 @@ export class CatalogService {
           ],
         }
       : {};
+    const where: Prisma.ProductWhereInput = { AND: [{ published: true }, changedWhere] };
 
     const products = await this.prisma.product.findMany({
       where,
@@ -166,23 +167,23 @@ export class CatalogService {
 
   async categories(): Promise<Array<{ category: string; count: number }>> {
     const rows = await this.prisma.product.groupBy({
-      by: ['category'], where: { archived: false }, orderBy: { category: 'asc' }, _count: { _all: true },
+      by: ['category'], where: { archived: false, published: true }, orderBy: { category: 'asc' }, _count: { _all: true },
     });
     return rows.map((row) => ({ category: row.category, count: row._count._all }));
   }
 
   async product(id: string) {
     const product = await this.prisma.product.findFirst({
-      where: { id, archived: false }, include: this.stockCountInclude(),
+      where: { id, archived: false, published: true }, include: this.stockCountInclude(),
     });
     if (!product) throw new ValidationError('catalog_product_not_found', `Товар ${id} не найден`);
     const [variants, related] = await Promise.all([
       product.variantGroup ? this.prisma.product.findMany({
-        where: { archived: false, variantGroup: product.variantGroup, id: { not: id } },
+        where: { archived: false, published: true, variantGroup: product.variantGroup, id: { not: id } },
         orderBy: [{ price: 'asc' }, { name: 'asc' }], include: this.stockCountInclude(),
       }) : [],
       this.prisma.product.findMany({
-        where: { archived: false, category: product.category, id: { not: id } },
+        where: { archived: false, published: true, category: product.category, id: { not: id } },
         orderBy: [{ name: 'asc' }], take: 12, include: this.stockCountInclude(),
       }),
     ]);
@@ -194,7 +195,7 @@ export class CatalogService {
   async curated(ids: string[]): Promise<CatalogProductDto[]> {
     if (ids.length === 0) return [];
     const products = await this.prisma.product.findMany({
-      where: { id: { in: ids }, archived: false },
+      where: { id: { in: ids }, archived: false, published: true },
       include: this.stockCountInclude(),
     });
     const byId = new Map(products.map((product) => [product.id, this.toCatalogProduct(product)]));
@@ -214,7 +215,7 @@ export class CatalogService {
     const index = client.index(indexName);
 
     const products = await this.prisma.product.findMany({
-      where: { archived: false },
+      where: { archived: false, published: true },
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
       include: this.stockCountInclude(),
     });
@@ -351,6 +352,7 @@ export class CatalogService {
     const q = query.q?.trim();
     return {
       archived: false,
+      published: true,
       ...(query.category ? { category: query.category } : {}),
       ...(q
         ? {

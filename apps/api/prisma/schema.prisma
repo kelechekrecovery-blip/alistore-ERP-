@@ -778,6 +778,9 @@ model Product {
   supplier                    Supplier?                    @relation(fields: [supplierId], references: [id])
   supplierOffers              SupplierOffer[]
   attrs                       Json
+  /// Public storefront visibility. Existing rows remain published; every new
+  /// SKU created through product workflows starts as a draft until media QA.
+  published                   Boolean                      @default(true)
   archived                    Boolean                      @default(false) // soft-delete: НЕ удалять физически
   updatedAt                   DateTime                     @default(now()) @updatedAt
   units                       DeviceUnit[]

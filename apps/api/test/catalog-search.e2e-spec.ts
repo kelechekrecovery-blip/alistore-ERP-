@@ -96,6 +96,29 @@ describe('Catalog search integration', () => {
     expect(result.items[0]).not.toHaveProperty('cost');
   });
 
+  it('keeps a new product draft out of every public catalog projection', async () => {
+    const draft = await prisma.product.create({
+      data: {
+        sku: `DRAFT-${Date.now()}`,
+        name: 'Draft with pending media',
+        price: 1000,
+        cost: 500,
+        category: 'drafts',
+        attrs: {},
+        published: false,
+      },
+    });
+
+    const search = await catalog.search({ limit: 20, offset: 0 });
+    const categories = await catalog.categories();
+    const curated = await catalog.curated([draft.id]);
+
+    expect(search.items.map((item) => item.id)).not.toContain(draft.id);
+    expect(categories.map((item) => item.category)).not.toContain('drafts');
+    expect(curated).toEqual([]);
+    await expect(catalog.product(draft.id)).rejects.toMatchObject({ code: 'catalog_product_not_found' });
+  });
+
   it('supports category filters and excludes out-of-stock products when requested', async () => {
     const { phone, watch } = await seedCatalog();
 

@@ -195,7 +195,7 @@ export class StorefrontService {
   private async assertFeaturedProducts(tx: Prisma.TransactionClient, ids: string[]) {
     if (ids.length === 0) return;
     const products = await tx.product.findMany({
-      where: { id: { in: ids }, archived: false },
+      where: { id: { in: ids }, archived: false, published: true },
       select: { id: true },
     });
     if (products.length !== ids.length) {
