@@ -81,7 +81,9 @@
     ".next-dev-verify/types/**/*.ts",
     ".next-dev-verify/dev/types/**/*.ts",
     ".next-deploy/types/**/*.ts",
-    ".next-deploy/dev/types/**/*.ts"
+    ".next-deploy/dev/types/**/*.ts",
+    ".next-new/types/**/*.ts",
+    ".next-new/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
