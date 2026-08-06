@@ -1,1 +1,0 @@
-{"version":3,"file":"fetch-with-timeout.js","sourceRoot":"","sources":["../../../src/outbox/transports/fetch-with-timeout.ts"],"names":[],"mappings":";;AAKA,4CAMC;AAND,SAAgB,gBAAgB,CAC9B,KAAmB,EACnB,OAAoB,EAAE,EACtB,SAAS,GAAG,MAAM;IAElB,OAAO,KAAK,CAAC,KAAK,EAAE,EAAE,GAAG,IAAI,EAAE,MAAM,EAAE,WAAW,CAAC,OAAO,CAAC,SAAS,CAAC,EAAE,CAAC,CAAC;AAC3E,CAAC"}
