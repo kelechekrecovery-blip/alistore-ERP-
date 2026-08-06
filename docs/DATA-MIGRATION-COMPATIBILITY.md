@@ -15,10 +15,13 @@ down, or destructive schema migrations during an incident or image rollback.
 Correct a bad schema/data change with a later, forward migration after the
 service is stable.
 
-This rule is intentionally stricter than the historical conditional wording in
-`infra/RUNBOOK.md`: no release plan may designate a production schema rollback
-as allowed. The Render CD workflow and `docs/GO-LIVE-RUNBOOK.md` already follow
-this rule.
+This rule supersedes narrower historical wording. The header in
+`.github/workflows/cd-production.yml` prohibits reversing a *data-bearing*
+migration, but this contract prohibits every production schema rollback; the
+workflow is not changed by this documentation task. A non-authoritative legacy
+self-hosted runbook also contains conditional rollback wording, which does not
+create an exception. No release plan may designate a production schema rollback
+as allowed.
 
 ## Required lifecycle
 
@@ -144,5 +147,3 @@ this contract. Secrets stay deploy-owned and are never placed in evidence.
 - [Master plan](MASTER-PLAN.md) — authoritative planning index.
 - [Production activation](PRODUCTION-ACTIVATION.md) — operator release gate.
 - [Go-live rollback](GO-LIVE-RUNBOOK.md#rollback) — Render image rollback.
-- [Infrastructure runbook](../infra/RUNBOOK.md#9-rollback) — historical
-  self-hosted command shape; this policy controls any schema conflict.
