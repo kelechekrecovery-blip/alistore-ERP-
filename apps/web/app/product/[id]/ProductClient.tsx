@@ -283,6 +283,12 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   )}
                 </div>
               )}
+              {/* Продавец — та же метка, что на карточке каталога. */}
+              {product.seller && (
+                <div className="mt-3 text-sm text-white/55">
+                  Продавец: <span className="font-semibold text-white">{product.seller.name}</span>
+                </div>
+              )}
               {typeof product.bonusPoints === "number" && product.bonusPoints > 0 && (
                 <div className="mt-3 text-sm text-white/55">
                   Около <span className="font-semibold text-white">{product.bonusPoints.toLocaleString("ru-RU")}</span> бонусов до скидок и доставки

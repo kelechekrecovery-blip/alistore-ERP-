@@ -129,6 +129,15 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
             около +{product.bonusPoints.toLocaleString('ru-RU')} бонусов
           </div>
         )}
+        {/* Чей это товар. У позиций AliStore метки нет вовсе: подписывать
+            каждую свою карточку «AliStore» — навязывать шум там, где покупателю
+            и так ясно, у кого он покупает. Метка появляется ровно тогда, когда
+            продавец другой, и это единственное, что она должна сообщать. */}
+        {product.seller && (
+          <div className={`mt-1 text-[11px] ${design3 ? 'text-white/48' : 'text-faint'}`}>
+            Продавец: <span className={design3 ? 'text-white/70' : 'text-ink'}>{product.seller.name}</span>
+          </div>
+        )}
         {!product.installment && typeof product.attrs?.financingText === 'string' && <div className={`mt-1 text-[11px] ${design3 ? 'text-[#c6ff3d]' : 'text-faint'}`}>{product.attrs.financingText}</div>}
         <div className="mt-auto flex gap-1.5 pt-3">
           <button type="button" disabled={!buyable} aria-describedby={!buyable && toOrder ? `availability-${product.id}` : undefined} onClick={addToCart} className={`flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[8px] text-xs font-bold transition disabled:cursor-not-allowed disabled:bg-linen disabled:text-faint ${added ? 'bg-success text-white' : 'bg-coral text-white hover:bg-deep'}`}>

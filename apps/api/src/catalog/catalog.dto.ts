@@ -81,7 +81,29 @@ export class InstallmentProviderDto {
   @ApiProperty({ example: '/media/qr-omarket.png', description: 'QR магазина, загруженный владельцем в ERP.' }) qrUrl!: string;
 }
 
+export class SellerRefDto {
+  @ApiProperty({ example: 'clx_seller_001' }) id!: string;
+  @ApiProperty({ example: 'Мобайл Плюс' }) name!: string;
+}
+
 export class CatalogProductDto {
+  /**
+   * Владелец позиции. Пусто — товар AliStore.
+   *
+   * Внутреннее поле: витрине нужен `seller` с именем, а не идентификатор.
+   * Держим его отдельно, чтобы обогащение знало, кого спрашивать.
+   */
+  sellerId?: string | null;
+
+  /**
+   * Кто продаёт — метка «Продавец: N» на карточке.
+   *
+   * Поля нет у собственных товаров: подписывать каждую свою карточку «AliStore»
+   * значит навязывать шум там, где метка ничего не сообщает.
+   */
+  @ApiPropertyOptional({ type: () => SellerRefDto })
+  seller?: SellerRefDto;
+
   /**
    * Лучшая партнёрская рассрочка для этой цены — «от N сом/мес» на карточке.
    * `null` — рассрочка недоступна или все провайдеры выключены в настройках.

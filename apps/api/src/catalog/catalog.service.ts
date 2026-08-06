@@ -183,7 +183,7 @@ export class CatalogService {
         orderBy: [{ name: 'asc' }], take: 12, include: this.stockCountInclude(),
       }),
     ]);
-    const enriched = await this.enrichOffers(await this.enrichReviews([product, ...variants, ...related].map((item) => this.toCatalogProduct(item))));
+    const enriched = await this.enrichOffers(await this.enrichSellers(await this.enrichReviews([product, ...variants, ...related].map((item) => this.toCatalogProduct(item)))));
     const [main, ...rest] = enriched;
     return { product: main, variants: rest.slice(0, variants.length), related: rest.slice(variants.length) };
   }
@@ -284,7 +284,7 @@ export class CatalogService {
       total: response.estimatedTotalHits ?? response.totalHits ?? ordered.length,
       limit: query.limit,
       offset: query.offset,
-      items: await this.enrichOffers(await this.enrichReviews(ordered)),
+      items: await this.enrichOffers(await this.enrichSellers(await this.enrichReviews(ordered))),
     };
   }
 
@@ -310,7 +310,7 @@ export class CatalogService {
         total: sorted.length,
         limit: query.limit,
         offset: query.offset,
-        items: await this.enrichOffers(await this.enrichReviews(sorted.slice(query.offset, query.offset + query.limit))),
+        items: await this.enrichOffers(await this.enrichSellers(await this.enrichReviews(sorted.slice(query.offset, query.offset + query.limit)))),
       };
     }
     const [total, products] = await this.prisma.$transaction([
@@ -330,7 +330,7 @@ export class CatalogService {
       total,
       limit: query.limit,
       offset: query.offset,
-      items: await this.enrichOffers(await this.enrichReviews(products.map((product) => this.toCatalogProduct(product)))),
+      items: await this.enrichOffers(await this.enrichSellers(await this.enrichReviews(products.map((product) => this.toCatalogProduct(product))))),
     };
   }
 
@@ -393,6 +393,8 @@ export class CatalogService {
         ? 'to_order' as const
         : 'unavailable' as const;
     return {
+      // Владелец позиции: обогащение по нему подставит имя магазина.
+      sellerId: product.sellerId,
       id: product.id,
       sku: product.sku,
       barcode: product.barcode,
@@ -507,6 +509,31 @@ export class CatalogService {
         installmentProviders: providers.length > 0 ? providers : undefined,
         bonusPoints: earnRateBps === undefined ? undefined : loyaltyEarnAmount(item.price, earnRateBps),
       };
+    });
+  }
+
+  /**
+   * Кто продаёт эту позицию — для метки «Продавец: N» на витрине.
+   *
+   * Один запрос на страницу, а не по товару: карточек на странице до сотни, и
+   * N+1 здесь стоил бы сотни round-trip'ов ради одной строки текста.
+   *
+   * Товары AliStore (`sellerId = null`) поля не получают вовсе. Подписывать
+   * каждую свою карточку «AliStore» — навязывать шум там, где покупателю и так
+   * ясно, у кого он покупает; метка нужна ровно тогда, когда продавец другой.
+   */
+  private async enrichSellers(items: CatalogProductDto[]): Promise<CatalogProductDto[]> {
+    if (items.length === 0) return items;
+    const ids = [...new Set(items.map((item) => item.sellerId).filter((id): id is string => Boolean(id)))];
+    if (ids.length === 0) return items;
+    const rows = await this.prisma.seller.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true },
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return items.map((item) => {
+      const seller = item.sellerId ? byId.get(item.sellerId) : undefined;
+      return seller ? { ...item, seller } : item;
     });
   }
 
