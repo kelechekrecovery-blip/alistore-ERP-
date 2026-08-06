@@ -60,7 +60,7 @@ describe('Managed promotion codes', () => {
       data: { code: `PROMO-${run}-${Date.now()}`, name: 'Promo point', address: 'Bishkek', inventoryLocation: `PROMO-${run}-LOC`, hours: '10:00-20:00', active: true, createdBy: 'test', idempotencyKey: `promo-point-${run}-${Date.now()}` },
     });
     const product = await prisma.product.create({
-      data: { sku: `PROMO-${run}-${Date.now()}`, name: 'Eligible phone', price: 10000, cost: 7000, category: 'phones', attrs: {} },
+      data: { sku: `PROMO-${run}-${Date.now()}`, name: 'Eligible phone', price: 10000, cost: 7000, category: 'phones', attrs: {}, published: true },
     });
     await prisma.deviceUnit.createMany({ data: [
       { imei: `PROMO-${run}-${Date.now()}-1`, productId: product.id, status: 'in_stock', location: point.inventoryLocation },

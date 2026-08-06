@@ -53,7 +53,7 @@ describe('Storefront blocks CMS', () => {
     const invalid = await http.post('/storefront-blocks').set(auth()).send(block('BAD', { imageUrl: 'http://unsafe.example/banner.jpg' })).expect(422);
     expect(invalid.body.code).toBe('storefront_block_image_invalid');
 
-    const product = await prisma.product.create({ data: { sku: `${run}-SKU`, name: 'CMS phone', price: 12000, cost: 9000, category: 'phones', attrs: {} } });
+    const product = await prisma.product.create({ data: { sku: `${run}-SKU`, name: 'CMS phone', price: 12000, cost: 9000, category: 'phones', attrs: {}, published: true } });
     const collection = await http.post('/storefront-blocks').set(auth()).send(block('COLLECTION', { type: 'collection', device: 'desktop', productIds: [product.id], ctaHref: '/catalog?category=phones' })).expect(201);
     const hero = await http.post('/storefront-blocks').set(auth()).send(block('HERO', { type: 'hero', device: 'desktop', imageUrl: 'https://media.example/banner.jpg' })).expect(201);
     await http.post(`/storefront-blocks/${collection.body.id}/publish`).set(auth()).send({}).expect(201);
@@ -77,9 +77,9 @@ describe('Storefront blocks CMS', () => {
    * между блоками.
    */
   it('keeps each collection ordered independently when several are published', async () => {
-    const a = await prisma.product.create({ data: { sku: `${run}-A`, name: 'Batch A', price: 1000, cost: 500, category: 'phones', attrs: {} } });
-    const b = await prisma.product.create({ data: { sku: `${run}-B`, name: 'Batch B', price: 2000, cost: 900, category: 'phones', attrs: {} } });
-    const c = await prisma.product.create({ data: { sku: `${run}-C`, name: 'Batch C', price: 3000, cost: 1200, category: 'phones', attrs: {} } });
+    const a = await prisma.product.create({ data: { sku: `${run}-A`, name: 'Batch A', price: 1000, cost: 500, category: 'phones', attrs: {}, published: true } });
+    const b = await prisma.product.create({ data: { sku: `${run}-B`, name: 'Batch B', price: 2000, cost: 900, category: 'phones', attrs: {}, published: true } });
+    const c = await prisma.product.create({ data: { sku: `${run}-C`, name: 'Batch C', price: 3000, cost: 1200, category: 'phones', attrs: {}, published: true } });
 
     // Первый блок: b, a. Второй: a, c. Порядки разные и пересекаются по `a`.
     const first = await http.post('/storefront-blocks').set(auth())

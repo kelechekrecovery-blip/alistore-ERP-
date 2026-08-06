@@ -181,6 +181,7 @@ describe('Order supply mode: to_order request (slice 2)', () => {
         supplyMode: 'to_order',
         supplyLeadDays: 14,
         attrs: {},
+        published: true,
         supplierId: supplier.id,
         supplierOffers: {
           create: {
@@ -264,6 +265,7 @@ describe('Order supply mode: to_order request (slice 2)', () => {
         category: 'accessories',
         trackingMode: 'quantity',
         attrs: {},
+        published: true,
         ...overrides,
       },
     });

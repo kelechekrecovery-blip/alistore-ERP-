@@ -21,7 +21,7 @@ const FIELD = 'w-full rounded-[8px] border border-surface-3 bg-surface-2 px-3 py
 interface ImageFieldProps {
   label: string;
   value: string;
-  onChange: (url: string) => void;
+  onChange: (url: string, key?: string) => void;
   accessToken: string;
   /** Storage prefix hint shown to the operator, e.g. «баннер витрины». */
   hint?: string;
@@ -51,7 +51,7 @@ export function ImageField({ label, value, onChange, accessToken, hint }: ImageF
     setBusy(true);
     try {
       const image = await uploadImage(file, accessToken);
-      onChange(image.url);
+      onChange(image.url, image.key);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Не удалось загрузить изображение');
     } finally {

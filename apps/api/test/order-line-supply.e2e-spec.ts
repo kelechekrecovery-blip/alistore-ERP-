@@ -110,6 +110,7 @@ describe('Order-line supply (slice 3)', () => {
         supplyMode: 'to_order',
         supplyLeadDays: 10,
         attrs: {},
+        published: true,
         supplierId: quoteSupplier.id,
         supplierOffers: {
           create: {
@@ -175,7 +176,7 @@ describe('Order-line supply (slice 3)', () => {
   it('does not create an OrderLineSupply row for an own-stock order', async () => {
     seq += 1;
     const product = await prisma.product.create({
-      data: { sku: `S3-OWN-${seq}`, name: 'Свой сток', price: 10_000, cost: 6_000, category: 'accessories', trackingMode: 'quantity', attrs: {} },
+      data: { sku: `S3-OWN-${seq}`, name: 'Свой сток', price: 10_000, cost: 6_000, category: 'accessories', trackingMode: 'quantity', attrs: {}, published: true },
     });
     await inventory.receiveQuantity({ idempotencyKey: `s3-recv-${seq}`, productId: product.id, location: 'BISHKEK-1', quantity: 5 }, 'warehouse');
     const buyer = await customer();
@@ -215,7 +216,7 @@ describe('Order-line supply (slice 3)', () => {
   it('rejects placeSupplierOrder on a line that has no OrderLineSupply row (own-stock)', async () => {
     seq += 1;
     const product = await prisma.product.create({
-      data: { sku: `S3-OWN-REJECT-${seq}`, name: 'Свой сток', price: 10_000, cost: 6_000, category: 'accessories', trackingMode: 'quantity', attrs: {} },
+      data: { sku: `S3-OWN-REJECT-${seq}`, name: 'Свой сток', price: 10_000, cost: 6_000, category: 'accessories', trackingMode: 'quantity', attrs: {}, published: true },
     });
     await inventory.receiveQuantity({ idempotencyKey: `s3-recv-reject-${seq}`, productId: product.id, location: 'BISHKEK-1', quantity: 5 }, 'warehouse');
     const buyer = await customer();

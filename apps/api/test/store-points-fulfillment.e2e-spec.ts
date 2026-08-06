@@ -72,7 +72,7 @@ describe('Store point fulfillment contract', () => {
 
     const suffix = run.replace(/\W/g, '').slice(-12).toUpperCase();
     const localProduct = await prisma.product.create({
-      data: { sku: `FUL-LOCAL-${suffix}`, name: 'Local phone', price: 10000, cost: 7000, category: 'phones', attrs: {} },
+      data: { sku: `FUL-LOCAL-${suffix}`, name: 'Local phone', price: 10000, cost: 7000, category: 'phones', attrs: {}, published: true },
     });
     productIds.push(localProduct.id);
     const localUnit = await prisma.deviceUnit.create({
@@ -141,7 +141,7 @@ describe('Store point fulfillment contract', () => {
     });
     deliveryPointId = deliveryPoint.id;
     const deliveryProduct = await prisma.product.create({
-      data: { sku: `FUL-DELIVERY-${suffix}`, name: 'Delivery case', price: 1000, cost: 400, category: 'accessories', attrs: {}, trackingMode: 'quantity', balances: { create: { location: deliveryPoint.inventoryLocation, onHand: 2 } } },
+      data: { sku: `FUL-DELIVERY-${suffix}`, name: 'Delivery case', price: 1000, cost: 400, category: 'accessories', attrs: {}, trackingMode: 'quantity', published: true, balances: { create: { location: deliveryPoint.inventoryLocation, onHand: 2 } } },
     });
     productIds.push(deliveryProduct.id);
     const exactAddress = 'Бишкек, ул. Токтогула 125/1, кв. 42, домофон 17';

@@ -96,6 +96,7 @@ describe('Product bundles (integration)', () => {
         cost,
         category: 'components',
         attrs: {},
+        published: true,
       },
     });
     for (let index = 0; index < unitCount; index += 1) {
@@ -125,6 +126,7 @@ describe('Product bundles (integration)', () => {
         { sku: accessory.sku, qty: 2 },
       ],
     }, 'owner-bundle-test');
+    await prisma.product.update({ where: { id: product.id }, data: { published: true } });
     return { phone, accessory, product };
   }
 

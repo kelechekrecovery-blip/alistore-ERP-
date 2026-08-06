@@ -14,6 +14,7 @@ export interface AdminProduct {
   trackingMode: 'serialized' | 'quantity';
   attrs: Record<string, unknown> | null;
   bundleComponents: Array<{ productId: string; sku: string; name: string; qty: number }>;
+  published: boolean;
   archived: boolean;
   availableUnits: number;
 }
@@ -83,6 +84,10 @@ export function updateAdminProduct(
   accessToken: string,
 ): Promise<AdminProduct> {
   return patchAuthJson(`/products/${encodeURIComponent(id)}`, input, accessToken);
+}
+
+export function publishAdminProduct(id: string, accessToken: string): Promise<AdminProduct> {
+  return postAuthJson(`/products/${encodeURIComponent(id)}/publish`, {}, accessToken);
 }
 
 export function requestProductPriceChange(

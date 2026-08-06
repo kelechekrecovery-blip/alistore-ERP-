@@ -83,6 +83,15 @@ export class ProductsController {
     return this.products.create(dto, user.customerId);
   }
 
+  @ApiOperation({ summary: 'Publish a product after the storefront media gate passes' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('products', 'update')
+  @Post(':id/publish')
+  publish(@CurrentUser() user: AuthPrincipal, @Param('id') id: string) {
+    return this.products.publish(id, user.customerId);
+  }
+
   // Отдаёт внутреннюю карточку товара: закупочную цену, поставщика, политику
   // поставки. Публичная витрина ходит в /catalog/products/:id и этот роут не
   // потребляет — поэтому он закрыт тем же правом, что и список для персонала.

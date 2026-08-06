@@ -78,8 +78,8 @@ describe('Storefront CMS publication', () => {
 
   it('keeps drafts private, publishes one revision, exposes active points and writes the ledger', async () => {
     await prisma.storePoint.create({ data: { code: `CMS-${run}-1`, name: 'AliStore Test', address: 'Тестовый адрес', inventoryLocation: `CMS-${run}-LOC`, hours: '10:00–20:00', active: true, sortOrder: 1, createdBy: 'test', idempotencyKey: `CMS-${run}-KEY` } });
-    const first = await prisma.product.create({ data: { sku: `CMS-${run}-1`, name: 'Первый товар подборки', price: 1000, cost: 800, category: 'CMS', attrs: {} } });
-    const second = await prisma.product.create({ data: { sku: `CMS-${run}-2`, name: 'Второй товар подборки', price: 2000, cost: 1500, category: 'CMS', attrs: {} } });
+    const first = await prisma.product.create({ data: { sku: `CMS-${run}-1`, name: 'Первый товар подборки', price: 1000, cost: 800, category: 'CMS', attrs: {}, published: true } });
+    const second = await prisma.product.create({ data: { sku: `CMS-${run}-2`, name: 'Второй товар подборки', price: 2000, cost: 1500, category: 'CMS', attrs: {}, published: true } });
     const fallback = await request(app.getHttpServer()).get('/storefront/content').expect(200);
     expect(fallback.body.content.id).toBe('fallback');
 
@@ -104,7 +104,7 @@ describe('Storefront CMS publication', () => {
   });
 
   it('activates and expires a scheduled collection without exposing it early', async () => {
-    const product = await prisma.product.create({ data: { sku: `CMS-${run}-SCHEDULED`, name: 'Товар по расписанию', price: 3000, cost: 2000, category: 'CMS', attrs: {} } });
+    const product = await prisma.product.create({ data: { sku: `CMS-${run}-SCHEDULED`, name: 'Товар по расписанию', price: 3000, cost: 2000, category: 'CMS', attrs: {}, published: true } });
     const baseline = await request(app.getHttpServer()).post('/storefront/revisions').set('Authorization', `Bearer ${marketerToken}`).send(body()).expect(201);
     await publishViaApproval(baseline.body.id);
     const candidate = await request(app.getHttpServer()).post('/storefront/revisions').set('Authorization', `Bearer ${marketerToken}`).send({ ...body([product.id]), heroTitle: 'Запланированная витрина' }).expect(201);

@@ -65,7 +65,7 @@ describe('Logistics zones, capacity and dispatch (integration + RBAC)', () => {
     await request(app.getHttpServer()).post('/logistics/zones').set('Authorization', `Bearer ${sellerToken}`).set('Idempotency-Key', `zone-${run}`).send(zonePayload).expect(403);
     const zone = await request(app.getHttpServer()).post('/logistics/zones').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `zone-${run}`).send(zonePayload).expect(201);
     const slot = await request(app.getHttpServer()).post('/logistics/slots').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `slot-${run}`).send({ zoneId: zone.body.id, startsAt: `${date}T04:00:00.000Z`, endsAt: `${date}T06:00:00.000Z`, capacity: 1 }).expect(201);
-    const product = await prisma.product.create({ data: { sku: `LOG-${run}`, name: 'Logistics phone', price: 1000, cost: 700, category: 'phones', attrs: {}, trackingMode: 'quantity', balances: { create: { location: fulfillmentLocation, onHand: 2 } } } });
+    const product = await prisma.product.create({ data: { sku: `LOG-${run}`, name: 'Logistics phone', price: 1000, cost: 700, category: 'phones', attrs: {}, trackingMode: 'quantity', published: true, balances: { create: { location: fulfillmentLocation, onHand: 2 } } } });
     const customerA = await prisma.customer.create({ data: { phone: `+996701${run}1`, name: 'A' } });
     const customerB = await prisma.customer.create({ data: { phone: `+996701${run}2`, name: 'B' } });
     const token = (id: string, phone: string) => sign({ sub: id, typ: 'customer', phone }, process.env.JWT_SECRET ?? 'dev-insecure-change-me', { expiresIn: '15m' });

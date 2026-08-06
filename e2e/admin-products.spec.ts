@@ -86,6 +86,8 @@ test('admin manages products with AI enrichment and approval-gated danger action
   await page.getByRole('button', { name: 'Создать товар' }).click();
   await expect(page.getByText(`Создан товар: ${sku}`)).toBeVisible();
   await expect(page.getByText(sku).first()).toBeVisible();
+  await expect(page.getByText('Черновик', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Проверить и опубликовать' })).toBeDisabled();
 
   const created = await prisma.product.findUniqueOrThrow({ where: { sku } });
   expect(created).toMatchObject({
@@ -101,6 +103,26 @@ test('admin manages products with AI enrichment and approval-gated danger action
       description: expect.stringContaining('iPhone 15 128GB UI'),
     }),
   );
+  expect(created.published).toBe(false);
+
+  const upload = page.locator('input[type="file"][accept="image/*"]');
+  await upload.setInputFiles({
+    name: 'product.svg',
+    mimeType: 'image/svg+xml',
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><path fill="#f65" d="M0 0h2v2H0z"/></svg>'),
+  });
+  await expect(page.getByLabel('Фото товара')).toHaveValue(/\/uploads\/media\/.+\.webp$/);
+  await page.getByRole('button', { name: 'Проверить и опубликовать' }).click();
+  await expect(page.getByText(`Опубликовано: ${sku}`)).toBeVisible();
+  await expect(page.getByText('Опубликован', { exact: true })).toBeVisible();
+  await expect(prisma.product.findUniqueOrThrow({ where: { id: created.id } }))
+    .resolves.toMatchObject({
+      published: true,
+      attrs: expect.objectContaining({
+        imageUrl: expect.stringMatching(/\/uploads\/media\/.+\.webp$/),
+        imageKey: expect.stringMatching(/^media\/.+\.webp$/),
+      }),
+    });
 
   const aside = page.locator('aside');
   await aside.locator('input').nth(0).fill('160000');

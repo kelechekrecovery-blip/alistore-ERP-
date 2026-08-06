@@ -83,7 +83,7 @@ describe('Quantity consignment inventory (integration)', () => {
   async function setup(quantity = 5) {
     const suffix = `${Date.now()}-${++seq}`;
     const product = await prisma.product.create({
-      data: { sku: `QCONS-${suffix}`, name: 'Consignment cases', price: 1_000, cost: 0, category: 'accessories', trackingMode: 'quantity', attrs: {} },
+      data: { sku: `QCONS-${suffix}`, name: 'Consignment cases', price: 1_000, cost: 0, category: 'accessories', trackingMode: 'quantity', attrs: {}, published: true },
     });
     const customer = await prisma.customer.create({ data: { phone: `+996709${suffix.slice(-6)}`, name: 'Quantity buyer' } });
     const lot = await inventory.receiveQuantityConsignment({

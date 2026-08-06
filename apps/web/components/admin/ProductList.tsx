@@ -112,6 +112,11 @@ export function ProductList({
                         архив
                       </span>
                     )}
+                    {!product.archived && !product.published && (
+                      <span className="rounded-chip bg-warn/10 px-2 py-0.5 text-[11px] font-semibold text-warn">
+                        черновик · нужно фото
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="text-right">

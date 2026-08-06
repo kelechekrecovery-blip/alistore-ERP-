@@ -60,6 +60,7 @@ describe('Product supply mode', () => {
         cost: 80000,
         category: 'phones',
         attrs: {},
+        published: true,
         ...data,
       } as never,
     });

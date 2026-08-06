@@ -112,7 +112,7 @@ describe('Orders by customer (account)', () => {
   it('serializes concurrent quantity fulfillment without duplicate allocations', async () => {
     const owner = await customer();
     const product = await prisma.product.create({
-      data: { sku: `QTY-FULFILL-${seq}`, name: 'Quantity item', price: 1000, cost: 700, category: 'accessories', attrs: {}, trackingMode: 'quantity' },
+      data: { sku: `QTY-FULFILL-${seq}`, name: 'Quantity item', price: 1000, cost: 700, category: 'accessories', attrs: {}, trackingMode: 'quantity', published: true },
     });
     await prisma.inventoryBalance.create({
       data: { productId: product.id, location: 'BISHKEK-1', onHand: 2, reserved: 0, inventoryValue: 1400 },
@@ -153,7 +153,7 @@ describe('Orders by customer (account)', () => {
   it('creates authenticated native orders from server prices and current stock', async () => {
     const owner = await customer();
     const product = await prisma.product.create({
-      data: { sku: 'NATIVE-SERVER-PRICE', name: 'Native phone', price: 125000, cost: 100000, category: 'phones', attrs: {} },
+      data: { sku: 'NATIVE-SERVER-PRICE', name: 'Native phone', price: 125000, cost: 100000, category: 'phones', attrs: {}, published: true },
     });
     await prisma.deviceUnit.createMany({
       data: [
@@ -188,7 +188,7 @@ describe('Orders by customer (account)', () => {
   it('keeps courier COD unpaid through picking and rejects fake paid transitions', async () => {
     const owner = await customer();
     const product = await prisma.product.create({
-      data: { sku: `COD-CONTRACT-${seq}`, name: 'COD phone', price: 10000, cost: 7000, category: 'phones', attrs: {} },
+      data: { sku: `COD-CONTRACT-${seq}`, name: 'COD phone', price: 10000, cost: 7000, category: 'phones', attrs: {}, published: true },
     });
     await prisma.deviceUnit.create({
       data: { imei: `COD-CONTRACT-${seq}-IMEI`, productId: product.id, status: 'in_stock', location: 'BISHKEK-1', acquisitionCost: 7000 },
@@ -283,6 +283,7 @@ describe('Orders by customer (account)', () => {
         cost: 3000,
         category: 'accessories',
         attrs: {},
+        published: true,
         trackingMode: 'quantity',
       },
     });
@@ -313,7 +314,7 @@ describe('Orders by customer (account)', () => {
       data: { customerId: owner.id, label: 'Стартовые бонусы', amount: 1000, sourceRef: 'loyalty-pricing-seed' },
     });
     const product = await prisma.product.create({
-      data: { sku: 'LOYALTY-PRICE', name: 'Server priced phone', price: 10000, cost: 8000, category: 'phones', attrs: {} },
+      data: { sku: 'LOYALTY-PRICE', name: 'Server priced phone', price: 10000, cost: 8000, category: 'phones', attrs: {}, published: true },
     });
     await prisma.deviceUnit.create({
       data: { imei: 'LOYALTY-PRICE-1', productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },
@@ -366,7 +367,7 @@ describe('Orders by customer (account)', () => {
       data: { customerId: owner.id, label: 'Баланс выше цены', amount: 1000, sourceRef: `loyalty-cap-${seq}` },
     });
     const product = await prisma.product.create({
-      data: { sku: `LOYALTY-CAP-${seq}`, name: 'Capped loyalty phone', price: 500, cost: 400, category: 'phones', attrs: {} },
+      data: { sku: `LOYALTY-CAP-${seq}`, name: 'Capped loyalty phone', price: 500, cost: 400, category: 'phones', attrs: {}, published: true },
     });
     await prisma.deviceUnit.create({
       data: { imei: `LOYALTY-CAP-${seq}-IMEI`, productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },
@@ -393,7 +394,7 @@ describe('Orders by customer (account)', () => {
       data: { customerId: owner.id, label: 'Баланс', amount: 1000, sourceRef: 'loyalty-race-seed' },
     });
     const product = await prisma.product.create({
-      data: { sku: 'LOYALTY-RACE', name: 'Race phone', price: 5000, cost: 4000, category: 'phones', attrs: {} },
+      data: { sku: 'LOYALTY-RACE', name: 'Race phone', price: 5000, cost: 4000, category: 'phones', attrs: {}, published: true },
     });
     await prisma.deviceUnit.createMany({ data: [
       { imei: 'LOYALTY-RACE-1', productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },
@@ -457,7 +458,7 @@ describe('Orders by customer (account)', () => {
       data: { customerId: owner.id, label: 'Баланс', amount: 5000, sourceRef: 'loyalty-zero-seed' },
     });
     const product = await prisma.product.create({
-      data: { sku: 'LOYALTY-ZERO', name: 'Bonus phone', price: 5000, cost: 4000, category: 'phones', attrs: {} },
+      data: { sku: 'LOYALTY-ZERO', name: 'Bonus phone', price: 5000, cost: 4000, category: 'phones', attrs: {}, published: true },
     });
     await prisma.deviceUnit.create({
       data: { imei: 'LOYALTY-ZERO-1', productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },
@@ -490,7 +491,7 @@ describe('Orders by customer (account)', () => {
   it('rejects native checkout when catalog stock is insufficient', async () => {
     const owner = await customer();
     const product = await prisma.product.create({
-      data: { sku: 'NATIVE-LOW-STOCK', name: 'One phone', price: 90000, cost: 70000, category: 'phones', attrs: {} },
+      data: { sku: 'NATIVE-LOW-STOCK', name: 'One phone', price: 90000, cost: 70000, category: 'phones', attrs: {}, published: true },
     });
     await prisma.deviceUnit.create({ data: { imei: 'NATIVE-LOW-1', productId: product.id, status: 'in_stock', location: 'BISHKEK-1' } });
 

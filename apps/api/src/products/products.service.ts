@@ -211,6 +211,7 @@ export class ProductsService {
               }
             : {}),
           attrs: (dto.attrs ?? {}) as Prisma.InputJsonValue,
+          published: false,
           ...(bundleComponents.length > 0
             ? { bundleComponents: { create: bundleComponents } }
             : {}),

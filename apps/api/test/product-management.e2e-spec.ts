@@ -8,6 +8,8 @@ import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
+import { MediaService } from '../src/media/media.service';
+import { randomUUID } from 'node:crypto';
 
 describe('Product management API', () => {
   let app: INestApplication;
@@ -18,6 +20,7 @@ describe('Product management API', () => {
   let ownerToken: string;
   let ownerId: string;
   let sellerToken: string;
+  let media: MediaService;
   const RUN = Math.floor(Math.random() * 1_000_000);
 
   beforeAll(async () => {
@@ -36,6 +39,7 @@ describe('Product management API', () => {
     await app.init();
     prisma = moduleRef.get(PrismaService);
     staffAuth = moduleRef.get(StaffAuthService);
+    media = moduleRef.get(MediaService);
 
     const createSession = async (role: 'admin' | 'owner' | 'seller') => {
       const username = `${role}-pm-${RUN}`;
@@ -113,6 +117,7 @@ describe('Product management API', () => {
       price: 120000,
       cost: 90000,
       category: 'phones',
+      published: false,
       archived: false,
       availableUnits: 0,
     });
@@ -206,6 +211,74 @@ describe('Product management API', () => {
 
     const types = (await prisma.auditEvent.findMany({ orderBy: { ts: 'asc' } })).map((e) => e.type);
     expect(types).not.toContain('product.cost_changed');
+  });
+
+  it('publishes a draft only after an approved product image is present', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        sku: `MEDIA-GATE-${RUN}`,
+        name: 'Media-gated phone',
+        price: 100000,
+        cost: 70000,
+        category: 'phones',
+        attrs: {},
+      })
+      .expect(201);
+
+    expect(created.body.published).toBe(false);
+    await request(app.getHttpServer())
+      .get(`/products/${created.body.id}/reviews`)
+      .expect(422)
+      .expect(({ body }) => expect(body.code).toBe('product_not_found'));
+    await request(app.getHttpServer())
+      .post(`/products/${created.body.id}/publish`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(422)
+      .expect(({ body }) => expect(body.code).toBe('product_media_required'));
+
+    const image = await media.ingestImage(
+      Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><path fill="#f65" d="M0 0h2v2H0z"/></svg>'),
+    );
+    await request(app.getHttpServer())
+      .patch(`/products/${created.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ attrs: { imageUrl: image.url, imageKey: image.key } })
+      .expect(200);
+
+    const published = await request(app.getHttpServer())
+      .post(`/products/${created.body.id}/publish`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(201);
+    expect(published.body).toMatchObject({ id: created.body.id, published: true });
+
+    await request(app.getHttpServer())
+      .post(`/products/${created.body.id}/publish`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(201)
+      .expect(({ body }) => expect(body.published).toBe(true));
+
+    await request(app.getHttpServer())
+      .patch(`/products/${created.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ attrs: {} })
+      .expect(422)
+      .expect(({ body }) => expect(body.code).toBe('product_media_required'));
+
+    await request(app.getHttpServer())
+      .patch(`/products/${created.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ attrs: { imageKey: `media/${randomUUID()}.webp`, imageUrl: 'https://external.example/broken.webp' } })
+      .expect(422)
+      .expect(({ body }) => expect(body.code).toBe('product_media_not_found'));
+
+    const canonical = await request(app.getHttpServer())
+      .patch(`/products/${created.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ attrs: { imageKey: image.key, imageUrl: 'https://external.example/tracker.webp' } })
+      .expect(200);
+    expect(canonical.body.attrs).toMatchObject({ imageKey: image.key, imageUrl: image.url, image: image.url });
   });
 
   it('keeps dangerous price and archive actions in the approval flow', async () => {

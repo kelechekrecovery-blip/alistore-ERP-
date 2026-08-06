@@ -149,7 +149,7 @@ async function clearImmutableFinanceAggregates() {
 export async function seedProduct(prefix: string, price = 100000, cost = 80000) {
   const suffix = `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`.toUpperCase();
   const product = await prisma.product.create({
-    data: { sku: suffix, name: `${prefix} iPhone`, price, cost, category: 'phones', attrs: {} },
+    data: { sku: suffix, name: `${prefix} iPhone`, price, cost, category: 'phones', attrs: {}, published: true },
   });
   const unit = await prisma.deviceUnit.create({
     data: { imei: `${suffix}-IMEI`, productId: product.id, status: 'in_stock', location: 'BISHKEK-1' },

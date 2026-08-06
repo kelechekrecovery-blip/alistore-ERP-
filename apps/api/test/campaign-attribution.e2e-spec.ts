@@ -76,7 +76,7 @@ describe('Campaign attribution → paid conversion (integration)', () => {
     const product = await prisma.product.create({
       data: {
         sku: `MKT005-${run}`, name: 'Attributed accessory', price: 10000, cost: 4000,
-        category: 'accessories', trackingMode: 'quantity', attrs: {},
+        category: 'accessories', trackingMode: 'quantity', attrs: {}, published: true,
       },
     });
     const balance = await prisma.inventoryBalance.create({

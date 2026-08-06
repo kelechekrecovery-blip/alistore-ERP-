@@ -5,6 +5,7 @@ import {
   createAdminProduct,
   fetchAdminProducts,
   importProductsExcel,
+  publishAdminProduct,
   type ImportProductsResult,
   requestProductArchive,
   requestProductPriceChange,
@@ -53,7 +54,7 @@ export function ProductManagementView({ accessToken }: { accessToken: string }) 
     try {
       const report = await importProductsExcel(file, accessToken);
       setImportReport(report);
-      flash(`Импорт: +${report.created} новых, ${report.updated} обновлено`);
+      flash(`Импорт: +${report.created} черновиков, ${report.updated} обновлено`);
       await load();
     } catch (error) {
       flash(error instanceof Error ? error.message : 'Импорт не удался');
@@ -222,6 +223,21 @@ export function ProductManagementView({ accessToken }: { accessToken: string }) 
     });
   }
 
+  async function publishProduct() {
+    if (!selected) return;
+    await withBusy('publish', async () => {
+      // The photo field edits attrs locally. Persist that exact media reference
+      // before asking the server to publish so a fast click cannot validate a
+      // stale product row.
+      await updateAdminProduct(selected.id, { attrs: parseAttrs(form.attrsText) }, accessToken);
+      const published = await publishAdminProduct(selected.id, accessToken);
+      flash(`Опубликовано: ${published.sku}`);
+      await load();
+      setSelectedId(published.id);
+      setForm(formFromProduct(published));
+    });
+  }
+
   async function requestArchive() {
     if (!selected) return;
     await withBusy('archive', async () => {
@@ -267,7 +283,7 @@ export function ProductManagementView({ accessToken }: { accessToken: string }) 
       </div>
       {importReport && (
         <div className="rounded-[8px] border border-surface-3 bg-surface px-4 py-3 text-[13px] text-bright">
-          Создано {importReport.created}, обновлено {importReport.updated}, без изменений {importReport.unchanged}.
+          Создано черновиков {importReport.created}, обновлено {importReport.updated}, без изменений {importReport.unchanged}.
           {importReport.errors.length > 0 && (
             <span className="text-danger-soft"> Ошибок: {importReport.errors.length} (строки {importReport.errors.slice(0, 5).map((err) => err.row).join(', ')}
               {importReport.errors.length > 5 ? '…' : ''}).</span>
@@ -298,6 +314,7 @@ export function ProductManagementView({ accessToken }: { accessToken: string }) 
         accessToken={accessToken}
         onUpdateForm={updateForm}
         onSave={() => void saveProduct()}
+        onPublish={() => void publishProduct()}
         onStartCreate={startCreate}
         onAutoCategory={() => void autoCategory()}
         onAutoDescription={() => void autoDescription()}

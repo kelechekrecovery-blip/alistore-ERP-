@@ -126,6 +126,7 @@ export class ImportService {
               category: p.category,
               trackingMode: p.trackingMode,
               attrs: {},
+              published: false,
             },
           });
           return {

@@ -49,7 +49,7 @@ describe('AliStore Business: владение товаром и изоляция
 
   async function seedProduct(sku: string, sellerId: string | null) {
     return prisma.product.create({
-      data: { sku, name: `Товар ${sku}`, price: 10_000, cost: 8_000, category: 'Смартфоны', attrs: {}, sellerId },
+      data: { sku, name: `Товар ${sku}`, price: 10_000, cost: 8_000, category: 'Смартфоны', attrs: {}, sellerId, published: true },
     });
   }
 

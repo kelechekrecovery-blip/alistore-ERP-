@@ -44,6 +44,7 @@ describe('Catalog search integration', () => {
         cost: 120000,
         category: 'phones',
         attrs: { storage: '256GB', color: 'natural' },
+        published: true,
       },
     });
     const watch = await prisma.product.create({
@@ -54,6 +55,7 @@ describe('Catalog search integration', () => {
         cost: 33000,
         category: 'wearables',
         attrs: { size: '45mm' },
+        published: true,
       },
     });
     await prisma.deviceUnit.create({
@@ -186,7 +188,7 @@ describe('Catalog search integration', () => {
   it('paginates beyond one hundred products and resolves exact product details', async () => {
     seq += 1;
     const suffix = seq.toString().padStart(3, '0');
-    await prisma.product.createMany({ data: Array.from({ length: 105 }, (_, index) => ({ sku: `PAGE-${suffix}-${index.toString().padStart(3, '0')}`, name: `Paged product ${index.toString().padStart(3, '0')}`, price: 1000 + index, cost: 500, category: 'paging', attrs: {} })) });
+    await prisma.product.createMany({ data: Array.from({ length: 105 }, (_, index) => ({ sku: `PAGE-${suffix}-${index.toString().padStart(3, '0')}`, name: `Paged product ${index.toString().padStart(3, '0')}`, price: 1000 + index, cost: 500, category: 'paging', attrs: {}, published: true })) });
     const secondPage = await catalog.search({ category: 'paging', limit: 10, offset: 100, sort: 'name' });
     expect(secondPage.total).toBe(105);
     expect(secondPage.items).toHaveLength(5);

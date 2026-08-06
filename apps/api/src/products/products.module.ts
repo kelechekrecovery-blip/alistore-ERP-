@@ -5,9 +5,10 @@ import { ApprovalsModule } from '../approvals/approvals.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { AuthzModule } from '../authz/authz.module';
 import { ModerationModule } from '../ai/moderation.module';
+import { MediaModule } from '../media/media.module';
 
 @Module({
-  imports: [ApprovalsModule, StaffAuthModule, AuthzModule, ModerationModule],
+  imports: [ApprovalsModule, StaffAuthModule, AuthzModule, ModerationModule, MediaModule],
   providers: [ProductsService],
   controllers: [ProductsController],
   exports: [ProductsService],

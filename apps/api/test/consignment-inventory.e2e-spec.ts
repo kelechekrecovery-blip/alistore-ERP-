@@ -69,7 +69,7 @@ describe('Serialized consignment inventory (integration)', () => {
   }
 
   async function serializedProduct(sku = `USED-${++seq}`) {
-    return products.create({
+    const product = await products.create({
       sku,
       name: 'Used iPhone 12',
       price: 50_000,
@@ -78,6 +78,10 @@ describe('Serialized consignment inventory (integration)', () => {
       trackingMode: 'serialized',
       attrs: { condition: 'B' },
     }, 'owner-consignment-test');
+    return prisma.product.update({
+      where: { id: product.id },
+      data: { published: true },
+    });
   }
 
   async function receive(productId: string, imei = `CONS-${seq}-001`) {

@@ -90,7 +90,7 @@ describe('public endpoint rate limits', () => {
   it('rate-limits checkout order creation', async () => {
     await exhaust(
       '/orders',
-      { customerId: 'customer-1', channel: 'web', total: 1000, items: [{ sku: 'SKU', qty: 1, price: 1000 }] },
+      { customerId: 'customer-1', channel: 'web', total: 1000, piiConsent: true, items: [{ sku: 'SKU', qty: 1, price: 1000 }] },
       20,
       201,
       { 'x-guest-capability': issueGuestCheckoutCapability('customer-1') },

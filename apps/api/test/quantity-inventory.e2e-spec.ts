@@ -80,7 +80,7 @@ describe('Quantity inventory (integration)', () => {
 
   async function quantityProduct() {
     seq += 1;
-    return products.create({
+    const product = await products.create({
       sku: `CASE-QTY-${seq}`,
       name: 'Silicone case',
       price: 2500,
@@ -89,6 +89,7 @@ describe('Quantity inventory (integration)', () => {
       trackingMode: 'quantity',
       attrs: { color: 'black' },
     }, 'owner-quantity-test');
+    return prisma.product.update({ where: { id: product.id }, data: { published: true } });
   }
 
   it('receives quantity stock atomically and exposes available stock to the catalog', async () => {

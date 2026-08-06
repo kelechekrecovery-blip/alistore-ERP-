@@ -16,22 +16,28 @@ import { ImageField } from '@/components/erp/ImageField';
  * Returns '' when the text is not valid JSON yet — the field then degrades to
  * read-only rather than fighting a half-typed document.
  */
-function readAttrsImage(attrsText: string): { url: string; parsable: boolean } {
+function readAttrsImage(attrsText: string): { url: string; key: string; parsable: boolean } {
   try {
     const parsed = JSON.parse(attrsText || '{}') as Record<string, unknown>;
     const value = parsed.imageUrl ?? parsed.image;
-    return { url: typeof value === 'string' ? value : '', parsable: true };
+    return {
+      url: typeof value === 'string' ? value : '',
+      key: typeof parsed.imageKey === 'string' ? parsed.imageKey : '',
+      parsable: true,
+    };
   } catch {
-    return { url: '', parsable: false };
+    return { url: '', key: '', parsable: false };
   }
 }
 
 /** Write the main photo back, preserving key order and every other attribute. */
-function writeAttrsImage(attrsText: string, url: string): string | null {
+function writeAttrsImage(attrsText: string, url: string, key?: string): string | null {
   try {
     const parsed = JSON.parse(attrsText || '{}') as Record<string, unknown>;
     if (url) parsed.imageUrl = url;
     else delete parsed.imageUrl;
+    if (url && key) parsed.imageKey = key;
+    else delete parsed.imageKey;
     return `${JSON.stringify(parsed, null, 2)}\n`;
   } catch {
     return null;
@@ -45,6 +51,7 @@ interface ProductEditorProps {
   accessToken: string;
   onUpdateForm: (patch: Partial<ProductForm>) => void;
   onSave: () => void;
+  onPublish: () => void;
   onStartCreate: () => void;
   onAutoCategory: () => void;
   onAutoDescription: () => void;
@@ -70,6 +77,7 @@ export function ProductEditor({
   accessToken,
   onUpdateForm,
   onSave,
+  onPublish,
   onStartCreate,
   onAutoCategory,
   onAutoDescription,
@@ -93,11 +101,14 @@ export function ProductEditor({
                 {selected ? selected.sku : 'Новый товар'}
               </div>
               <div className="mt-1 text-sm text-subtle">
-                {selected ? 'Обычные поля сохраняются сразу. Цена и архив идут через approval.' : 'Создание товара добавит карточку в каталог.'}
+                {selected ? 'Обычные поля сохраняются сразу. Цена и архив идут через approval.' : 'Новый товар сохранится черновиком и не попадёт на витрину без фото.'}
               </div>
             </div>
             {selected && (
               <div className="ml-auto flex flex-wrap gap-2">
+                <span className={`rounded-chip px-3 py-1.5 text-xs font-semibold ${selected.published ? 'bg-success/15 text-success' : 'bg-warn/15 text-warn'}`}>
+                  {selected.published ? 'Опубликован' : 'Черновик'}
+                </span>
                 <span className="rounded-chip bg-surface-2 px-3 py-1.5 text-xs font-semibold text-bright">
                   Маржа {productMargin(selected)}%
                 </span>
@@ -254,8 +265,8 @@ export function ProductEditor({
                 <ImageField
                   label="Фото товара"
                   value={attrsImage.url}
-                  onChange={(url) => {
-                    const next = writeAttrsImage(form.attrsText, url);
+                  onChange={(url, key) => {
+                    const next = writeAttrsImage(form.attrsText, url, key);
                     if (next !== null) onUpdateForm({ attrsText: next });
                   }}
                   accessToken={accessToken}
@@ -297,6 +308,17 @@ export function ProductEditor({
             >
               {busy === 'save' ? 'Сохраняем…' : selected ? 'Сохранить изменения' : 'Создать товар'}
             </button>
+            {selected && !selected.published && (
+              <button
+                type="button"
+                onClick={onPublish}
+                disabled={busy === 'publish' || !attrsImage.key}
+                title={attrsImage.key ? 'Опубликовать товар в витрине' : 'Сначала загрузите фото через медиатеку AliStore'}
+                className="rounded-[12px] bg-lime px-5 py-3 text-sm font-bold text-lime-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-line disabled:text-faint"
+              >
+                {busy === 'publish' ? 'Проверяем…' : 'Проверить и опубликовать'}
+              </button>
+            )}
             <button type="button" onClick={onStartCreate} className={mutedButtonCls}>
               Очистить форму
             </button>

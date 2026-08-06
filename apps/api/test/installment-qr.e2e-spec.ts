@@ -44,7 +44,7 @@ describe('QR рассрочки: из настроек ERP на карточку
     await prisma.setting.deleteMany({ where: { key: { in: [...QR_KEYS] } } });
     await prisma.product.deleteMany({ where: { sku: 'QR-TEST-1' } });
     await prisma.product.create({
-      data: { sku: 'QR-TEST-1', name: 'Тестовый телефон', price: 24_900, cost: 20_000, category: 'Смартфоны', attrs: {} },
+      data: { sku: 'QR-TEST-1', name: 'Тестовый телефон', price: 24_900, cost: 20_000, category: 'Смартфоны', attrs: {}, published: true },
     });
   });
 
