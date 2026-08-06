@@ -63,6 +63,10 @@ fi
 
 node "$repo_root/scripts/validate-ios-store-metadata.mjs" "$metadata_file" \
   || fail 'App Store metadata validation failed'
+(cd "$repo_root" && node scripts/validate-ios-ecosystem-store-metadata.mjs) \
+  || fail 'iOS ecosystem App Store metadata validation failed'
+node "$repo_root/scripts/validate-ios-privacy-contract.mjs" \
+  || fail 'iOS privacy contract validation failed'
 
 plist_buddy=/usr/libexec/PlistBuddy
 client_plist="$ios_root/Client/Info.plist"
@@ -223,7 +227,7 @@ for entry in \
     "$scheme" "$resolved_bundle_id" "$resolved_marketing_version" "$resolved_build_number"
 done
 
-printf 'store-preflight: App Store metadata and privacy manifest are present\n'
+printf 'store-preflight: all four metadata schemas and privacy contracts verified\n'
 printf 'store-preflight: all four apps verified\n'
 if [[ "$strict_asc" == "1" ]]; then
   printf 'store-preflight: App Store Connect API credentials verified\n'

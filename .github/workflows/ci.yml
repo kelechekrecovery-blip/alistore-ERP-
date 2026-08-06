@@ -67,6 +67,8 @@ jobs:
       - name: Production CD exact-SHA contract
         run: node --test scripts/__tests__/production-cd-workflow.test.mjs scripts/render-deploy.test.mjs
       - run: npm run native:deeplink-preflight
+      - run: npm run ios:privacy-contract:test
+      - run: npm run ios:privacy-contract
       # Guards the App Store screenshot device class; needs no simulator.
       - run: npm run ios:store-screenshots:test
       - run: npm run prisma:generate -w @alistore/api
