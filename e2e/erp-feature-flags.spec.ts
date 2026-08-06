@@ -4,15 +4,13 @@ import { API_BASE, prisma, resetDb, seedStaffCredentials } from './helpers';
 const KEY = 'supply.to_order_checkout';
 
 test.afterEach(async () => {
-  await prisma.featureFlagOverride.deleteMany();
-  await prisma.featureFlagGeneration.deleteMany();
+  await clearFeatureFlagState();
   await resetDb();
 });
 
 test('admin is read-only and owner override/reset is reflected without restart', async ({ page, request }) => {
   await resetDb();
-  await prisma.featureFlagOverride.deleteMany();
-  await prisma.featureFlagGeneration.deleteMany();
+  await clearFeatureFlagState();
   const admin = await seedStaffCredentials('admin', 'e2e-feature-flags-admin');
   const owner = await seedStaffCredentials('owner', 'e2e-feature-flags-owner');
 
@@ -110,4 +108,18 @@ function staffSession(
     role,
     totpEnabled: false,
   };
+}
+
+async function clearFeatureFlagState() {
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw<Array<{ marker: string }>>`
+      SELECT set_config(
+        'alistore.feature_flag_mutation_contract',
+        'generation-v2',
+        true
+      ) AS marker
+    `;
+    await tx.featureFlagOverride.deleteMany();
+    await tx.featureFlagGeneration.deleteMany();
+  });
 }

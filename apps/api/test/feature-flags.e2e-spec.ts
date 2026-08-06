@@ -88,8 +88,7 @@ describe('Feature flags (integration)', () => {
   });
 
   afterAll(async () => {
-    await prisma.featureFlagOverride.deleteMany();
-    await prisma.featureFlagGeneration.deleteMany();
+    await clearFeatureFlagState();
     await prisma.auditEvent.deleteMany({ where: { type: 'feature_flag.changed' } });
     await app.close();
     await prisma.$disconnect();
@@ -100,8 +99,7 @@ describe('Feature flags (integration)', () => {
   });
 
   beforeEach(async () => {
-    await prisma.featureFlagOverride.deleteMany();
-    await prisma.featureFlagGeneration.deleteMany();
+    await clearFeatureFlagState();
     await prisma.auditEvent.deleteMany({ where: { type: 'feature_flag.changed' } });
     for (const name of ENV_NAMES) delete process.env[name];
   });
@@ -252,35 +250,74 @@ describe('Feature flags (integration)', () => {
     expect(await featureFlagEventPayloads(key)).toHaveLength(3);
   });
 
-  it('advances generation for previous-image direct insert/update/delete writes', async () => {
+  it('rejects unmarked previous-image insert, update, and delete mutations after cutover', async () => {
     const key = FeatureFlagKey.PartialHandover;
-    await prisma.$executeRaw`
-      INSERT INTO "FeatureFlagOverride" ("key", "enabled", "reason", "updatedBy", "updatedAt")
-      VALUES (${key}, true, 'Previous-image insert', 'previous-image', CURRENT_TIMESTAMP)
-    `;
+    const current = await flags.set(key, true, 'Current-image insert', 'current-image', null);
+    expect(current.overrideRevision).toBe(1);
+
+    await expect(prisma.featureFlagOverride.update({
+      where: { key },
+      data: { enabled: false, reason: 'Previous-image update', updatedBy: 'previous-image' },
+    })).rejects.toThrow(/current application image required/i);
+    await expect(prisma.featureFlagOverride.delete({ where: { key } }))
+      .rejects.toThrow(/current application image required/i);
+    await expect(prisma.featureFlagOverride.upsert({
+      where: { key },
+      create: {
+        key, enabled: false, reason: 'Tombstone-image insert', updatedBy: 'tombstone-image', active: false,
+      },
+      update: {
+        reason: 'Tombstone-image reset', updatedBy: 'tombstone-image', active: false,
+        revision: { increment: 1 },
+      },
+    })).rejects.toThrow(/current application image required/i);
+
+    await expect(prisma.featureFlagOverride.findUnique({ where: { key } }))
+      .resolves.toMatchObject({ enabled: true, revision: 1 });
     await expect(prisma.featureFlagGeneration.findUnique({ where: { key } }))
       .resolves.toMatchObject({ revision: 1 });
-    await expect(flags.list()).resolves.toContainEqual(expect.objectContaining({
-      key, enabled: true, source: 'database', overrideActive: true, overrideRevision: 1,
-    }));
+  });
 
-    await prisma.$executeRaw`
-      UPDATE "FeatureFlagOverride"
-      SET "enabled" = false, "reason" = 'Previous-image update', "revision" = "revision" + 1,
-          "updatedBy" = 'previous-image', "updatedAt" = CURRENT_TIMESTAMP
-      WHERE "key" = ${key}
-    `;
+  it('rejects the stale missing-row null mutation that previous images cannot validate', async () => {
+    const key = FeatureFlagKey.Cancellation;
+    process.env.SUPPLY_CANCELLATION_ENABLED = 'true';
+
+    const inserted = await flags.set(key, false, 'Current-image set', 'current-image', null);
+    await flags.reset(key, 'Current-image reset', 'current-image', inserted.overrideRevision);
+    await expect(prisma.featureFlagOverride.findUnique({ where: { key } })).resolves.toBeNull();
+    await expect(prisma.featureFlagGeneration.findUnique({ where: { key } }))
+      .resolves.toMatchObject({ revision: 2 });
+
+    // A pre-generation image sees only row absence, so its expectedRevision:null
+    // check passes in application code. The database cutover marker must still
+    // reject the stale create before it can resurrect the override.
+    const previousImageObservedRow = await prisma.featureFlagOverride.findUnique({ where: { key } });
+    expect(previousImageObservedRow).toBeNull();
+    await expect(prisma.featureFlagOverride.deleteMany({ where: { key } }))
+      .rejects.toThrow(/current application image required/i);
+    await expect(prisma.featureFlagOverride.upsert({
+      where: { key },
+      create: {
+        key,
+        enabled: false,
+        reason: 'Stale previous-image null create',
+        updatedBy: 'previous-image',
+        active: true,
+      },
+      update: {
+        enabled: false,
+        reason: 'Stale previous-image null update',
+        updatedBy: 'previous-image',
+        active: true,
+        revision: { increment: 1 },
+      },
+    })).rejects.toThrow(/current application image required/i);
+
+    await expect(prisma.featureFlagOverride.findUnique({ where: { key } })).resolves.toBeNull();
     await expect(prisma.featureFlagGeneration.findUnique({ where: { key } }))
       .resolves.toMatchObject({ revision: 2 });
     await expect(flags.list()).resolves.toContainEqual(expect.objectContaining({
-      key, enabled: false, source: 'database', overrideActive: true, overrideRevision: 2,
-    }));
-
-    await prisma.$executeRaw`DELETE FROM "FeatureFlagOverride" WHERE "key" = ${key}`;
-    await expect(prisma.featureFlagGeneration.findUnique({ where: { key } }))
-      .resolves.toMatchObject({ revision: 3 });
-    await expect(flags.list()).resolves.toContainEqual(expect.objectContaining({
-      key, enabled: false, source: 'default', overrideActive: false, overrideRevision: 3,
+      key, enabled: true, source: 'environment', overrideActive: false, overrideRevision: 2,
     }));
   });
 
@@ -325,8 +362,9 @@ describe('Feature flags (integration)', () => {
 
   it('serializes concurrent set/reset mutations and prevents a stale reset deleting a newer override', async () => {
     const key = FeatureFlagKey.OwnerResolution;
-    await prisma.featureFlagOverride.create({
-      data: { key, enabled: true, reason: 'Initial override', updatedBy: 'owner-initial' },
+    await flags.set(key, true, 'Initial override', 'owner-initial', null);
+    await prisma.auditEvent.deleteMany({
+      where: { type: 'feature_flag.changed', refs: { has: key } },
     });
 
     const { results, settledWhileHeld } = await runBehindHeldFeatureFlagLock(key, [
@@ -452,5 +490,19 @@ describe('Feature flags (integration)', () => {
       where: { type: 'feature_flag.changed', refs: { has: key } },
     });
     return events.map((event) => event.payload as unknown as FeatureFlagEventPayload);
+  }
+
+  async function clearFeatureFlagState(): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ marker: string }>>`
+        SELECT set_config(
+          'alistore.feature_flag_mutation_contract',
+          'generation-v2',
+          true
+        ) AS marker
+      `;
+      await tx.featureFlagOverride.deleteMany();
+      await tx.featureFlagGeneration.deleteMany();
+    });
   }
 });

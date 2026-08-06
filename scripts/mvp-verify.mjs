@@ -16,6 +16,7 @@ const steps = [
   ['Prisma schema validate', 'npx', ['prisma', 'validate', '--schema', 'apps/api/prisma/schema.prisma']],
   ['Prisma client generate', 'npm', ['run', 'prisma:generate', '-w', '@alistore/api']],
   ['Refund migration upgrade path', 'npm', ['run', 'test:refund-migration-upgrade', '-w', '@alistore/api'], migrationEnv],
+  ['Feature-flag generation migration path', 'npm', ['run', 'test:feature-flag-generation-migration', '-w', '@alistore/api'], migrationEnv],
   ['Inventory roll-forward migration upgrade path', 'npm', ['run', 'test:inventory-roll-forward-migration-upgrade', '-w', '@alistore/api'], migrationEnv],
   ['Exchange migration upgrade path', 'npm', ['run', 'test:exchange-migration-upgrade', '-w', '@alistore/api'], migrationEnv],
   ['Order payment-mode migration upgrade path', 'npm', ['run', 'test:order-payment-mode-migration-upgrade', '-w', '@alistore/api'], migrationEnv],

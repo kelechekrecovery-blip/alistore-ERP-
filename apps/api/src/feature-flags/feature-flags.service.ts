@@ -40,6 +40,8 @@ interface EvaluatedValue {
 }
 
 const featureFlagLockName = (key: FeatureFlagKey) => `feature-flag-override:${key}`;
+const featureFlagMutationSetting = 'alistore.feature_flag_mutation_contract';
+const featureFlagMutationContract = 'generation-v2';
 
 @Injectable()
 export class FeatureFlagsService {
@@ -90,6 +92,7 @@ export class FeatureFlagsService {
 
     return this.audit.transaction(async (tx) => {
       await this.lockOverride(tx, definition.key);
+      await this.markCurrentMutationImage(tx);
       const generation = await tx.featureFlagGeneration.findUnique({
         where: { key: definition.key },
       });
@@ -134,6 +137,7 @@ export class FeatureFlagsService {
 
     return this.audit.transaction(async (tx) => {
       await this.lockOverride(tx, definition.key);
+      await this.markCurrentMutationImage(tx);
       const generation = await tx.featureFlagGeneration.findUnique({
         where: { key: definition.key },
       });
@@ -204,6 +208,20 @@ export class FeatureFlagsService {
       SELECT 1 AS "locked"
       FROM pg_advisory_xact_lock(hashtextextended(${featureFlagLockName(key)}, 0))
     `;
+  }
+
+  /** Satisfy the post-cutover DB contract without leaking state across pooled transactions. */
+  private async markCurrentMutationImage(tx: Prisma.TransactionClient): Promise<void> {
+    const [result] = await tx.$queryRaw<Array<{ marker: string }>>`
+      SELECT set_config(
+        ${featureFlagMutationSetting},
+        ${featureFlagMutationContract},
+        true
+      ) AS marker
+    `;
+    if (result?.marker !== featureFlagMutationContract) {
+      throw new Error('Feature flag mutation contract marker was not installed');
+    }
   }
 
   private changedEvent(
