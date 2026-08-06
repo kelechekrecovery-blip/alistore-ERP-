@@ -15,6 +15,8 @@ export interface AppleMethodState extends AuthMethodState {
    * одним — и подстановка bundle id даёт отказ Apple уже после клика.
    */
   clientId: string | null;
+  /** Exact URI used both by Apple JS authorization and the server code exchange. */
+  redirectUri: string | null;
 }
 
 export interface GoogleMethodState extends AuthMethodState {
@@ -91,14 +93,21 @@ export function describeAuthMethods(env: AuthMethodsEnvReader): AuthMethodsView 
   const appleTokenAudiences = appleAudiences(env);
   const appleEnabled = appleTokenAudiences.length > 0;
   const configuredAppleWebClientId = appleWebClientId(env);
+  const configuredAppleRedirectUri = env('APPLE_REDIRECT_URI')?.trim() || null;
+  const exposedAppleWebClientId = configuredAppleWebClientId
+    && appleTokenAudiences.includes(configuredAppleWebClientId)
+    ? configuredAppleWebClientId
+    : null;
   const apple: AppleMethodState = {
     enabled: appleEnabled,
     registers: appleEnabled && phoneEnabled,
     // Не показываем браузерную кнопку, если API не принимает выпущенный для
     // неё audience. Иначе Apple успешно вернёт токен, а наш API отвергнет его.
-    clientId: configuredAppleWebClientId && appleTokenAudiences.includes(configuredAppleWebClientId)
-      ? configuredAppleWebClientId
-      : null,
+    clientId: exposedAppleWebClientId,
+    // A code can only be exchanged with the same redirect URI used for
+    // authorization. Never derive it from the current browser host: ali.kg and
+    // www.ali.kg are both served in production but Apple registration is exact.
+    redirectUri: exposedAppleWebClientId ? configuredAppleRedirectUri : null,
   };
 
   const googleTokenAudiences = googleAudiences(env);

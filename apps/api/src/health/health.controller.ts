@@ -1,5 +1,6 @@
-import { Controller, Get, ServiceUnavailableException, UseGuards } from '@nestjs/common';
+import { Controller, Get, Res, ServiceUnavailableException, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Response } from 'express';
 import {
   HealthCheck,
   HealthCheckService,
@@ -19,6 +20,10 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { PermissionGuard } from '../authz/permission.guard';
 import { RequirePermission } from '../authz/require-permission.decorator';
+import {
+  WORKER_RUNTIME_HEARTBEAT_ID,
+  WORKER_RUNTIME_STALE_AFTER_MS,
+} from './worker-runtime-heartbeat.service';
 
 const READINESS_HEAP_LIMIT_BYTES = 1536 * 1024 * 1024;
 
@@ -34,25 +39,51 @@ export class HealthController {
 
   /** Readiness — DB reachable + heap sane. For orchestrators / load balancers. */
   @Get()
-  check() {
-    return this.ready();
+  check(@Res({ passthrough: true }) response: Response) {
+    return this.ready(response);
   }
 
   /** Explicit readiness alias for managed-cloud probes. */
   @Get('ready')
-  async ready() {
+  async ready(@Res({ passthrough: true }) response: Response) {
     try {
       await this.probe();
     } catch {
       throw new ServiceUnavailableException();
     }
-    return { status: 'ok' as const };
+    return this.publicStatus(response);
   }
 
   /** Liveness — the process is up (no dependencies checked). */
   @Get('live')
-  live() {
+  live(@Res({ passthrough: true }) response: Response) {
+    return this.publicStatus(response);
+  }
+
+  /** Minimal, revision-bound liveness proof for the separate worker service. */
+  @Get('worker')
+  async worker(@Res({ passthrough: true }) response: Response) {
+    const heartbeat = await this.prisma.workerHeartbeat.findUnique({
+      where: { id: WORKER_RUNTIME_HEARTBEAT_ID },
+    });
+    const revision = this.workerRevision(heartbeat?.meta);
+    const fresh = heartbeat
+      && Date.now() - heartbeat.lastSeenAt.getTime() <= WORKER_RUNTIME_STALE_AFTER_MS;
+    if (!fresh || !revision) throw new ServiceUnavailableException();
+    response.setHeader('X-AliStore-Revision', revision);
     return { status: 'ok' as const };
+  }
+
+  private publicStatus(response: Response) {
+    const revision = this.config.get<string>('RENDER_GIT_COMMIT')?.trim();
+    if (revision) response.setHeader('X-AliStore-Revision', revision);
+    return { status: 'ok' as const };
+  }
+
+  private workerRevision(meta: unknown): string | null {
+    if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
+    const revision = (meta as Record<string, unknown>).revision;
+    return typeof revision === 'string' && revision.trim() ? revision.trim() : null;
   }
 
   /**

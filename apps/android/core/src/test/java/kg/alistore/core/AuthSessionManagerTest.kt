@@ -12,6 +12,104 @@ import org.junit.Test
 
 class AuthSessionManagerTest {
   @Test
+  fun capabilityFailureHidesMethodsAndPreventsOtpRequest() = runTest {
+    val api = FakeAuthGateway().apply { authMethodsFailure = ApiException(503, "unavailable") }
+    val manager = AuthSessionManager(api, FakeStore(), FakeGoogleSignInProvider())
+
+    manager.loadAuthMethods()
+    val error = runCatching { manager.requestOtp("+996700123456") }.exceptionOrNull()
+
+    assertEquals(CustomerAuthMethodsState.Unavailable, manager.authMethodsState)
+    assertTrue(error?.message.orEmpty().contains("Не удалось проверить"))
+    assertNull(api.requestedPhone)
+  }
+
+  @Test
+  fun disabledPhoneEmailAndGoogleNeverReachLoginEndpoints() = runTest {
+    val api = FakeAuthGateway().apply {
+      methods = testAuthMethods(phone = false, email = false, google = false, googleClientId = null)
+    }
+    val manager = AuthSessionManager(api, FakeStore())
+
+    val phoneError = runCatching { manager.requestOtp("+996700123456") }.exceptionOrNull()
+    val emailError = runCatching { manager.requestEmailOtp("user@example.com") }.exceptionOrNull()
+    val googleState = manager.loginWithGoogle(GoogleIdentityCredential("token", "nonce"))
+
+    assertTrue(phoneError?.message.orEmpty().contains("телефону"))
+    assertTrue(emailError?.message.orEmpty().contains("почте"))
+    assertTrue((googleState as AuthState.Failed).message.contains("Google"))
+    assertNull(api.requestedPhone)
+    assertNull(api.requestedEmail)
+    assertNull(api.googleLoginCall)
+  }
+
+  @Test
+  fun disabledRecoveryNeverReachesRecoveryEndpoints() = runTest {
+    val api = FakeAuthGateway().apply { methods = testAuthMethods(recovery = false) }
+    val manager = AuthSessionManager(api, FakeStore())
+
+    val requestError = runCatching { manager.requestRecoveryOtp("+996700123456") }.exceptionOrNull()
+    val verifyState = manager.verifyRecovery("+996700123456", "123456")
+
+    assertEquals("Восстановление доступа сейчас недоступно", requestError?.message)
+    assertEquals(
+      "Не удалось восстановить доступ. Проверьте код и попробуйте ещё раз",
+      (verifyState as AuthState.Failed).message,
+    )
+    assertNull(api.requestedRecoveryPhone)
+    assertNull(api.verifiedRecovery)
+  }
+
+  @Test
+  fun unavailableCapabilitiesPreventRecoveryCalls() = runTest {
+    val api = FakeAuthGateway().apply { authMethodsFailure = ApiException(503, "unavailable") }
+    val manager = AuthSessionManager(api, FakeStore())
+
+    val error = runCatching { manager.requestRecoveryOtp("+996700123456") }.exceptionOrNull()
+
+    assertTrue(error?.message.orEmpty().contains("Не удалось проверить"))
+    assertNull(api.requestedRecoveryPhone)
+  }
+
+  @Test
+  fun recoveryRequestDoesNotExposeWhetherCustomerExists() = runTest {
+    val api = FakeAuthGateway().apply {
+      requestRecoveryFailure = ApiException(404, "Клиент не найден", "customer_not_found")
+    }
+    val manager = AuthSessionManager(api, FakeStore())
+
+    val error = runCatching { manager.requestRecoveryOtp("+996700123456") }.exceptionOrNull()
+
+    assertEquals("Не удалось отправить код восстановления. Попробуйте позже", error?.message)
+    assertTrue(!error?.message.orEmpty().contains("найден", ignoreCase = true))
+  }
+
+  @Test
+  fun googleNeedsApiConfirmedWebAudienceBeforeAccountPicker() = runTest {
+    val api = FakeAuthGateway().apply {
+      methods = testAuthMethods(google = true, googleClientId = null)
+    }
+
+    val state = AuthSessionManager(api, FakeStore(), FakeGoogleSignInProvider())
+      .loginWithGoogle(GoogleIdentityCredential("token", "nonce"))
+
+    assertTrue(state is AuthState.Failed)
+    assertNull(api.googleLoginCall)
+  }
+
+  @Test
+  fun googleRejectsBuildAudienceNotConfirmedByApi() = runTest {
+    val api = FakeAuthGateway()
+    val provider = FakeGoogleSignInProvider(serverClientId = "other-client.apps.googleusercontent.com")
+
+    val state = AuthSessionManager(api, FakeStore(), provider)
+      .loginWithGoogle(GoogleIdentityCredential("token", "nonce"))
+
+    assertTrue(state is AuthState.Failed)
+    assertNull(api.googleLoginCall)
+  }
+
+  @Test
   fun restoresValidStoredSession() = runTest {
     val tokens = AuthTokens("access", "refresh")
     val store = FakeStore(tokens)
@@ -89,6 +187,75 @@ class AuthSessionManagerTest {
   }
 
   @Test
+  fun recoveryUsesPinnedChallengeAndPersistsValidatedReplacementSession() = runTest {
+    val store = FakeStore()
+    val api = FakeAuthGateway()
+    val manager = AuthSessionManager(api, store)
+
+    manager.requestRecoveryOtp(" +996 700-12-34-56 ")
+    val state = manager.verifyRecovery(" +996 700-12-34-56 ", " 987654 ")
+
+    assertTrue(state is AuthState.SignedIn)
+    assertEquals("+996700123456", api.requestedRecoveryPhone)
+    assertEquals("+996700123456" to "987654", api.verifiedRecovery)
+    assertEquals("recovery-challenge", api.verifiedRecoveryChallengeId)
+    assertEquals(api.recoveryTokens, store.tokens)
+    assertEquals("client:customer-1", store.principalId)
+  }
+
+  @Test
+  fun recoveryChallengeIdMismatchCannotPersistOrValidateSession() = runTest {
+    val store = FakeStore()
+    val api = FakeAuthGateway().apply {
+      expectedRecoveryChallengeId = "different-challenge"
+    }
+    val manager = AuthSessionManager(api, store)
+
+    manager.requestRecoveryOtp("+996700123456")
+    val state = manager.verifyRecovery("+996700123456", "987654")
+
+    assertTrue(state is AuthState.Failed)
+    assertEquals("recovery-challenge", api.verifiedRecoveryChallengeId)
+    assertNull(store.tokens)
+    assertNull(store.principalId)
+    assertEquals(0, store.saveCount)
+  }
+
+  @Test
+  fun recoveryVerificationDoesNotExposeWhetherCustomerExists() = runTest {
+    val api = FakeAuthGateway().apply {
+      verifyRecoveryFailure = ApiException(404, "Клиент не найден", "customer_not_found")
+    }
+    val manager = AuthSessionManager(api, FakeStore())
+
+    manager.requestRecoveryOtp("+996700123456")
+    val state = manager.verifyRecovery("+996700123456", "987654")
+
+    assertEquals(
+      "Не удалось восстановить доступ. Проверьте код и попробуйте ещё раз",
+      (state as AuthState.Failed).message,
+    )
+    assertTrue(!state.message.contains("найден", ignoreCase = true))
+  }
+
+  @Test
+  fun recoveryVerificationRethrowsCancellationWithoutClearingSession() = runTest {
+    val store = FakeStore()
+    val api = FakeAuthGateway().apply {
+      verifyRecoveryFailure = CancellationException("screen closed")
+    }
+    val manager = AuthSessionManager(api, store)
+
+    manager.requestRecoveryOtp("+996700123456")
+    val error = runCatching {
+      manager.verifyRecovery("+996700123456", "987654")
+    }.exceptionOrNull()
+
+    assertTrue(error is CancellationException)
+    assertEquals(0, store.clearCount)
+  }
+
+  @Test
   fun emailLoginNormalizesAddressAndPersistsTokens() = runTest {
     val store = FakeStore()
     val api = FakeAuthGateway()
@@ -138,7 +305,7 @@ class AuthSessionManagerTest {
       googleResult = SocialAuthResult.Authenticated(AuthTokens("google-access", "google-refresh"))
     }
 
-    val state = AuthSessionManager(api, store).loginWithGoogle(
+    val state = AuthSessionManager(api, store, FakeGoogleSignInProvider()).loginWithGoogle(
       GoogleIdentityCredential("google-id-token", "raw-nonce"),
     )
 
@@ -154,7 +321,7 @@ class AuthSessionManagerTest {
       googleResult = SocialAuthResult.EnrollmentRequired("memory-ticket", 600)
       socialEnrollmentTokens = AuthTokens("enrolled-access", "enrolled-refresh")
     }
-    val manager = AuthSessionManager(api, store)
+    val manager = AuthSessionManager(api, store, FakeGoogleSignInProvider())
 
     val enrollment = manager.loginWithGoogle(GoogleIdentityCredential("google-id-token", "raw-nonce"))
     assertTrue(enrollment is AuthState.SocialEnrollment)
@@ -177,7 +344,7 @@ class AuthSessionManagerTest {
     val api = FakeAuthGateway().apply {
       googleResult = SocialAuthResult.EnrollmentRequired("memory-ticket", 600)
     }
-    val manager = AuthSessionManager(api, FakeStore())
+    val manager = AuthSessionManager(api, FakeStore(), FakeGoogleSignInProvider())
     manager.loginWithGoogle(GoogleIdentityCredential("token", "nonce"))
 
     assertEquals(AuthState.Guest, manager.cancelSocialEnrollment())
@@ -193,7 +360,7 @@ class AuthSessionManagerTest {
     val api = FakeAuthGateway().apply {
       googleResult = SocialAuthResult.EnrollmentRequired("memory-ticket", 10)
     }
-    val manager = AuthSessionManager(api, FakeStore(), nowMillis = { clock })
+    val manager = AuthSessionManager(api, FakeStore(), FakeGoogleSignInProvider(), nowMillis = { clock })
     val state = manager.loginWithGoogle(GoogleIdentityCredential("token", "nonce")) as AuthState.SocialEnrollment
     assertEquals(11_000L, state.expiresAtMillis)
 
@@ -389,6 +556,13 @@ private class FakeAuthGateway : AuthGateway {
   var requestedPhone: String? = null
   var verified: Pair<String, String>? = null
   var verifiedChallengeId: String? = null
+  var requestedRecoveryPhone: String? = null
+  var requestRecoveryFailure: Throwable? = null
+  var verifiedRecovery: Pair<String, String>? = null
+  var verifiedRecoveryChallengeId: String? = null
+  var expectedRecoveryChallengeId: String? = "recovery-challenge"
+  var recoveryTokens = AuthTokens("recovery-access", "recovery-refresh")
+  var verifyRecoveryFailure: Throwable? = null
   var requestedEmail: String? = null
   var verifiedEmail: Pair<String, String>? = null
   var verifiedEmailChallengeId: String? = null
@@ -407,10 +581,31 @@ private class FakeAuthGateway : AuthGateway {
   var googleLoginCall: Pair<String, String>? = null
   var socialEnrollmentTokens = verifiedTokens
   val socialEnrollmentCalls = mutableListOf<SocialEnrollmentCall>()
+  var methods = testAuthMethods()
+  var authMethodsFailure: Throwable? = null
+
+  override suspend fun authMethods(): CustomerAuthMethods {
+    authMethodsFailure?.let { throw it }
+    return methods
+  }
 
   override suspend fun requestOtp(phone: String): OtpChallenge {
     requestedPhone = phone
     return OtpChallenge("123456", "phone-challenge")
+  }
+
+  override suspend fun requestRecoveryOtp(phone: String): OtpChallenge {
+    requestRecoveryFailure?.let { throw it }
+    requestedRecoveryPhone = phone
+    return OtpChallenge("987654", "recovery-challenge")
+  }
+
+  override suspend fun verifyRecoveryOtp(phone: String, code: String, challengeId: String?): AuthTokens {
+    verifyRecoveryFailure?.let { throw it }
+    verifiedRecovery = phone to code
+    verifiedRecoveryChallengeId = challengeId
+    if (challengeId != expectedRecoveryChallengeId) throw ApiException(422, "Код не найден", "otp_not_found")
+    return recoveryTokens
   }
 
   override suspend fun requestEmailOtp(email: String): EmailOtpChallenge {
@@ -489,8 +684,25 @@ private data class SocialEnrollmentCall(
   val challengeId: String?,
 )
 
-private class FakeGoogleSignInProvider : GoogleSignInProvider {
+private class FakeGoogleSignInProvider(
+  override val serverClientId: String? = "google-web.apps.googleusercontent.com",
+) : GoogleSignInProvider {
   var clearCalls = 0
   override suspend fun signIn() = GoogleIdentityCredential("token", "nonce")
   override suspend fun clearCredentialState() { clearCalls += 1 }
 }
+
+private fun testAuthMethods(
+  phone: Boolean = true,
+  email: Boolean = true,
+  google: Boolean = true,
+  googleClientId: String? = "google-web.apps.googleusercontent.com",
+  recovery: Boolean = true,
+): CustomerAuthMethods = CustomerAuthMethods(
+  phone = CustomerAuthMethodAvailability(phone, phone),
+  email = CustomerAuthMethodAvailability(email, false),
+  google = CustomerSocialAuthMethodAvailability(google, google && phone, googleClientId),
+  recovery = CustomerRecoveryAuthMethodAvailability(recovery),
+  anyLoginAvailable = phone || email || google,
+  registrationAvailable = phone || (google && phone),
+)

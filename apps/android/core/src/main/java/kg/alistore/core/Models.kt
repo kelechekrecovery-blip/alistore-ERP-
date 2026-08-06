@@ -50,9 +50,47 @@ data class PendingMutation(
 
 data class AuthTokens(val accessToken: String, val refreshToken: String)
 
+/**
+ * Server-authoritative availability for customer authentication.
+ *
+ * `enabled` permits an existing customer to sign in. `registers` additionally
+ * confirms that an unknown identity can finish account creation right now.
+ */
+data class CustomerAuthMethodAvailability(
+  val enabled: Boolean,
+  val registers: Boolean,
+)
+
+data class CustomerSocialAuthMethodAvailability(
+  val enabled: Boolean,
+  val registers: Boolean,
+  val clientId: String?,
+)
+
+data class CustomerRecoveryAuthMethodAvailability(
+  val enabled: Boolean,
+)
+
+data class CustomerAuthMethods(
+  val phone: CustomerAuthMethodAvailability,
+  val email: CustomerAuthMethodAvailability,
+  val google: CustomerSocialAuthMethodAvailability,
+  val recovery: CustomerRecoveryAuthMethodAvailability,
+  val anyLoginAvailable: Boolean,
+  val registrationAvailable: Boolean,
+)
+
+sealed interface CustomerAuthMethodsState {
+  data object Loading : CustomerAuthMethodsState
+  data class Available(val methods: CustomerAuthMethods) : CustomerAuthMethodsState
+  data object Unavailable : CustomerAuthMethodsState
+}
+
 data class GoogleIdentityCredential(val identityToken: String, val nonce: String)
 
 interface GoogleSignInProvider {
+  /** OAuth web audience requested by Credential Manager for the ID token. */
+  val serverClientId: String? get() = null
   suspend fun signIn(): GoogleIdentityCredential
   suspend fun clearCredentialState()
 }

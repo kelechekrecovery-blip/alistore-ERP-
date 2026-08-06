@@ -24,7 +24,7 @@ async function mockAuthMethods(page: Page) {
       // `botUsername: null` — виджет для обычного браузера не нужен: внутри
       // Mini App вход идёт подписанным initData.
       telegram: { enabled: true, registers: true, botUsername: null },
-      apple: { enabled: false, registers: false, clientId: null },
+      apple: { enabled: false, registers: false, clientId: null, redirectUri: null },
       recovery: { enabled: false },
       anyLoginAvailable: true,
       registrationAvailable: true,

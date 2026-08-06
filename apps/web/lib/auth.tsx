@@ -46,7 +46,7 @@ interface AuthContextValue {
   ) => Promise<{ status: 'authenticated' } | Extract<TelegramAuthResult, { status: 'enrollment_required' }>>;
   appleLogin: (
     identityToken: string,
-    options: { nonce: string; name?: string },
+    options: { nonce: string; authorizationCode: string; name?: string },
   ) => Promise<{ status: 'authenticated' } | Extract<TelegramAuthResult, { status: 'enrollment_required' }>>;
   googleLogin: (
     identityToken: string,
@@ -569,7 +569,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const appleLogin = useCallback(
-    async (identityToken: string, options: { nonce: string; name?: string }) => {
+    async (
+      identityToken: string,
+      options: { nonce: string; authorizationCode: string; name?: string },
+    ) => {
       const result = await authAppleLogin(identityToken, options);
       // Тот же двухшаговый путь, что у Telegram: неизвестный Apple-аккаунт не
       // ошибка, а человек без привязанного телефона. Возвращаем токен привязки

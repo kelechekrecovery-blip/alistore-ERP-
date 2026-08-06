@@ -593,6 +593,8 @@ model Customer {
   segments                String[]
   ltv                     Int                     @default(0)
   identities              CustomerIdentity[]
+  socialEnrollments       SocialEnrollment[]      @relation("CustomerSocialEnrollments")
+  appleOAuthGrants        AppleOAuthGrant[]       @relation("CustomerAppleOAuthGrants")
   pushTokens              PushToken[]
   addresses               CustomerAddress[]
   preferences             CustomerPreferences?
@@ -705,20 +707,63 @@ model CustomerIdentity {
 // and phone ownership. Neither the provider credential nor the opaque
 // enrollment token is stored: only non-reversible SHA-256 fingerprints.
 model SocialEnrollment {
-  id            String    @id @default(cuid())
-  tokenHash     String    @unique
-  assertionHash String    @unique
-  provider      String
-  subject       String
-  email         String?
-  displayName   String?
-  avatarUrl     String?
-  expiresAt     DateTime
-  consumedAt    DateTime?
-  createdAt     DateTime  @default(now())
+  id                        String    @id @default(cuid())
+  tokenHash                 String    @unique
+  assertionHash             String    @unique
+  provider                  String
+  subject                   String
+  email                     String?
+  displayName               String?
+  avatarUrl                 String?
+  appleClientId             String?
+  appleGrantId              String?   @unique
+  expiresAt                 DateTime
+  consumedAt                DateTime?
+  customerId                String?
+  customer                  Customer? @relation("CustomerSocialEnrollments", fields: [customerId], references: [id], onDelete: Cascade)
+  createdAt                 DateTime  @default(now())
 
   @@index([provider, subject])
   @@index([expiresAt])
+  @@index([customerId])
+}
+
+// Encrypted Apple refresh tokens are retained independently of the identity so
+// account deletion can unlink PII immediately while a durable worker retries
+// Apple's revocation endpoint. Plaintext authorization/refresh tokens are never
+// persisted.
+model AppleOAuthGrant {
+  id                   String    @id @default(cuid())
+  customerId           String?
+  customer             Customer? @relation("CustomerAppleOAuthGrants", fields: [customerId], references: [id], onDelete: SetNull)
+  subject              String
+  clientId             String
+  refreshTokenEnvelope String    @db.Text
+  status               String    @default("active") // active | enrollment
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([clientId, subject])
+  @@index([customerId])
+}
+
+// Immutable copies queued for revocation. Keeping jobs separate from the
+// current grant prevents a concurrent re-login from being deleted by a worker
+// that is finishing an older token generation.
+model AppleRevocationJob {
+  id                   String    @id @default(cuid())
+  subject              String
+  clientId             String
+  refreshTokenEnvelope String    @db.Text
+  status               String    @default("pending") // pending | processing | configuration_error
+  claimToken           String?
+  attempts             Int       @default(0)
+  nextAttemptAt        DateTime?
+  lastErrorCode        String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([status, nextAttemptAt])
 }
 
 // Durable global budget for the deliberately narrow App Store / Play review

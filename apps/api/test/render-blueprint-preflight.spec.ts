@@ -63,6 +63,26 @@ describe('render.yaml · боевой режим', () => {
     expect(webDockerfile).not.toMatch(/ARG NEXT_PUBLIC_DEMO_MODE=true/);
   });
 
+  it('не откатывает активированные каналы входа при Blueprint sync', () => {
+    // Эти переключатели зависят от секретов/живой доставки и меняются только
+    // владельцем после smoke. Репозиторий объявляет слоты, но не имеет права
+    // снова пришить disabled/false поверх проверенной production-настройки.
+    expect(valuesOf('SMS_PROVIDER')).toEqual([]);
+    expect(valuesOf('AUTH_EMAIL_LOGIN_ENABLED')).toEqual([]);
+    expect(valuesOf('AUTH_RECOVERY_OTP_ENABLED')).toEqual([]);
+    expect(blueprint).toMatch(/- key: SMS_PROVIDER\n\s+sync: false/);
+    expect(blueprint).toMatch(/- key: AUTH_EMAIL_LOGIN_ENABLED\n\s+sync: false/);
+    expect(blueprint).toMatch(/- key: AUTH_RECOVERY_OTP_ENABLED\n\s+sync: false/);
+  });
+
+  it('фиксирует единый публичный контракт Apple для Web и iOS', () => {
+    expect(valuesOf('APPLE_CLIENT_ID')).toEqual(['kg.alistore.web,kg.alistore.client']);
+    expect(valuesOf('APPLE_WEB_CLIENT_ID')).toEqual(['kg.alistore.web']);
+    expect(valuesOf('APPLE_REDIRECT_URI')).toEqual(['https://ali.kg/login']);
+    expect(valuesOf('APPLE_TEAM_ID')).toEqual(['ZYU3F8W56P']);
+    expect(valuesOf('SMS_GATEWAY_URL')).toEqual(['https://api.sms-gate.app/3rdparty/v1']);
+  });
+
   it('выбирает честно недоступный шлюз на значении из блюпринта', () => {
     const [provider] = valuesOf('PAYMENT_PROVIDER');
     expect(selectPaymentGatewayProvider((name) => (name === 'PAYMENT_PROVIDER' ? provider : undefined)))

@@ -68,54 +68,239 @@ jobs:
   deploy:
     needs: migration-rehearsal
     runs-on: ubuntu-latest
+    outputs:
+      previous-revision: ${{ steps.previous.outputs.revision }}
+      previous-api-web-verifiable: ${{ steps.previous.outputs.api-web-verifiable }}
+      previous-worker-verifiable: ${{ steps.previous.outputs.worker-verifiable }}
     steps:
+      - name: Capture rollback revision
+        id: previous
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          revision_header() {
+            curl -sS -D - -o /dev/null "$1" 2>/dev/null \
+              | tr -d '\r' \
+              | awk -F': ' 'tolower($1) == "x-alistore-revision" { print $2; exit }'
+          }
+          http_status() {
+            curl -sS -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || printf '000'
+          }
+          api_status="$(http_status "$PROD_API_BASE_URL/api/health/live")"
+          web_status="$(http_status "$PROD_WEB_BASE_URL/healthz")"
+          worker_status="$(http_status "$PROD_API_BASE_URL/api/health/worker")"
+          if [ "$api_status" != "200" ] || [ "$web_status" != "200" ]; then
+            echo "::error::Pre-deploy API/Web health is not ready (api=$api_status web=$web_status)."
+            exit 1
+          fi
+          api_revision="$(revision_header "$PROD_API_BASE_URL/api/health/live" || true)"
+          web_revision="$(revision_header "$PROD_WEB_BASE_URL/healthz" || true)"
+          worker_revision="$(revision_header "$PROD_API_BASE_URL/api/health/worker" || true)"
+          previous=""
+          if [ -n "$api_revision" ] && [ "$api_revision" = "$web_revision" ]; then
+            previous="$api_revision"
+            echo "api-web-verifiable=true" >> "$GITHUB_OUTPUT"
+            if [ "$worker_status" != "200" ] || [ "$worker_revision" != "$previous" ]; then
+              echo "::error::Worker is not healthy at live revision $previous (status=$worker_status revision=${worker_revision:-missing})."
+              exit 1
+            fi
+            echo "worker-verifiable=true" >> "$GITHUB_OUTPUT"
+          elif [ -z "$api_revision" ] && [ -z "$web_revision" ] \
+             && [ "$worker_status" = "404" ] \
+             && [ "$GITHUB_EVENT_NAME" = "push" ] \
+             && [[ "$PUSH_BEFORE" =~ ^[0-9a-f]{40}$ ]] \
+             && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            # One-time legacy rollout: both old health routes work, neither can
+            # expose a revision, and the worker route does not exist yet.
+            previous="$PUSH_BEFORE"
+            echo "api-web-verifiable=false" >> "$GITHUB_OUTPUT"
+            echo "worker-verifiable=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Cannot determine a coherent rollback target (api=$api_status/${api_revision:-missing} web=$web_status/${web_revision:-missing} worker=$worker_status/${worker_revision:-missing})."
+            exit 1
+          fi
+          echo "revision=$previous" >> "$GITHUB_OUTPUT"
+          echo "Rollback revision captured: $previous"
       - name: Trigger Render production deploy hooks
         env:
           API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API_PROD }}
           WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB_PROD }}
           WORKER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WORKER_PROD }}
+          PREVIOUS_REVISION: ${{ steps.previous.outputs.revision }}
+          PREVIOUS_API_WEB_VERIFIABLE: ${{ steps.previous.outputs.api-web-verifiable }}
+          PREVIOUS_WORKER_VERIFIABLE: ${{ steps.previous.outputs.worker-verifiable }}
         run: |
           set -euo pipefail
-          triggered=0
+          # Validate the complete rollout contract before triggering any service.
+          # Otherwise a missing later hook can leave production on mixed revisions.
           for pair in "api:$API_HOOK" "web:$WEB_HOOK" "worker:$WORKER_HOOK"; do
             name="${pair%%:*}"
             url="${pair#*:}"
-            if [ -n "$url" ]; then
-              echo "Triggering $name deploy hook"
-              curl -fsS -X POST "$url"
-              triggered=1
-            else
-              echo "::notice::RENDER_DEPLOY_HOOK_$(echo "$name" | tr '[:lower:]' '[:upper:]')_PROD is not set — skipping $name"
+            if [ -z "$url" ]; then
+              echo "::error::RENDER_DEPLOY_HOOK_$(echo "$name" | tr '[:lower:]' '[:upper:]')_PROD is required."
+              exit 1
             fi
           done
-          if [ "$triggered" -eq 0 ]; then
-            echo "::error::No Render production deploy hooks configured; nothing was deployed."
+          pids=()
+          for pair in "api:$API_HOOK" "web:$WEB_HOOK" "worker:$WORKER_HOOK"; do
+            name="${pair%%:*}"
+            url="${pair#*:}"
+            separator='?'
+            case "$url" in *\?*) separator='&' ;; esac
+            echo "Triggering $name deploy hook for $GITHUB_SHA"
+            curl -fsS -X POST "${url}${separator}ref=${GITHUB_SHA}" >/dev/null &
+            pids+=("$!")
+          done
+          failed=0
+          for pid in "${pids[@]}"; do
+            wait "$pid" || failed=1
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::At least one Render deploy hook rejected the coordinated rollout; rolling accepted services back to $PREVIOUS_REVISION."
+            rollback_pids=()
+            for pair in "api:$API_HOOK" "web:$WEB_HOOK" "worker:$WORKER_HOOK"; do
+              url="${pair#*:}"
+              separator='?'
+              case "$url" in *\?*) separator='&' ;; esac
+              curl -fsS -X POST "${url}${separator}ref=${PREVIOUS_REVISION}" >/dev/null &
+              rollback_pids+=("$!")
+            done
+            rollback_failed=0
+            for pid in "${rollback_pids[@]}"; do wait "$pid" || rollback_failed=1; done
+            if [ "$rollback_failed" -ne 0 ]; then
+              echo "::error::Automatic rollback hook failure; manual Render rollback to $PREVIOUS_REVISION is required."
+              exit 1
+            fi
+            deployed_revision() {
+              curl -fsS -D - -o /dev/null "$1" 2>/dev/null \
+                | tr -d '\r' \
+                | awk -F': ' 'tolower($1) == "x-alistore-revision" { print $2; exit }'
+            }
+            healthy_status() {
+              curl -sS -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || printf '000'
+            }
+            api_web_restored() {
+              if [ "$PREVIOUS_API_WEB_VERIFIABLE" = "true" ]; then
+                [ "$(deployed_revision "$PROD_API_BASE_URL/api/health/live" || true)" = "$PREVIOUS_REVISION" ] \
+                  && [ "$(deployed_revision "$PROD_WEB_BASE_URL/healthz" || true)" = "$PREVIOUS_REVISION" ]
+              else
+                [ "$(healthy_status "$PROD_API_BASE_URL/api/health/live")" = "200" ] \
+                  && [ "$(healthy_status "$PROD_WEB_BASE_URL/healthz")" = "200" ]
+              fi
+            }
+            worker_restored() {
+              if [ "$PREVIOUS_WORKER_VERIFIABLE" = "true" ]; then
+                [ "$(deployed_revision "$PROD_API_BASE_URL/api/health/worker" || true)" = "$PREVIOUS_REVISION" ]
+              else
+                [ "$(healthy_status "$PROD_API_BASE_URL/api/health/worker")" = "404" ]
+              fi
+            }
+            deadline=$(( $(date +%s) + 1200 ))
+            until api_web_restored && worker_restored; do
+              if [ "$(date +%s)" -ge "$deadline" ]; then
+                echo "::error::Automatic rollback could not verify revision $PREVIOUS_REVISION; manual Render rollback is required."
+                exit 1
+              fi
+              echo "Waiting for partial-rollout rollback to $PREVIOUS_REVISION..."
+              sleep 30
+            done
+            echo "Rollback after partial hook failure verified at $PREVIOUS_REVISION."
             exit 1
           fi
 
   health-check:
     needs: deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
       - name: Wait for production health endpoints
         run: |
           set -euo pipefail
+          deployed_revision() {
+            curl -fsS -D - -o /dev/null "$1" \
+              | tr -d '\r' \
+              | awk -F': ' 'tolower($1) == "x-alistore-revision" { print $2; exit }'
+          }
           deadline=$(( $(date +%s) + 1200 ))
-          until curl -fsS "$PROD_API_BASE_URL/api/health/live" >/dev/null \
-             && curl -fsS "$PROD_API_BASE_URL/api/health/ready" >/dev/null \
-             && curl -fsS "$PROD_WEB_BASE_URL/healthz" >/dev/null; do
+          until [ "$(deployed_revision "$PROD_API_BASE_URL/api/health/live")" = "$GITHUB_SHA" ] \
+             && [ "$(deployed_revision "$PROD_API_BASE_URL/api/health/ready")" = "$GITHUB_SHA" ] \
+             && [ "$(deployed_revision "$PROD_WEB_BASE_URL/healthz")" = "$GITHUB_SHA" ] \
+             && [ "$(deployed_revision "$PROD_API_BASE_URL/api/health/worker")" = "$GITHUB_SHA" ]; do
             if [ "$(date +%s)" -ge "$deadline" ]; then
-              echo "::error::Production health checks did not pass within 20 minutes — inspect the Render deploy events."
+              echo "::error::Production did not expose expected revision $GITHUB_SHA within 20 minutes."
               exit 1
             fi
-            echo "Waiting for production health (api=$PROD_API_BASE_URL web=$PROD_WEB_BASE_URL)..."
+            echo "Waiting for production revision $GITHUB_SHA (api=$PROD_API_BASE_URL web=$PROD_WEB_BASE_URL)..."
             sleep 30
           done
-          echo "Production health endpoints are live."
+          echo "Production API, Web, and worker expose revision $GITHUB_SHA."
       - name: Deployment smoke
         env:
           WEB_BASE_URL: ${{ env.PROD_WEB_BASE_URL }}
           API_BASE_URL: ${{ env.PROD_API_BASE_URL }}
+          REQUIRE_CUSTOMER_AUTH_CONFIGURATION: 'true'
         run: node scripts/deployment-smoke.mjs
+      - name: Roll back failed production validation
+        if: ${{ failure() }}
+        timeout-minutes: 25
+        env:
+          API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API_PROD }}
+          WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB_PROD }}
+          WORKER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WORKER_PROD }}
+          PREVIOUS_REVISION: ${{ needs.deploy.outputs.previous-revision }}
+          PREVIOUS_API_WEB_VERIFIABLE: ${{ needs.deploy.outputs.previous-api-web-verifiable }}
+          PREVIOUS_WORKER_VERIFIABLE: ${{ needs.deploy.outputs.previous-worker-verifiable }}
+        run: |
+          set -euo pipefail
+          pids=()
+          for pair in "api:$API_HOOK" "web:$WEB_HOOK" "worker:$WORKER_HOOK"; do
+            name="${pair%%:*}"
+            url="${pair#*:}"
+            separator='?'
+            case "$url" in *\?*) separator='&' ;; esac
+            echo "Triggering $name rollback to $PREVIOUS_REVISION"
+            curl -fsS -X POST "${url}${separator}ref=${PREVIOUS_REVISION}" >/dev/null &
+            pids+=("$!")
+          done
+          rollback_failed=0
+          for pid in "${pids[@]}"; do wait "$pid" || rollback_failed=1; done
+          if [ "$rollback_failed" -ne 0 ]; then
+            echo "::error::One or more rollback hooks failed; manual Render rollback is required."
+            exit 1
+          fi
+          deployed_revision() {
+            curl -fsS -D - -o /dev/null "$1" 2>/dev/null \
+              | tr -d '\r' \
+              | awk -F': ' 'tolower($1) == "x-alistore-revision" { print $2; exit }'
+          }
+          healthy_status() {
+            curl -sS -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || printf '000'
+          }
+          api_web_restored() {
+            if [ "$PREVIOUS_API_WEB_VERIFIABLE" = "true" ]; then
+              [ "$(deployed_revision "$PROD_API_BASE_URL/api/health/live" || true)" = "$PREVIOUS_REVISION" ] \
+                && [ "$(deployed_revision "$PROD_WEB_BASE_URL/healthz" || true)" = "$PREVIOUS_REVISION" ]
+            else
+              [ "$(healthy_status "$PROD_API_BASE_URL/api/health/live")" = "200" ] \
+                && [ "$(healthy_status "$PROD_WEB_BASE_URL/healthz")" = "200" ]
+            fi
+          }
+          worker_restored() {
+            if [ "$PREVIOUS_WORKER_VERIFIABLE" = "true" ]; then
+              [ "$(deployed_revision "$PROD_API_BASE_URL/api/health/worker" || true)" = "$PREVIOUS_REVISION" ]
+            else
+              [ "$(healthy_status "$PROD_API_BASE_URL/api/health/worker")" = "404" ]
+            fi
+          }
+          deadline=$(( $(date +%s) + 1200 ))
+          until api_web_restored && worker_restored; do
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Rollback did not restore verified revision $PREVIOUS_REVISION within 20 minutes."
+              exit 1
+            fi
+            echo "Waiting for rollback revision $PREVIOUS_REVISION..."
+            sleep 30
+          done
+          echo "Rollback verified at revision $PREVIOUS_REVISION."

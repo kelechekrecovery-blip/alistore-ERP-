@@ -84,6 +84,8 @@ class SecureTokenStore(context: Context, private val alias: String) : SessionSto
     return runCatching { JSONObject(value).getString("accessToken") }.getOrDefault(value)
   }
 
+  fun readToken(): String? = read()
+
   override fun readSession(): AuthTokens? {
     val value = readEncrypted() ?: return null
     return runCatching {

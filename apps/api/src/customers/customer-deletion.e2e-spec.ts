@@ -4,6 +4,7 @@ import { JwtModule, JwtService } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { Test } from '@nestjs/testing';
 import * as argon2 from 'argon2';
+import { createHash } from 'node:crypto';
 import request from 'supertest';
 import { AuditModule } from '../audit/audit.module';
 import { AuthService } from '../auth/auth.service';
@@ -68,6 +69,30 @@ describe('Customer account deletion and export', () => {
     await prisma.customerIdentity.create({
       data: { customerId: owner.id, provider: 'apple', subject: `sub-${run}` },
     });
+    const googleSubject = `google-sub-${run}`;
+    const googleSubjectHash = createHash('sha256').update(googleSubject, 'utf8').digest('hex');
+    await prisma.customerIdentity.create({
+      data: { customerId: owner.id, provider: 'google', subject: googleSubject },
+    });
+    const consumedEnrollment = await prisma.socialEnrollment.create({
+      data: {
+        tokenHash: `consumed-token-${run}`,
+        assertionHash: `consumed-assertion-${run}`,
+        provider: 'apple',
+        subject: `sub-${run}`,
+        customerId: owner.id,
+        consumedAt: new Date(),
+        expiresAt: new Date(Date.now() + 86_400_000),
+      },
+    });
+    const appleGrant = await prisma.appleOAuthGrant.create({
+      data: {
+        customerId: owner.id,
+        subject: `sub-${run}`,
+        clientId: 'kg.alistore.client',
+        refreshTokenEnvelope: 'v1.test.iv.tag.ciphertext',
+      },
+    });
     const telegramIdentity = await prisma.telegramAgentIdentity.create({
       data: {
         customerId: owner.id,
@@ -108,11 +133,15 @@ describe('Customer account deletion and export', () => {
       })),
     });
 
-    await request(app.getHttpServer())
+    const firstDeletion = await request(app.getHttpServer())
       .delete('/customers/me')
       .set('Authorization', `Bearer ${token(owner)}`)
       .expect(200)
-      .expect(({ body }) => expect(body).toEqual({ id: owner.id, deleted: true }));
+      .expect(({ body }) => expect(body).toEqual({
+        id: owner.id,
+        deleted: true,
+        providerCleanup: { googleSubjectHashes: [googleSubjectHash] },
+      }));
 
     const anonymized = await prisma.customer.findUnique({ where: { id: owner.id } });
     expect(anonymized).toMatchObject({
@@ -121,7 +150,25 @@ describe('Customer account deletion and export', () => {
       consent: false,
     });
     expect(await prisma.customerAddress.count({ where: { customerId: owner.id } })).toBe(0);
+    expect(await prisma.socialEnrollment.count({ where: { customerId: owner.id } })).toBe(0);
+    const enrollmentTombstone = await prisma.socialEnrollment.findUniqueOrThrow({
+      where: { assertionHash: `consumed-assertion-${run}` },
+    });
+    expect(enrollmentTombstone).toMatchObject({
+      customerId: null,
+      subject: `deleted:${consumedEnrollment.id}`,
+      email: null,
+      displayName: null,
+      avatarUrl: null,
+      appleClientId: null,
+      appleGrantId: null,
+    });
+    expect(JSON.stringify(enrollmentTombstone)).not.toContain(owner.id);
     expect(await prisma.customerIdentity.count({ where: { customerId: owner.id } })).toBe(0);
+    expect(await prisma.appleOAuthGrant.findUnique({ where: { id: appleGrant.id } })).toBeNull();
+    expect(await prisma.appleRevocationJob.findFirst({
+      where: { clientId: appleGrant.clientId, subject: appleGrant.subject },
+    })).toMatchObject({ status: 'pending', attempts: 0, lastErrorCode: null });
     expect(await prisma.telegramAgentIdentity.count({ where: { customerId: owner.id } })).toBe(0);
     expect(await prisma.telegramAgentMessage.count({
       where: { telegramUserId: telegramIdentity.telegramUserId },
@@ -137,15 +184,24 @@ describe('Customer account deletion and export', () => {
     const sessions = await prisma.refreshToken.findMany({ where: { customerId: owner.id } });
     expect(sessions).toHaveLength(2);
     expect(sessions.every((session) => session.revokedAt !== null)).toBe(true);
-    expect(await prisma.auditEvent.count({ where: { type: 'customer.deleted', refs: { has: owner.id } } })).toBe(1);
+    const deletionEvents = await prisma.auditEvent.findMany({
+      where: { type: 'customer.deleted', refs: { has: owner.id } },
+    });
+    expect(deletionEvents).toHaveLength(1);
+    expect(deletionEvents[0]?.payload).toEqual({
+      customerId: owner.id,
+      providerCleanup: { googleSubjectHashes: [googleSubjectHash] },
+    });
+    expect(JSON.stringify(deletionEvents[0]?.payload)).not.toContain(googleSubject);
     // consent flipped true → false, so campaigns see the withdrawal event
     expect(await prisma.auditEvent.count({ where: { type: 'customer.consent_changed', refs: { has: owner.id } } })).toBe(1);
 
     // repeat deletion is an idempotent no-op (no second ledger event)
-    await request(app.getHttpServer())
+    const replayedDeletion = await request(app.getHttpServer())
       .delete('/customers/me')
       .set('Authorization', `Bearer ${token(owner)}`)
       .expect(200);
+    expect(replayedDeletion.body).toEqual(firstDeletion.body);
     expect(await prisma.auditEvent.count({ where: { type: 'customer.deleted', refs: { has: owner.id } } })).toBe(1);
   });
 
