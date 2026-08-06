@@ -1,6 +1,7 @@
 import { config } from 'dotenv';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { resolveProductionPreflightEnvFiles } from '../src/config/runtime-env-files';
 import { buildProductionPreflightReport } from '../src/health/production-preflight';
 
 interface Args {
@@ -19,13 +20,19 @@ if (!existsSync(envFile)) {
   process.exit(1);
 }
 
-config({ path: envFile, override: true });
+const envFiles = resolveProductionPreflightEnvFiles(envFile);
+for (const candidate of envFiles) {
+  if (!existsSync(candidate)) continue;
+  // Runtime-injected variables win. The local file is loaded first so its
+  // operator-only secrets and overrides win over committed production values.
+  config({ path: candidate, override: false });
+}
 const report = buildProductionPreflightReport((name) => process.env[name]);
 
 if (args.json) {
   console.log(JSON.stringify(report, null, 2));
 } else {
-  printTextReport(report, envFile);
+  printTextReport(report, envFiles.filter(existsSync));
 }
 
 if (args.strict && report.status !== 'ready') {
@@ -58,9 +65,9 @@ function parseArgs(argv: string[]): Args {
 
 function printTextReport(
   report: ReturnType<typeof buildProductionPreflightReport>,
-  envFile: string,
+  envFiles: string[],
 ) {
-  console.log(`Production preflight env file: ${envFile}`);
+  console.log(`Production preflight env files: ${envFiles.join(', ')}`);
   console.log(`Production preflight: ${report.status}`);
   console.log(
     `Summary: ready=${report.summary.ready}, missing=${report.summary.missing}, unsafe=${report.summary.unsafe}, blocking=${report.summary.blockingRemaining}`,
