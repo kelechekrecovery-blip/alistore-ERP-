@@ -242,6 +242,24 @@ struct StaffInventoryView: View {
         isLoadingCatalog = true
         catalogError = nil
         defer { isLoadingCatalog = false }
+        #if DEBUG
+        // UI tests must exercise the form itself, not depend on a separately
+        // running API. Other Staff/POS screens already use the same signed-in
+        // bootstrap contract for deterministic local fixtures.
+        if UITestBootstrap.startsSignedIn {
+            products = [
+                Product(
+                    id: "iphone-15-128",
+                    sku: "IP15-128-BLK",
+                    name: "iPhone 15 128 GB Black",
+                    price: 109_900,
+                    category: "phones",
+                    availableUnits: 4
+                )
+            ]
+            return
+        }
+        #endif
         do {
             let response: CatalogResponse = try await APIClient(baseURL: environment.apiBaseURL)
                 .get("catalog/products", token: session.accessToken)
