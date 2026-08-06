@@ -4,6 +4,14 @@ import Observation
 @MainActor
 @Observable
 public final class StaffAuthStore {
+    private static let terminalRefreshCodes: Set<String> = [
+        "staff_refresh_invalid",
+        "staff_refresh_reused",
+        "staff_inactive",
+        "staff_session_revoked",
+        "staff_role_revoked",
+    ]
+
     private struct RefreshFlight {
         let id: UUID
         let refreshToken: String
@@ -77,7 +85,7 @@ public final class StaffAuthStore {
         } catch {
             // Протухший доступ — не повод выкидывать смену: сначала пробуем обменять
             // refresh-токен, и только его отказ означает, что входить надо заново.
-            if case let APIError.rejected(status, _) = error, status == 401 || status == 403,
+            if case let APIError.rejected(status, _, _) = error, status == 401 || status == 403,
                let refreshToken = storedRefresh {
                 let generation = sessionGeneration
                 if await renew(using: refreshToken, failedAccessToken: token, requiringUnlock: true) != nil {
@@ -91,7 +99,7 @@ public final class StaffAuthStore {
             // Всё остальное — сеть, 5xx, разобранный ответ — оставляет сессию на месте.
             // Раньше любой такой отказ стирал и токен, и PIN: холодный старт без
             // интернета разлогинивал кассира и требовал полноценного входа.
-            guard case let APIError.rejected(status, _) = error, status == 401 || status == 403 else { return }
+            guard case let APIError.rejected(status, _, _) = error, status == 401 || status == 403 else { return }
             try? tokens.clear()
             try? tokens.clear(account: Self.refreshAccount)
             clearQuickUnlock()
@@ -152,8 +160,7 @@ public final class StaffAuthStore {
         } catch {
             guard canApply(flight) else { return session?.accessToken }
             if refreshFlight?.id == flight.id { refreshFlight = nil }
-            guard case let APIError.rejected(status, _) = error,
-                  status == 401 || status == 403 else { return nil }
+            guard Self.isTerminalRefreshError(error) else { return nil }
             clearLocalSession()
             return nil
         }
@@ -239,6 +246,12 @@ public final class StaffAuthStore {
         refreshFlight?.id == flight.id && sessionGeneration == flight.generation
     }
 
+    private static func isTerminalRefreshError(_ error: Error) -> Bool {
+        guard case let APIError.rejected(status, _, code) = error else { return false }
+        if status == 401 || status == 403 { return true }
+        return status == 422 && code.map(terminalRefreshCodes.contains) == true
+    }
+
     private func invalidateRefreshFlight() {
         sessionGeneration &+= 1
         refreshFlight?.task.cancel()
@@ -270,7 +283,7 @@ public final class StaffAuthStore {
         do {
             let _: StaffPrincipal = try await api.get("staff-auth/me", token: fixture.accessToken)
         } catch {
-            guard case let APIError.rejected(status, _) = error,
+            guard case let APIError.rejected(status, _, _) = error,
                   status == 401 || status == 403,
                   let refreshToken = fixture.refreshToken else { return }
             _ = await renew(

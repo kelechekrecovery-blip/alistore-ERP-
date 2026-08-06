@@ -215,7 +215,7 @@ struct CourierRootView: View {
         switch apiError {
         case .invalidResponse, .decoding:
             return true
-        case let .rejected(status, _):
+        case let .rejected(status, _, _):
             return status >= 500
         }
     }
@@ -541,7 +541,7 @@ private func courierErrorIsTransport(_ error: Error) -> Bool {
     switch apiError {
     case .invalidResponse, .decoding:
         return true
-    case let .rejected(status, _):
+    case let .rejected(status, _, _):
         return status >= 500
     }
 }
@@ -695,7 +695,7 @@ private struct CourierRunCard: View {
         guard let apiError = error as? APIError else { return false }
         switch apiError {
         case .invalidResponse, .decoding: return true
-        case let .rejected(status, _): return status >= 500
+        case let .rejected(status, _, _): return status >= 500
         }
     }
 }

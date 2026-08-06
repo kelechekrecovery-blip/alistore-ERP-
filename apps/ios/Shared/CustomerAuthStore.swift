@@ -692,7 +692,7 @@ public final class CustomerAuthStore {
             // Раньше сюда попадал и запуск без сети: пропавший интернет стирал
             // и сохранённую сессию, и PIN быстрого входа — человек в самолёте
             // терял аккаунт и не мог его вернуть до полноценного входа.
-            guard case let APIError.rejected(status, _) = error, status == 401 || status == 403 else { return }
+            guard case let APIError.rejected(status, _, _) = error, status == 401 || status == 403 else { return }
             clearQuickUnlock()
             try? tokens.clear(account: "customer-session")
             session = nil
