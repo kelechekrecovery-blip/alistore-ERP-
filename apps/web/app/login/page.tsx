@@ -1,6 +1,7 @@
 'use client';
 
 import { Mail, Phone } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useT } from '@/lib/i18n/locale';
 import { LanguageToggle } from '@/components/LanguageToggle';
@@ -149,6 +150,11 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // SSR controls have no React handlers until hydration. WebKit can accept a
+  // click/fill in that window and React then restores the initial value, which
+  // looks like a random validation failure. Match SSR and first client render,
+  // then enable controlled interactions after handlers are attached.
+  const [clientReady, setClientReady] = useState(false);
   // Every OTP request belongs to the exact login/recovery intent that created
   // it. A late response must not install its challenge after the customer has
   // switched mode or channel (a queued click can still run before React paints
@@ -207,6 +213,10 @@ function LoginForm() {
     : socialEnrollmentProvider === 'google'
       ? 'Google'
       : 'Telegram';
+
+  useEffect(() => {
+    setClientReady(true);
+  }, []);
 
   useEffect(() => {
     const webApp = window.Telegram?.WebApp;
@@ -660,7 +670,7 @@ function LoginForm() {
           >
             <button
               type="button"
-              disabled={busy}
+              disabled={!clientReady || busy}
               aria-pressed={channel === 'phone'}
               data-testid="login-channel-phone"
               onClick={() => switchChannel('phone')}
@@ -690,7 +700,7 @@ function LoginForm() {
           >
             <button
               type="button"
-              disabled={busy}
+              disabled={!clientReady || busy}
               aria-pressed={mode === 'login'}
               data-testid="login-mode-login"
               onClick={() => switchMode('login')}
@@ -724,25 +734,25 @@ function LoginForm() {
               не подключён. Заказ можно оформить без аккаунта: доставка и оплата
               при получении работают как обычно.
             </p>
-            <button
-              type="button"
-              onClick={() => router.push('/')}
-              className="mt-5 w-full rounded-[13px] bg-coral py-3.5 text-center text-[15px] font-bold text-white"
+            <Link
+              href="/"
+              replace
+              className="mt-5 block w-full rounded-[13px] bg-coral py-3.5 text-center text-[15px] font-bold text-white"
             >
               {t('login.guest')}
-            </button>
+            </Link>
           </div>
         ) : !stepCode ? (
           <form onSubmit={send} className="mt-3">
             {channel === 'phone' ? (
               <label className="block text-sm font-semibold text-white">
                 {copy.phoneLabel}
-                <input type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(normalizePhone(e.target.value))} disabled={busy} placeholder="+996 555 000 000" className="login-field mt-2 w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-[15px] text-white outline-none focus:border-lime disabled:opacity-60" autoFocus />
+                <input type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(normalizePhone(e.target.value))} disabled={!clientReady || busy} placeholder="+996 555 000 000" className="login-field mt-2 w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-[15px] text-white outline-none focus:border-lime disabled:opacity-60" autoFocus />
               </label>
             ) : (
               <label className="block text-sm font-semibold text-white">
                 {copy.emailLabel}
-                <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={busy} placeholder="you@example.com" className="login-field mt-2 w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 text-[15px] text-white outline-none focus:border-lime disabled:opacity-60" autoFocus />
+                <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={!clientReady || busy} placeholder="you@example.com" className="login-field mt-2 w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 text-[15px] text-white outline-none focus:border-lime disabled:opacity-60" autoFocus />
               </label>
             )}
             {channel === 'phone' && !phoneLoginEnabled && (
@@ -755,7 +765,7 @@ function LoginForm() {
             {error && <p role="alert" aria-live="assertive" className="mt-2 text-sm text-danger-soft">{error}</p>}
             <button
               type="submit"
-              disabled={busy || (channel === 'phone' && !phoneLoginEnabled)}
+              disabled={!clientReady || busy || (channel === 'phone' && !phoneLoginEnabled)}
               className="mt-3 w-full rounded-[13px] bg-coral py-3.5 text-center text-[15px] font-bold text-white disabled:opacity-60"
             >
               {busy
@@ -806,7 +816,7 @@ function LoginForm() {
                 Отменить вход через {socialProviderLabel}
               </button>
             )}
-            <button type="button" onClick={() => router.push('/')} className="mt-5 w-full text-center text-[13px] text-muted">{t('login.guest')}</button>
+            <Link href="/" replace className="mt-5 block w-full text-center text-[13px] text-muted">{t('login.guest')}</Link>
           </form>
         ) : (
           <form onSubmit={confirm} className="mt-3">

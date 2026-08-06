@@ -34,8 +34,7 @@ test('login rejects an empty phone without an OTP API request', async ({ page })
 
 test('guest continuation stays unauthenticated', async ({ page }) => {
   await page.goto('/login?next=%2Fcart');
-  await page.getByRole('button', { name: /Продолжить как гость/i }).click();
-
+  await page.getByRole('link', { name: /Продолжить как гость/i }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect.poll(() => page.evaluate(() => localStorage.getItem('alistore.auth.v1'))).toBeNull();
   expect(await page.context().cookies()).not.toEqual(
