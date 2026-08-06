@@ -23,7 +23,7 @@ const ROW_KEYS = Object.freeze([
   'id', 'contour', 'owner', 'surface', 'api', 'models', 'rbac', 'ledger',
   'acceptance', 'status', 'blockers',
 ]);
-const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const NON_READ_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 const read = (projectRoot, relativePath) =>
   fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
@@ -148,6 +148,39 @@ export function validateManifest(manifest, inventory) {
   const allKnownSurfaces = new Set([
     ...inventory.webSurfaces, ...inventory.iosSurfaces, ...inventory.androidSurfaces,
   ]);
+  const apiEffects = manifest?.apiEffects && typeof manifest.apiEffects === 'object' && !Array.isArray(manifest.apiEffects)
+    ? manifest.apiEffects
+    : {};
+  if (!manifest?.apiEffects || typeof manifest.apiEffects !== 'object' || Array.isArray(manifest.apiEffects)) {
+    issue(errors, 'invalid-api-effects', 'apiEffects must be an object keyed by exact non-GET API route.');
+  }
+  const reviewedEffects = new Map();
+  for (const [route, candidate] of Object.entries(apiEffects)) {
+    const descriptor = candidate && typeof candidate === 'object' && !Array.isArray(candidate) ? candidate : {};
+    if (!knownApis.has(route)) issue(errors, 'unknown-api-effect-route', `Unknown classified API route: ${route}.`);
+    if (!NON_READ_METHODS.has(route.split(' ', 1)[0])) issue(errors, 'read-route-api-effect', `GET routes do not need an apiEffects declaration: ${route}.`);
+    if (JSON.stringify(Object.keys(descriptor).sort()) !== JSON.stringify(['effect', 'ledger'])) {
+      issue(errors, 'invalid-api-effect-shape', `apiEffects.${route} must contain exactly effect and ledger.`);
+    }
+    if (!['read-only', 'mutation'].includes(descriptor.effect)) {
+      issue(errors, 'invalid-api-effect', `Invalid effect for ${route}: ${descriptor.effect}.`);
+    }
+    const routeLedger = Array.isArray(descriptor.ledger) ? descriptor.ledger : [];
+    if (!Array.isArray(descriptor.ledger) || routeLedger.some((value) => typeof value !== 'string' || value.trim() === '')) {
+      issue(errors, 'invalid-api-effect-ledger', `apiEffects.${route}.ledger must be an array of non-empty event values.`);
+    }
+    for (const event of routeLedger) {
+      if (!knownEvents.has(event)) issue(errors, 'unknown-ledger-event', `Unknown Ledger event in apiEffects.${route}: ${event}.`);
+    }
+    if (descriptor.effect === 'mutation' && routeLedger.length === 0) {
+      issue(errors, 'mutation-effect-without-ledger', `Mutation classification requires a Ledger event: ${route}.`);
+    }
+    if (descriptor.effect === 'read-only' && routeLedger.length > 0) {
+      issue(errors, 'read-only-effect-with-ledger', `Read-only classification cannot claim Ledger events: ${route}.`);
+    }
+    reviewedEffects.set(route, { effect: descriptor.effect, ledger: routeLedger });
+  }
+  const usedEffects = new Set();
 
   for (const [index, candidate] of rows.entries()) {
     const row = candidate && typeof candidate === 'object' && !Array.isArray(candidate) ? candidate : {};
@@ -190,10 +223,31 @@ export function validateManifest(manifest, inventory) {
     for (const value of rbac) if (!knownFiles.has(value)) issue(errors, 'unknown-rbac-reference', `Unknown RBAC source/policy reference: ${value}.`, rowId);
     if (['external', 'blocked'].includes(row.status) && blockers.length === 0) issue(errors, 'missing-blocker', `${row.status} rows require a blocker.`, rowId);
     if (row.status === 'accepted' && acceptance.length === 0) issue(errors, 'missing-acceptance', 'accepted rows require acceptance evidence.', rowId);
-    const hasCriticalMutation = api.some((value) => MUTATION_METHODS.has(value.split(' ', 1)[0]));
-    if (hasCriticalMutation && ledger.length === 0) {
-      issue(errors, 'critical-mutation-without-ledger', 'A row declaring a mutation must declare at least one catalogued Ledger event.', rowId);
+    const requiredLedger = new Set();
+    for (const route of api) {
+      if (!NON_READ_METHODS.has(route.split(' ', 1)[0])) continue;
+      const effect = reviewedEffects.get(route);
+      if (!effect) {
+        issue(errors, 'unclassified-api-effect', `Non-GET route requires reviewed apiEffects classification: ${route}.`, rowId);
+        continue;
+      }
+      usedEffects.add(route);
+      if (effect.effect !== 'mutation') continue;
+      for (const event of effect.ledger) {
+        requiredLedger.add(event);
+        if (!ledger.includes(event)) {
+          issue(errors, 'missing-route-ledger', `${route} requires Ledger declaration ${event}.`, rowId);
+        }
+      }
     }
+    for (const event of ledger) {
+      if (!requiredLedger.has(event)) {
+        issue(errors, 'unrelated-ledger-event', `Ledger event ${event} is not required by a declared mutation route.`, rowId);
+      }
+    }
+  }
+  for (const route of reviewedEffects.keys()) {
+    if (!usedEffects.has(route)) issue(errors, 'unused-api-effect', `apiEffects entry is not referenced by any row: ${route}.`);
   }
 
   const declared = rows.map((row) => row?.surface).filter((surface) => typeof surface === 'string');
@@ -222,6 +276,7 @@ export function validateManifest(manifest, inventory) {
       rbac: rows.reduce((count, row) => count + (Array.isArray(row?.rbac) ? row.rbac.length : 0), 0),
       ledger: rows.reduce((count, row) => count + (Array.isArray(row?.ledger) ? row.ledger.length : 0), 0),
       acceptance: rows.reduce((count, row) => count + (Array.isArray(row?.acceptance) ? row.acceptance.length : 0), 0),
+      apiEffects: reviewedEffects.size,
     },
     errors,
   };
