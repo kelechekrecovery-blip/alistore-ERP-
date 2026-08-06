@@ -18,7 +18,7 @@ export interface OrderInvoiceData {
   channel: string;
   total: number;
   createdAt: Date;
-  customer: { name: string; phone: string };
+  customer: { name: string; phone: string | null };
   items: InvoiceLineItem[];
   payments: InvoicePayment[];
 }
@@ -32,7 +32,7 @@ export function buildOrderInvoiceLines(order: OrderInvoiceData): string[] {
     `Канал: ${order.channel} · статус: ${order.status}`,
     '',
     'Покупатель:',
-    `  ${order.customer.name || '—'} · тел. ${order.customer.phone}`,
+    `  ${order.customer.name || '—'} · тел. ${order.customer.phone ?? 'не указан'}`,
     '',
     'Товары:',
   ];

@@ -360,7 +360,7 @@ export class CustomersService {
       await tx.otpChallenge.deleteMany({
         where: {
           OR: [
-            { phone: customer.phone },
+            ...(customer.phone ? [{ phone: customer.phone }] : []),
             ...(customer.email ? [{ email: customer.email }] : []),
           ],
         },
@@ -376,6 +376,7 @@ export class CustomersService {
         data: {
           name: DELETED_CUSTOMER_NAME,
           phone: deletedPhone(customerId),
+          phoneVerifiedAt: null,
           email: null,
           consent: false,
         },
@@ -566,7 +567,7 @@ function deletedPhone(customerId: string): string {
 }
 
 function isAnonymized(customer: Customer): boolean {
-  return customer.phone.startsWith(DELETED_PHONE_PREFIX);
+  return customer.phone?.startsWith(DELETED_PHONE_PREFIX) ?? false;
 }
 
 function normalizeAddress(dto: CreateCustomerAddressDto) {

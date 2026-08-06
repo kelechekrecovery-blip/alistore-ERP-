@@ -68,6 +68,21 @@ final class CustomerEmailLoginTests: XCTestCase {
         XCTAssertEqual(body?["challengeId"], "challenge-email-1")
     }
 
+    func testEmailLoginWithoutPhoneKeepsCheckoutIdentityUnverified() async {
+        EmailLoginMockURLProtocol.stub(path: "/api/auth/email/verify", status: 200, body: """
+        {"accessToken":"access-social","refreshToken":"refresh-social","tokenType":"Bearer","expiresIn":"15m"}
+        """)
+        EmailLoginMockURLProtocol.stub(path: "/api/auth/me", status: 200, body: """
+        {"customerId":"customer-social","typ":"customer"}
+        """)
+        let store = makeStore()
+
+        await store.verifyEmail(email: "owner@example.com", code: "123456")
+
+        XCTAssertEqual(store.session?.customerId, "customer-social")
+        XCTAssertNil(store.session?.phone)
+    }
+
     func testAttachRequestCarriesSessionToken() async {
         EmailLoginMockURLProtocol.stub(path: "/api/auth/email/attach/request", status: 201, body: """
         {"challengeId":"challenge-2","devCode":"654321"}

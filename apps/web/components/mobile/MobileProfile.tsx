@@ -48,7 +48,7 @@ export default function MobileProfile({
   loyaltyError = false,
   onLogout,
 }: {
-  phone: string;
+  phone: string | null;
   orders: MyOrder[] | null;
   /** Текст отказа загрузки заказов; пустая строка — отказа не было. */
   ordersError?: string;
@@ -57,6 +57,8 @@ export default function MobileProfile({
   onLogout: () => void;
 }) {
   const levelLabel = loyalty?.level ?? '...';
+  const phoneLabel = phone ?? 'Телефон не подтверждён';
+  const avatarLabel = phone?.slice(-2) ?? 'AI';
 
   return (
     <MobileFrame active="account">
@@ -64,14 +66,14 @@ export default function MobileProfile({
         {/* header card */}
         <div className="mb-2 flex items-center gap-3.5 rounded-[16px] border border-surface-3 bg-surface-2 p-4">
           <div className="grid h-[52px] w-[52px] flex-shrink-0 place-items-center rounded-full bg-gradient-to-br from-coral to-deep font-display text-[22px] font-extrabold text-white">
-            {phone.slice(-2)}
+            {avatarLabel}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="font-display text-[16px] font-bold text-white">Клиент AliStore</span>
               <span className="rounded-full bg-warn px-2 py-0.5 text-[10px] font-bold text-lime-ink">{levelLabel}</span>
             </div>
-            <div className="font-mono text-[12px] text-muted">{phone}</div>
+            <div className="font-mono text-[12px] text-muted">{phoneLabel}</div>
           </div>
         </div>
 

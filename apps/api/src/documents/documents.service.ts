@@ -123,7 +123,7 @@ export class DocumentsService {
 
     if (order?.customer) {
       writer('Покупатель:', 12, 18);
-      writer(`  ${order.customer.name} · тел. ${order.customer.phone}`, 11, 16);
+      writer(`  ${order.customer.name} · тел. ${order.customer.phone ?? 'не указан'}`, 11, 16);
       writer(
         `  Дата продажи: ${order.createdAt.toISOString().slice(0, 10)}`,
         11,

@@ -64,7 +64,8 @@ describe('Device protection policies', () => {
     await prisma.auditEvent.deleteMany({ where: { type: { startsWith: 'protection.' } } });
   });
 
-  function token(customerId: string, phone: string) {
+  function token(customerId: string, phone: string | null) {
+    if (!phone) throw new Error('Test customer must have a phone');
     return jwt.sign({ sub: customerId, typ: 'customer', phone });
   }
 

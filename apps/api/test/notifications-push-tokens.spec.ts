@@ -58,7 +58,7 @@ describe('Notifications push token registry (integration)', () => {
         platform: 'android',
         deviceId: 'android-install-1',
       },
-      { typ: 'customer', customerId: customer.id, phone: customer.phone },
+      { typ: 'customer', customerId: customer.id, phone: customer.phone ?? undefined },
     );
     const second = await notifications.registerPushToken(
       {
@@ -66,7 +66,7 @@ describe('Notifications push token registry (integration)', () => {
         platform: 'android',
         deviceId: 'android-install-2',
       },
-      { typ: 'customer', customerId: customer.id, phone: customer.phone },
+      { typ: 'customer', customerId: customer.id, phone: customer.phone ?? undefined },
     );
 
     expect(second.id).toBe(first.id);

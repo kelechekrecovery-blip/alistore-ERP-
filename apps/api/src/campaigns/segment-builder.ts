@@ -12,7 +12,7 @@ export interface SegmentRules {
 export interface AudienceCustomer {
   id: string;
   name: string;
-  phone: string;
+  phone: string | null;
   consent: boolean;
   segments: string[];
   ltv: number;

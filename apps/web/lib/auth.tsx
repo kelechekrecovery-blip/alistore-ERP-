@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  authAttachPhone,
   authLogout,
   authMe,
   authAppleLogin,
@@ -35,6 +36,7 @@ interface AuthContextValue {
   hydrated: boolean;
   requestOtp: (phone: string) => Promise<OtpChallenge>;
   verifyOtp: (phone: string, code: string, challengeId?: string) => Promise<void>;
+  attachPhone: (phone: string, code: string, challengeId?: string) => Promise<void>;
   requestRecoveryOtp: (phone: string) => Promise<OtpChallenge>;
   verifyRecoveryOtp: (phone: string, code: string, challengeId?: string) => Promise<void>;
   /** Second login channel into the same account — Customer.phone stays the unique key. */
@@ -533,6 +535,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [finishAuth],
   );
 
+  const attachPhone = useCallback(
+    async (phone: string, code: string, challengeId?: string) => {
+      const stored = tokens.current;
+      if (!stored) throw new Error('not-authenticated');
+      const committed = await finishAuth(
+        () => authAttachPhone(phone, code, stored.accessToken, challengeId),
+      );
+      if (!committed) throw new Error('auth-flow-superseded');
+    },
+    [finishAuth],
+  );
+
   const requestRecoveryOtp = useCallback(async (phone: string) => {
     return authRequestRecoveryOtp(phone);
   }, []);
@@ -688,6 +702,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       hydrated,
       requestOtp,
       verifyOtp,
+      attachPhone,
       requestRecoveryOtp,
       verifyRecoveryOtp,
       requestEmailOtp,
@@ -704,6 +719,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       hydrated,
       requestOtp,
       verifyOtp,
+      attachPhone,
       requestRecoveryOtp,
       verifyRecoveryOtp,
       requestEmailOtp,

@@ -56,7 +56,8 @@ describe('Product reviews', () => {
     await prisma.customer.deleteMany();
   });
 
-  function customerToken(customer: { id: string; phone: string }) {
+  function customerToken(customer: { id: string; phone: string | null }) {
+    if (!customer.phone) throw new Error('Test customer must have a phone');
     return jwt.sign({ sub: customer.id, typ: 'customer', phone: customer.phone });
   }
 

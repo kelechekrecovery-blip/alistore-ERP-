@@ -41,7 +41,10 @@ export default function TradeInPage() {
   const [done, setDone] = useState<{ tradeIn: TradeIn; evidenceCount: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user?.phone]);
+  useEffect(() => {
+    const verifiedPhone = user?.phone;
+    if (verifiedPhone) setPhone((p) => p || verifiedPhone);
+  }, [user?.phone]);
 
   // Оценку считает сервер той же функцией, что потом запишет её в договор.
   // Раньше страница считала сама по таблице моделей и показывала вилку

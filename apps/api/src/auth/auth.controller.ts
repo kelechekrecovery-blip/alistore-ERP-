@@ -4,6 +4,7 @@ import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import {
   AppleSocialLoginDto,
+  CompletePhoneAttachDto,
   CompleteSocialEnrollmentDto,
   GoogleSocialLoginDto,
   RefreshDto,
@@ -63,6 +64,26 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async verifyOtp(@Body() dto: VerifyOtpDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     const tokens = await this.auth.verifyOtp(dto.phone, dto.code, dto.challengeId);
+    if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
+    return webAuthResponse(request, tokens);
+  }
+
+  @Post('phone/attach/complete')
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async completePhoneAttach(
+    @CurrentUser() user: AuthPrincipal,
+    @Body() dto: CompletePhoneAttachDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    if (user.typ !== 'customer') throw new ForbiddenException('Требуется customer JWT');
+    const tokens = await this.auth.completePhoneAttach(
+      user.customerId,
+      dto.phone,
+      dto.code,
+      dto.challengeId,
+    );
     if (isWebSessionRequest(request)) setWebSessionCookies(response, tokens, process.env.NODE_ENV === 'production');
     return webAuthResponse(request, tokens);
   }

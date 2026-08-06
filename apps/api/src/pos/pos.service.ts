@@ -125,7 +125,7 @@ export class PosService {
     });
     return {
       name: customer.name || 'Клиент AliStore',
-      phone: maskPhone(customer.phone),
+      phone: customer.phone ? maskPhone(customer.phone) : null,
       loyaltyBalance: Math.max(0, entries.reduce((sum, entry) => sum + entry.amount, 0)),
       binding: issuePosCustomerBinding(customer.id, staffId, storePoint.inventoryLocation, clientSaleId),
     };

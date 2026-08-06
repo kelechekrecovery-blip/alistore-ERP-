@@ -558,6 +558,60 @@ export class AuthService implements OnModuleInit {
   }
 
   /**
+   * Attach the first phone to a social-first customer. The login-purpose OTP is
+   * only consumed in the same transaction that writes the canonical phone, so
+   * a collision or transient write failure never burns valid proof.
+   */
+  async completePhoneAttach(
+    customerId: string,
+    rawPhone: string,
+    code: string,
+    challengeId?: string,
+  ): Promise<AuthTokens> {
+    const phone = normalizePhone(rawPhone);
+    const challenge = await this.claimPhoneOtp(phone, code, 'login', challengeId);
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`
+          SELECT pg_advisory_xact_lock(hashtext(${'phone-attach:' + phone}))::text AS locked
+        `;
+        await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${customerId} FOR UPDATE`;
+        const customer = await tx.customer.findUnique({ where: { id: customerId } });
+        if (!customer) {
+          throw new ValidationError('customer_not_found', 'Аккаунт не найден');
+        }
+        if (customer.phone !== null) {
+          throw new ValidationError(
+            'phone_already_attached',
+            'К аккаунту уже привязан номер телефона',
+          );
+        }
+        const owner = await tx.customer.findUnique({ where: { phone } });
+        if (owner && owner.id !== customerId) {
+          throw new ValidationError(
+            'phone_already_linked',
+            'Этот номер уже привязан к другому аккаунту',
+          );
+        }
+        await this.consumeClaimOnTx(tx, challenge.id);
+        const updated = await tx.customer.update({
+          where: { id: customerId },
+          data: { phone, phoneVerifiedAt: new Date() },
+        });
+        return this.issueTokens(updated.id, updated.phone, tx);
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ValidationError(
+          'phone_already_linked',
+          'Этот номер уже привязан к другому аккаунту',
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
    * True only when a review account is configured (both AUTH_REVIEW_PHONE and
    * AUTH_REVIEW_OTP) and the request matches it exactly. Absent either env var the
    * method is inert, so production without these variables has no bypass at all.
@@ -672,9 +726,15 @@ export class AuthService implements OnModuleInit {
         null,
         customer.id,
       );
+      const verifiedCustomer = customer.phoneVerifiedAt
+        ? customer
+        : await tx.customer.update({
+            where: { id: customer.id },
+            data: { phoneVerifiedAt: now },
+          });
       return {
         kind: 'authenticated' as const,
-        tokens: await this.issueTokens(customer.id, customer.phone, tx),
+        tokens: await this.issueTokens(verifiedCustomer.id, verifiedCustomer.phone, tx),
       };
     });
 
@@ -886,6 +946,10 @@ export class AuthService implements OnModuleInit {
       };
     }
 
+    if (this.socialFirstSignupEnabled() && ['apple', 'google'].includes(profile.provider)) {
+      return this.createSocialFirstCustomer(profile, providerAssertion, appleGrant);
+    }
+
     const expiresIn = this.socialEnrollmentTtlSeconds();
     const enrollmentToken = randomBytes(32).toString('base64url');
     try {
@@ -952,6 +1016,145 @@ export class AuthService implements OnModuleInit {
       throw error;
     }
     return { status: 'enrollment_required', enrollmentToken, expiresIn };
+  }
+
+  private socialFirstSignupEnabled(): boolean {
+    return this.config.get<string>('AUTH_SOCIAL_FIRST_SIGNUP_ENABLED')?.trim() === 'true';
+  }
+
+  /**
+   * Create an Apple/Google customer without inventing a phone. A provider/subject
+   * advisory lock serializes two different fresh assertions for the same new
+   * identity; the assertion hash remains the replay/idempotency authority.
+   */
+  private async createSocialFirstCustomer(
+    profile: SocialProfile,
+    providerAssertion: string,
+    appleGrant?: AppleGrantMaterial,
+  ): Promise<{ status: 'authenticated' } & AuthTokens> {
+    const now = new Date();
+    await this.deleteExpiredSocialAssertions(now);
+    const internalMarker = randomBytes(32).toString('base64url');
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`
+          SELECT pg_advisory_xact_lock(hashtext(${'social-first:' + profile.provider + ':' + profile.subject}))::text AS locked
+        `;
+        const existingIdentity = await tx.customerIdentity.findUnique({
+          where: {
+            provider_subject: {
+              provider: profile.provider,
+              subject: profile.subject,
+            },
+          },
+          include: { customer: true },
+        });
+
+        let appleGrantCustomerId: string | null = null;
+        if (profile.provider === 'apple' && appleGrant) {
+          const replacement = await this.replaceAppleGrantOnTx(tx, {
+            customerId: existingIdentity?.customerId ?? null,
+            subject: profile.subject,
+            status: 'active',
+            clientId: appleGrant.clientId,
+            refreshTokenEnvelope: appleGrant.refreshTokenEnvelope,
+          });
+          appleGrantCustomerId = replacement.customerId;
+        }
+
+        let customer: Customer;
+        if (existingIdentity) {
+          if (existingIdentity.customer.phone?.startsWith('deleted:')) {
+            throw new ValidationError('customer_session_revoked', 'Сессия клиента отозвана');
+          }
+          await tx.customerIdentity.update({
+            where: { id: existingIdentity.id },
+            data: {
+              email: profile.email,
+              displayName: profile.displayName,
+              avatarUrl: profile.avatarUrl,
+            },
+          });
+          customer = existingIdentity.customer;
+          if (!customer.name && profile.displayName) {
+            customer = await tx.customer.update({
+              where: { id: customer.id },
+              data: { name: profile.displayName },
+            });
+          }
+        } else if (appleGrantCustomerId) {
+          customer = await tx.customer.findUniqueOrThrow({ where: { id: appleGrantCustomerId } });
+          if (customer.phone?.startsWith('deleted:')) {
+            throw new ValidationError('customer_session_revoked', 'Сессия клиента отозвана');
+          }
+          await tx.customerIdentity.create({
+            data: {
+              customerId: customer.id,
+              provider: profile.provider,
+              subject: profile.subject,
+              email: profile.email,
+              displayName: profile.displayName,
+              avatarUrl: profile.avatarUrl,
+            },
+          });
+        } else {
+          customer = await tx.customer.create({
+            data: {
+              phone: null,
+              phoneVerifiedAt: null,
+              name: profile.displayName?.trim() || '',
+              identities: {
+                create: {
+                  provider: profile.provider,
+                  subject: profile.subject,
+                  email: profile.email,
+                  displayName: profile.displayName,
+                  avatarUrl: profile.avatarUrl,
+                },
+              },
+            },
+          });
+          if (profile.provider === 'apple' && appleGrant) {
+            const attached = await tx.appleOAuthGrant.updateMany({
+              where: {
+                clientId: appleGrant.clientId,
+                subject: profile.subject,
+                customerId: null,
+                status: 'active',
+              },
+              data: { customerId: customer.id },
+            });
+            if (attached.count !== 1) {
+              throw new ValidationError('apple_grant_missing', 'Apple credential is missing');
+            }
+          }
+        }
+
+        await tx.socialEnrollment.create({
+          data: {
+            tokenHash: this.hashToken(internalMarker),
+            assertionHash: this.hashToken(providerAssertion),
+            provider: profile.provider,
+            subject: profile.subject,
+            customerId: customer.id,
+            expiresAt: new Date(now.getTime() + SOCIAL_ASSERTION_RETENTION_SECONDS * 1000),
+            consumedAt: now,
+          },
+        });
+        return {
+          status: 'authenticated' as const,
+          ...(await this.issueTokens(customer.id, customer.phone, tx)),
+        };
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ValidationError(
+          'social_auth_replayed',
+          'Эта авторизация провайдера уже использована',
+        );
+      }
+      throw error;
+    }
   }
 
   private async exchangeAppleGrant(
@@ -1288,7 +1491,7 @@ export class AuthService implements OnModuleInit {
       await this.prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${customerId} FOR UPDATE`;
         const activeCustomer = await tx.customer.findUnique({ where: { id: customerId } });
-        if (!activeCustomer || activeCustomer.phone.startsWith('deleted:')) {
+        if (!activeCustomer || activeCustomer.phone?.startsWith('deleted:')) {
           throw new ValidationError('customer_session_revoked', 'Сессия клиента отозвана');
         }
         await tx.socialEnrollment.create({
@@ -1511,18 +1714,25 @@ export class AuthService implements OnModuleInit {
     createIfMissing: boolean,
   ): Promise<Customer | null> {
     const canonical = await tx.customer.findUnique({ where: { phone } });
-    if (canonical) return canonical;
+    if (canonical) {
+      return canonical.phoneVerifiedAt
+        ? canonical
+        : tx.customer.update({
+            where: { id: canonical.id },
+            data: { phoneVerifiedAt: new Date() },
+          });
+    }
 
     const legacy = await tx.customer.findUnique({ where: { phone: phone.slice(1) } });
     if (legacy) {
       return tx.customer.update({
         where: { id: legacy.id },
-        data: { phone },
+        data: { phone, phoneVerifiedAt: new Date() },
       });
     }
 
     return createIfMissing
-      ? tx.customer.create({ data: { phone, name: '' } })
+      ? tx.customer.create({ data: { phone, phoneVerifiedAt: new Date(), name: '' } })
       : null;
   }
 
@@ -1694,11 +1904,11 @@ export class AuthService implements OnModuleInit {
 
   private async issueTokens(
     customerId: string,
-    phone: string,
+    phone: string | null,
     db: Pick<Prisma.TransactionClient, 'refreshToken'> = this.prisma,
   ): Promise<AuthTokens> {
     const accessToken = await this.jwt.signAsync(
-      { sub: customerId, phone, typ: 'customer' },
+      { sub: customerId, ...(phone ? { phone } : {}), typ: 'customer' },
       { expiresIn: ACCESS_TTL },
     );
     const refreshToken = randomBytes(32).toString('base64url');
@@ -1714,7 +1924,7 @@ export class AuthService implements OnModuleInit {
 
   private async issueDerivedRefreshTokens(
     customerId: string,
-    phone: string,
+    phone: string | null,
     parentRefreshToken: string,
     db: Pick<Prisma.TransactionClient, 'refreshToken'>,
   ): Promise<AuthTokens | null> {
@@ -1740,7 +1950,7 @@ export class AuthService implements OnModuleInit {
     });
     if (record.customerId !== customerId || record.revokedAt) return null;
     const accessToken = await this.jwt.signAsync(
-      { sub: customerId, phone, typ: 'customer' },
+      { sub: customerId, ...(phone ? { phone } : {}), typ: 'customer' },
       { expiresIn: ACCESS_TTL },
     );
     return { accessToken, refreshToken, tokenType: 'Bearer', expiresIn: ACCESS_TTL };

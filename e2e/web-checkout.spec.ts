@@ -234,6 +234,7 @@ test('product page switches between independently stocked variants', async ({ pa
       cost: 85000,
       category: 'phones',
       attrs: { color: 'Blue', storage: '256GB' },
+      published: true,
     },
   });
   await prisma.deviceUnit.create({
@@ -264,6 +265,7 @@ test('product page displays bundle composition and component-derived availabilit
       cost: 0,
       category: 'bundles',
       attrs: { description: 'Готовый комплект' },
+      published: true,
       bundleComponents: {
         create: [
           { componentProductId: phone.id, qty: 1 },
@@ -289,7 +291,9 @@ test('product page displays bundle composition and component-derived availabilit
 test('authenticated checkout redeems server loyalty and canonical promo exactly once', async ({ page }) => {
   await resetDb();
   const { product } = await seedProduct('LOYALTY-E2E');
-  const customer = await prisma.customer.create({ data: { phone: '+996700900725', name: 'Loyalty Buyer' } });
+  const customer = await prisma.customer.create({
+    data: { phone: '+996700900725', phoneVerifiedAt: new Date(), name: 'Loyalty Buyer' },
+  });
   await prisma.loyaltyEntry.create({
     data: { customerId: customer.id, label: 'E2E balance', amount: 725, sourceRef: 'loyalty-e2e-seed' },
   });
@@ -321,7 +325,7 @@ test('authenticated checkout redeems server loyalty and canonical promo exactly 
   await expect(page.locator('span:visible').filter({ hasText: '−725 с' }).first()).toBeVisible();
   await page.getByRole('link', { name: 'Перейти к оформлению' }).click();
   await page.getByRole('button', { name: 'Далее' }).last().click();
-  await expect(page.getByPlaceholder('+996 700 12 34 56')).toHaveValue(customer.phone);
+  await expect(page.locator('.checkout-field').filter({ hasText: customer.phone ?? '' })).toBeVisible();
   await page.getByRole('button', { name: 'Далее' }).last().click();
   await page.getByRole('button', { name: /Картой/ }).click();
   await page.getByRole('button', { name: 'К подтверждению' }).click();

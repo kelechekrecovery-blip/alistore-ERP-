@@ -113,7 +113,8 @@ describe('Warranty console RBAC', () => {
     return { customer, imei };
   }
 
-  function customerToken(customerId: string, phone: string) {
+  function customerToken(customerId: string, phone: string | null) {
+    if (!phone) throw new Error('Test customer must have a phone');
     return jwt.sign({ sub: customerId, typ: 'customer', phone });
   }
 

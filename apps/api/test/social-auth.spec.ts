@@ -41,7 +41,14 @@ describe('Auth: social provider login', () => {
     await prisma.appleOAuthGrant.deleteMany();
     await prisma.appleRevocationJob.deleteMany();
     await prisma.customerIdentity.deleteMany();
-    await prisma.customer.deleteMany({ where: { phone: { startsWith: '+999' } } });
+    await prisma.customer.deleteMany({
+      where: {
+        OR: [
+          { phone: { startsWith: '+999' } },
+          { name: { startsWith: 'social-first-test' } },
+        ],
+      },
+    });
   });
 
   it('verifies Telegram Mini App initData and signs in a linked identity', async () => {
@@ -411,6 +418,146 @@ describe('Auth: social provider login', () => {
     expect((err as ValidationError).code).toBe('social_provider_not_configured');
   });
 
+  it('atomically creates one phone-less customer and rejects replayed assertions', async () => {
+    const auth = service({ AUTH_SOCIAL_FIRST_SIGNUP_ENABLED: 'true' });
+    const profile = {
+      provider: 'google' as const,
+      subject: `social-first-concurrent-${Date.now()}`,
+      email: 'same-address@example.test',
+      displayName: 'social-first-test concurrent',
+    };
+    const assertion = `verified-google-assertion-${Date.now()}`;
+
+    const outcomes = await Promise.allSettled([
+      resolveSocial(auth, profile, assertion),
+      resolveSocial(auth, profile, assertion),
+    ]);
+
+    expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1);
+    const rejected = outcomes.find((outcome) => outcome.status === 'rejected');
+    expect(rejected).toMatchObject({ reason: { code: 'social_auth_replayed' } });
+    const identities = await prisma.customerIdentity.findMany({
+      where: { provider: 'google', subject: profile.subject },
+      include: { customer: true },
+    });
+    expect(identities).toHaveLength(1);
+    expect(identities[0].customer).toMatchObject({
+      phone: null,
+      phoneVerifiedAt: null,
+      name: profile.displayName,
+    });
+    expect(await prisma.socialEnrollment.count({
+      where: { assertionHash: createHash('sha256').update(assertion).digest('hex'), consumedAt: { not: null } },
+    })).toBe(1);
+
+    const authenticated = outcomes.find(
+      (outcome): outcome is PromiseFulfilledResult<Awaited<ReturnType<typeof resolveSocial>>> =>
+        outcome.status === 'fulfilled',
+    )!.value;
+    expect(jwt.decode<{ phone?: string }>(authenticated.accessToken)?.phone).toBeUndefined();
+  });
+
+  it('never auto-links by verified provider email', async () => {
+    const email = `shared-${Date.now()}@example.test`;
+    const original = await prisma.customer.create({
+      data: {
+        phone: `+999${Date.now().toString().slice(-10)}`,
+        phoneVerifiedAt: new Date(),
+        email,
+        emailVerifiedAt: new Date(),
+        name: 'Existing email owner',
+      },
+    });
+    const auth = service({ AUTH_SOCIAL_FIRST_SIGNUP_ENABLED: 'true' });
+    const result = await resolveSocial(auth, {
+      provider: 'google',
+      subject: `no-email-link-${Date.now()}`,
+      email,
+      displayName: 'social-first-test distinct customer',
+    }, `verified-assertion-${Date.now()}`);
+
+    const claims = jwt.decode<{ sub: string }>(result.accessToken)!;
+    expect(claims.sub).not.toBe(original.id);
+    await expect(prisma.customer.findUniqueOrThrow({ where: { id: claims.sub } }))
+      .resolves.toMatchObject({ phone: null, email: null });
+  });
+
+  it('attaches an active Apple grant to the newly created customer', async () => {
+    const auth = service({ AUTH_SOCIAL_FIRST_SIGNUP_ENABLED: 'true' });
+    const subject = `social-first-apple-${Date.now()}`;
+    const result = await resolveSocial(auth, {
+      provider: 'apple',
+      subject,
+      displayName: 'social-first-test Apple',
+    }, `verified-apple-assertion-${Date.now()}`, {
+      clientId: 'kg.alistore.client',
+      subject,
+      refreshToken: 'only-in-memory',
+      refreshTokenEnvelope: 'v1.test.encrypted',
+    });
+    const customerId = jwt.decode<{ sub: string }>(result.accessToken)!.sub;
+    await expect(prisma.appleOAuthGrant.findFirstOrThrow({
+      where: { clientId: 'kg.alistore.client', subject },
+    })).resolves.toMatchObject({ customerId, status: 'active' });
+  });
+
+  it('attaches an unused canonical phone once and refreshes the phone claim', async () => {
+    const auth = service({
+      NODE_ENV: 'test',
+      AUTH_OTP_DEV_ECHO: 'true',
+      AUTH_SOCIAL_FIRST_SIGNUP_ENABLED: 'true',
+    });
+    const result = await resolveSocial(auth, {
+      provider: 'google',
+      subject: `phone-attach-${Date.now()}`,
+      displayName: 'social-first-test phone attach',
+    }, `verified-attach-assertion-${Date.now()}`);
+    const customerId = jwt.decode<{ sub: string }>(result.accessToken)!.sub;
+    const phone = `+999${(Date.now() + 11).toString().slice(-10)}`;
+    const challenge = await auth.requestOtp(phone);
+    expect(challenge.devCode).toMatch(/^\d{6}$/u);
+
+    const refreshed = await auth.completePhoneAttach(
+      customerId,
+      phone,
+      challenge.devCode!,
+      challenge.challengeId,
+    );
+    expect(jwt.decode<{ phone?: string }>(refreshed.accessToken)?.phone).toBe(phone);
+    await expect(prisma.customer.findUniqueOrThrow({ where: { id: customerId } }))
+      .resolves.toMatchObject({ phone, phoneVerifiedAt: expect.any(Date) });
+    await expect(prisma.otpChallenge.findUniqueOrThrow({ where: { id: challenge.challengeId } }))
+      .resolves.toMatchObject({ consumedAt: expect.any(Date) });
+  });
+
+  it('returns phone_already_linked without consuming a valid attach challenge', async () => {
+    const phone = `+999${(Date.now() + 22).toString().slice(-10)}`;
+    await prisma.customer.create({
+      data: { phone, phoneVerifiedAt: new Date(), name: 'Existing phone owner' },
+    });
+    const auth = service({
+      NODE_ENV: 'test',
+      AUTH_OTP_DEV_ECHO: 'true',
+      AUTH_SOCIAL_FIRST_SIGNUP_ENABLED: 'true',
+    });
+    const result = await resolveSocial(auth, {
+      provider: 'google',
+      subject: `phone-collision-${Date.now()}`,
+      displayName: 'social-first-test collision',
+    }, `verified-collision-assertion-${Date.now()}`);
+    const customerId = jwt.decode<{ sub: string }>(result.accessToken)!.sub;
+    const challenge = await auth.requestOtp(phone);
+
+    await expect(auth.completePhoneAttach(
+      customerId,
+      phone,
+      challenge.devCode!,
+      challenge.challengeId,
+    )).rejects.toMatchObject({ code: 'phone_already_linked' });
+    await expect(prisma.otpChallenge.findUniqueOrThrow({ where: { id: challenge.challengeId } }))
+      .resolves.toMatchObject({ consumedAt: null });
+  });
+
   function service(values: Record<string, string>): AuthService {
     return new AuthService(prisma, jwt, {
       get: (key: string) => values[key],
@@ -462,6 +609,32 @@ describe('Auth: social provider login', () => {
     });
   }
 });
+
+function resolveSocial(
+  auth: AuthService,
+  profile: {
+    provider: 'apple' | 'google';
+    subject: string;
+    email?: string;
+    displayName?: string;
+    avatarUrl?: string;
+  },
+  assertion: string,
+  grant?: {
+    clientId: string;
+    subject: string;
+    refreshToken: string;
+    refreshTokenEnvelope: string;
+  },
+) {
+  return (auth as unknown as {
+    resolveSocialV2(
+      socialProfile: typeof profile,
+      providerAssertion: string,
+      appleGrant?: typeof grant,
+    ): Promise<{ status: 'authenticated'; accessToken: string }>;
+  }).resolveSocialV2(profile, assertion, grant);
+}
 
 function signedTelegramInitData(
   botToken: string,

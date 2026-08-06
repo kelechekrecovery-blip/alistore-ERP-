@@ -79,7 +79,7 @@ describe('Store point fulfillment contract', () => {
       data: { imei: `FUL-IMEI-${suffix}`, productId: localProduct.id, location, status: 'in_stock' },
     });
     const phone = `+99655${run.replace(/\D/g, '').slice(-7).padStart(7, '0')}`;
-    const customer = await prisma.customer.create({ data: { phone, name: 'Fulfillment customer' } });
+    const customer = await prisma.customer.create({ data: { phone, phoneVerifiedAt: new Date(), name: 'Fulfillment customer' } });
     customerId = customer.id;
     const customerToken = sign({ sub: customer.id, typ: 'customer', phone }, process.env.JWT_SECRET ?? 'dev-insecure-change-me', { expiresIn: '15m' });
     const base = { channel: 'web', fulfillmentType: 'pickup', piiConsent: true, total: 1, items: [{ sku: localProduct.sku, qty: 1, price: 1 }] };

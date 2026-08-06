@@ -148,7 +148,8 @@ describe('Notification coverage NOTIF-003 (integration)', () => {
     return prisma.customerNotification.findMany({ where: { customerId, template } });
   }
 
-  async function expectCustomerNotice(template: string, customerId: string, phone: string) {
+  async function expectCustomerNotice(template: string, customerId: string, phone: string | null) {
+    if (!phone) throw new Error('Test customer must have a phone');
     const messages = await outboxFor(template);
     expect(messages).toHaveLength(1);
     expect(messages[0].channel).toBe('sms');

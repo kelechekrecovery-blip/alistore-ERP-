@@ -48,7 +48,7 @@ export function authMethods(): Promise<AuthMethodsView> {
 
 export interface AuthUser {
   customerId: string;
-  phone: string;
+  phone: string | null;
   typ: string;
 }
 
@@ -62,6 +62,21 @@ export function authVerifyOtp(phone: string, code: string, challengeId?: string)
     { phone, code, ...(challengeId ? { challengeId } : {}) },
     { 'x-alistore-web': '1' },
     true,
+  );
+}
+
+/** Attach an OTP-verified phone to an authenticated social-first account. */
+export function authAttachPhone(
+  phone: string,
+  code: string,
+  accessToken: string,
+  challengeId?: string,
+): Promise<AuthTokens> {
+  return postAuthJson(
+    '/auth/phone/attach/complete',
+    { phone, code, ...(challengeId ? { challengeId } : {}) },
+    accessToken,
+    { 'x-alistore-web': '1' },
   );
 }
 

@@ -61,9 +61,11 @@ export interface AuthMethodsView {
 export function describeAuthMethods(env: AuthMethodsEnvReader): AuthMethodsView {
   const production = env('NODE_ENV') === 'production';
   const phoneEnabled = resolvePhoneChannel(env, production);
+  const socialFirstSignupEnabled = env('AUTH_SOCIAL_FIRST_SIGNUP_ENABLED')?.trim() === 'true';
 
-  // Телефон — единственный путь, создающий Customer: `verifyOtp` зовёт
-  // `customer.create`, все остальные каналы только опознают уже существующего.
+  // Phone OTP always creates a fully phone-verified Customer. Apple and Google
+  // may also create a phone-less Customer, but only behind the explicit
+  // social-first rollout flag below.
   const phone: AuthMethodState = { enabled: phoneEnabled, registers: phoneEnabled };
 
   const emailFlagAllows = !production || env('AUTH_EMAIL_LOGIN_ENABLED')?.trim() === 'true';
@@ -76,11 +78,9 @@ export function describeAuthMethods(env: AuthMethodsEnvReader): AuthMethodsView 
     registers: false,
   };
 
-  // Социальная привязка нового человека завершается в
-  // `completeSocialEnrollment`, а он ищет погашенный SMS-challenge. Поэтому без
-  // рабочего телефонного канала Apple и Telegram — вход исключительно для тех,
-  // у кого CustomerIdentity уже есть в базе. Именно это, а не подпись токена,
-  // сломало ревью Apple: у ревьюера identity не было.
+  // Telegram enrollment still requires a working phone channel. Apple/Google
+  // can bypass that enrollment only when social-first rollout is explicit;
+  // otherwise they remain login-only for known identities.
   const telegramEnabled = Boolean(env('TELEGRAM_BOT_TOKEN')?.trim());
   const telegram: TelegramMethodState = {
     enabled: telegramEnabled,
@@ -100,7 +100,7 @@ export function describeAuthMethods(env: AuthMethodsEnvReader): AuthMethodsView 
     : null;
   const apple: AppleMethodState = {
     enabled: appleEnabled,
-    registers: appleEnabled && phoneEnabled,
+    registers: appleEnabled && (phoneEnabled || socialFirstSignupEnabled),
     // Не показываем браузерную кнопку, если API не принимает выпущенный для
     // неё audience. Иначе Apple успешно вернёт токен, а наш API отвергнет его.
     clientId: exposedAppleWebClientId,
@@ -115,7 +115,7 @@ export function describeAuthMethods(env: AuthMethodsEnvReader): AuthMethodsView 
   const configuredGoogleWebClientId = env('GOOGLE_WEB_CLIENT_ID')?.trim() || null;
   const google: GoogleMethodState = {
     enabled: googleEnabled,
-    registers: googleEnabled && phoneEnabled,
+    registers: googleEnabled && (phoneEnabled || socialFirstSignupEnabled),
     // Не показываем кнопку, если выпущенный для неё token API заведомо
     // отклонит по audience. Native client IDs при этом продолжают работать.
     clientId: configuredGoogleWebClientId && googleTokenAudiences.includes(configuredGoogleWebClientId)

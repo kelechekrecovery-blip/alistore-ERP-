@@ -43,7 +43,8 @@ describe('Customer-owned loyalty, addresses and settings', () => {
     });
   }
 
-  function token(value: { id: string; phone: string }) {
+  function token(value: { id: string; phone: string | null }) {
+    if (!value.phone) throw new Error('Test customer must have a phone');
     return jwt.sign({ sub: value.id, typ: 'customer', phone: value.phone });
   }
 

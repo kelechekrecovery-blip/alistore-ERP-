@@ -213,7 +213,7 @@ export class OutboxService {
         identity?.active &&
         (identity.kind === 'staff'
           ? identity.staff?.active && ['admin', 'owner'].includes(identity.staff.role)
-          : identity.customer && !identity.customer.phone.startsWith('deleted:')),
+          : identity.customer && !identity.customer.phone?.startsWith('deleted:')),
       );
       if (!active) {
         await tx.outboxMessage.updateMany({

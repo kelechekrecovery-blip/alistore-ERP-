@@ -478,7 +478,7 @@ public final class CustomerAuthStore {
                 accessToken: auth.accessToken,
                 refreshToken: auth.refreshToken,
                 customerId: principal.customerId,
-                phone: principal.phone ?? ""
+                phone: principal.phone
             )
             try activate(next, requiresQuickUnlock: false)
             devCode = nil
@@ -560,6 +560,69 @@ public final class CustomerAuthStore {
             phoneChallengeId = nil
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Adds a real OTP-verified phone to a social-first account. The API issues
+    /// fresh tokens so the JWT contact claim changes atomically with Customer.
+    @discardableResult
+    public func attachPhone(phone: String, code: String) async -> Bool {
+        guard let active = session else {
+            errorMessage = "Нужно войти в аккаунт"
+            return false
+        }
+        let generation = sessionGeneration
+        var issuedRefreshToken: String?
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let auth: CustomerAuthTokens = try await api.post(
+                "auth/phone/attach/complete",
+                body: OTPVerification(phone: phone, code: code, challengeId: phoneChallengeId),
+                token: active.accessToken
+            )
+            issuedRefreshToken = auth.refreshToken
+            guard canApplySessionMutation(generation: generation, session: active) else {
+                try? await api.postNoContent(
+                    "auth/logout",
+                    body: RefreshRequest(refreshToken: auth.refreshToken)
+                )
+                issuedRefreshToken = nil
+                return false
+            }
+            let principal: CustomerPrincipal = try await api.get("auth/me", token: auth.accessToken)
+            guard canApplySessionMutation(generation: generation, session: active),
+                  principal.customerId == active.customerId,
+                  let verifiedPhone = principal.phone,
+                  !verifiedPhone.isEmpty else {
+                try? await api.postNoContent(
+                    "auth/logout",
+                    body: RefreshRequest(refreshToken: auth.refreshToken)
+                )
+                issuedRefreshToken = nil
+                return false
+            }
+            let next = CustomerSession(
+                accessToken: auth.accessToken,
+                refreshToken: auth.refreshToken,
+                customerId: principal.customerId,
+                phone: verifiedPhone
+            )
+            try activate(next, requiresQuickUnlock: false)
+            issuedRefreshToken = nil
+            devCode = nil
+            phoneChallengeId = nil
+            return true
+        } catch {
+            if let issuedRefreshToken {
+                try? await api.postNoContent(
+                    "auth/logout",
+                    body: RefreshRequest(refreshToken: issuedRefreshToken)
+                )
+            }
+            errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -743,7 +806,7 @@ public final class CustomerAuthStore {
         clearSocialEnrollment()
     }
 
-    private func finishAuthentication(_ auth: CustomerAuthTokens, fallbackPhone: String) async throws {
+    private func finishAuthentication(_ auth: CustomerAuthTokens, fallbackPhone: String?) async throws {
         let principal: CustomerPrincipal = try await api.get("auth/me", token: auth.accessToken)
         let next = CustomerSession(
             accessToken: auth.accessToken,
@@ -782,7 +845,7 @@ public final class CustomerAuthStore {
     ) async throws {
         switch result {
         case .authenticated(let auth):
-            try await finishAuthentication(auth, fallbackPhone: "")
+            try await finishAuthentication(auth, fallbackPhone: nil)
         case .enrollmentRequired(let enrollmentToken, let expiresIn):
             if case .available(let methods) = authMethodsState {
                 let canRegister = provider == .apple ? methods.apple.registers : methods.google.registers
@@ -811,6 +874,12 @@ public final class CustomerAuthStore {
         // During restore `session` is nil and generation is the authority. During
         // an active-session refresh, the initiating rotating token must still be current.
         return session == nil || session?.refreshToken == stored.refreshToken
+    }
+
+    private func canApplySessionMutation(generation: UInt64, session initiatingSession: CustomerSession) -> Bool {
+        sessionGeneration == generation
+            && session?.customerId == initiatingSession.customerId
+            && session?.refreshToken == initiatingSession.refreshToken
     }
 
     private func save(_ session: CustomerSession) throws {

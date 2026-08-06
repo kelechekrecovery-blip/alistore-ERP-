@@ -27,7 +27,7 @@ test('customer attaches an email in settings, then signs back in with it', async
   }, tokens);
 
   await page.goto('/account/settings');
-  await expect(page.getByText('не привязан')).toBeVisible();
+  await expect(page.getByText('Вход по почте').locator('..').getByText('не привязан')).toBeVisible();
 
   await page.getByRole('button', { name: 'Привязать почту' }).click();
   await page.getByLabel('Email для привязки').fill(email);

@@ -8,6 +8,7 @@ import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { UnitsService } from '../units/units.service';
 import { ConflictError, ValidationError } from '../common/errors';
+import { assertVerifiedCustomerPhone } from '../customers/verified-phone';
 import { assertTransition } from './order-state-machine';
 import { CreateOrderDto } from './orders.dto';
 import { OutboxService } from '../outbox/outbox.service';
@@ -159,6 +160,10 @@ export class OrdersService {
     @Optional() private readonly campaignAttribution?: CampaignAttributionService,
     @Optional() private readonly settings?: SettingsService,
   ) {}
+
+  assertVerifiedPhone(customerId: string): Promise<void> {
+    return assertVerifiedCustomerPhone(this.prisma, customerId);
+  }
 
   get(id: string) {
     return this.prisma.order.findUnique({

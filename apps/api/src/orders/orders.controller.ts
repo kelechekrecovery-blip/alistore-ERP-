@@ -219,12 +219,13 @@ export class OrdersController {
   @ApiCreatedResponse({ description: 'Customer-owned order created.' })
   @Post('mine')
   @UseGuards(JwtAuthGuard)
-  createMine(
+  async createMine(
     @CurrentUser() user: AuthPrincipal,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: CreateMyOrderDto,
   ) {
     requireStorefrontConsent(dto.piiConsent);
+    await this.orders.assertVerifiedPhone(user.customerId);
     return this.orders.createFromCatalog(
       {
         ...dto,

@@ -585,7 +585,8 @@ export class ProductsService {
     }
 
     const text = dto.text?.trim() || null;
-    const customerName = order.customer.name.trim() || this.maskPhone(order.customer.phone);
+    const customerName = order.customer.name.trim()
+      || (order.customer.phone ? this.maskPhone(order.customer.phone) : 'Клиент');
 
     // AI moderation runs BEFORE the transaction (an LLM call must not hold a DB tx open).
     // It never throws — falls back to keyless rules / no-op without a provider key. When it

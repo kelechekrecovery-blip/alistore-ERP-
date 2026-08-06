@@ -1700,7 +1700,7 @@ private struct ClientRootView: View {
             if auth.requiresQuickUnlock, let session = auth.session {
                 QuickUnlockView(
                     title: "AliStore",
-                    username: session.phone,
+                    username: session.phone ?? "Социальный аккаунт",
                     pinService: auth.quickUnlockService,
                     onUnlocked: auth.unlock,
                     onLogout: {
@@ -2395,7 +2395,7 @@ private struct CartView: View {
                 ) { fulfillment = "courier" }
             case .address:
                 Text("Контакты и адрес").font(ClientTheme.display(16, weight: .bold)).foregroundStyle(.white)
-                ClientReadOnlyField(title: "Телефон", value: auth.session?.phone ?? "Войдите в аккаунт", monospaced: true)
+                ClientReadOnlyField(title: "Телефон", value: auth.session?.phone ?? "Подтвердите телефон в настройках", monospaced: true)
                 if fulfillment == "courier" {
                     ClientInputField(title: "Адрес доставки", text: $address, placeholder: "Город, улица, дом")
                     if managedCourierDelivery {
@@ -2586,6 +2586,8 @@ private struct CartView: View {
         VStack(alignment: .leading, spacing: 10) {
             if auth.session == nil {
                 ClientCallout(symbol: "person.badge.key", title: "Войдите, чтобы оформить заказ", detail: "Откройте Кабинет и войдите по SMS-коду.")
+            } else if auth.session?.phone == nil {
+                ClientCallout(symbol: "phone.badge.checkmark", title: "Подтвердите телефон", detail: "Откройте Кабинет → Настройки и подтвердите номер перед оформлением заказа.")
             }
             if let errorMessage {
                 Text(errorMessage).font(ClientTheme.body(12)).foregroundStyle(Design3.danger)
@@ -2628,7 +2630,7 @@ private struct CartView: View {
     }
 
     private var canAdvance: Bool {
-        guard auth.session != nil else { return false }
+        guard auth.session?.phone != nil else { return false }
         switch checkoutStep {
         case .delivery: return fulfillment == "pickup" || fulfillment == "courier"
         case .address:
@@ -4824,7 +4826,7 @@ private struct AccountView: View {
                                 .background(ClientTheme.gold, in: Capsule())
                         }
                     }
-                    Text(maskedPhone(session.phone))
+                    Text(session.phone.map(maskedPhone) ?? "Телефон не подтверждён")
                         .font(Design3.mono(12))
                         .foregroundStyle(ClientTheme.muted)
                 }
@@ -5791,6 +5793,10 @@ private struct CustomerSettingsView: View {
     @State private var emailRequested = false
     @State private var attachedEmail: String?
     @State private var emailMessage: String?
+    @State private var phoneInput = ""
+    @State private var phoneCode = ""
+    @State private var phoneRequested = false
+    @State private var phoneMessage: String?
 
     var body: some View {
         ZStack {
@@ -5810,9 +5816,7 @@ private struct CustomerSettingsView: View {
                             .foregroundStyle(.white).padding(13)
                             .glass(radius: 13)
                             .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
-                        if let settings {
-                            Text(settings.phone).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
-                        }
+                        phoneSection
 
                         emailSection
 
@@ -5841,8 +5845,146 @@ private struct CustomerSettingsView: View {
         .navigationTitle("Настройки")
         .navigationBarTitleDisplayMode(.inline)
         .tint(ClientTheme.lime)
-        .task { await load() }
+        .task {
+            async let profileLoad: Void = load()
+            async let methodsLoad: Void = auth.loadAuthMethods()
+            _ = await (profileLoad, methodsLoad)
+        }
         .refreshable { await load() }
+    }
+
+    @ViewBuilder
+    private var phoneSection: some View {
+        Text("Телефон")
+            .font(ClientTheme.body(12, weight: .semibold))
+            .foregroundStyle(ClientTheme.muted)
+            .padding(.top, 4)
+
+        if let phone = settings?.phone {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.seal.fill").foregroundStyle(ClientTheme.lime)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(phone).font(ClientTheme.body(14, weight: .semibold)).foregroundStyle(.white)
+                    Text("Номер подтверждён").font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                }
+                Spacer()
+            }
+            .padding(13)
+            .glass(radius: 13)
+            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+            .accessibilityIdentifier("client-attached-phone")
+        } else if case .loading = auth.authMethodsState {
+            HStack(spacing: 10) {
+                ProgressView().tint(ClientTheme.lime)
+                Text("Проверяем доступность SMS…")
+                    .font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
+            }
+        } else if !phoneCapabilityEnabled {
+            Text("Подтверждение телефона сейчас недоступно. Чтобы оформить заказ, выйдите из аккаунта и продолжите как гость.")
+                .font(ClientTheme.body(12))
+                .foregroundStyle(ClientTheme.muted)
+                .padding(13)
+                .glass(radius: 13)
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+        } else {
+            Text("Подтвердите номер перед оформлением доставки или оплатой.")
+                .font(ClientTheme.body(12))
+                .foregroundStyle(ClientTheme.muted)
+            TextField("+996700123456", text: $phoneInput)
+                .keyboardType(.phonePad)
+                .textContentType(.telephoneNumber)
+                .foregroundStyle(.white)
+                .padding(13)
+                .glass(radius: 13)
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                .disabled(phoneRequested)
+                .accessibilityIdentifier("client-attach-phone")
+            if phoneRequested {
+                TextField("6-значный SMS-код", text: $phoneCode)
+                    .keyboardType(.numberPad)
+                    .textContentType(.oneTimeCode)
+                    .foregroundStyle(.white)
+                    .padding(13)
+                    .glass(radius: 13)
+                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.lime))
+                    .accessibilityIdentifier("client-attach-phone-code")
+                if let devCode = auth.devCode {
+                    Text("Код для тестового контура: \(devCode)")
+                        .font(ClientTheme.body(11)).foregroundStyle(ClientTheme.muted)
+                }
+            }
+            if let phoneMessage {
+                Text(phoneMessage).font(ClientTheme.body(12)).foregroundStyle(ClientTheme.muted)
+            }
+            Button { Task { await attachPhone() } } label: {
+                HStack { Spacer(); Text(phoneRequested ? "Подтвердить телефон" : "Получить SMS-код"); Spacer() }
+                    .font(ClientTheme.body(14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(height: 44)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(ClientTheme.line))
+            }
+            .buttonStyle(.plain)
+            .disabled(auth.isLoading || !canSubmitPhone)
+            .accessibilityIdentifier("client-attach-phone-submit")
+            if phoneRequested {
+                HStack(spacing: 10) {
+                    Button("Отправить ещё раз") { Task { await requestPhoneCode() } }
+                        .disabled(auth.isLoading)
+                    Button("Изменить номер") { resetPhoneChallenge() }
+                        .disabled(auth.isLoading)
+                }
+                .font(ClientTheme.body(12, weight: .semibold))
+                .foregroundStyle(ClientTheme.muted)
+            }
+        }
+    }
+
+    private var phoneCapabilityEnabled: Bool {
+        guard case .available(let methods) = auth.authMethodsState else { return false }
+        return methods.phone.enabled
+    }
+
+    private var normalizedPhoneInput: String {
+        let digits = phoneInput.filter(\.isNumber)
+        return digits.isEmpty ? "" : "+\(digits)"
+    }
+
+    private var canSubmitPhone: Bool {
+        if phoneRequested { return phoneCode.filter(\.isNumber).count == 6 }
+        return (9...15).contains(normalizedPhoneInput.filter(\.isNumber).count)
+    }
+
+    private func attachPhone() async {
+        let phone = normalizedPhoneInput
+        if phoneRequested {
+            if await auth.attachPhone(phone: phone, code: phoneCode.filter(\.isNumber)) {
+                phoneRequested = false
+                phoneCode = ""
+                phoneMessage = nil
+                await load()
+            } else {
+                phoneMessage = auth.errorMessage
+            }
+        } else {
+            await requestPhoneCode()
+        }
+    }
+
+    private func requestPhoneCode() async {
+        let phone = normalizedPhoneInput
+        phoneRequested = await auth.requestOTP(phone: phone)
+        if phoneRequested {
+            phoneCode = auth.devCode ?? ""
+            phoneMessage = "SMS-код отправлен на \(phone)"
+        } else {
+            phoneMessage = auth.errorMessage
+        }
+    }
+
+    private func resetPhoneChallenge() {
+        phoneRequested = false
+        phoneCode = ""
+        phoneMessage = nil
     }
 
     /// Привязка почты как второго способа входа. Адрес принимается только после

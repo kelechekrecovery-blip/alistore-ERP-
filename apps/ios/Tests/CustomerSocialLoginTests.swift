@@ -285,6 +285,114 @@ final class CustomerSocialLoginTests: XCTestCase {
         XCTAssertFalse(store.requiresApplePhoneEnrollment)
     }
 
+    func testSocialFirstAppleSignupAuthenticatesWithoutInventingPhone() async {
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/v2/social/apple", status: 200, body: """
+        {"status":"authenticated","accessToken":"access-social","refreshToken":"refresh-social","tokenType":"Bearer","expiresIn":"15m"}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/me", status: 200, body: """
+        {"customerId":"customer-social","typ":"customer"}
+        """)
+        let store = makeStore()
+
+        await store.signInWithApple(
+            identityToken: "apple-token",
+            authorizationCode: "apple-code",
+            nonce: "hashed-nonce",
+            name: "Айжан"
+        )
+
+        XCTAssertEqual(store.session?.customerId, "customer-social")
+        XCTAssertNil(store.session?.phone)
+        XCTAssertFalse(store.requiresApplePhoneEnrollment)
+    }
+
+    func testAuthenticatedSocialAccountAttachesLatestPhoneChallenge() async {
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/otp/request", status: 201, body: """
+        {"challengeId":"phone-attach-challenge","devCode":"123456"}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/phone/attach/complete", status: 200, body: """
+        {"accessToken":"access-attached","refreshToken":"refresh-attached","tokenType":"Bearer","expiresIn":"15m"}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/me", status: 200, body: """
+        {"customerId":"customer-social","phone":"+996700123456","typ":"customer"}
+        """)
+        let store = makeStore()
+        store.useUITestSession(CustomerSession(
+            accessToken: "access-social",
+            refreshToken: "refresh-social",
+            customerId: "customer-social",
+            phone: nil
+        ))
+
+        let requested = await store.requestOTP(phone: "+996700123456")
+        XCTAssertTrue(requested)
+        let attached = await store.attachPhone(phone: "+996700123456", code: "123456")
+        XCTAssertTrue(attached)
+
+        let request = SocialLoginMockURLProtocol.request(for: "/api/auth/phone/attach/complete")
+        XCTAssertEqual(request?.value(forHTTPHeaderField: "Authorization"), "Bearer access-social")
+        let body = SocialLoginMockURLProtocol.jsonBody(for: "/api/auth/phone/attach/complete")
+        XCTAssertEqual(body?["phone"], "+996700123456")
+        XCTAssertEqual(body?["code"], "123456")
+        XCTAssertEqual(body?["challengeId"], "phone-attach-challenge")
+        XCTAssertEqual(store.session?.phone, "+996700123456")
+    }
+
+    func testLogoutDuringPhoneAttachmentCannotRestoreSession() async {
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/phone/attach/complete", status: 200, body: """
+        {"accessToken":"stale-access","refreshToken":"stale-refresh","tokenType":"Bearer","expiresIn":"15m"}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/logout", status: 204, body: "")
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/me", status: 200, body: """
+        {"customerId":"customer-social","phone":"+996700123456","typ":"customer"}
+        """)
+        let attachGate = SocialLoginMockURLProtocol.hold(path: "/api/auth/phone/attach/complete")
+        let store = makeStore()
+        store.useUITestSession(CustomerSession(
+            accessToken: "access-social",
+            refreshToken: "refresh-social",
+            customerId: "customer-social",
+            phone: nil
+        ))
+
+        let attachment = Task { await store.attachPhone(phone: "+996700123456", code: "123456") }
+        await waitForRequest("/api/auth/phone/attach/complete")
+        await store.logout()
+        attachGate.signal()
+        let attached = await attachment.value
+
+        XCTAssertFalse(attached)
+        XCTAssertNil(store.session)
+        XCTAssertEqual(SocialLoginMockURLProtocol.requestCount(for: "/api/auth/me"), 0)
+    }
+
+    func testPhoneAttachmentRevokesIssuedRefreshTokenWhenProfileReadFails() async {
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/phone/attach/complete", status: 200, body: """
+        {"accessToken":"access-attached","refreshToken":"refresh-attached","tokenType":"Bearer","expiresIn":"15m"}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/me", status: 503, body: """
+        {"message":"profile unavailable"}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/logout", status: 204, body: "")
+        let store = makeStore()
+        store.useUITestSession(CustomerSession(
+            accessToken: "access-social",
+            refreshToken: "refresh-social",
+            customerId: "customer-social",
+            phone: nil
+        ))
+
+        let attached = await store.attachPhone(phone: "+996700123456", code: "123456")
+
+        XCTAssertFalse(attached)
+        XCTAssertEqual(store.session?.refreshToken, "refresh-social")
+        XCTAssertEqual(SocialLoginMockURLProtocol.requestCount(for: "/api/auth/logout"), 1)
+        XCTAssertEqual(
+            SocialLoginMockURLProtocol.jsonBody(for: "/api/auth/logout")?["refreshToken"],
+            "refresh-attached"
+        )
+    }
+
     func testEnrollmentRetryResendUsesLatestChallengeAndCancelClearsState() async {
         SocialLoginMockURLProtocol.stub(path: "/api/auth/v2/social/apple", status: 200, body: """
         {"status":"enrollment_required","enrollmentToken":"opaque-enrollment-token-1234567890","expiresIn":600}
@@ -758,6 +866,14 @@ final class CustomerSocialLoginTests: XCTestCase {
         )
     }
 
+    private func waitForRequest(_ path: String) async {
+        for _ in 0..<100 {
+            if SocialLoginMockURLProtocol.requestCount(for: path) > 0 { return }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("Timed out waiting for \(path)")
+    }
+
     private var googleServerClientID: String {
         "123456789-alistore-web.apps.googleusercontent.com"
     }
@@ -803,12 +919,14 @@ private final class SocialLoginMockURLProtocol: URLProtocol, @unchecked Sendable
     nonisolated(unsafe) static var requests: [String: URLRequest] = [:]
     nonisolated(unsafe) static var bodies: [String: Data] = [:]
     nonisolated(unsafe) static var requestCounts: [String: Int] = [:]
+    nonisolated(unsafe) static var responseGates: [String: DispatchSemaphore] = [:]
 
     static func reset() {
         responses = [:]
         requests = [:]
         bodies = [:]
         requestCounts = [:]
+        responseGates = [:]
     }
 
     static func stub(path: String, status: Int, body: String) {
@@ -817,6 +935,12 @@ private final class SocialLoginMockURLProtocol: URLProtocol, @unchecked Sendable
 
     static func request(for path: String) -> URLRequest? { requests[path] }
     static func requestCount(for path: String) -> Int { requestCounts[path, default: 0] }
+
+    static func hold(path: String) -> DispatchSemaphore {
+        let gate = DispatchSemaphore(value: 0)
+        responseGates[path] = gate
+        return gate
+    }
 
     static func jsonBody(for path: String) -> [String: String]? {
         guard let data = bodies[path] else { return nil }
@@ -848,15 +972,25 @@ private final class SocialLoginMockURLProtocol: URLProtocol, @unchecked Sendable
         }
 
         let stub = Self.responses[path] ?? (status: 404, body: Data("{}".utf8))
-        let response = HTTPURLResponse(
-            url: request.url!,
-            statusCode: stub.status,
-            httpVersion: nil,
-            headerFields: ["Content-Type": "application/json"]
-        )!
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: stub.body)
-        client?.urlProtocolDidFinishLoading(self)
+        let sendResponse: @Sendable () -> Void = { [self] in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: stub.status,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: stub.body)
+            client?.urlProtocolDidFinishLoading(self)
+        }
+        if let gate = Self.responseGates[path] {
+            DispatchQueue.global().async {
+                gate.wait()
+                sendResponse()
+            }
+        } else {
+            sendResponse()
+        }
     }
 
     override func stopLoading() {}
