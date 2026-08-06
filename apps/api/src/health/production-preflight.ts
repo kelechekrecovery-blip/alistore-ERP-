@@ -122,6 +122,39 @@ const CHECKS: CheckDefinition[] = [
     },
   },
   {
+    id: 'e2e_throttle_bypass',
+    area: 'security',
+    title: 'E2E throttle bypass disabled',
+    requiredEnv: [],
+    note: 'E2E_TEST must not be true in production because it disables every request throttle.',
+    evaluate: (env) => env('E2E_TEST')?.trim().toLowerCase() === 'true' ? 'unsafe' : 'ready',
+  },
+  {
+    id: 'refresh_rotation_grace_secret',
+    area: 'auth',
+    title: 'Refresh rotation grace derivation secret',
+    requiredEnv: [],
+    note: 'When refresh grace is enabled, AUTH_REFRESH_DERIVATION_SECRET must be a strong value of at least 32 characters.',
+    evaluate: (env) => {
+      if (env('AUTH_REFRESH_ROTATION_GRACE_ENABLED')?.trim().toLowerCase() !== 'true') {
+        return 'ready';
+      }
+      const secret = env('AUTH_REFRESH_DERIVATION_SECRET')?.trim() ?? '';
+      return secret.length >= 32 && !WEAK_JWT_SECRETS.has(secret) ? 'ready' : secret ? 'unsafe' : 'missing';
+    },
+  },
+  {
+    id: 'apple_jwks_origin',
+    area: 'identity',
+    title: 'Canonical Apple JWKS endpoint',
+    requiredEnv: [],
+    note: 'Production must use the built-in https://appleid.apple.com/auth/keys endpoint; test JWKS overrides are forbidden.',
+    evaluate: (env) => {
+      const configured = env('APPLE_JWKS_URL')?.trim();
+      return !configured || configured === 'https://appleid.apple.com/auth/keys' ? 'ready' : 'unsafe';
+    },
+  },
+  {
     id: 'email_otp_delivery',
     area: 'auth',
     title: 'Email verification delivery',

@@ -30,7 +30,15 @@ export function readWebCookie(request: Pick<Request, 'headers'>, name: string): 
     if (separator < 0) continue;
     const key = part.slice(0, separator).trim();
     if (key !== name) continue;
-    return decodeURIComponent(part.slice(separator + 1).trim());
+    const value = part.slice(separator + 1).trim();
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      // Preserve malformed credential material so Passport attempts validation
+      // and returns 401. Throwing here would turn an anonymous bad Cookie header
+      // into a pre-throttle 500 on every optional-auth route.
+      return value;
+    }
   }
   return undefined;
 }

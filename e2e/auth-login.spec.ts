@@ -21,10 +21,14 @@ test('login rejects an empty phone without an OTP API request', async ({ page })
     await route.continue();
   });
 
+  const methodsLoaded = page.waitForResponse((response) => response.url().includes('/auth/methods'));
   await page.goto('/login');
-  await page.getByRole('button', { name: /Получить код/i }).click();
-
-  await expect(page.getByText(/Введите корректный номер/i)).toBeVisible();
+  // The validation handler is client-side. Wait for the capability request so
+  // this checks the hydrated form instead of racing Next.js hydration and
+  // accidentally exercising a native form navigation.
+  await methodsLoaded;
+  await page.getByRole('button', { name: /Получить код/i }).first().click();
+  await expect(page.getByText(/корректный номер/i)).toBeVisible();
   expect(otpRequests).toBe(0);
 });
 

@@ -191,7 +191,7 @@ test('wrong enrollment OTP can be retried successfully', async ({ page }) => {
   await page.getByRole('button', { name: 'Получить код по SMS' }).click();
   await page.getByLabel('Код из SMS').fill('000000');
   await page.getByRole('button', { name: 'Подтвердить номер и войти' }).click();
-  await expect(page.getByText('Неверный или просроченный код.')).toBeVisible();
+  await expect(page.getByText('Неверный код.')).toBeVisible();
 
   await page.getByLabel('Код из SMS').fill('654321');
   await page.getByRole('button', { name: 'Подтвердить номер и войти' }).click();

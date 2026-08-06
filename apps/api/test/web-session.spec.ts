@@ -30,6 +30,11 @@ describe('Web cookie session contract', () => {
     expect(readWebCookie(request, WEB_ACCESS_COOKIE)).toBeUndefined();
   });
 
+  it('returns malformed encoded credentials for fail-closed JWT validation', () => {
+    const request = { headers: { cookie: 'alistore_access=%' } };
+    expect(readWebCookie(request, WEB_ACCESS_COOKIE)).toBe('%');
+  });
+
   it('sets HttpOnly SameSite cookies and hides refresh token from Web JSON', () => {
     const cookies: Array<[string, string, Record<string, unknown>]> = [];
     const response = { cookie: (name: string, value: string, options: Record<string, unknown>) => cookies.push([name, value, options]) } as never;

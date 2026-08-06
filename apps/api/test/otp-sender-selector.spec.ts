@@ -77,19 +77,24 @@ describe('OTP sender selector', () => {
    * Тесты выше проверяют код против выдуманных значений и такого поймать не
    * могут. Этот проверяет код против того, с чем сервис реально поедет.
    */
-  it('принимает каждое значение SMS_PROVIDER, объявленное в render.yaml', () => {
-    // Разбор текстом, а не через js-yaml: тянуть зависимость (и её типы) ради
-    // одного ключа дороже, чем прочитать пару строк блюпринта.
+  it('не публикует непроверенный SMS_PROVIDER в render.yaml', () => {
+    // SMS_PROVIDER теперь задаётся владельцем через `sync: false`: blueprint
+    // не должен затереть рабочий Android gateway или сертифицированный
+    // A2P-канал при следующей синхронизации. Если когда-нибудь вернётся
+    // статическое `value`, тест снова сверит его с реальным селектором.
     const blueprint = readFileSync(join(__dirname, '../../../render.yaml'), 'utf8');
-    const declared = [...new Set(
-      [...blueprint.matchAll(/key:\s*SMS_PROVIDER\s*\n\s*value:\s*(.+)/g)]
-        .map((match) => match[1].trim().replace(/^["']|["']$/g, ''))
-        .filter(Boolean),
-    )];
+    const declaration = blueprint.match(/- key:\s*SMS_PROVIDER\s*\n((?:\s{8}.+\n?)*)/);
 
-    expect(declared.length).toBeGreaterThan(0);
-    for (const value of declared) {
-      expect(() => select({ SMS_PROVIDER: value })).not.toThrow();
+    expect(declaration).not.toBeNull();
+    const block = declaration?.[1] ?? '';
+    const staticValue = block.match(/^\s*value:\s*(.+)$/m)?.[1]
+      ?.trim()
+      .replace(/^["']|["']$/g, '');
+
+    if (staticValue) {
+      expect(() => select({ SMS_PROVIDER: staticValue })).not.toThrow();
+    } else {
+      expect(block).toMatch(/^\s*sync:\s*false\s*$/m);
     }
   });
 
@@ -107,17 +112,18 @@ describe('OTP sender selector', () => {
    * Поэтому отсутствие SMS-провайдера обязано быть рабочим состоянием, а не
    * причиной падения контейнера.
    */
-  it('поднимается в production с тем, что объявлено в render.yaml', () => {
+  it('принимает в production статическое значение render.yaml или fail-closed disabled', () => {
     const blueprint = readFileSync(join(__dirname, '../../../render.yaml'), 'utf8');
-    const declared = [...new Set(
-      [...blueprint.matchAll(/key:\s*SMS_PROVIDER\s*\n\s*value:\s*(.+)/g)]
-        .map((match) => match[1].trim().replace(/^["']|["']$/g, ''))
-        .filter(Boolean),
-    )];
+    const declaration = blueprint.match(/- key:\s*SMS_PROVIDER\s*\n((?:\s{8}.+\n?)*)/);
+    const block = declaration?.[1] ?? '';
+    const staticValue = block.match(/^\s*value:\s*(.+)$/m)?.[1]
+      ?.trim()
+      .replace(/^["']|["']$/g, '');
 
-    for (const value of declared) {
-      expect(() => select({ SMS_PROVIDER: value, NODE_ENV: 'production' })).not.toThrow();
-    }
+    expect(() => select({
+      SMS_PROVIDER: staticValue || 'disabled',
+      NODE_ENV: 'production',
+    })).not.toThrow();
   });
 
   it('без SMS-провайдера отправка кода отклоняется понятной ошибкой, а не падением старта', async () => {

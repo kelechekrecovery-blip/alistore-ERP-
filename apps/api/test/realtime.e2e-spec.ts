@@ -51,7 +51,7 @@ describe('RealtimeGateway (socket.io)', () => {
       const received = new Promise<{ orderId: string; status: string }>(
         (resolve) => client.once('order:status', resolve),
       );
-      gateway.emitOrderStatus('order-1', 'paid', { total: 100000 });
+      await gateway.emitOrderStatus('order-1', 'paid', { total: 100000 });
 
       const message = await received;
       expect(message.orderId).toBe('order-1');

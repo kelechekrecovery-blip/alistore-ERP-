@@ -1,5 +1,6 @@
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import * as argon2 from 'argon2';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthService } from '../src/auth/auth.service';
 import { ValidationError } from '../src/common/errors';
@@ -56,7 +57,12 @@ describe('Auth: email + OTP → JWT (integration)', () => {
   });
 
   /** Заводит покупателя и запоминает его id, чтобы чистка не выходила за пределы сьюта. */
-  async function createOwnCustomer(data: { phone: string; name: string; email?: string }) {
+  async function createOwnCustomer(data: {
+    phone: string;
+    name: string;
+    email?: string;
+    emailVerifiedAt?: Date;
+  }) {
     const customer = await prisma.customer.create({ data });
     ownCustomerIds = [...ownCustomerIds, customer.id];
     return customer;
@@ -73,7 +79,12 @@ describe('Auth: email + OTP → JWT (integration)', () => {
   }
 
   async function seedCustomerWithEmail(email: string) {
-    return createOwnCustomer({ phone: nextPhone(), name: 'Тест', email });
+    return createOwnCustomer({
+      phone: nextPhone(),
+      name: 'Тест',
+      email,
+      emailVerifiedAt: new Date(),
+    });
   }
 
   it('logs an existing customer in by their attached email', async () => {
@@ -130,6 +141,29 @@ describe('Auth: email + OTP → JWT (integration)', () => {
     // и форма ответа не отличались от ветки известного адреса. Прежний вариант
     // «не создавать строку» и выдавал отличие: короткий синтетический id.
     expect(issued.devCode).toBeUndefined();
+  });
+
+  it('never delivers or mints tokens for an unverified email value', async () => {
+    const email = nextEmail();
+    await createOwnCustomer({ phone: nextPhone(), name: 'Imported row', email });
+
+    const issued = await auth.requestEmailOtp(email);
+    expect(issued.challengeId).toEqual(expect.any(String));
+    expect(issued.devCode).toBeUndefined();
+
+    const challenge = await prisma.otpChallenge.findUniqueOrThrow({
+      where: { id: issued.challengeId },
+    });
+    const knownCode = '381904';
+    await prisma.otpChallenge.update({
+      where: { id: challenge.id },
+      data: { codeHash: await argon2.hash(knownCode) },
+    });
+    await expect(auth.verifyEmailOtp(email, knownCode, challenge.id))
+      .rejects.toBeInstanceOf(ValidationError);
+    expect(await prisma.refreshToken.count({
+      where: { customerId: { in: ownCustomerIds } },
+    })).toBe(0);
   });
 
   it('выдаёт неотличимый challengeId и для известного, и для неизвестного адреса', async () => {

@@ -3697,6 +3697,9 @@ model OtpChallenge {
 model RefreshToken {
   id         String    @id @default(cuid())
   customerId String
+  // A login/recovery creates a new family; every rotation keeps it. Replaying
+  // an old family can revoke only its own descendants, never a newer recovery.
+  familyId   String    @default(dbgenerated("('legacy:'::text || gen_random_uuid()::text)"))
   tokenHash  String    @unique
   expiresAt  DateTime
   revokedAt  DateTime?
@@ -3706,6 +3709,7 @@ model RefreshToken {
   createdAt  DateTime  @default(now())
 
   @@index([customerId])
+  @@index([customerId, familyId])
 }
 
 // ---------- OUTBOX ----------
@@ -3804,6 +3808,10 @@ model StaffUser {
   point                   String
   storePoint              StorePoint              @relation(fields: [point], references: [inventoryLocation], onDelete: Restrict, onUpdate: Cascade)
   active                  Boolean                 @default(true)
+  // Incremented on credential/authorization changes. Access JWTs carry the
+  // value so password/TOTP reset, deactivation and role changes revoke them
+  // immediately instead of waiting for the 15-minute expiry.
+  sessionVersion          Int                     @default(0)
   totpSecret              String?
   totpEnabled             Boolean                 @default(false)
   totpLastToken           String? // last used TOTP code — single-use guard (anti-replay)

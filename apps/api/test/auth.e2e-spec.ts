@@ -1,6 +1,7 @@
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
+import { createHash } from 'node:crypto';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthService } from '../src/auth/auth.service';
 import { ValidationError } from '../src/common/errors';
@@ -376,6 +377,72 @@ describe('Auth: phone + OTP → JWT (integration)', () => {
     await expect(auth.refresh(replacement.refreshToken)).rejects.toMatchObject({ code: 'refresh_reused' });
   });
 
+  it('bridges a new parent to old-writer legacy children without revoking a new session', async () => {
+    const phone = nextPhone();
+    const { devCode } = await auth.requestOtp(phone);
+    const current = await auth.verifyOtp(phone, devCode as string);
+    const customer = await prisma.customer.findUniqueOrThrow({ where: { phone } });
+    const hash = (value: string) => createHash('sha256').update(value).digest('hex');
+    const ancestor = `legacy-ancestor-${phone}`;
+    const child = `legacy-child-${phone}`;
+    const sibling = `legacy-sibling-${phone}`;
+    await prisma.refreshToken.createMany({
+      data: [
+        {
+          customerId: customer.id,
+          familyId: 'a'.repeat(32),
+          tokenHash: hash(ancestor),
+          expiresAt: new Date(Date.now() + 60_000),
+          revokedAt: new Date(Date.now() - 60_000),
+          rotatedAt: new Date(Date.now() - 60_000),
+        },
+        {
+          customerId: customer.id,
+          familyId: 'legacy:child-from-old-writer',
+          tokenHash: hash(child),
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+        {
+          customerId: customer.id,
+          familyId: 'legacy:other-old-writer',
+          tokenHash: hash(sibling),
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      ],
+    });
+
+    await expect(auth.refresh(ancestor)).rejects.toMatchObject({ code: 'refresh_reused' });
+    const legacyRows = await prisma.refreshToken.findMany({
+      where: { customerId: customer.id, familyId: { startsWith: 'legacy:' } },
+    });
+    expect(legacyRows.every((row) => row.revokedAt !== null)).toBe(true);
+    await expect(auth.refresh(current.refreshToken)).resolves.toHaveProperty('accessToken');
+  });
+
+  it('database blocks an old-binary broad replay update from revoking a new family', async () => {
+    const phone = nextPhone();
+    const { devCode } = await auth.requestOtp(phone);
+    const current = await auth.verifyOtp(phone, devCode as string);
+    const customer = await prisma.customer.findUniqueOrThrow({ where: { phone } });
+    await prisma.refreshToken.create({
+      data: {
+        customerId: customer.id,
+        familyId: `legacy:replayed-${customer.id}`,
+        tokenHash: createHash('sha256').update(`old-replay-${phone}`).digest('hex'),
+        expiresAt: new Date(Date.now() + 60_000),
+        revokedAt: new Date(Date.now() - 60_000),
+      },
+    });
+
+    // This is the previous binary's exact replay statement. The compatibility
+    // trigger must abort it once it touches a live exact-family row.
+    await expect(prisma.refreshToken.updateMany({
+      where: { customerId: customer.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })).rejects.toThrow();
+    await expect(auth.refresh(current.refreshToken)).resolves.toHaveProperty('accessToken');
+  });
+
   it('prevents concurrent refresh and logout from leaving a live replacement', async () => {
     const phone = nextPhone();
     const { devCode } = await auth.requestOtp(phone);
@@ -417,6 +484,9 @@ describe('Auth: phone + OTP → JWT (integration)', () => {
     const oldRefresh = await auth.refresh(first.refreshToken).catch((e) => e);
     expect(oldRefresh).toBeInstanceOf(ValidationError);
     expect((oldRefresh as ValidationError).code).toBe('refresh_reused');
+    // Replaying a stolen token from the pre-recovery family cannot log the
+    // recovered user out again.
+    await expect(auth.refresh(rotated.refreshToken)).resolves.toHaveProperty('accessToken');
   });
 
   it('does not create an account during recovery verify', async () => {

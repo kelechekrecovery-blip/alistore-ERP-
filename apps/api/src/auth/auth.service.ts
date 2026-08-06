@@ -22,6 +22,7 @@ import {
 } from './social-login';
 import { NoopOtpSender } from './noop-otp.sender';
 import { describeAuthMethods, type AuthMethodsView } from './auth-methods';
+import { resolveReviewLoginConfig } from './review-login-config';
 import { OTP_SENDER, OtpSender } from './otp-sender';
 import {
   EMAIL_OTP_SENDER,
@@ -30,6 +31,11 @@ import {
 } from './email-otp.sender';
 import type { AuthPrincipal, JwtPayload } from './jwt.strategy';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
+import {
+  authorizeRefreshTokenRevocation,
+  customerAuthLockKey,
+  isActiveCustomer,
+} from './customer-session';
 import {
   AppleOAuthClient,
   AppleOAuthError,
@@ -59,7 +65,6 @@ const ACCESS_TTL = '15m';
 const SOCIAL_ENROLLMENT_TTL_SECONDS = 10 * 60;
 const SOCIAL_ASSERTION_RETENTION_SECONDS = 24 * 60 * 60;
 const SOCIAL_ASSERTION_CLEANUP_BATCH_SIZE = 100;
-const REVIEW_LOGIN_MAX_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const REVIEW_LOGIN_MAX_ATTEMPTS = 5;
 const REVIEW_LOGIN_LOCK_MS = 15 * 60 * 1000;
 const REVIEW_LOGIN_MAX_SUCCESSES = 20;
@@ -118,7 +123,7 @@ export class AuthService implements OnModuleInit {
   onModuleInit(): void {
     if (this.config.get<string>('AUTH_REVIEW_PHONE')?.trim()) {
       this.logger.warn(
-        'AUTH_REVIEW_PHONE is set — App Store review login is ACTIVE. Use a throwaway number and clear AUTH_REVIEW_PHONE/AUTH_REVIEW_OTP after review.',
+        'AUTH_REVIEW_PHONE is set. App Store review login is active only with a valid six-digit AUTH_REVIEW_OTP and short-lived AUTH_REVIEW_UNTIL; clear all three after review.',
       );
     }
   }
@@ -140,11 +145,35 @@ export class AuthService implements OnModuleInit {
     if (!payload.sub || !['customer', 'staff'].includes(payload.typ)) {
       throw new ValidationError('access_token_invalid', 'Недействительный access-токен');
     }
+    if (payload.typ === 'customer') {
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: payload.sub },
+        select: { phone: true },
+      });
+      if (!isActiveCustomer(customer)) {
+        throw new ValidationError('customer_session_revoked', 'Сессия клиента отозвана');
+      }
+    } else {
+      const staff = await this.prisma.staffUser.findUnique({
+        where: { id: payload.sub },
+        select: { active: true, role: true, point: true, sessionVersion: true },
+      });
+      if (
+        !staff?.active
+        || payload.role !== staff.role
+        || payload.point !== staff.point
+        || (payload.sessionVersion ?? 0) !== staff.sessionVersion
+      ) {
+        throw new ValidationError('staff_session_revoked', 'Сессия сотрудника отозвана');
+      }
+    }
     return {
       customerId: payload.sub,
       phone: payload.phone,
       typ: payload.typ,
       role: payload.role,
+      point: payload.point,
+      storePointId: payload.storePointId,
     };
   }
 
@@ -275,7 +304,9 @@ export class AuthService implements OnModuleInit {
     // известные — email_transport_unavailable. Это тоже был ответ на вопрос
     // «есть ли здесь аккаунт».
     this.emailOtpSender.assertOperational();
-    const customer = await this.prisma.customer.findUnique({ where: { email: normalized } });
+    const customer = await this.prisma.customer.findFirst({
+      where: { email: normalized, emailVerifiedAt: { not: null } },
+    });
     // Вызов создаётся всегда — и для неизвестного адреса тоже. Прежняя ветка
     // возвращала `randomBytes(16).toString('base64url')`: 22 символа из
     // [A-Za-z0-9_-] против 25-символьного cuid из базы. Одного запроса хватало,
@@ -296,8 +327,10 @@ export class AuthService implements OnModuleInit {
   async verifyEmailOtp(email: string, code: string, challengeId?: string): Promise<AuthTokens> {
     const normalized = normalizeEmail(email);
     await this.consumeEmailOtp(normalized, code, 'login', challengeId);
-    const customer = await this.prisma.customer.findUnique({ where: { email: normalized } });
-    if (!customer) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { email: normalized, emailVerifiedAt: { not: null } },
+    });
+    if (!isActiveCustomer(customer)) {
       throw new ValidationError('customer_not_found', 'Аккаунт не найден');
     }
     return this.issueTokens(customer.id, customer.phone);
@@ -314,11 +347,25 @@ export class AuthService implements OnModuleInit {
     email: string,
   ): Promise<{ challengeId: string; devCode?: string }> {
     const normalized = normalizeEmail(email);
-    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
-    if (!customer) {
-      throw new ValidationError('customer_not_found', 'Аккаунт не найден');
-    }
-    return this.issueEmailChallenge(normalized, 'email_attach');
+    this.assertEmailChallengeOperational();
+    const prepared = await this.prepareEmailChallenge();
+    const challenge = await this.prisma.$transaction(async (tx) => {
+      await this.lockCustomerAuth(tx, customerId);
+      const customer = await tx.customer.findUnique({ where: { id: customerId } });
+      if (!isActiveCustomer(customer)) {
+        throw new ValidationError('customer_session_revoked', 'Сессия клиента отозвана');
+      }
+      return tx.otpChallenge.create({
+        data: this.emailChallengeData(normalized, 'email_attach', prepared.codeHash),
+      });
+    });
+    return this.deliverEmailChallenge(
+      challenge.id,
+      normalized,
+      'email_attach',
+      prepared.code,
+      { deliver: true },
+    );
   }
 
   /** Confirm the attach code and bind the address to the account. */
@@ -339,7 +386,15 @@ export class AuthService implements OnModuleInit {
     );
     try {
       await this.prisma.$transaction(async (tx) => {
+        await this.lockCustomerAuth(tx, customerId);
         await this.consumeEmailClaim(challenge.id, tx);
+        const customer = await tx.customer.findUnique({
+          where: { id: customerId },
+          select: { phone: true },
+        });
+        if (!isActiveCustomer(customer)) {
+          throw new ValidationError('customer_session_revoked', 'Сессия клиента отозвана');
+        }
         const owner = await tx.customer.findUnique({
           where: { email: normalized },
         });
@@ -370,24 +425,51 @@ export class AuthService implements OnModuleInit {
     purpose: 'login' | 'email_attach',
     options: { deliver: boolean; genericDeliveryResponse?: boolean } = { deliver: true },
   ): Promise<{ challengeId: string; devCode?: string }> {
+    this.assertEmailChallengeOperational();
+    const prepared = await this.prepareEmailChallenge();
+    const challenge = await this.prisma.otpChallenge.create({
+      data: this.emailChallengeData(email, purpose, prepared.codeHash),
+    });
+    return this.deliverEmailChallenge(challenge.id, email, purpose, prepared.code, options);
+  }
+
+  private assertEmailChallengeOperational(): void {
     if (this.config.get<string>('NODE_ENV') === 'production' && this.emailOtpSender.name === 'noop') {
       throw new ValidationError('email_transport_unavailable', 'Email transport is not configured');
     }
     this.emailOtpSender.assertOperational();
+  }
+
+  private async prepareEmailChallenge(): Promise<{ code: string; codeHash: string }> {
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     // argon2 считается и для недоставляемого вызова: это самая дорогая операция
     // в запросе, и пропустить её значило бы вернуть таймингу ту же роль оракула,
     // которую только что отняли у формы идентификатора.
     const codeHash = await argon2.hash(code);
-    const challenge = await this.prisma.otpChallenge.create({
-      data: {
-        email,
-        channel: 'email',
-        purpose,
-        codeHash,
-        expiresAt: new Date(Date.now() + OTP_TTL_MS),
-      },
-    });
+    return { code, codeHash };
+  }
+
+  private emailChallengeData(
+    email: string,
+    purpose: 'login' | 'email_attach',
+    codeHash: string,
+  ) {
+    return {
+      email,
+      channel: 'email' as const,
+      purpose,
+      codeHash,
+      expiresAt: new Date(Date.now() + OTP_TTL_MS),
+    };
+  }
+
+  private async deliverEmailChallenge(
+    challengeId: string,
+    email: string,
+    purpose: 'login' | 'email_attach',
+    code: string,
+    options: { deliver: boolean; genericDeliveryResponse?: boolean },
+  ): Promise<{ challengeId: string; devCode?: string }> {
     const deliveryStartedAt = Date.now();
     let delivered = !options.deliver;
     if (options.deliver) {
@@ -402,12 +484,12 @@ export class AuthService implements OnModuleInit {
       } catch (error) {
         if (!options.genericDeliveryResponse) {
           await this.prisma.otpChallenge
-            .delete({ where: { id: challenge.id } })
+            .delete({ where: { id: challengeId } })
             .catch(() => undefined);
           throw error;
         }
         this.logger.warn(
-          `Email OTP delivery failed for challenge ${challenge.id}`,
+          `Email OTP delivery failed for challenge ${challengeId}`,
           error instanceof Error ? error.stack : undefined,
         );
       }
@@ -434,7 +516,7 @@ export class AuthService implements OnModuleInit {
       && delivered
       && this.config.get<string>('AUTH_OTP_DEV_ECHO') === 'true'
       && this.config.get<string>('NODE_ENV') !== 'production';
-    return echo ? { challengeId: challenge.id, devCode: code } : { challengeId: challenge.id };
+    return echo ? { challengeId, devCode: code } : { challengeId };
   }
 
   /**
@@ -612,30 +694,13 @@ export class AuthService implements OnModuleInit {
   }
 
   /**
-   * True only when a review account is configured (both AUTH_REVIEW_PHONE and
-   * AUTH_REVIEW_OTP) and the request matches it exactly. Absent either env var the
-   * method is inert, so production without these variables has no bypass at all.
+   * True only when the complete, short-lived review credential is valid and
+   * the request matches its phone exactly. The shared parser keeps this gate in
+   * lockstep with the public auth-capability response.
    */
   private reviewOtpForPhone(phone: string): string | null {
-    const configuredPhone = this.config.get<string>('AUTH_REVIEW_PHONE')?.trim();
-    const reviewOtp = this.config.get<string>('AUTH_REVIEW_OTP')?.trim();
-    if (!configuredPhone || !reviewOtp) return null;
-    let reviewPhone: string;
-    try {
-      reviewPhone = normalizePhone(configuredPhone);
-    } catch {
-      return null;
-    }
-    // Expiry is mandatory and capped: review credentials must not become a
-    // permanent customer-login bypass if deployment configuration is forgotten.
-    const until = this.config.get<string>('AUTH_REVIEW_UNTIL')?.trim();
-    if (!until) return null;
-    const expiry = new Date(until).getTime();
-    const remaining = expiry - Date.now();
-    if (!Number.isFinite(expiry) || remaining <= 0 || remaining > REVIEW_LOGIN_MAX_WINDOW_MS) {
-      return null;
-    }
-    return phone === reviewPhone ? reviewOtp : null;
+    const config = resolveReviewLoginConfig((name) => this.config.get<string>(name));
+    return config && phone === config.phone ? config.otp : null;
   }
 
   private async authenticateReviewLogin(
@@ -780,11 +845,20 @@ export class AuthService implements OnModuleInit {
     const phone = normalizePhone(rawPhone);
     const challenge = await this.claimPhoneOtp(phone, code, 'recovery', challengeId);
     return this.prisma.$transaction(async (tx) => {
+      const candidate = await tx.customer.findFirst({
+        where: { phone: { in: [phone, phone.slice(1)] } },
+        select: { id: true },
+      });
+      if (!candidate) {
+        throw new ValidationError('customer_not_found', 'Аккаунт не найден');
+      }
+      await this.lockCustomerAuth(tx, candidate.id);
       await this.consumeClaimOnTx(tx, challenge.id);
       const customer = await this.customerByCanonicalPhoneOnTx(tx, phone, false);
       if (!customer) {
         throw new ValidationError('customer_not_found', 'Аккаунт не найден');
       }
+      await authorizeRefreshTokenRevocation(tx);
       await tx.refreshToken.updateMany({
         where: { customerId: customer.id, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -923,7 +997,11 @@ export class AuthService implements OnModuleInit {
       clientId,
       nonce: dto.nonce,
       name: dto.name,
-      jwksUrl: this.config.get<string>('APPLE_JWKS_URL'),
+      // Production always trusts Apple's canonical endpoint from social-login.
+      // The override exists only so isolated tests can serve deterministic keys.
+      jwksUrl: this.config.get<string>('NODE_ENV') === 'production'
+        ? undefined
+        : this.config.get<string>('APPLE_JWKS_URL'),
     });
   }
 
@@ -1200,7 +1278,9 @@ export class AuthService implements OnModuleInit {
       const exchangedProfile = await verifyAppleIdentityToken({
         identityToken: exchange.identityToken,
         clientId: profile.clientId,
-        jwksUrl: this.config.get<string>('APPLE_JWKS_URL'),
+        jwksUrl: this.config.get<string>('NODE_ENV') === 'production'
+          ? undefined
+          : this.config.get<string>('APPLE_JWKS_URL'),
       });
       if (exchangedProfile.subject !== profile.subject) {
         throw new ValidationError(
@@ -1741,15 +1821,24 @@ export class AuthService implements OnModuleInit {
     const tokenHash = this.hashToken(refreshToken);
     const graceEnabled = this.refreshRotationGraceEnabled();
     const outcome = await this.prisma.$transaction(async (tx) => {
+      const owner = await tx.refreshToken.findUnique({
+        where: { tokenHash },
+        select: { customerId: true },
+      });
+      if (!owner) {
+        throw new ValidationError('refresh_invalid', 'Refresh-токен недействителен');
+      }
+      await this.lockCustomerAuth(tx, owner.customerId);
       const locked = await tx.$queryRaw<Array<{
         id: string;
         customerId: string;
+        familyId: string;
         expiresAt: Date;
         revokedAt: Date | null;
         rotatedAt: Date | null;
         withinRotationGrace: boolean;
       }>>`
-        SELECT id, "customerId", "expiresAt", "revokedAt", "rotatedAt",
+        SELECT id, "customerId", "familyId", "expiresAt", "revokedAt", "rotatedAt",
                (
                  "rotatedAt" IS NOT NULL
                  AND "rotatedAt" >= (NOW() AT TIME ZONE 'UTC') - INTERVAL '5 seconds'
@@ -1779,19 +1868,23 @@ export class AuthService implements OnModuleInit {
             customer.id,
             customer.phone,
             refreshToken,
+            record.familyId,
             tx,
           );
           if (tokens) return { kind: 'rotated' as const, tokens };
+          await authorizeRefreshTokenRevocation(tx);
           await tx.refreshToken.updateMany({
-            where: { customerId: record.customerId, revokedAt: null },
+            where: this.refreshFamilyRevocationWhere(record),
             data: { revokedAt: now },
           });
           return { kind: 'reused' as const };
         }
-        // Outside the narrow concurrency window, replay retains the existing
-        // fail-closed behavior and revokes every live customer session.
+        // Outside the narrow concurrency window, revoke only descendants of
+        // the compromised rotation family. A historical token must not become
+        // an indefinite logout capability against a newer recovery/device.
+        await authorizeRefreshTokenRevocation(tx);
         await tx.refreshToken.updateMany({
-          where: { customerId: record.customerId, revokedAt: null },
+          where: this.refreshFamilyRevocationWhere(record),
           data: { revokedAt: now },
         });
         return { kind: 'reused' as const };
@@ -1815,6 +1908,7 @@ export class AuthService implements OnModuleInit {
               customer.id,
               customer.phone,
               refreshToken,
+              record.familyId,
               tx,
             ).then((tokens) => {
               if (!tokens) {
@@ -1822,7 +1916,7 @@ export class AuthService implements OnModuleInit {
               }
               return tokens;
             })
-          : await this.issueTokens(customer.id, customer.phone, tx),
+          : await this.issueTokens(customer.id, customer.phone, tx, record.familyId),
       };
     });
     if (outcome.kind === 'reused') {
@@ -1838,12 +1932,19 @@ export class AuthService implements OnModuleInit {
   async logout(refreshToken: string): Promise<void> {
     const tokenHash = this.hashToken(refreshToken);
     await this.prisma.$transaction(async (tx) => {
+      const owner = await tx.refreshToken.findUnique({
+        where: { tokenHash },
+        select: { customerId: true },
+      });
+      if (!owner) return;
+      await this.lockCustomerAuth(tx, owner.customerId);
       const locked = await tx.$queryRaw<Array<{
         id: string;
         customerId: string;
+        familyId: string;
         revokedAt: Date | null;
       }>>`
-        SELECT id, "customerId", "revokedAt"
+        SELECT id, "customerId", "familyId", "revokedAt"
         FROM "RefreshToken"
         WHERE "tokenHash" = ${tokenHash}
         FOR UPDATE
@@ -1859,12 +1960,14 @@ export class AuthService implements OnModuleInit {
           SET "rotatedAt" = NULL
           WHERE id = ${record.id}
         `;
+        await authorizeRefreshTokenRevocation(tx);
         await tx.refreshToken.updateMany({
-          where: { customerId: record.customerId, revokedAt: null },
+          where: this.refreshFamilyRevocationWhere(record),
           data: { revokedAt: new Date() },
         });
         return;
       }
+      await authorizeRefreshTokenRevocation(tx);
       await tx.refreshToken.update({
         where: { id: record.id },
         data: { revokedAt: new Date() },
@@ -1905,8 +2008,16 @@ export class AuthService implements OnModuleInit {
   private async issueTokens(
     customerId: string,
     phone: string | null,
-    db: Pick<Prisma.TransactionClient, 'refreshToken'> = this.prisma,
+    db: Pick<Prisma.TransactionClient, 'customer' | 'refreshToken'> = this.prisma,
+    familyId = randomBytes(16).toString('hex'),
   ): Promise<AuthTokens> {
+    const activeCustomer = await db.customer.findUnique({
+      where: { id: customerId },
+      select: { phone: true },
+    });
+    if (!isActiveCustomer(activeCustomer)) {
+      throw new ValidationError('customer_session_revoked', 'Сессия клиента отозвана');
+    }
     const accessToken = await this.jwt.signAsync(
       { sub: customerId, ...(phone ? { phone } : {}), typ: 'customer' },
       { expiresIn: ACCESS_TTL },
@@ -1915,6 +2026,7 @@ export class AuthService implements OnModuleInit {
     await db.refreshToken.create({
       data: {
         customerId,
+        familyId,
         tokenHash: this.hashToken(refreshToken),
         expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
       },
@@ -1926,8 +2038,16 @@ export class AuthService implements OnModuleInit {
     customerId: string,
     phone: string | null,
     parentRefreshToken: string,
-    db: Pick<Prisma.TransactionClient, 'refreshToken'>,
+    familyId: string,
+    db: Pick<Prisma.TransactionClient, 'customer' | 'refreshToken'>,
   ): Promise<AuthTokens | null> {
+    const activeCustomer = await db.customer.findUnique({
+      where: { id: customerId },
+      select: { phone: true },
+    });
+    if (!isActiveCustomer(activeCustomer)) {
+      throw new ValidationError('customer_session_revoked', 'Сессия клиента отозвана');
+    }
     const secret = this.config.get<string>('AUTH_REFRESH_DERIVATION_SECRET')?.trim();
     if (!secret || secret.length < 32) {
       throw new Error(
@@ -1943,6 +2063,7 @@ export class AuthService implements OnModuleInit {
       where: { tokenHash },
       create: {
         customerId,
+        familyId,
         tokenHash,
         expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
       },
@@ -1960,6 +2081,38 @@ export class AuthService implements OnModuleInit {
     return this.config.get<string>('AUTH_REFRESH_ROTATION_GRACE_ENABLED')
       ?.trim()
       .toLowerCase() === 'true';
+  }
+
+  private refreshFamilyRevocationWhere(record: { customerId: string; familyId: string }) {
+    if (record.familyId.startsWith('legacy:')) {
+      return {
+        customerId: record.customerId,
+        familyId: { startsWith: 'legacy:' },
+        revokedAt: null,
+      };
+    }
+    return {
+      customerId: record.customerId,
+      OR: [
+        { familyId: record.familyId },
+        // During a mixed-version rollout an old instance cannot preserve the
+        // new family id and writes its rotated child with the DB legacy marker.
+        // A replay of the revoked new parent must therefore close both paths.
+        { familyId: { startsWith: 'legacy:' } },
+      ],
+      revokedAt: null,
+    };
+  }
+
+  private async lockCustomerAuth(
+    tx: Pick<Prisma.TransactionClient, '$queryRaw'>,
+    customerId: string,
+  ): Promise<void> {
+    await tx.$queryRaw`
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(${customerAuthLockKey(customerId)}, 0)
+      )::text AS locked
+    `;
   }
 
   private hashToken(token: string): string {

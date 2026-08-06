@@ -4,6 +4,10 @@ import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 import { ValidationError } from '../src/common/errors';
 import { TotpService } from '../src/auth/totp.service';
 import { authenticator } from 'otplib';
+import { createHash } from 'node:crypto';
+import { ConfigService } from '@nestjs/config';
+import { AuthService } from '../src/auth/auth.service';
+import * as argon2 from 'argon2';
 
 /** Staff login carries the role in the JWT (foundation for server-side authz). */
 describe('StaffAuth (login → role in JWT)', () => {
@@ -101,9 +105,106 @@ describe('StaffAuth (login → role in JWT)', () => {
     expect((err as ValidationError).code).toBe('staff_invalid_credentials');
   });
 
+  it('cannot insert a late session after credentials change during password verification', async () => {
+    const username = `login-race-${RUN}`;
+    const staff = await service.createStaff(username, 'old-strong-pass', 'admin');
+    const originalFindUnique = prisma.staffUser.findUnique.bind(prisma.staffUser);
+    let snapshotRead!: () => void;
+    let releaseSnapshot!: () => void;
+    const read = new Promise<void>((resolve) => { snapshotRead = resolve; });
+    const released = new Promise<void>((resolve) => { releaseSnapshot = resolve; });
+    const pausedFindUnique = async (args: Parameters<typeof originalFindUnique>[0]) => {
+      const snapshot = await originalFindUnique(args);
+      snapshotRead();
+      await released;
+      return snapshot;
+    };
+    const findSpy = jest.spyOn(prisma.staffUser, 'findUnique')
+      .mockImplementationOnce(pausedFindUnique as never);
+
+    try {
+      const login = service.login(username, 'old-strong-pass');
+      await read;
+      await prisma.staffUser.update({
+        where: { id: staff.id },
+        data: {
+          passwordHash: await argon2.hash('new-strong-pass'),
+          sessionVersion: { increment: 1 },
+        },
+      });
+      releaseSnapshot();
+      await expect(login).rejects.toMatchObject({ code: 'staff_session_changed' });
+      await expect(prisma.refreshToken.count({
+        where: { customerId: `staff:${staff.id}`, revokedAt: null },
+      })).resolves.toBe(0);
+    } finally {
+      releaseSnapshot();
+      findSpy.mockRestore();
+    }
+  });
+
   it('rejects an unknown user', async () => {
     const err = await service.login(`nobody-${RUN}`, 'x').catch((e) => e);
     expect(err).toBeInstanceOf(ValidationError);
     expect((err as ValidationError).code).toBe('staff_invalid_credentials');
+  });
+
+  it('revokes an old-writer legacy child when a new-family staff parent is replayed', async () => {
+    const username = `mixed-${RUN}`;
+    const staff = await service.createStaff(username, 'strong-pass', 'admin');
+    const current = await service.login(username, 'strong-pass');
+    const ancestor = `staff-hex-ancestor-${RUN}`;
+    const legacyChild = `staff-legacy-child-${RUN}`;
+    const tokenHash = (token: string) => createHash('sha256').update(token).digest('hex');
+    await prisma.refreshToken.createMany({
+      data: [
+        {
+          customerId: `staff:${staff.id}`,
+          familyId: 'b'.repeat(32),
+          tokenHash: tokenHash(ancestor),
+          expiresAt: new Date(Date.now() + 60_000),
+          revokedAt: new Date(Date.now() - 60_000),
+          rotatedAt: new Date(Date.now() - 60_000),
+        },
+        {
+          customerId: `staff:${staff.id}`,
+          familyId: 'legacy:old-writer-child',
+          tokenHash: tokenHash(legacyChild),
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      ],
+    });
+
+    await expect(service.refresh(ancestor)).rejects.toMatchObject({
+      code: 'staff_refresh_reused',
+    });
+    await expect(prisma.refreshToken.findUniqueOrThrow({
+      where: { tokenHash: tokenHash(legacyChild) },
+    })).resolves.toMatchObject({ revokedAt: expect.any(Date) });
+    await expect(service.refresh(current.refreshToken)).resolves.toHaveProperty('accessToken');
+  });
+
+  it('rejects a stale staff role on the non-HTTP realtime token path', async () => {
+    const username = `realtime-${RUN}`;
+    const staff = await service.createStaff(username, 'strong-pass', 'admin');
+    const session = await service.login(username, 'strong-pass');
+    const transportAuth = new AuthService(
+      prisma,
+      jwt,
+      { get: () => undefined } as unknown as ConfigService,
+    );
+
+    await expect(transportAuth.verifyAccessToken(session.accessToken)).resolves.toMatchObject({
+      customerId: staff.id,
+      typ: 'staff',
+      role: 'admin',
+    });
+    await prisma.staffUser.update({
+      where: { id: staff.id },
+      data: { role: 'seller', sessionVersion: { increment: 1 } },
+    });
+    await expect(transportAuth.verifyAccessToken(session.accessToken)).rejects.toMatchObject({
+      code: 'staff_session_revoked',
+    });
   });
 });

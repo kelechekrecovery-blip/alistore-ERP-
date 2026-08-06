@@ -105,6 +105,24 @@ describe('GET /auth/methods', () => {
     expect(response.body.registrationAvailable).toBe(false);
   });
 
+  it('публикует валидный review-вход без регистрации и recovery', async () => {
+    app = await boot({
+      NODE_ENV: 'production',
+      SMS_PROVIDER: 'disabled',
+      AUTH_REVIEW_PHONE: '+996700000001',
+      AUTH_REVIEW_OTP: '424242',
+      AUTH_REVIEW_UNTIL: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      AUTH_RECOVERY_OTP_ENABLED: 'true',
+    });
+
+    const response = await request(app.getHttpServer()).get('/auth/methods').expect(200);
+
+    expect(response.body.phone).toEqual({ enabled: true, registers: false });
+    expect(response.body.recovery).toEqual({ enabled: false });
+    expect(response.body.anyLoginAvailable).toBe(true);
+    expect(response.body.registrationAvailable).toBe(false);
+  });
+
   /** Секретам здесь не место: наружу уходят флаги и публичный Apple client id. */
   it('не раскрывает ни одного секрета', async () => {
     app = await boot({
