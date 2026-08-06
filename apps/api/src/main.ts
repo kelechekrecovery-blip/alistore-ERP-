@@ -1,8 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import dotenv from 'dotenv';
-import { existsSync } from 'node:fs';
 import { AppModule } from './app.module';
 import { setupOpenApi, shouldExposeOpenApi } from './openapi';
 import helmet from 'helmet';
@@ -12,18 +10,11 @@ import {
   resolveHelmetOptions,
   resolveTrustProxy,
 } from './config/runtime-security';
-import { resolveRuntimeEnvFiles } from './config/runtime-env-files';
+import { preloadRuntimeEnvFiles } from './config/runtime-env-files';
 import { assertProductionRuntimeReady } from './health/production-preflight';
 
-function preloadRuntimeEnvFiles(): void {
-  for (const envFile of resolveRuntimeEnvFiles(process.env.NODE_ENV)) {
-    if (!existsSync(envFile)) continue;
-    dotenv.config({ path: envFile, override: false });
-  }
-}
-
 async function bootstrap(): Promise<void> {
-  preloadRuntimeEnvFiles();
+  preloadRuntimeEnvFiles(process.env.NODE_ENV);
   const env = (name: string) => process.env[name];
   assertProductionRuntimeReady(env);
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
