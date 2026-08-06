@@ -1,9 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { preloadRuntimeEnvFiles } from './config/runtime-env-files';
 import { assertProductionRuntimeReady } from './health/production-preflight';
 
 async function bootstrap(): Promise<void> {
   process.env.PROCESS_ROLE = 'worker';
+  preloadRuntimeEnvFiles(process.env.NODE_ENV);
   assertProductionRuntimeReady((name) => process.env[name]);
   const app = await NestFactory.createApplicationContext(AppModule);
   app.enableShutdownHooks();
