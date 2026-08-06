@@ -89,6 +89,7 @@ describe('Feature flags (integration)', () => {
 
   afterAll(async () => {
     await prisma.featureFlagOverride.deleteMany();
+    await prisma.featureFlagGeneration.deleteMany();
     await prisma.auditEvent.deleteMany({ where: { type: 'feature_flag.changed' } });
     await app.close();
     await prisma.$disconnect();
@@ -100,6 +101,7 @@ describe('Feature flags (integration)', () => {
 
   beforeEach(async () => {
     await prisma.featureFlagOverride.deleteMany();
+    await prisma.featureFlagGeneration.deleteMany();
     await prisma.auditEvent.deleteMany({ where: { type: 'feature_flag.changed' } });
     for (const name of ENV_NAMES) delete process.env[name];
   });
@@ -211,7 +213,10 @@ describe('Feature flags (integration)', () => {
     await expect(flags.isEnabled(FeatureFlagKey.Cancellation)).resolves.toBe(true);
     expect(await prisma.featureFlagOverride.findUnique({
       where: { key: FeatureFlagKey.Cancellation },
-    })).toMatchObject({ active: false, revision: 2 });
+    })).toBeNull();
+    expect(await prisma.featureFlagGeneration.findUnique({
+      where: { key: FeatureFlagKey.Cancellation },
+    })).toMatchObject({ revision: 2 });
 
     const events = await prisma.auditEvent.findMany({
       where: { type: 'feature_flag.changed', refs: { has: FeatureFlagKey.Cancellation } },
@@ -233,6 +238,7 @@ describe('Feature flags (integration)', () => {
 
     const tombstone = await flags.reset(key, 'Reset to fallback', 'owner-reset', 1);
     expect(tombstone).toMatchObject({ enabled: false, source: 'default', overrideActive: false, overrideRevision: 2 });
+    await expect(prisma.featureFlagOverride.findUnique({ where: { key } })).resolves.toBeNull();
 
     const revisionThree = await flags.set(key, false, 'Recreate override', 'owner-recreate', 2);
     expect(revisionThree).toMatchObject({ enabled: false, source: 'database', overrideActive: true, overrideRevision: 3 });
@@ -246,22 +252,52 @@ describe('Feature flags (integration)', () => {
     expect(await featureFlagEventPayloads(key)).toHaveLength(3);
   });
 
-  it('treats populated pre-tombstone rows as active without requiring a backfill rewrite', async () => {
+  it('advances generation for previous-image direct insert/update/delete writes', async () => {
     const key = FeatureFlagKey.PartialHandover;
-    await prisma.featureFlagOverride.create({
-      data: { key, enabled: true, reason: 'Existing populated row', updatedBy: 'migration-compatibility' },
-    });
-
-    const [databaseRow] = await prisma.$queryRaw<Array<{ active: boolean; revision: number }>>`
-      SELECT "active", "revision" FROM "FeatureFlagOverride" WHERE "key" = ${key}
+    await prisma.$executeRaw`
+      INSERT INTO "FeatureFlagOverride" ("key", "enabled", "reason", "updatedBy", "updatedAt")
+      VALUES (${key}, true, 'Previous-image insert', 'previous-image', CURRENT_TIMESTAMP)
     `;
-    expect(databaseRow).toEqual({ active: true, revision: 1 });
+    await expect(prisma.featureFlagGeneration.findUnique({ where: { key } }))
+      .resolves.toMatchObject({ revision: 1 });
     await expect(flags.list()).resolves.toContainEqual(expect.objectContaining({
-      key,
-      enabled: true,
-      source: 'database',
-      overrideActive: true,
-      overrideRevision: 1,
+      key, enabled: true, source: 'database', overrideActive: true, overrideRevision: 1,
+    }));
+
+    await prisma.$executeRaw`
+      UPDATE "FeatureFlagOverride"
+      SET "enabled" = false, "reason" = 'Previous-image update', "revision" = "revision" + 1,
+          "updatedBy" = 'previous-image', "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "key" = ${key}
+    `;
+    await expect(prisma.featureFlagGeneration.findUnique({ where: { key } }))
+      .resolves.toMatchObject({ revision: 2 });
+    await expect(flags.list()).resolves.toContainEqual(expect.objectContaining({
+      key, enabled: false, source: 'database', overrideActive: true, overrideRevision: 2,
+    }));
+
+    await prisma.$executeRaw`DELETE FROM "FeatureFlagOverride" WHERE "key" = ${key}`;
+    await expect(prisma.featureFlagGeneration.findUnique({ where: { key } }))
+      .resolves.toMatchObject({ revision: 3 });
+    await expect(flags.list()).resolves.toContainEqual(expect.objectContaining({
+      key, enabled: false, source: 'default', overrideActive: false, overrideRevision: 3,
+    }));
+  });
+
+  it('physically removes a reset override so previous row-presence evaluation sees fallback', async () => {
+    const key = FeatureFlagKey.ToOrderCheckout;
+    process.env.TO_ORDER_CHECKOUT_ENABLED = 'true';
+    const set = await flags.set(key, false, 'New-image override', 'new-image', null);
+    await flags.reset(key, 'New-image reset', 'new-image', set.overrideRevision);
+
+    const previousImageRow = await prisma.featureFlagOverride.findUnique({ where: { key } });
+    const previousImageEnabled = previousImageRow
+      ? previousImageRow.enabled
+      : String(process.env.TO_ORDER_CHECKOUT_ENABLED).trim().toLowerCase() === 'true';
+    expect(previousImageRow).toBeNull();
+    expect(previousImageEnabled).toBe(true);
+    await expect(flags.list()).resolves.toContainEqual(expect.objectContaining({
+      key, enabled: true, source: 'environment', overrideActive: false, overrideRevision: 2,
     }));
   });
 

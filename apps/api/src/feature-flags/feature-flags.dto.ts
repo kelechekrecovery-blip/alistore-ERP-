@@ -63,7 +63,7 @@ export class FeatureFlagStateDto {
 
   @ApiProperty({
     example: { enabled: false, source: 'default' },
-    description: 'State that reset will restore after deactivating the database override',
+    description: 'State that reset will restore after deleting the database override',
   })
   fallback!: {
     enabled: boolean;

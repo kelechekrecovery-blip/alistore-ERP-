@@ -32,8 +32,6 @@ export interface FeatureFlagFallback {
 interface StoredOverride {
   key: string;
   enabled: boolean;
-  active: boolean;
-  revision: number;
 }
 
 interface EvaluatedValue {
@@ -61,11 +59,23 @@ export class FeatureFlagsService {
 
   /** Registry order is stable, and raw environment values never enter the result. */
   async list(): Promise<FeatureFlagState[]> {
-    const rows = await this.prisma.featureFlagOverride.findMany({
-      where: { key: { in: [...FEATURE_FLAG_KEYS] } },
-    });
-    const stored = new Map(rows.map((row) => [row.key, row]));
-    return FEATURE_FLAGS.map((definition) => this.state(definition, stored.get(definition.key)));
+    return this.prisma.$transaction(async (tx) => {
+      const rows = await tx.featureFlagOverride.findMany({
+        where: { key: { in: [...FEATURE_FLAG_KEYS] } },
+      });
+      const generations = await tx.featureFlagGeneration.findMany({
+        where: { key: { in: [...FEATURE_FLAG_KEYS] } },
+      });
+      const stored = new Map(rows.map((row) => [row.key, row]));
+      const revisions = new Map(
+        generations.map((generation) => [generation.key, generation.revision]),
+      );
+      return FEATURE_FLAGS.map((definition) => this.state(
+        definition,
+        stored.get(definition.key),
+        revisions.get(definition.key) ?? null,
+      ));
+    }, { isolationLevel: 'RepeatableRead' });
   }
 
   async set(
@@ -80,8 +90,11 @@ export class FeatureFlagsService {
 
     return this.audit.transaction(async (tx) => {
       await this.lockOverride(tx, definition.key);
+      const generation = await tx.featureFlagGeneration.findUnique({
+        where: { key: definition.key },
+      });
       const existing = await tx.featureFlagOverride.findUnique({ where: { key: definition.key } });
-      this.assertExpectedRevision(existing?.revision ?? null, expectedRevision);
+      this.assertExpectedRevision(generation?.revision ?? null, expectedRevision);
       const before = this.evaluate(definition, existing);
       const stored = await tx.featureFlagOverride.upsert({
         where: { key: definition.key },
@@ -97,12 +110,14 @@ export class FeatureFlagsService {
           reason: normalizedReason,
           updatedBy: actor,
           active: true,
-          revision: { increment: 1 },
         },
+      });
+      const nextGeneration = await tx.featureFlagGeneration.findUniqueOrThrow({
+        where: { key: definition.key },
       });
       const after: EvaluatedValue = { enabled, source: 'database' };
       return {
-        result: this.state(definition, stored),
+        result: this.state(definition, stored, nextGeneration.revision),
         events: [this.changedEvent(definition.key, normalizedReason, before, after, actor)],
       };
     });
@@ -119,46 +134,41 @@ export class FeatureFlagsService {
 
     return this.audit.transaction(async (tx) => {
       await this.lockOverride(tx, definition.key);
+      const generation = await tx.featureFlagGeneration.findUnique({
+        where: { key: definition.key },
+      });
       const existing = await tx.featureFlagOverride.findUnique({ where: { key: definition.key } });
-      this.assertExpectedRevision(existing?.revision ?? null, expectedRevision);
+      this.assertExpectedRevision(generation?.revision ?? null, expectedRevision);
       const before = this.evaluate(definition, existing);
       const after = this.evaluate(definition);
-      const stored = await tx.featureFlagOverride.upsert({
+      await tx.featureFlagOverride.deleteMany({ where: { key: definition.key } });
+      const nextGeneration = await tx.featureFlagGeneration.findUnique({
         where: { key: definition.key },
-        create: {
-          key: definition.key,
-          enabled: after.enabled,
-          reason: normalizedReason,
-          updatedBy: actor,
-          active: false,
-        },
-        update: {
-          reason: normalizedReason,
-          updatedBy: actor,
-          active: false,
-          revision: { increment: 1 },
-        },
       });
       return {
-        result: this.state(definition, stored),
+        result: this.state(definition, undefined, nextGeneration?.revision ?? null),
         events: [this.changedEvent(definition.key, normalizedReason, before, after, actor)],
       };
     });
   }
 
-  private state(definition: FeatureFlagDefinition, row?: StoredOverride): FeatureFlagState {
+  private state(
+    definition: FeatureFlagDefinition,
+    row: StoredOverride | undefined,
+    revision: number | null,
+  ): FeatureFlagState {
     const fallback = this.fallback(definition);
     return {
       ...definition,
-      ...(row?.active ? { enabled: row.enabled, source: 'database' as const } : fallback),
-      overrideActive: row?.active ?? false,
-      overrideRevision: row?.revision ?? null,
+      ...(row ? { enabled: row.enabled, source: 'database' as const } : fallback),
+      overrideActive: Boolean(row),
+      overrideRevision: revision,
       fallback,
     };
   }
 
   private evaluate(definition: FeatureFlagDefinition, row?: StoredOverride | null): EvaluatedValue {
-    if (row?.active) return { enabled: row.enabled, source: 'database' };
+    if (row) return { enabled: row.enabled, source: 'database' };
     return this.fallback(definition);
   }
 

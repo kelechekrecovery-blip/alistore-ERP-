@@ -3941,3 +3941,10 @@ model FeatureFlagOverride {
 
   @@index([updatedAt])
 }
+
+/// Persistent OCC generation independent from active override row existence.
+model FeatureFlagGeneration {
+  key       String   @id
+  revision  Int
+  updatedAt DateTime @default(now()) @updatedAt
+}
