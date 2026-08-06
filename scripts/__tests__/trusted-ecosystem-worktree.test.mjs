@@ -195,6 +195,21 @@ test('committed-HEAD runbook binds the extracted bootstrap to the selected workt
   );
 });
 
+test('bootstrap forwards only an explicitly confirmed test database override', () => {
+  assert.match(
+    bootstrapSource,
+    /DATABASE_URL[^\n]+E2E_DATABASE_URL[\s\S]+accepts only the validated TEST_DATABASE_URL override/u,
+  );
+  assert.match(
+    bootstrapSource,
+    /ALISTORE_EVIDENCE_DATABASE_CONFIRMED:-[^\n]+!= '1'[\s\S]+TEST_DATABASE_URL=\$TEST_DATABASE_URL/u,
+  );
+  assert.ok(
+    bootstrapSource.indexOf('TEST_DATABASE_URL=$TEST_DATABASE_URL') <
+      bootstrapSource.indexOf('/usr/bin/env -i "$@"'),
+  );
+});
+
 test('committed recorder self-respawn preserves the bootstrap-validated worktree root', (t) => {
   assert.match(
     evidenceRecorderSource,

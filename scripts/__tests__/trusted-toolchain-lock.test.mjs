@@ -13,6 +13,11 @@ import {
   writeToolchainLockAtomically,
 } from '../regenerate-toolchain-lock.mjs';
 import { hashDependencyTree, sha256File } from '../toolchain-hashes.mjs';
+import {
+  isTrustedEvidenceDatabaseIdentity,
+  resolveTrustedEvidenceDatabase,
+  trustedNpmEnvironment,
+} from '../trusted-npm.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const canonicalTmpDir = fs.realpathSync(os.tmpdir());
@@ -70,6 +75,77 @@ test('generator modes require one explicit non-ambiguous operation', () => {
   for (const args of [[], ['--write', '--check'], ['--force'], ['--write', 'elsewhere.json']]) {
     assert.throws(() => parseToolchainLockMode(args), /Usage:/);
   }
+});
+
+test('trusted evidence requires one explicitly confirmed disposable database', () => {
+  const databaseUrl = 'postgresql://alistore@127.0.0.1:5432/alistore_evidence_gate0_a1_test?schema=public';
+  for (const environment of [
+    {},
+    { TEST_DATABASE_URL: databaseUrl },
+    { ALISTORE_EVIDENCE_DATABASE_CONFIRMED: '1' },
+  ]) {
+    assert.throws(
+      () => resolveTrustedEvidenceDatabase(environment),
+      /explicit|requires/u,
+    );
+  }
+
+  assert.deepEqual(
+    resolveTrustedEvidenceDatabase({
+      ALISTORE_EVIDENCE_DATABASE_CONFIRMED: '1',
+      TEST_DATABASE_URL: databaseUrl,
+    }),
+    {
+      identity: 'postgresql://127.0.0.1:5432/alistore_evidence_gate0_a1_test',
+      url: databaseUrl,
+    },
+  );
+});
+
+test('trusted evidence rejects shared, remote, credentialed, or rerouted databases', () => {
+  const invalidUrls = [
+    'postgresql://alistore@127.0.0.1:5432/alistore_test?schema=public',
+    'postgresql://alistore@localhost:5432/alistore_evidence_gate0_test?schema=public',
+    'postgresql://alistore:secret@127.0.0.1:5432/alistore_evidence_gate0_test?schema=public',
+    'postgresql://claimant@127.0.0.1:5432/alistore_evidence_gate0_test?schema=public',
+    'postgresql://alistore@127.0.0.1:5432/alistore_evidence_gate0_test?schema=public&host=remote',
+    'postgresql://alistore@127.0.0.1:5432/claimant_test?schema=public',
+  ];
+  for (const databaseUrl of invalidUrls) {
+    assert.throws(
+      () => resolveTrustedEvidenceDatabase({
+        ALISTORE_EVIDENCE_DATABASE_CONFIRMED: '1',
+        TEST_DATABASE_URL: databaseUrl,
+      }),
+      /canonical, passwordless, loopback/u,
+      databaseUrl,
+    );
+  }
+});
+
+test('trusted npm propagates only the validated test identity to database consumers', () => {
+  const databaseUrl = 'postgresql://alistore@127.0.0.1:5432/alistore_evidence_gate0_b2_test?schema=public';
+  const environment = trustedNpmEnvironment(
+    { cliPath: '/trusted/npm-cli.js', scriptShellPath: '/bin/sh' },
+    {
+      ALISTORE_EVIDENCE_DATABASE_CONFIRMED: '1',
+      DATABASE_URL: 'postgresql://claimant:secret@remote.invalid/production',
+      HOME: '/tmp/trusted-home',
+      TEST_DATABASE_URL: databaseUrl,
+    },
+  );
+
+  assert.equal(environment.TEST_DATABASE_URL, databaseUrl);
+  assert.equal(environment.E2E_DATABASE_URL, databaseUrl);
+  assert.equal(
+    environment.ALISTORE_EVIDENCE_DATABASE_IDENTITY,
+    'postgresql://127.0.0.1:5432/alistore_evidence_gate0_b2_test',
+  );
+  assert.equal(environment.ALISTORE_EVIDENCE_DATABASE_CONFIRMED, '1');
+  assert.equal(Object.hasOwn(environment, 'DATABASE_URL'), false);
+  assert.equal(isTrustedEvidenceDatabaseIdentity(environment.ALISTORE_EVIDENCE_DATABASE_IDENTITY), true);
+  assert.equal(isTrustedEvidenceDatabaseIdentity('postgresql://127.0.0.1:5432/alistore_test'), false);
+  assert.equal(isTrustedEvidenceDatabaseIdentity('postgresql://remote.invalid:5432/alistore_evidence_gate0_b2_test'), false);
 });
 
 test('generator refuses a claimant-controlled browser path', () => {

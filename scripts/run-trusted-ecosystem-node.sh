@@ -194,6 +194,22 @@ if [ -n "${E2E_REUSE_EXISTING_SERVER:-}" ]; then
   esac
 fi
 
+if [ -n "${DATABASE_URL:-}" ] || [ -n "${E2E_DATABASE_URL:-}" ]; then
+  echo 'Trusted evidence accepts only the validated TEST_DATABASE_URL override.' >&2
+  exit 2
+fi
+if [ -n "${TEST_DATABASE_URL:-}" ] || [ -n "${ALISTORE_EVIDENCE_DATABASE_CONFIRMED:-}" ]; then
+  if [ -z "${TEST_DATABASE_URL:-}" ] || \
+     [ "${ALISTORE_EVIDENCE_DATABASE_CONFIRMED:-}" != '1' ]; then
+    echo 'Trusted evidence database override requires TEST_DATABASE_URL and explicit confirmation.' >&2
+    exit 2
+  fi
+  set -- \
+    "ALISTORE_EVIDENCE_DATABASE_CONFIRMED=1" \
+    "TEST_DATABASE_URL=$TEST_DATABASE_URL" \
+    "$@"
+fi
+
 set -- \
   'ALISTORE_TRUSTED_BOOTSTRAP_FD=3' \
   "ALISTORE_TRUSTED_WORK_TREE=$ROOT" \

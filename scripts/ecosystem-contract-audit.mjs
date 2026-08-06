@@ -6,7 +6,11 @@ import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { inspectHeadWorktree, resolveTrustedGit, trustedGitArgs } from './trusted-git.mjs';
-import { resolveTrustedNpm, verifyTrustedBootstrap } from './trusted-npm.mjs';
+import {
+  isTrustedEvidenceDatabaseIdentity,
+  resolveTrustedNpm,
+  verifyTrustedBootstrap,
+} from './trusted-npm.mjs';
 
 const root = process.env.ALISTORE_TRUSTED_WORK_TREE
   ? fs.realpathSync(process.env.ALISTORE_TRUSTED_WORK_TREE)
@@ -292,7 +296,8 @@ const acceptedGate = (id, commandPattern) => {
           environment?.jestCliPath === npm.jestCliPath &&
           environment?.jestCliSha256 === npm.jestCliSha256 &&
           JSON.stringify(environment?.jestShim) === JSON.stringify(npm.jestShim) &&
-          environment?.acceptanceDatabaseIdentity === npm.acceptanceDatabaseIdentity &&
+          isTrustedEvidenceDatabaseIdentity(environment?.acceptanceDatabaseIdentity) &&
+          environment?.acceptanceDatabasePolicy === npm.acceptanceDatabaseIdentity &&
           environment?.toolchain === currentToolchain &&
           result.executionEnvironmentSha256 === sha256(JSON.stringify(environment)) &&
           Number.isFinite(completedAt) &&

@@ -58,6 +58,22 @@ scripts/record-ecosystem-evidence.mjs android-app-ui
 scripts/record-ecosystem-evidence.mjs reconciled-e2e
 ```
 
+Evidence recording requires a freshly created disposable database, never the shared
+`alistore_test` database. Before invoking the committed bootstrap, create a unique database whose
+name matches `alistore_evidence_<unique>_test` and export its exact passwordless loopback URL plus
+the destructive-test confirmation:
+
+```bash
+TEST_DATABASE_URL='postgresql://alistore@127.0.0.1:5432/alistore_evidence_<unique>_test?schema=public'
+ALISTORE_EVIDENCE_DATABASE_CONFIRMED=1
+export TEST_DATABASE_URL ALISTORE_EVIDENCE_DATABASE_CONFIRMED
+```
+
+The bootstrap forwards only this confirmed `TEST_DATABASE_URL`. The trusted runtime validates the
+exact host, port, user, query and database-name shape, then supplies the same URL as
+`E2E_DATABASE_URL`. Evidence records the sanitized database identity. Drop only that exact
+disposable database after every required result is committed and the final strict audit passes.
+
 The visual gate compares deterministic fixed-data storefront desktop/mobile and ERP desktop screenshots against committed Playwright PNG goldens. It is a bounded regression contract for currently implemented shells, not owner approval of absent `.dc.html` references.
 
 The committed bootstrap verifies its pinned Node runtime manifest with system `shasum` before Node starts, extracts the selected entrypoint and its transitive trust modules from `HEAD` into a private read-only runtime, clears the process environment, and then the recorder/audit verifies the selected worktree, toolchain and evidence contracts. Direct execution of worktree JavaScript, direct Node execution and `npm run` are not authoritative evidence entrypoints.

@@ -11,6 +11,42 @@ import {
 } from './toolchain-hashes.mjs';
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
+const evidenceDatabaseNamePattern = /^alistore_evidence_[a-z0-9_]{1,32}_test$/u;
+
+export const isTrustedEvidenceDatabaseIdentity = (identity) => (
+  typeof identity === 'string'
+  && /^postgresql:\/\/127\.0\.0\.1:5432\/alistore_evidence_[a-z0-9_]{1,32}_test$/u.test(identity)
+);
+
+export const resolveTrustedEvidenceDatabase = (environment = process.env) => {
+  const databaseUrl = environment.TEST_DATABASE_URL;
+  if (typeof databaseUrl !== 'string' || databaseUrl.length === 0) {
+    throw new Error('Trusted evidence requires an explicit disposable TEST_DATABASE_URL');
+  }
+  if (environment.ALISTORE_EVIDENCE_DATABASE_CONFIRMED !== '1') {
+    throw new Error('Trusted evidence requires explicit disposable database confirmation');
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(databaseUrl);
+  } catch {
+    throw new Error('Trusted evidence TEST_DATABASE_URL is invalid');
+  }
+  const databaseName = parsed.pathname.slice(1);
+  const canonicalUrl = evidenceDatabaseNamePattern.test(databaseName)
+    ? `postgresql://alistore@127.0.0.1:5432/${databaseName}?schema=public`
+    : null;
+  if (canonicalUrl === null || databaseUrl !== canonicalUrl) {
+    throw new Error(
+      'Trusted evidence TEST_DATABASE_URL must be a canonical, passwordless, loopback alistore_evidence_*_test database',
+    );
+  }
+  return {
+    identity: `postgresql://127.0.0.1:5432/${databaseName}`,
+    url: canonicalUrl,
+  };
+};
 
 export const verifyTrustedBootstrap = (root) => {
   if (process.env.ALISTORE_TRUSTED_BOOTSTRAP_FD !== '3') {
@@ -189,7 +225,8 @@ export const resolveTrustedNpm = (
   };
 };
 
-export const trustedNpmEnvironment = (npm) => {
+export const trustedNpmEnvironment = (npm, sourceEnvironment = process.env) => {
+  const evidenceDatabase = resolveTrustedEvidenceDatabase(sourceEnvironment);
   const environment = {};
   const allowedKeys = new Set([
     'FORCE_COLOR',
@@ -209,7 +246,7 @@ export const trustedNpmEnvironment = (npm) => {
     'E2E_WEB_PORT',
     'E2E_REUSE_EXISTING_SERVER',
   ]);
-  for (const [key, value] of Object.entries(process.env)) {
+  for (const [key, value] of Object.entries(sourceEnvironment)) {
     if (allowedKeys.has(key) && value !== undefined) environment[key] = value;
   }
   return {
@@ -220,8 +257,10 @@ export const trustedNpmEnvironment = (npm) => {
     npm_config_script_shell: npm.scriptShellPath,
     npm_config_userconfig: '/dev/null',
     ALISTORE_EVIDENCE_MODE: '1',
-    TEST_DATABASE_URL: 'postgresql://alistore@127.0.0.1:5432/alistore_test?schema=public',
-    E2E_DATABASE_URL: 'postgresql://alistore@127.0.0.1:5432/alistore_test?schema=public',
+    ALISTORE_EVIDENCE_DATABASE_CONFIRMED: '1',
+    ALISTORE_EVIDENCE_DATABASE_IDENTITY: evidenceDatabase.identity,
+    TEST_DATABASE_URL: evidenceDatabase.url,
+    E2E_DATABASE_URL: evidenceDatabase.url,
     E2E_REUSE_EXISTING_SERVER: 'false',
     PATH: [path.dirname(process.execPath), '/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(path.delimiter),
   };

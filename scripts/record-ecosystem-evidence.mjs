@@ -28,6 +28,7 @@ const artifactDirectory = path.join(root, 'docs', 'acceptance', 'artifacts');
 verifyTrustedBootstrap(root);
 const npm = resolveTrustedNpm(root);
 const trustedGit = resolveTrustedGit(root);
+const npmEnvironment = trustedNpmEnvironment(npm);
 const sourcePaths = [
   'apps',
   'e2e',
@@ -126,7 +127,8 @@ const executionEnvironment = () => ({
   jestCliPath: npm.jestCliPath,
   jestCliSha256: npm.jestCliSha256,
   jestShim: npm.jestShim,
-  acceptanceDatabaseIdentity: npm.acceptanceDatabaseIdentity,
+  acceptanceDatabaseIdentity: npmEnvironment.ALISTORE_EVIDENCE_DATABASE_IDENTITY,
+  acceptanceDatabasePolicy: npm.acceptanceDatabaseIdentity,
   toolchain:
     gateId === 'ios-app-ui'
       ? commandOutput('xcodebuild', ['-version'], {
@@ -146,7 +148,7 @@ if (process.env.ALISTORE_EVIDENCE_LOCK_HELD !== '1') {
     {
       cwd: root,
       env: {
-        ...trustedNpmEnvironment(npm),
+        ...npmEnvironment,
         ALISTORE_EVIDENCE_LOCK_HELD: '1',
         ALISTORE_TRUSTED_BOOTSTRAP_FD: '3',
         ALISTORE_TRUSTED_WORK_TREE: root,
@@ -205,7 +207,7 @@ const run = spawnSync(
   directRunner ? [directRunner] : [npm.cliPath, 'run', '--', packageScript],
   {
     cwd: root,
-    env: trustedNpmEnvironment(npm),
+    env: npmEnvironment,
     shell: false,
     stdio: 'inherit',
   },
