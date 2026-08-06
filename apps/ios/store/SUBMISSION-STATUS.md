@@ -12,10 +12,9 @@ Public App Store scope confirmed by the owner on 2026-07-19:
 The original Client-only npm/store pipeline remains Client-only. Staff, Courier
 and POS use the separate ecosystem metadata and screenshot scripts.
 
-_Last updated: 2026-08-06. The Apps list was read back live from App Store
-Connect in the browser. All four `1.0.0` versions now show `REJECTED`. Opening
-the detailed review messages required a fresh Apple sign-in, so the new rejection
-text is not yet recorded here. Credentials and tokens are intentionally omitted._
+_Last updated: 2026-08-07. All four detailed rejection messages were read back
+live from App Store Connect in the browser. Credentials and tokens are
+intentionally omitted._
 
 ## Builds in App Store Connect
 
@@ -28,10 +27,11 @@ text is not yet recorded here. Credentials and tokens are intentionally omitted.
 
 The `Sign in with Apple` provisioning blocker that held the Client back is
 resolved; Client was archived, exported and uploaded on 2026-07-25.
-The repository is already at build 6. All four build-5 submissions are now
-rejected. Do **not** upload build 6 or replace the attached builds until the
-detailed rejection messages are read; a metadata/distribution rejection may not
-require a replacement binary.
+The repository is already at build 6. All four build-5 submissions are rejected.
+Client needs a replacement binary after the production Sign in with Apple fix is
+verified on a physical iPad/iPhone. Staff, Courier and POS must not be resubmitted
+as public App Store apps: Apple explicitly classified them as organization-only
+software under Guideline 3.2.
 
 ## Ready and verified
 
@@ -85,11 +85,18 @@ require a replacement binary.
 
 ## Current App Review status — rejected
 
-All four `1.0.0` versions were verified on 2026-08-05 in `WAITING_FOR_REVIEW`
-with release type `AFTER_APPROVAL`. On 2026-08-06 the authenticated App Store
-Connect Apps list showed all four versions as `REJECTED`. Do not resubmit,
-replace build 5 or upload build 6 until the detailed review messages have been
-read and mapped to code, metadata or distribution fixes.
+All four `1.0.0 (5)` submissions were reviewed on an iPad Air 11-inch (M3) on
+2026-08-05. The detailed App Store Connect messages were read on 2026-08-07:
+
+| App | Guideline | Apple's finding | Required resolution |
+|---|---|---|---|
+| AliStore KG | `2.1(a) Performance — App Completeness` | Reviewer could not use Sign in with Apple on iPadOS 26.6 | Deploy and verify native Apple identity-token login plus revocation credentials, test the release build on a physical device, then upload build 6 and resubmit |
+| AliStore Staff | `3.2 Business — Other Business Model Issues` | Organization/employee app submitted with public App Store distribution | Move to Apple Business Manager Custom App distribution, or an approved Unlisted distribution request; do not resubmit publicly |
+| AliStore Courier | `3.2 Business — Other Business Model Issues` | Organization/employee app submitted with public App Store distribution | Move to Apple Business Manager Custom App distribution, or an approved Unlisted distribution request; do not resubmit publicly |
+| AliStore POS | `3.2 Business — Other Business Model Issues` | Organization/employee app submitted with public App Store distribution | Move to Apple Business Manager Custom App distribution, or an approved Unlisted distribution request; do not resubmit publicly |
+
+Submission IDs are retained in App Store Connect. No review message or account
+credential is copied into the repository.
 
 The public catalog probe on 2026-07-28 returned `200`, `total: 4`, with all
 four products reporting purchasable stock. That catalog result remains historical
