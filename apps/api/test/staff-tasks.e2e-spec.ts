@@ -87,8 +87,14 @@ describe('Staff tasks HTTP', () => {
 
   it('rejects a revoked assignee before reading tasks', async () => {
     await prisma.staffUser.update({ where: { id: sellerId }, data: { active: false } });
-    await request(app.getHttpServer()).get('/staff-tasks/mine')
-      .set('Authorization', `Bearer ${sellerToken}`).expect(403);
-    await prisma.staffUser.update({ where: { id: sellerId }, data: { active: true } });
+    try {
+      // An inactive principal is no longer authenticated. The JWT strategy
+      // rejects it before endpoint authorization, so the correct boundary is
+      // 401 (not a 403 permission decision for a still-valid session).
+      await request(app.getHttpServer()).get('/staff-tasks/mine')
+        .set('Authorization', `Bearer ${sellerToken}`).expect(401);
+    } finally {
+      await prisma.staffUser.update({ where: { id: sellerId }, data: { active: true } });
+    }
   });
 });
