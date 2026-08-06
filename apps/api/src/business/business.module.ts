@@ -8,11 +8,16 @@ import { BusinessAuthService } from './business-auth.service';
 import { BusinessProductsService } from './business-products.service';
 import { BusinessAuthGuard } from './business-auth.guard';
 import { BusinessController } from './business.controller';
+import { SellersService } from '../sellers/sellers.service';
+import { AuthzModule } from '../authz/authz.module';
+import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 
 @Module({
   imports: [
     PrismaModule,
     AuditModule,
+    AuthzModule,
+    StaffAuthModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -20,7 +25,7 @@ import { BusinessController } from './business.controller';
     }),
   ],
   controllers: [BusinessController],
-  providers: [BusinessAuthService, BusinessProductsService, BusinessAuthGuard],
-  exports: [BusinessAuthService],
+  providers: [BusinessAuthService, BusinessProductsService, BusinessAuthGuard, SellersService],
+  exports: [BusinessAuthService, SellersService],
 })
 export class BusinessModule {}

@@ -74,9 +74,13 @@ export const canPrintReceipts = (role: string) => staffCan(role, 'receipts', 'pr
 export type ErpRoute =
   | 'dash' | 'admin' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'hr'
   | 'logistics' | 'operations' | 'service' | 'kpi' | 'crm' | 'campaigns'
-  | 'storefront' | 'risks' | 'readiness' | 'settings' | 'ledger' | 'tasks';
+  | 'storefront' | 'risks' | 'readiness' | 'settings' | 'ledger' | 'tasks'
+  | 'partners';
 
 export const ERP_ROUTE_PERMISSION: Record<ErpRoute, StaffPermission | null> = {
+  // Видеть список подключённых магазинов может тот же круг, что и отчёты;
+  // подключать — только владелец, и это проверяет сам экран и сервер.
+  partners: { obj: 'reports', act: 'read' },
   dash: { obj: 'reports', act: 'read' },
   admin: null, // module launcher filters its own cards by role
   ai: { obj: 'ai', act: 'read' },

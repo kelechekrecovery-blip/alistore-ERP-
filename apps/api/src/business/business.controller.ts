@@ -6,6 +6,11 @@ import { IsInt, IsString, Min, MinLength } from 'class-validator';
 import { BusinessAuthService } from './business-auth.service';
 import { BusinessProductsService } from './business-products.service';
 import { BusinessAuthGuard } from './business-auth.guard';
+import { SellersService } from '../sellers/sellers.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ActiveStaffGuard } from '../auth/active-staff.guard';
+import { PermissionGuard } from '../authz/permission.guard';
+import { RequirePermission } from '../authz/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthPrincipal } from '../auth/jwt.strategy';
 
@@ -16,6 +21,15 @@ class BusinessLoginDto {
 
 class UpdatePriceDto {
   @IsInt() @Min(1) price!: number;
+}
+
+class OnboardSellerDto {
+  @IsString() @MinLength(2) name!: string;
+  @IsString() @MinLength(2) slug!: string;
+  @IsString() @MinLength(3) username!: string;
+  // Планка та же, что в BusinessAuthService: партнёру выдают доступ к вашей
+  // витрине, и короткий пароль здесь дороже неудобства при заведении.
+  @IsString() @MinLength(10) password!: string;
 }
 
 /**
@@ -31,8 +45,32 @@ export class BusinessController {
   constructor(
     private readonly auth: BusinessAuthService,
     private readonly products: BusinessProductsService,
+    private readonly sellers: SellersService,
     private readonly jwt: JwtService,
   ) {}
+
+  /**
+   * Завести магазин-партнёра. Только владелец.
+   *
+   * Право `staff:manage` намеренно: выдать постороннему доступ к витрине — то
+   * же по весу действие, что завести сотрудника, и держать его ниже значило бы
+   * позволить админу подключить чужой магазин молча.
+   */
+  @Post('sellers')
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('staff', 'manage')
+  @ApiOperation({ summary: 'Завести магазин-партнёра и его первый логин' })
+  onboard(@CurrentUser() user: AuthPrincipal, @Body() dto: OnboardSellerDto) {
+    return this.sellers.onboard(dto, user.customerId);
+  }
+
+  @Get('sellers')
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('reports', 'read')
+  @ApiOperation({ summary: 'Список подключённых магазинов' })
+  listSellers() {
+    return this.sellers.list();
+  }
 
   @Post('auth/login')
   // Единственный логин в проекте, оставшийся без защиты от перебора: пароль

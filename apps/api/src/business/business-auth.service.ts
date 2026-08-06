@@ -27,6 +27,27 @@ export class BusinessAuthService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Проверить логин и пароль и вернуть хэш — без записи в базу.
+   *
+   * Нужен заведению магазина: argon2 намеренно медленный, и считать его внутри
+   * открытой транзакции значит держать соединение занятым сотни миллисекунд
+   * впустую. Правила длины живут здесь же, чтобы не разъехаться с `createUser`.
+   */
+  async hashPassword(username: string, password: string): Promise<string> {
+    const login = username.trim().toLowerCase();
+    if (login.length < 3) {
+      throw new ValidationError('username_invalid', 'Логин короче трёх символов');
+    }
+    if (password.length < BusinessAuthService.MIN_PASSWORD) {
+      throw new ValidationError(
+        'password_too_short',
+        `Пароль короче ${BusinessAuthService.MIN_PASSWORD} символов`,
+      );
+    }
+    return argon2.hash(password);
+  }
+
   async createUser(sellerId: string, username: string, password: string) {
     const login = username.trim().toLowerCase();
     if (login.length < 3) {

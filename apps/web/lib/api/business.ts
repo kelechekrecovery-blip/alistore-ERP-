@@ -88,3 +88,39 @@ export async function updateBusinessPrice(
   if (!res.ok) await parseError(res, 'Цена не сохранена');
   return (await res.json()) as BusinessProduct;
 }
+
+export interface PartnerSeller {
+  id: string;
+  name: string;
+  slug: string;
+  active: boolean;
+  createdAt: string;
+}
+
+/**
+ * Заведение магазина-партнёра владельцем — из ERP, а не скриптом.
+ *
+ * Токен здесь **staff**, а не партнёрский: подключает магазин владелец, а не
+ * сам магазин. Пароль уходит один раз и наружу не возвращается.
+ */
+export async function onboardSeller(
+  token: string,
+  input: { name: string; slug: string; username: string; password: string },
+): Promise<{ seller: PartnerSeller; username: string }> {
+  const res = await fetch(`${API_BASE}/business/sellers`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) await parseError(res, 'Магазин не заведён');
+  return (await res.json()) as { seller: PartnerSeller; username: string };
+}
+
+export async function fetchPartnerSellers(token: string): Promise<PartnerSeller[]> {
+  const res = await fetch(`${API_BASE}/business/sellers`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  if (!res.ok) await parseError(res, 'Список магазинов не загрузился');
+  return (await res.json()) as PartnerSeller[];
+}

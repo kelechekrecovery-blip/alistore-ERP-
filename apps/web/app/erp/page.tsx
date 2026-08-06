@@ -28,6 +28,7 @@ import {
   Wrench,
   X,
   type LucideIcon,
+  Store,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -61,6 +62,7 @@ import { KpiView } from '@/components/erp/KpiView';
 import { DashboardView } from '@/components/erp/DashboardView';
 import { CampaignsView } from '@/components/erp/CampaignsView';
 import { Card } from '@/components/erp/Card';
+import { PartnersView } from '@/components/erp/PartnersView';
 import { SettingsView } from '@/components/erp/SettingsView';
 import { ReadinessView } from '@/components/erp/ReadinessView';
 import { RiskCenterView } from '@/components/erp/RiskCenterView';
@@ -100,11 +102,13 @@ const EXTENDED_NAV: { id: Route; Icon: LucideIcon; label: string }[] = [
   { id: 'risks', Icon: AlertTriangle, label: 'Риски' },
   { id: 'readiness', Icon: ShieldCheck, label: 'Готовность' },
   { id: 'settings', Icon: SlidersHorizontal, label: 'Параметры' },
+  { id: 'partners', Icon: Store, label: 'Партнёры' },
   { id: 'ledger', Icon: ScrollText, label: 'Event Ledger' },
 ];
 const TITLES: Record<Route, [string, string]> = {
   dash: ['Дашборд', 'Обзор сети · сегодня'],
   settings: ['Параметры бизнеса', 'Скидки · зарплата · гарантия · выкуп · бонусы'],
+  partners: ['AliStore Business', 'Магазины-партнёры и их доступ к витрине'],
   admin: ['Администрирование', 'Сайт · операции · доступы'],
   ai: ['AI-ассистент', 'Сводка по данным сети'],
   pricing: ['Ценовые рекомендации', 'Спрос/остаток → подсказка по цене'],
@@ -492,6 +496,7 @@ export default function ErpPage() {
           {activeRoute === 'risks' && <RiskCenterView risks={risks} onSignal={actOnSignal} />}
           {activeRoute === 'readiness' && <ReadinessView report={readiness} error={readinessError} />}
           {activeRoute === 'settings' && <SettingsView accessToken={session.accessToken} canEdit={staffCan(session.role, 'settings', 'manage')} />}
+          {activeRoute === 'partners' && <PartnersView accessToken={session.accessToken} canEdit={staffCan(session.role, 'staff', 'manage')} />}
           {activeRoute === 'ledger' && <LedgerView ledger={ledger} />}
         </div>
       </main>

@@ -3,6 +3,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { BusinessAuthService } from '../src/business/business-auth.service';
 import { BusinessProductsService } from '../src/business/business-products.service';
+import { SellersService } from '../src/sellers/sellers.service';
 import type { AuthPrincipal } from '../src/auth/jwt.strategy';
 
 /**
@@ -20,6 +21,7 @@ describe('AliStore Business: кабинет партнёра', () => {
   let prisma: PrismaService;
   let auth: BusinessAuthService;
   let products: BusinessProductsService;
+  let sellers: SellersService;
   let seq = 0;
 
   const sellerPrincipal = (sellerId: string): AuthPrincipal =>
@@ -31,6 +33,7 @@ describe('AliStore Business: кабинет партнёра', () => {
     const audit = new AuditService(prisma);
     auth = new BusinessAuthService(prisma);
     products = new BusinessProductsService(prisma, audit);
+    sellers = new SellersService(prisma, audit, auth);
   });
 
   afterAll(async () => {
@@ -143,5 +146,58 @@ describe('AliStore Business: кабинет партнёра', () => {
     const a = await seedSellerWithUser('Альфа');
     const own = await seedProduct('BIZ-A-4', a.seller.id);
     await expect(products.updatePrice(sellerPrincipal(a.seller.id), own.id, 0)).rejects.toBeTruthy();
+  });
+
+  it('владелец заводит магазин и его первый логин', async () => {
+    // Без этого партнёра можно было завести только скриптом или прямой записью
+    // в базу — то есть в обход прав, аудита и любой проверки.
+    const created = await sellers.onboard(
+      { name: 'Мобайл Плюс', slug: 'mobile-plus', username: 'mobileplus', password: 'ДемоПароль2026' },
+      'owner-1',
+    );
+    expect(created.seller.name).toBe('Мобайл Плюс');
+    expect(created.username).toBe('mobileplus');
+
+    // Логин сразу рабочий — иначе «завёл» означало бы «наполовину завёл».
+    const session = await auth.login('mobileplus', 'ДемоПароль2026');
+    expect(session.sellerId).toBe(created.seller.id);
+  });
+
+  it('пароль партнёра не возвращается наружу ни в каком виде', async () => {
+    const created = await sellers.onboard(
+      { name: 'Альфа', slug: 'alfa-secret', username: 'alfauser', password: 'ДемоПароль2026' },
+      'owner-1',
+    );
+    expect(JSON.stringify(created)).not.toContain('ДемоПароль2026');
+    expect(JSON.stringify(created)).not.toContain('passwordHash');
+  });
+
+  it('повторный slug отвергается — два магазина с одной ссылкой это коллизия', async () => {
+    // Логины разные и валидные: иначе тест упал бы на длине логина и «прошёл»,
+    // ничего не сказав про slug.
+    await sellers.onboard({ name: 'Альфа', slug: 'dup', username: 'dupuser1', password: 'ДемоПароль2026' }, 'owner-1');
+    await expect(
+      sellers.onboard({ name: 'Бета', slug: 'dup', username: 'dupuser2', password: 'ДемоПароль2026' }, 'owner-1'),
+    ).rejects.toThrow(/[Сс]сылка/);
+  });
+
+  it('повторный логин отвергается — иначе второй магазин перехватил бы вход первого', async () => {
+    await sellers.onboard({ name: 'Альфа', slug: 's1', username: 'sameuser', password: 'ДемоПароль2026' }, 'owner-1');
+    await expect(
+      sellers.onboard({ name: 'Бета', slug: 's2', username: 'sameuser', password: 'ДемоПароль2026' }, 'owner-1'),
+    ).rejects.toThrow(/[Лл]огин/);
+  });
+
+  it('заведение магазина пишется в Event Ledger', async () => {
+    const created = await sellers.onboard(
+      { name: 'Гамма', slug: 'gamma', username: 'gammauser', password: 'ДемоПароль2026' },
+      'owner-42',
+    );
+    const event = await prisma.auditEvent.findFirst({
+      where: { refs: { has: created.seller.id } },
+      orderBy: { ts: 'desc' },
+    });
+    expect(event?.actor).toBe('owner-42');
+    expect(event?.payload).toMatchObject({ name: 'Гамма', slug: 'gamma' });
   });
 });

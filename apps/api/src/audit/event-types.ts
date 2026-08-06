@@ -234,6 +234,8 @@ export const EventType = {
   B2BQuoteUpdated: 'b2b.quote_updated',
   ProtectionRequested: 'protection.requested',
   ProtectionUpdated: 'protection.updated',
+  /** Владелец завёл магазин-партнёра вместе с его первым логином. */
+  SellerOnboarded: 'seller.onboarded',
   StaffTaskCreated: 'staff_task.created',
   StaffTaskUpdated: 'staff_task.updated',
   OrderNoShowReminderQueued: 'order.no_show_reminder_queued',

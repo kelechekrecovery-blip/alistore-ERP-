@@ -4,6 +4,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { CatalogService } from '../src/catalog/catalog.service';
 import { SellersService } from '../src/sellers/sellers.service';
+import { BusinessAuthService } from '../src/business/business-auth.service';
 import { sellerScopeFor } from '../src/sellers/seller-scope';
 import type { AuthPrincipal } from '../src/auth/jwt.strategy';
 
@@ -33,7 +34,8 @@ describe('AliStore Business: владение товаром и изоляция
     prisma = new PrismaService();
     await prisma.$connect();
     catalog = new CatalogService(prisma, new ConfigService());
-    sellers = new SellersService(prisma, new AuditService(prisma));
+    const audit = new AuditService(prisma);
+    sellers = new SellersService(prisma, audit, new BusinessAuthService(prisma));
   });
 
   afterAll(async () => {
