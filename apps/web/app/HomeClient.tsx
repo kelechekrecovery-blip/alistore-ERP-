@@ -2,10 +2,11 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, BadgeCheck, Headphones, ImageOff, Laptop, PackagePlus, RotateCcw, ShieldCheck, Smartphone, Tablet, Truck, Tv, Watch } from 'lucide-react';
+import { ArrowRight, BadgeCheck, Headphones, Laptop, PackagePlus, RotateCcw, ShieldCheck, Smartphone, Tablet, Truck, Tv, Watch } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LoadFailure } from '@/components/LoadFailure';
 import { ProductCard } from '@/components/ProductCard';
+import { StorefrontHeroVisualFallback } from '@/components/ProductVisualFallback';
 import { SiteFooter } from '@/components/SiteFooter';
 import { SiteHeader } from '@/components/SiteHeader';
 import MobileHome from '@/components/mobile/MobileHome';
@@ -87,7 +88,7 @@ export default function HomePage({ initialStorefront = null, initialBlocks = [],
               </div>
               {storefront?.content.heroImageUrl
                 ? <MediaImage src={storefront.content.heroImageUrl} width={360} height={360} priority className="absolute -bottom-16 right-4 h-[360px] w-[360px] object-contain drop-shadow-2xl transition-transform duration-500 group-hover:scale-105" />
-                : <ImageOff className="absolute bottom-10 right-14 text-white/20" size={120} />}
+                : <StorefrontHeroVisualFallback />}
             </Link>
 
             <div className="grid grid-rows-2 gap-4">

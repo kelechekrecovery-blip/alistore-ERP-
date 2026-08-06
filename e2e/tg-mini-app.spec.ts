@@ -9,6 +9,7 @@ test('Telegram Mini App shell creates an order with channel telegram', async ({ 
   await page.goto('/tg', { waitUntil: 'domcontentloaded' });
   await expect(page.getByText('AliStore Mini')).toBeVisible();
   await expect(page.getByText(product.name)).toBeVisible();
+  await expect(page.getByTestId('product-visual-fallback').first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Добавить' }).first().click();
   await page.getByRole('button', { name: /Оформить · 1 шт/ }).click();
@@ -45,6 +46,20 @@ test('Telegram Mini App shell creates an order with channel telegram', async ({ 
   expect(order?.items).toHaveLength(1);
   expect(order?.items[0]).toMatchObject({ sku: product.sku, qty: 1, price: product.price });
   expect(order?.piiConsentAt).not.toBeNull();
+});
+
+test('Telegram Mini App prefers an approved product image over the fallback', async ({ page }) => {
+  await resetDb();
+  const { product } = await seedProduct('TG-IMAGE-E2E');
+  await prisma.product.update({
+    where: { id: product.id },
+    data: { attrs: { imageUrl: '/icon.svg' } },
+  });
+
+  await page.goto('/tg', { waitUntil: 'domcontentloaded' });
+  const card = page.locator('article').filter({ hasText: product.name });
+  await expect(card.getByRole('img', { name: product.name })).toBeVisible();
+  await expect(card.getByTestId('product-visual-fallback')).toHaveCount(0);
 });
 
 test('authenticated Telegram checkout records consent on the customer order', async ({ page }) => {

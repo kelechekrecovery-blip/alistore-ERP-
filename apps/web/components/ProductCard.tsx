@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Heart, ImageOff, Scale, ShoppingCart, Star } from 'lucide-react';
+import { Heart, Scale, ShoppingCart, Star } from 'lucide-react';
 import { useState } from 'react';
 import type { CatalogProduct } from '@/lib/api';
 import { conditionLabel, som } from '@/lib/format';
@@ -11,6 +11,7 @@ import { availabilityLabel, catalogAvailability } from '@/lib/to-order';
 import { useFavorites } from '@/lib/favorites';
 import { useCompare } from '@/lib/compare';
 import { StatusPill } from '@/components/ui/Badge';
+import { ProductVisualFallback } from '@/components/ProductVisualFallback';
 // Чистые помощники по картинкам вынесены в неклиентский модуль, чтобы их мог
 // звать серверный `generateMetadata`. Ре-экспорт сохранён для совместимости с
 // существующими импортами из ProductCard.
@@ -89,7 +90,7 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
           держим на той же тёмной поверхности, что и скелетоны. */}
       <div className={`relative aspect-square overflow-hidden rounded-[11px] ${design3 ? (productImage(product) ? 'bg-gradient-to-br from-[#ede6dc] to-[#d8cfc6]' : 'bg-white/[.04]') : 'bg-white'}`}>
         <Link href={href} className="absolute inset-0" aria-label={product.name}>
-          {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill sizes="(max-width: 700px) 50vw, 260px" className="object-contain p-3 transition duration-300 group-hover:scale-[1.04]" /> : <span className="flex h-full flex-col items-center justify-center gap-2 text-xs text-faint"><ImageOff size={28} /><span>Фото готовится</span></span>}
+          {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill sizes="(max-width: 700px) 50vw, 260px" className="object-contain p-3 transition duration-300 group-hover:scale-[1.04]" /> : <ProductVisualFallback category={product.category} dark={design3} />}
         </Link>
         <span className={`absolute left-1 top-1 rounded-[5px] px-2 py-1 text-[10px] font-bold ${design3 ? 'bg-[#c93a16] text-white' : 'bg-tint text-deep'}`}>{condition}</span>
         <button type="button" onClick={() => toggle(product.id)} aria-label={has(product.id) ? 'Удалить из избранного' : 'Добавить в избранное'} className={`absolute right-1 top-1 grid h-9 w-9 place-items-center rounded-full ${design3 ? 'bg-black/40 text-white/70' : 'bg-white/90'} ${has(product.id) ? 'text-coral' : 'text-faint hover:text-ink'}`}>

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -21,6 +22,8 @@ import {
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { LoadFailure } from '@/components/LoadFailure';
+import { productImage } from '@/components/ProductCard';
+import { ProductVisualFallback } from '@/components/ProductVisualFallback';
 import { som, conditionLabel } from '@/lib/format';
 import { guestOrderLink, saveGuestOrderAccess } from '@/lib/guest-order-access';
 
@@ -413,8 +416,10 @@ export default function TelegramMiniAppPage() {
                   const used = conditionLabel(product.attrs) === 'Б/У';
                   return (
                     <article key={product.id} className="overflow-hidden rounded-[16px] border border-surface-3 bg-surface-2">
-                      <div className="grid h-[104px] place-items-center bg-gradient-to-br from-surface-3 to-ink-dark">
-                        <span className="text-4xl">{productIcon(product.category)}</span>
+                      <div className="relative h-[104px] bg-gradient-to-br from-surface-3 to-ink-dark">
+                        {productImage(product)
+                          ? <Image src={productImage(product)!} alt={product.name} fill sizes="(max-width: 640px) 50vw, 220px" className="object-contain p-2" />
+                          : <ProductVisualFallback category={product.category} compact />}
                       </div>
                       <div className="p-3">
                         <div className="min-h-[38px] text-[13px] font-bold leading-tight">{product.name}</div>

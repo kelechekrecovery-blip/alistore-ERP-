@@ -12,7 +12,8 @@ import { useFavorites } from '@/lib/favorites';
 import { useCompare } from '@/lib/compare';
 import { productImage } from '@/components/ProductCard';
 import { StatusPill } from '@/components/ui/Badge';
-import { Heart, ImageOff } from 'lucide-react';
+import { ProductVisualFallback } from '@/components/ProductVisualFallback';
+import { Heart } from 'lucide-react';
 
 interface MobileProductCardProps {
   product: CatalogProduct;
@@ -62,7 +63,7 @@ export function MobileProductCard({ product, badge, priority = false, showCompar
       transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
     >
       <Link href={href} className="relative block h-[120px] bg-gradient-to-br from-surface-3 to-ink-dark">
-        {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill sizes="200px" priority={priority} className="object-contain p-3" /> : <span className="flex h-full flex-col items-center justify-center gap-1 text-[10px] text-subtle"><ImageOff size={24} /><span>Фото готовится</span></span>}
+        {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill sizes="200px" priority={priority} className="object-contain p-3" /> : <ProductVisualFallback category={product.category} />}
         {badge && (
           <span className="absolute left-2 top-2 rounded-[6px] bg-coral px-1.5 py-[3px] text-[10px] font-bold text-white">
             {badge}

@@ -24,10 +24,12 @@ test('desktop storefront matches the AliStore shop prototype', async ({ page }) 
   await expect(page.getByRole('banner').getByRole('link', { name: 'Каталог', exact: true })).toBeVisible();
   await expect(page.getByPlaceholder('Поиск техники…')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Обменяйте старый смартфон' })).toBeVisible();
+  await expect(page.getByTestId('storefront-hero-visual-fallback')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Популярное' })).toBeVisible();
   await expect(page.getByText('4.9', { exact: true })).toHaveCount(0);
   await expect(page.getByText('0 · 0 · 12', { exact: true })).toHaveCount(0);
   await expect(page.locator('article')).toHaveCount(1);
+  await expect(page.locator('.md\\:block').getByTestId('product-visual-fallback')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
 
   await page.goto('/app');

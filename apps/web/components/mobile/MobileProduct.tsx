@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { MobileFrame } from "@/components/mobile/MobileFrame";
 import { productImage, productSpecEntries } from "@/components/ProductCard";
+import { ProductVisualFallback } from "@/components/ProductVisualFallback";
 import { StatusPill } from "@/components/ui/Badge";
-import { Heart, ImageOff } from "lucide-react";
+import { Heart } from "lucide-react";
 import { som, conditionLabel } from "@/lib/format";
 import { TO_ORDER_CART_QTY_CAP, useCart } from "@/lib/cart";
 import { availabilityLabel, catalogAvailability } from "@/lib/to-order";
@@ -87,7 +88,7 @@ export default function MobileProduct({
       <div className="pb-6">
         {/* hero */}
         <div className="relative h-[260px] bg-gradient-to-br from-surface-3 to-ink-dark">
-          {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill sizes="440px" priority className="object-contain p-8" /> : <span className="flex h-full flex-col items-center justify-center gap-2 text-subtle"><ImageOff size={38} /><span>Фото готовится</span></span>}
+          {productImage(product) ? <Image src={productImage(product)!} alt={product.name} fill sizes="440px" priority className="object-contain p-8" /> : <ProductVisualFallback category={product.category} />}
           <button
             type="button"
             onClick={() => router.back()}
@@ -366,7 +367,7 @@ export default function MobileProduct({
                     className="w-[120px] flex-shrink-0"
                   >
                     <div className="relative h-[92px] overflow-hidden rounded-[12px] bg-gradient-to-br from-surface-3 to-ink-dark">
-                      {productImage(s) ? <Image src={productImage(s)!} alt={s.name} fill sizes="120px" className="object-contain p-2" /> : <span className="grid h-full place-items-center text-subtle"><ImageOff size={20} /></span>}
+                      {productImage(s) ? <Image src={productImage(s)!} alt={s.name} fill sizes="120px" className="object-contain p-2" /> : <ProductVisualFallback category={s.category} compact />}
                     </div>
                     <div className="mt-1.5 line-clamp-2 text-[11px] leading-[1.3] text-bright">
                       {s.name}
