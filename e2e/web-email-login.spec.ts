@@ -125,7 +125,7 @@ test('login presents one phone sign-in/create flow and only available providers'
   await expect(page.getByRole('button', { name: 'Восстановить' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Apple' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Telegram' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /Продолжить как гость/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Продолжить как гость/ })).toBeVisible();
 
   await page.getByTestId('login-channel-email').click();
   await expect(page.getByText(/по привязанной почте/)).toBeVisible();
