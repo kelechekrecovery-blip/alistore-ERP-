@@ -35,6 +35,7 @@ const STATE_KEYS = [
   'enabled',
   'source',
   'fallback',
+  'overrideActive',
   'overrideRevision',
 ].sort();
 
@@ -126,6 +127,7 @@ describe('Feature flags (integration)', () => {
     expect(states.every((state) => (
       state.enabled === false
       && state.source === 'default'
+      && state.overrideActive === false
       && state.overrideRevision === null
       && state.fallback.enabled === false
       && state.fallback.source === 'default'
@@ -146,6 +148,7 @@ describe('Feature flags (integration)', () => {
       ...FEATURE_FLAGS.find((definition) => definition.key === FeatureFlagKey.PartialHandover),
       enabled: true,
       source: 'environment',
+      overrideActive: false,
       overrideRevision: null,
       fallback: { enabled: true, source: 'environment' },
     });
@@ -165,6 +168,7 @@ describe('Feature flags (integration)', () => {
       ...FEATURE_FLAGS[0],
       enabled: false,
       source: 'database',
+      overrideActive: true,
       overrideRevision: 1,
       fallback: { enabled: true, source: 'environment' },
     });
@@ -200,13 +204,14 @@ describe('Feature flags (integration)', () => {
       ...FEATURE_FLAGS[1],
       enabled: true,
       source: 'environment',
-      overrideRevision: null,
+      overrideActive: false,
+      overrideRevision: 2,
       fallback: { enabled: true, source: 'environment' },
     });
     await expect(flags.isEnabled(FeatureFlagKey.Cancellation)).resolves.toBe(true);
     expect(await prisma.featureFlagOverride.findUnique({
       where: { key: FeatureFlagKey.Cancellation },
-    })).toBeNull();
+    })).toMatchObject({ active: false, revision: 2 });
 
     const events = await prisma.auditEvent.findMany({
       where: { type: 'feature_flag.changed', refs: { has: FeatureFlagKey.Cancellation } },
@@ -219,6 +224,45 @@ describe('Feature flags (integration)', () => {
       before: { enabled: false, source: 'database' },
       after: { enabled: true, source: 'environment' },
     });
+  });
+
+  it('preserves a monotonic generation across reset/recreate and rejects stale ABA mutations', async () => {
+    const key = FeatureFlagKey.AutoRefund;
+    const revisionOne = await flags.set(key, true, 'Initial override', 'owner-initial', null);
+    expect(revisionOne).toMatchObject({ enabled: true, source: 'database', overrideActive: true, overrideRevision: 1 });
+
+    const tombstone = await flags.reset(key, 'Reset to fallback', 'owner-reset', 1);
+    expect(tombstone).toMatchObject({ enabled: false, source: 'default', overrideActive: false, overrideRevision: 2 });
+
+    const revisionThree = await flags.set(key, false, 'Recreate override', 'owner-recreate', 2);
+    expect(revisionThree).toMatchObject({ enabled: false, source: 'database', overrideActive: true, overrideRevision: 3 });
+
+    await expect(flags.set(key, true, 'Stale revision one set', 'owner-stale-set', 1))
+      .rejects.toMatchObject({ code: 'feature_flag_revision_conflict', status: 409 });
+    await expect(flags.reset(key, 'Stale revision one reset', 'owner-stale-reset', 1))
+      .rejects.toMatchObject({ code: 'feature_flag_revision_conflict', status: 409 });
+
+    await expect(flags.list()).resolves.toContainEqual(revisionThree);
+    expect(await featureFlagEventPayloads(key)).toHaveLength(3);
+  });
+
+  it('treats populated pre-tombstone rows as active without requiring a backfill rewrite', async () => {
+    const key = FeatureFlagKey.PartialHandover;
+    await prisma.featureFlagOverride.create({
+      data: { key, enabled: true, reason: 'Existing populated row', updatedBy: 'migration-compatibility' },
+    });
+
+    const [databaseRow] = await prisma.$queryRaw<Array<{ active: boolean; revision: number }>>`
+      SELECT "active", "revision" FROM "FeatureFlagOverride" WHERE "key" = ${key}
+    `;
+    expect(databaseRow).toEqual({ active: true, revision: 1 });
+    await expect(flags.list()).resolves.toContainEqual(expect.objectContaining({
+      key,
+      enabled: true,
+      source: 'database',
+      overrideActive: true,
+      overrideRevision: 1,
+    }));
   });
 
   it('serializes concurrent set/set mutations and rejects the stale tab', async () => {
@@ -240,6 +284,7 @@ describe('Feature flags (integration)', () => {
       after: { enabled: finalState.enabled, source: 'database' },
     });
     expect(finalState.overrideRevision).toBe(1);
+    expect(finalState.overrideActive).toBe(true);
   });
 
   it('serializes concurrent set/reset mutations and prevents a stale reset deleting a newer override', async () => {
@@ -327,7 +372,7 @@ describe('Feature flags (integration)', () => {
       cancellationEnabled: false,
     });
     const serialized = JSON.stringify(response.body);
-    for (const forbidden of ['"source"', 'legacyEnv', 'overrideRevision', 'TO_ORDER_CHECKOUT_ENABLED']) {
+    for (const forbidden of ['"source"', 'legacyEnv', 'overrideActive', 'overrideRevision', 'TO_ORDER_CHECKOUT_ENABLED']) {
       expect(serialized).not.toContain(forbidden);
     }
   });

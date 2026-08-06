@@ -18,6 +18,7 @@ export interface FeatureFlagState {
   legacyEnv: string;
   enabled: boolean;
   source: FeatureFlagSource;
+  overrideActive: boolean;
   overrideRevision: number | null;
   fallback: {
     enabled: boolean;

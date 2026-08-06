@@ -51,6 +51,7 @@ function flag(): FeatureFlagState {
     legacyEnv: 'TO_ORDER_CHECKOUT_ENABLED',
     enabled: false,
     source: 'default',
+    overrideActive: false,
     overrideRevision: 7,
     fallback: { enabled: false, source: 'default' },
   };

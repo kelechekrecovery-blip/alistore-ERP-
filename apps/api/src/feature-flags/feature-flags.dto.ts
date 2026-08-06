@@ -56,8 +56,14 @@ export class FeatureFlagStateDto {
   overrideRevision!: number | null;
 
   @ApiProperty({
+    example: true,
+    description: 'Whether the persisted generation currently overrides fallback policy',
+  })
+  overrideActive!: boolean;
+
+  @ApiProperty({
     example: { enabled: false, source: 'default' },
-    description: 'State that reset will restore after deleting the database override',
+    description: 'State that reset will restore after deactivating the database override',
   })
   fallback!: {
     enabled: boolean;

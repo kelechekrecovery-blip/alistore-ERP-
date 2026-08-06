@@ -158,7 +158,7 @@ export function FeatureFlagsView({
             <div id="feature-flag-confirm-title" className="font-display text-lg font-bold text-white">Подтвердите изменение</div>
             <p className="mt-2 text-sm text-muted">
               {pending.action === 'reset' && pendingFlag
-                ? `Сброс удалит override и ${pendingFlag.fallback.enabled ? 'ВКЛЮЧИТ' : 'ВЫКЛЮЧИТ'} флаг через ${SOURCE_LABEL[pendingFlag.fallback.source]}.`
+                ? `Сброс отключит override и ${pendingFlag.fallback.enabled ? 'ВКЛЮЧИТ' : 'ВЫКЛЮЧИТ'} флаг через ${SOURCE_LABEL[pendingFlag.fallback.source]}.`
                 : `${pending.key}: ${pending.enabled ? 'включить' : 'выключить'}.`}
             </p>
             <p className="mt-2 text-xs text-subtle">Причина: {reasons[pending.key]?.trim()}</p>

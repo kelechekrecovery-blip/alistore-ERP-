@@ -19,6 +19,7 @@ export type FeatureFlagSource = 'database' | 'environment' | 'default';
 export interface FeatureFlagState extends FeatureFlagDefinition {
   enabled: boolean;
   source: FeatureFlagSource;
+  overrideActive: boolean;
   overrideRevision: number | null;
   fallback: FeatureFlagFallback;
 }
@@ -31,6 +32,7 @@ export interface FeatureFlagFallback {
 interface StoredOverride {
   key: string;
   enabled: boolean;
+  active: boolean;
   revision: number;
 }
 
@@ -88,11 +90,13 @@ export class FeatureFlagsService {
           enabled,
           reason: normalizedReason,
           updatedBy: actor,
+          active: true,
         },
         update: {
           enabled,
           reason: normalizedReason,
           updatedBy: actor,
+          active: true,
           revision: { increment: 1 },
         },
       });
@@ -118,10 +122,25 @@ export class FeatureFlagsService {
       const existing = await tx.featureFlagOverride.findUnique({ where: { key: definition.key } });
       this.assertExpectedRevision(existing?.revision ?? null, expectedRevision);
       const before = this.evaluate(definition, existing);
-      await tx.featureFlagOverride.deleteMany({ where: { key: definition.key } });
       const after = this.evaluate(definition);
+      const stored = await tx.featureFlagOverride.upsert({
+        where: { key: definition.key },
+        create: {
+          key: definition.key,
+          enabled: after.enabled,
+          reason: normalizedReason,
+          updatedBy: actor,
+          active: false,
+        },
+        update: {
+          reason: normalizedReason,
+          updatedBy: actor,
+          active: false,
+          revision: { increment: 1 },
+        },
+      });
       return {
-        result: this.state(definition),
+        result: this.state(definition, stored),
         events: [this.changedEvent(definition.key, normalizedReason, before, after, actor)],
       };
     });
@@ -131,14 +150,15 @@ export class FeatureFlagsService {
     const fallback = this.fallback(definition);
     return {
       ...definition,
-      ...(row ? { enabled: row.enabled, source: 'database' as const } : fallback),
+      ...(row?.active ? { enabled: row.enabled, source: 'database' as const } : fallback),
+      overrideActive: row?.active ?? false,
       overrideRevision: row?.revision ?? null,
       fallback,
     };
   }
 
   private evaluate(definition: FeatureFlagDefinition, row?: StoredOverride | null): EvaluatedValue {
-    if (row) return { enabled: row.enabled, source: 'database' };
+    if (row?.active) return { enabled: row.enabled, source: 'database' };
     return this.fallback(definition);
   }
 

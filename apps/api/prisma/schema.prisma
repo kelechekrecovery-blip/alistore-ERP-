@@ -3935,6 +3935,7 @@ model FeatureFlagOverride {
   reason    String
   updatedBy String
   revision  Int      @default(1)
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

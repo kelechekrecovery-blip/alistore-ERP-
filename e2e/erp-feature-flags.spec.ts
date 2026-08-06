@@ -56,7 +56,7 @@ test('admin is read-only and owner override/reset is reflected without restart',
 
   await ownerRow.getByLabel(`Причина ${KEY}`).fill('Restore deploy policy after stale-tab verification');
   await ownerRow.getByRole('button', { name: 'Сбросить к deploy default' }).click();
-  await expect(page.getByRole('dialog')).toContainText('Сброс удалит override и ВКЛЮЧИТ флаг через deploy env.');
+  await expect(page.getByRole('dialog')).toContainText('Сброс отключит override и ВКЛЮЧИТ флаг через deploy env.');
   await page.getByRole('dialog').getByRole('button', { name: 'Подтвердить' }).click();
   await expect(ownerRow).toContainText('deploy env');
   await expect(ownerRow).toContainText('включён');
@@ -79,13 +79,21 @@ test('admin is read-only and owner override/reset is reflected without restart',
 
   await ownerRow.getByLabel(`Причина ${KEY}`).fill('Restore deploy policy after E2E verification');
   await ownerRow.getByRole('button', { name: 'Сбросить к deploy default' }).click();
-  await expect(page.getByRole('dialog')).toContainText('Сброс удалит override и ВКЛЮЧИТ флаг через deploy env.');
+  await expect(page.getByRole('dialog')).toContainText('Сброс отключит override и ВКЛЮЧИТ флаг через deploy env.');
   await page.getByRole('dialog').getByRole('button', { name: 'Подтвердить' }).click();
 
   await expect(ownerRow).toContainText('deploy env');
   await expect(ownerRow).toContainText('включён');
   await expect(page.getByText('Deploy-политика восстановлена')).toBeVisible();
-  expect(await prisma.featureFlagOverride.findUnique({ where: { key: KEY } })).toBeNull();
+  expect(await prisma.featureFlagOverride.findUnique({ where: { key: KEY } }))
+    .toMatchObject({ active: false, revision: 4 });
+
+  const finalStateResponse = await request.get(`${API_BASE}/feature-flags`, {
+    headers: { authorization: `Bearer ${owner.accessToken}` },
+  });
+  expect(finalStateResponse.status()).toBe(200);
+  expect((await finalStateResponse.json()).find((flag: { key: string }) => flag.key === KEY))
+    .toMatchObject({ source: 'environment', overrideActive: false, overrideRevision: 4 });
 });
 
 function staffSession(
