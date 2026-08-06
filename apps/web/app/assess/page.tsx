@@ -6,7 +6,7 @@ import { fetchCatalog, type CatalogProduct } from '@/lib/api';
 import { assessUsed, type Valuation } from '@/lib/ai';
 import { som } from '@/lib/format';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
-import { clearStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
+import { logoutStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
 
 const GRADES: { id: 'A' | 'B' | 'C'; label: string }[] = [
   { id: 'A', label: 'A · как новый' },
@@ -89,10 +89,7 @@ export default function AssessPage() {
         </div>
         <button
           type="button"
-          onClick={() => {
-            clearStaffSession();
-            setSession(null);
-          }}
+          onClick={() => { void logoutStaffSession(() => setSession(null)); }}
           className="ml-auto rounded-chip bg-surface-2 px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
         >
           Выйти staff

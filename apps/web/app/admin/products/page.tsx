@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { ProductManagementView } from '@/components/admin/ProductManagementView';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import {
-  clearStaffSession,
+  logoutStaffSession,
   restoreStaffSession,
   type StaffSession,
 } from '@/lib/staff-session';
@@ -58,10 +58,7 @@ export default function AdminProductsPage() {
         </Link>
         <button
           type="button"
-          onClick={() => {
-            clearStaffSession();
-            setSession(null);
-          }}
+          onClick={() => { void logoutStaffSession(() => setSession(null)); }}
           className="rounded-chip border border-surface-3 px-4 py-2 text-sm font-medium text-subtle hover:border-line"
         >
           Выйти staff

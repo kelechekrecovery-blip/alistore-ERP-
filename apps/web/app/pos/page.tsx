@@ -38,7 +38,7 @@ import { PosTicket } from '@/components/pos/PosTicket';
 import { ServicePosPayment } from '@/components/pos/ServicePosPayment';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import {
-  clearStaffSession,
+  logoutStaffSession,
   restoreStaffSession,
   type StaffSession,
 } from '@/lib/staff-session';
@@ -422,8 +422,7 @@ export default function PosPage() {
           grid={grid}
           onAdd={add}
           onLogoutStaff={() => {
-            clearStaffSession();
-            setSession(null);
+            void logoutStaffSession(() => setSession(null));
           }}
         />
 

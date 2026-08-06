@@ -43,7 +43,7 @@ import { DebtsDesk } from '@/components/staff/DebtsDesk';
 import { GiftCardIssue } from '@/components/staff/GiftCardIssue';
 import { canCreateDebt, canIssueGiftCard, canPayDebt, canPrintDocuments, canPrintReceipts, staffTabAllowed, type StaffAppTab } from '@/lib/staff-permissions';
 import {
-  clearStaffSession,
+  logoutStaffSession,
   loadStaffSession,
   restoreStaffSession,
   type StaffSession,
@@ -563,22 +563,23 @@ export default function StaffPage() {
           <button
             type="button"
             onClick={() => {
-              sessionVersion.current += 1;
-              shiftLoadVersion.current += 1;
-              clearStaffSession();
-              setSession(null);
-              setShift(null);
-              setOrders(null);
-              setB2BQuotes(null);
-              setProtection(null);
-              setOpenShiftFiles([]);
-              setCloseShiftFiles([]);
-              setCloseCash('');
-              setCloseNote('');
-              setCloseShiftKey(crypto.randomUUID());
-              setLastReconciliation(null);
-              setPendingCloseEvidence(null);
-              previousShiftId.current = null;
+              void logoutStaffSession(() => {
+                sessionVersion.current += 1;
+                shiftLoadVersion.current += 1;
+                setSession(null);
+                setShift(null);
+                setOrders(null);
+                setB2BQuotes(null);
+                setProtection(null);
+                setOpenShiftFiles([]);
+                setCloseShiftFiles([]);
+                setCloseCash('');
+                setCloseNote('');
+                setCloseShiftKey(crypto.randomUUID());
+                setLastReconciliation(null);
+                setPendingCloseEvidence(null);
+                previousShiftId.current = null;
+              });
             }}
             className="text-[#8A7F76]"
           >

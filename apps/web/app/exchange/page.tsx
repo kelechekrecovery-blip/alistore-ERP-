@@ -15,7 +15,7 @@ import {
 import { som } from '@/lib/format';
 import { LoadFailure } from '@/components/LoadFailure';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
-import { clearStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
+import { logoutStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
 
 const METHODS = [
   { id: 'cash', name: 'Наличные' },
@@ -97,9 +97,10 @@ export default function ExchangePage() {
   }
 
   function logout() {
-    clearStaffSession();
-    setSession(null);
-    reset();
+    void logoutStaffSession(() => {
+      setSession(null);
+      reset();
+    }, setErr);
   }
 
   if (!hydrated) {

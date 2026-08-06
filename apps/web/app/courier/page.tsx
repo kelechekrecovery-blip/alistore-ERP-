@@ -35,7 +35,7 @@ import {
 } from '@/lib/api';
 import { som } from '@/lib/format';
 import {
-  clearStaffSession,
+  logoutStaffSession,
   restoreStaffSession,
   type StaffSession,
 } from '@/lib/staff-session';
@@ -98,12 +98,13 @@ export default function CourierPage() {
   }, [load]);
 
   function logout() {
-    requestVersion.current += 1;
-    clearStaffSession();
-    setSession(null);
-    setDeliveries(null);
-    setError('');
-    setTab('route');
+    void logoutStaffSession(() => {
+      requestVersion.current += 1;
+      setSession(null);
+      setDeliveries(null);
+      setError('');
+      setTab('route');
+    }, setError);
   }
 
   if (!session) {

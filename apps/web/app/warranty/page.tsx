@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { fetchWarranty, transitionWarranty, type WarrantyCase } from '@/lib/warranty';
 import { downloadWarrantyTalon } from '@/lib/api';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
-import { clearStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
+import { logoutStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
 
 interface Stage {
   status: string;
@@ -84,9 +84,10 @@ export default function WarrantyConsolePage() {
   }
 
   function logout() {
-    clearStaffSession();
-    setSession(null);
-    setCases(null);
+    void logoutStaffSession(() => {
+      setSession(null);
+      setCases(null);
+    }, (message) => window.alert(message));
   }
 
   if (!hydrated) {

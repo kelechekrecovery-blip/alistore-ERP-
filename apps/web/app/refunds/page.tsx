@@ -15,7 +15,7 @@ import {
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import { canManageRefunds, canReadRefunds, canRetryRefund } from '@/lib/staff-permissions';
 import {
-  clearStaffSession,
+  logoutStaffSession,
   restoreStaffSession,
   type StaffSession,
 } from '@/lib/staff-session';
@@ -186,10 +186,11 @@ export default function RefundsPage() {
           <button
             type="button"
             onClick={() => {
-              clearStaffSession();
-              setSession(null);
-              setReturns(null);
-              setSelected(null);
+              void logoutStaffSession(() => {
+                setSession(null);
+                setReturns(null);
+                setSelected(null);
+              });
             }}
             className="ml-auto rounded-chip border border-ink/15 px-4 py-2 text-sm font-medium text-ink/70 hover:border-ink/30"
           >

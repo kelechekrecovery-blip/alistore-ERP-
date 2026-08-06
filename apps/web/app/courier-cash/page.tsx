@@ -12,7 +12,7 @@ import {
 } from '@/lib/api';
 import { som } from '@/lib/format';
 import {
-  clearStaffSession,
+  logoutStaffSession,
   restoreStaffSession,
   type StaffSession,
 } from '@/lib/staff-session';
@@ -55,10 +55,11 @@ export default function CourierCashPage() {
   }, [load]);
 
   function logout() {
-    clearStaffSession();
-    setSession(null);
-    setRun(null);
-    setMessage('');
+    void logoutStaffSession(() => {
+      setSession(null);
+      setRun(null);
+      setMessage('');
+    }, setMessage);
   }
 
   if (!session) {

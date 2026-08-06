@@ -15,7 +15,7 @@ import { WarehouseOps } from '@/components/WarehouseOps';
 import { ConsignmentOps } from '@/components/ConsignmentOps';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import {
-  clearStaffSession,
+  logoutStaffSession,
   restoreStaffSession,
   type StaffSession,
 } from '@/lib/staff-session';
@@ -133,9 +133,10 @@ export default function WarehousePage() {
         <button
           type="button"
           onClick={() => {
-            clearStaffSession();
-            setSession(null);
-            setOrders(null);
+            void logoutStaffSession(() => {
+              setSession(null);
+              setOrders(null);
+            });
           }}
           className="ml-auto rounded-chip border border-surface-3 px-4 py-2 text-sm font-medium text-subtle hover:border-line"
         >

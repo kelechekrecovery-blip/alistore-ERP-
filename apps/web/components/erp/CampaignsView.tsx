@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import { som } from '@/lib/format';
 import {
   activateCampaign,
@@ -16,7 +15,7 @@ import {
   type CampaignRoi,
   type SegmentRules,
 } from '@/lib/api/campaigns';
-import { clearStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
+import type { StaffSession } from '@/lib/staff-session';
 import { ImageField } from './ImageField';
 
 const CHANNELS = ['sms', 'push', 'telegram', 'whatsapp'] as const;
@@ -52,9 +51,7 @@ const INITIAL_FORM: CampaignForm = {
   promotionCode: '',
 };
 
-export function CampaignsView() {
-  const [session, setSession] = useState<StaffSession | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+export function CampaignsView({ session, onLogout }: { session: StaffSession; onLogout: () => void }) {
   const [form, setForm] = useState<CampaignForm>(INITIAL_FORM);
   const [preview, setPreview] = useState<CampaignPreview | null>(null);
   const [campaigns, setCampaigns] = useState<CampaignRoi[]>([]);
@@ -70,12 +67,7 @@ export function CampaignsView() {
       .catch((error) => setNotice(error instanceof Error ? error.message : 'Не удалось загрузить кампании'));
   }, [session]);
 
-  useEffect(() => {
-    void restoreStaffSession().then(setSession);
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => { if (session) load(); }, [load, session]);
+  useEffect(() => { load(); }, [load]);
 
   async function runPreview() {
     if (!session) return;
@@ -162,29 +154,6 @@ export function CampaignsView() {
     }
   }
 
-  function logout() {
-    clearStaffSession();
-    setSession(null);
-    setPreview(null);
-    setCampaigns([]);
-  }
-
-  if (!hydrated) {
-    return <p className="font-mono text-sm text-faint">Загрузка…</p>;
-  }
-
-  if (!session) {
-    return (
-      <div className="grid min-h-[420px] place-items-center">
-        <StaffSessionLogin
-          title="Кампании · вход"
-          caption="Нужна роль маркетолога, администратора или владельца."
-          onAuthenticated={setSession}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="grid gap-4 xl:grid-cols-[0.9fr_1.2fr]">
       <section className="rounded-[16px] border border-surface-3 bg-surface p-5">
@@ -192,7 +161,7 @@ export function CampaignsView() {
           <span>{session.username} · {session.role}</span>
           <button
             type="button"
-            onClick={logout}
+            onClick={onLogout}
             className="rounded-chip border border-surface-3 px-3 py-1.5 font-semibold text-muted hover:text-white"
           >
             Выйти staff

@@ -75,7 +75,7 @@ import { ServiceCenterView } from '@/components/erp/ServiceCenterView';
 import { StorefrontView } from '@/components/erp/StorefrontView';
 import { AdminView } from '@/components/erp/AdminView';
 import { StoreOperationsView } from '@/components/erp/StoreOperationsView';
-import { clearStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
+import { logoutStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
 import { erpRouteAllowed, staffCan, type ErpRoute } from '@/lib/staff-permissions';
 
 type Route = ErpRoute;
@@ -320,6 +320,10 @@ export default function ErpPage() {
     else if (a?.tab) setRoute(a.tab);
   }
 
+  function logout() {
+    void logoutStaffSession(() => setSession(null));
+  }
+
   if (!session) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-night p-4">
@@ -425,10 +429,7 @@ export default function ErpPage() {
         </div>
         <button
           type="button"
-          onClick={() => {
-            clearStaffSession();
-            setSession(null);
-          }}
+          onClick={logout}
           aria-label="Выйти из staff-сессии"
           className="mt-2 flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-medium text-muted transition hover:text-white"
         >
@@ -491,7 +492,7 @@ export default function ErpPage() {
           {activeRoute === 'crm' && (
             <CrmView accessToken={session.accessToken} risks={risks} onOpenCampaigns={() => navigate('campaigns')} />
           )}
-          {activeRoute === 'campaigns' && <CampaignsView />}
+          {activeRoute === 'campaigns' && <CampaignsView session={session} onLogout={logout} />}
           {activeRoute === 'storefront' && <StorefrontView accessToken={session.accessToken} role={session.role} />}
           {activeRoute === 'risks' && <RiskCenterView risks={risks} onSignal={actOnSignal} />}
           {activeRoute === 'readiness' && <ReadinessView report={readiness} error={readinessError} />}

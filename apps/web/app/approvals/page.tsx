@@ -23,7 +23,7 @@ import { ApprovalList } from '@/components/approvals/ApprovalList';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
 import { canPrintDocuments, canReadRefunds } from '@/lib/staff-permissions';
 import {
-  clearStaffSession,
+  logoutStaffSession,
   restoreStaffSession,
   saveStaffSession,
   type StaffSession,
@@ -67,8 +67,7 @@ export default function ApprovalsPage() {
         const status = cause instanceof ApiError ? cause.status : 0;
         if (status === 401 || status === 403) {
           setItems([]);
-          setSession(null);
-          clearStaffSession();
+          void logoutStaffSession(() => setSession(null), setLoadError);
           return;
         }
         setItems(null);
@@ -299,11 +298,12 @@ export default function ApprovalsPage() {
           <button
             type="button"
             onClick={() => {
-              clearStaffSession();
-              setSession(null);
-              setItems(null);
-              setTotpSetup(null);
-              setTotpToken('');
+              void logoutStaffSession(() => {
+                setSession(null);
+                setItems(null);
+                setTotpSetup(null);
+                setTotpToken('');
+              }, setLoadError);
             }}
             className="ml-auto rounded-chip border border-surface-3 px-4 py-2 text-sm font-medium text-bright hover:border-line"
           >

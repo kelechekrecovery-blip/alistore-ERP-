@@ -64,12 +64,13 @@ async function responseError(res: Response): Promise<ApiError> {
 }
 
 /** POST JSON and unwrap the response, surfacing the API's error message on failure. */
-export async function postJson<T>(path: string, body: unknown, headers?: Record<string, string>, credentials = false): Promise<T> {
+export async function postJson<T>(path: string, body: unknown, headers?: Record<string, string>, credentials = false, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...headers },
     ...(credentials ? { credentials: 'include' as const } : {}),
     body: JSON.stringify(body),
+    signal,
   });
   if (!res.ok) throw await responseError(res);
   return (await res.json()) as T;
@@ -175,10 +176,11 @@ export async function deleteAuthJson<T>(
 }
 
 /** Authenticated GET (Bearer token). Throws on non-2xx. */
-export async function getJson<T>(path: string, accessToken: string): Promise<T> {
+export async function getJson<T>(path: string, accessToken: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { authorization: `Bearer ${accessToken}` },
     cache: 'no-store',
+    signal,
   });
   if (!res.ok) throw await responseError(res);
   return (await res.json()) as T;

@@ -59,8 +59,8 @@ export function staffBootstrapOwner(username: string, password: string, point: s
   return postJson('/staff-auth/bootstrap', { username, password, point }, { 'x-alistore-staff-web': '1' }, true);
 }
 
-export function staffAuthRefresh(): Promise<StaffLoginResult> {
-  return postJson('/staff-auth/refresh', {}, { 'x-alistore-staff-web': '1' }, true);
+export function staffAuthRefresh(signal?: AbortSignal): Promise<StaffLoginResult> {
+  return postJson('/staff-auth/refresh', {}, { 'x-alistore-staff-web': '1' }, true, signal);
 }
 
 export async function staffAuthLogout(): Promise<void> {
@@ -72,8 +72,8 @@ export async function staffAuthLogout(): Promise<void> {
   }).catch(() => undefined);
 }
 
-export function staffAuthMe(accessToken: string): Promise<StaffPublicProfile> {
-  return getJson('/staff-auth/me', accessToken);
+export function staffAuthMe(accessToken: string, signal?: AbortSignal): Promise<StaffPublicProfile> {
+  return getJson('/staff-auth/me', accessToken, signal);
 }
 
 export function staffTotpSetup(accessToken: string): Promise<StaffTotpSetupResult> {

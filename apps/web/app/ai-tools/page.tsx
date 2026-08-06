@@ -9,7 +9,7 @@ import {
   type ProductDescription,
 } from '@/lib/ai';
 import { StaffSessionLogin } from '@/components/StaffSessionLogin';
-import { clearStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
+import { logoutStaffSession, restoreStaffSession, type StaffSession } from '@/lib/staff-session';
 
 interface AttrRow {
   key: string;
@@ -119,10 +119,7 @@ export default function AiToolsPage() {
         </div>
         <button
           type="button"
-          onClick={() => {
-            clearStaffSession();
-            setSession(null);
-          }}
+          onClick={() => { void logoutStaffSession(() => setSession(null)); }}
           className="ml-auto rounded-chip bg-surface-2 px-4 py-2 text-xs font-semibold text-white/80 hover:text-white"
         >
           Выйти staff
