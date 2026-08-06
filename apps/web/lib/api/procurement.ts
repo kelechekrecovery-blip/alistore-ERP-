@@ -1,5 +1,4 @@
 import { getJson, postAuthJson } from './http';
-import type { FeatureFlagKey, FeatureFlagState } from './feature-flags';
 
 export type PurchaseOrderStatus = 'draft' | 'sent' | 'receiving' | 'received' | 'cancelled';
 export type SupplyOperationQueueKey =
@@ -29,10 +28,11 @@ export interface SupplyOperationRow {
 
 export interface SupplyOperationsReport {
   generatedAt: string;
-  flags: Record<FeatureFlagKey, FeatureFlagState>;
   capabilities: {
     financialQueuesVisible: boolean;
     ownerResolutionAvailable: boolean;
+    toOrderCheckoutEnabled: boolean;
+    cancellationEnabled: boolean;
   };
   counts: Record<SupplyOperationQueueKey, number>;
   queues: Record<SupplyOperationQueueKey, SupplyOperationRow[]>;

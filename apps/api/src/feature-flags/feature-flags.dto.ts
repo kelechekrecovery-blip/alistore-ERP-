@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsString, Matches, MaxLength } from 'class-validator';
+import { IsBoolean, IsInt, IsString, Matches, MaxLength, Min, ValidateIf } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { FEATURE_FLAG_KEYS } from './feature-flags.registry';
 
@@ -12,6 +12,16 @@ export class FeatureFlagReasonDto {
   @Matches(/\S/, { message: 'reason must contain a non-whitespace character' })
   @MaxLength(500)
   reason!: string;
+
+  @ApiProperty({
+    example: 3,
+    nullable: true,
+    description: 'Current override revision, or null when no database override exists',
+  })
+  @ValidateIf((_object, value) => value !== null)
+  @IsInt()
+  @Min(1)
+  expectedRevision!: number | null;
 }
 
 export class SetFeatureFlagDto extends FeatureFlagReasonDto {
@@ -41,4 +51,16 @@ export class FeatureFlagStateDto {
 
   @ApiProperty({ enum: ['database', 'environment', 'default'], example: 'default' })
   source!: 'database' | 'environment' | 'default';
+
+  @ApiProperty({ example: 3, nullable: true })
+  overrideRevision!: number | null;
+
+  @ApiProperty({
+    example: { enabled: false, source: 'default' },
+    description: 'State that reset will restore after deleting the database override',
+  })
+  fallback!: {
+    enabled: boolean;
+    source: 'environment' | 'default';
+  };
 }

@@ -1,5 +1,5 @@
 import { FeatureFlagKey } from '../feature-flags/feature-flags.registry';
-import type { FeatureFlagsService, FeatureFlagState } from '../feature-flags/feature-flags.service';
+import type { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 import { SupplyOperationsService } from './supply-operations.service';
 
 describe('SupplyOperationsService', () => {
@@ -70,11 +70,10 @@ describe('SupplyOperationsService', () => {
     expect(result.capabilities).toEqual({
       financialQueuesVisible: true,
       ownerResolutionAvailable: false,
+      toOrderCheckoutEnabled: false,
+      cancellationEnabled: true,
     });
-    expect(result.flags[FeatureFlagKey.ToOrderCheckout]).toMatchObject({ enabled: false, source: 'default' });
-    expect(result.flags[FeatureFlagKey.Cancellation]).toMatchObject({ enabled: true, source: 'default' });
-    expect(result.flags[FeatureFlagKey.AutoRefund]).toMatchObject({ enabled: false, source: 'default' });
-    expect(result.flags[FeatureFlagKey.OwnerResolution]).toMatchObject({ enabled: false, source: 'default' });
+    expect(result).not.toHaveProperty('flags');
   });
 
   it('does not query or return cancellation/refund finance queues to warehouse staff', async () => {
@@ -103,52 +102,45 @@ describe('SupplyOperationsService', () => {
     expect(result.queues.awaiting_deposit[0].amount).toBeNull();
     expect(result.queues.cancellation_awaiting_owner).toEqual([]);
     expect(result.queues.refund_failed).toEqual([]);
+    expect(JSON.stringify(result)).not.toContain('legacyEnv');
+    expect(JSON.stringify(result)).not.toContain('"source"');
   });
 
-  it('reports registry state and observes override/reset changes without a restart', async () => {
+  it('observes central capability changes without exposing registry state', async () => {
     const prisma = prismaMock({
       orderReceivables: [],
       draftPurchaseOrders: [],
       supplyBatches: [[], [], []],
       cancellations: [],
     });
-    let source: FeatureFlagState['source'] = 'environment';
     let enabled = true;
-    const flags = flagsService({}, () => ({ enabled, source }));
+    const flags = flagsService({}, (key) => (
+      key === FeatureFlagKey.ToOrderCheckout ? enabled : false
+    ));
     const service = new SupplyOperationsService(prisma as never, flags);
 
     const deployState = await service.list('owner', date());
-    expect(deployState.flags[FeatureFlagKey.ToOrderCheckout]).toMatchObject({ enabled: true, source: 'environment' });
+    expect(deployState.capabilities.toOrderCheckoutEnabled).toBe(true);
 
     enabled = false;
-    source = 'database';
     const overrideState = await service.list('owner', date());
-    expect(overrideState.flags[FeatureFlagKey.ToOrderCheckout]).toMatchObject({ enabled: false, source: 'database' });
+    expect(overrideState.capabilities.toOrderCheckoutEnabled).toBe(false);
 
     enabled = true;
-    source = 'environment';
     const resetState = await service.list('owner', date());
-    expect(resetState.flags[FeatureFlagKey.ToOrderCheckout]).toMatchObject({ enabled: true, source: 'environment' });
-    expect(flags.list).toHaveBeenCalledTimes(3);
+    expect(resetState.capabilities.toOrderCheckoutEnabled).toBe(true);
+    expect(flags.isEnabled).toHaveBeenCalledTimes(9);
   });
 });
 
 function flagsService(
   values: Partial<Record<FeatureFlagKey, boolean>>,
-  state?: () => Pick<FeatureFlagState, 'enabled' | 'source'>,
+  evaluate?: (key: FeatureFlagKey) => boolean,
 ): jest.Mocked<FeatureFlagsService> {
-  const definitions = Object.values(FeatureFlagKey).map((key) => ({
-    key,
-    description: key,
-    owner: 'supply',
-    defaultEnabled: false as const,
-    legacyEnv: key,
-    enabled: values[key] ?? false,
-    source: 'default' as const,
-  }));
   return {
-    isEnabled: jest.fn(async (key: FeatureFlagKey | string) => values[key as FeatureFlagKey] ?? false),
-    list: jest.fn(async () => definitions.map((definition) => ({ ...definition, ...(state?.() ?? {}) }))),
+    isEnabled: jest.fn(async (key: FeatureFlagKey | string) => (
+      evaluate?.(key as FeatureFlagKey) ?? values[key as FeatureFlagKey] ?? false
+    )),
   } as unknown as jest.Mocked<FeatureFlagsService>;
 }
 

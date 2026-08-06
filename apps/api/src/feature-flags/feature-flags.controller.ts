@@ -32,7 +32,13 @@ export class FeatureFlagsController {
     @Param('key') key: string,
     @Body() dto: SetFeatureFlagDto,
   ) {
-    return this.featureFlags.set(key, dto.enabled, dto.reason, user.customerId);
+    return this.featureFlags.set(
+      key,
+      dto.enabled,
+      dto.reason,
+      user.customerId,
+      dto.expectedRevision,
+    );
   }
 
   @Delete(':key')
@@ -44,6 +50,6 @@ export class FeatureFlagsController {
     @Param('key') key: string,
     @Body() dto: FeatureFlagReasonDto,
   ) {
-    return this.featureFlags.reset(key, dto.reason, user.customerId);
+    return this.featureFlags.reset(key, dto.reason, user.customerId, dto.expectedRevision);
   }
 }

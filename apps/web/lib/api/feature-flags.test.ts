@@ -18,8 +18,8 @@ describe('feature-flags API client', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await fetchFeatureFlags('token');
-    await setFeatureFlag(state.key, true, 'Enable staged checkout', 'token');
-    await resetFeatureFlag(state.key, 'Restore deployment default', 'token');
+    await setFeatureFlag(state.key, true, 'Enable staged checkout', state.overrideRevision, 'token');
+    await resetFeatureFlag(state.key, 'Restore deployment default', state.overrideRevision, 'token');
 
     expect(fetchMock.mock.calls[0]).toEqual([
       expect.stringContaining('/feature-flags'),
@@ -29,14 +29,14 @@ describe('feature-flags API client', () => {
       expect.stringContaining('/feature-flags/supply.to_order_checkout'),
       expect.objectContaining({
         method: 'PATCH',
-        body: JSON.stringify({ enabled: true, reason: 'Enable staged checkout' }),
+        body: JSON.stringify({ enabled: true, reason: 'Enable staged checkout', expectedRevision: 7 }),
       }),
     ]);
     expect(fetchMock.mock.calls[2]).toEqual([
       expect.stringContaining('/feature-flags/supply.to_order_checkout'),
       expect.objectContaining({
         method: 'DELETE',
-        body: JSON.stringify({ reason: 'Restore deployment default' }),
+        body: JSON.stringify({ reason: 'Restore deployment default', expectedRevision: 7 }),
       }),
     ]);
   });
@@ -51,5 +51,7 @@ function flag(): FeatureFlagState {
     legacyEnv: 'TO_ORDER_CHECKOUT_ENABLED',
     enabled: false,
     source: 'default',
+    overrideRevision: 7,
+    fallback: { enabled: false, source: 'default' },
   };
 }

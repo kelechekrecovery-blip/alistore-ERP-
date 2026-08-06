@@ -15,6 +15,7 @@ import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
+import { ProcurementModule } from '../src/procurement/procurement.module';
 
 const ENV_NAMES = [
   'TO_ORDER_CHECKOUT_ENABLED',
@@ -33,6 +34,8 @@ const STATE_KEYS = [
   'legacyEnv',
   'enabled',
   'source',
+  'fallback',
+  'overrideRevision',
 ].sort();
 
 type LedgerState = { enabled: boolean; source: 'database' | 'environment' | 'default' };
@@ -65,6 +68,7 @@ describe('Feature flags (integration)', () => {
         AuthzModule,
         StaffAuthModule,
         FeatureFlagsModule,
+        ProcurementModule,
       ],
     })
       .overrideProvider(PrismaService).useValue(prisma)
@@ -75,7 +79,7 @@ describe('Feature flags (integration)', () => {
     flags = app.get(FeatureFlagsService);
 
     const staffAuth = app.get(StaffAuthService);
-    for (const role of ['owner', 'admin', 'seller'] as const) {
+    for (const role of ['owner', 'admin', 'seller', 'warehouse'] as const) {
       const username = `feature-flags-${role}-${Math.floor(Math.random() * 1_000_000)}`;
       await staffAuth.createStaff(username, 'pass', role);
       tokens[role] = (await staffAuth.login(username, 'pass')).accessToken;
@@ -119,7 +123,13 @@ describe('Feature flags (integration)', () => {
 
     const states = await flags.list();
     expect(states).toHaveLength(6);
-    expect(states.every((state) => state.enabled === false && state.source === 'default')).toBe(true);
+    expect(states.every((state) => (
+      state.enabled === false
+      && state.source === 'default'
+      && state.overrideRevision === null
+      && state.fallback.enabled === false
+      && state.fallback.source === 'default'
+    ))).toBe(true);
   });
 
   it('retains legacy environment compatibility without exposing environment contents', async () => {
@@ -136,6 +146,8 @@ describe('Feature flags (integration)', () => {
       ...FEATURE_FLAGS.find((definition) => definition.key === FeatureFlagKey.PartialHandover),
       enabled: true,
       source: 'environment',
+      overrideRevision: null,
+      fallback: { enabled: true, source: 'environment' },
     });
     expect(JSON.stringify(response.body)).not.toContain(' TRUE ');
   });
@@ -146,13 +158,15 @@ describe('Feature flags (integration)', () => {
     const response = await request(app.getHttpServer())
       .patch(`/feature-flags/${FeatureFlagKey.ToOrderCheckout}`)
       .set('Authorization', `Bearer ${tokens.owner}`)
-      .send({ enabled: false, reason: 'Pause rollout after a checkout alert' })
+      .send({ enabled: false, reason: 'Pause rollout after a checkout alert', expectedRevision: null })
       .expect(200);
     expect(Object.keys(response.body).sort()).toEqual(STATE_KEYS);
     expect(response.body).toEqual({
       ...FEATURE_FLAGS[0],
       enabled: false,
       source: 'database',
+      overrideRevision: 1,
+      fallback: { enabled: true, source: 'environment' },
     });
     await expect(flags.isEnabled(FeatureFlagKey.ToOrderCheckout)).resolves.toBe(false);
 
@@ -171,21 +185,23 @@ describe('Feature flags (integration)', () => {
 
   it('resets to environment/default evaluation and writes one event for the reset', async () => {
     process.env.SUPPLY_CANCELLATION_ENABLED = 'true';
-    await request(app.getHttpServer())
+    const setResponse = await request(app.getHttpServer())
       .patch(`/feature-flags/${FeatureFlagKey.Cancellation}`)
       .set('Authorization', `Bearer ${tokens.owner}`)
-      .send({ enabled: false, reason: 'Hold cancellations' })
+      .send({ enabled: false, reason: 'Hold cancellations', expectedRevision: null })
       .expect(200);
 
     const response = await request(app.getHttpServer())
       .delete(`/feature-flags/${FeatureFlagKey.Cancellation}`)
       .set('Authorization', `Bearer ${tokens.owner}`)
-      .send({ reason: 'Restore deployment policy' })
+      .send({ reason: 'Restore deployment policy', expectedRevision: setResponse.body.overrideRevision })
       .expect(200);
     expect(response.body).toEqual({
       ...FEATURE_FLAGS[1],
       enabled: true,
       source: 'environment',
+      overrideRevision: null,
+      fallback: { enabled: true, source: 'environment' },
     });
     await expect(flags.isEnabled(FeatureFlagKey.Cancellation)).resolves.toBe(true);
     expect(await prisma.featureFlagOverride.findUnique({
@@ -205,57 +221,69 @@ describe('Feature flags (integration)', () => {
     });
   });
 
-  it('serializes concurrent set/set mutations into a truthful ledger chain', async () => {
+  it('serializes concurrent set/set mutations and rejects the stale tab', async () => {
     const key = FeatureFlagKey.QuarantineConversion;
-    const { settledWhileHeld } = await runBehindHeldFeatureFlagLock(key, [
-      () => flags.set(key, true, 'Concurrent enable', 'owner-enable'),
-      () => flags.set(key, false, 'Concurrent disable', 'owner-disable'),
+    const { results, settledWhileHeld } = await runBehindHeldFeatureFlagLock(key, [
+      () => flags.set(key, true, 'Concurrent enable', 'owner-enable', null),
+      () => flags.set(key, false, 'Concurrent disable', 'owner-disable', null),
     ]);
     expect(settledWhileHeld).toBe(0);
+    expect(results.filter(({ status }) => status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find(({ status }) => status === 'rejected') as PromiseRejectedResult;
+    expect(rejected.reason).toMatchObject({ code: 'feature_flag_revision_conflict', status: 409 });
 
     const finalState = (await flags.list()).find((state) => state.key === key)!;
     const payloads = await featureFlagEventPayloads(key);
-    assertTruthfulChain(payloads, { enabled: false, source: 'default' }, {
-      enabled: finalState.enabled,
-      source: finalState.source,
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0]).toMatchObject({
+      before: { enabled: false, source: 'default' },
+      after: { enabled: finalState.enabled, source: 'database' },
     });
+    expect(finalState.overrideRevision).toBe(1);
   });
 
-  it('serializes concurrent set/reset mutations into a truthful ledger chain', async () => {
+  it('serializes concurrent set/reset mutations and prevents a stale reset deleting a newer override', async () => {
     const key = FeatureFlagKey.OwnerResolution;
     await prisma.featureFlagOverride.create({
       data: { key, enabled: true, reason: 'Initial override', updatedBy: 'owner-initial' },
     });
 
-    const { settledWhileHeld } = await runBehindHeldFeatureFlagLock(key, [
-      () => flags.set(key, false, 'Concurrent set', 'owner-set'),
-      () => flags.reset(key, 'Concurrent reset', 'owner-reset'),
+    const { results, settledWhileHeld } = await runBehindHeldFeatureFlagLock(key, [
+      () => flags.set(key, false, 'Concurrent set', 'owner-set', 1),
+      () => flags.reset(key, 'Concurrent reset', 'owner-reset', 1),
     ]);
     expect(settledWhileHeld).toBe(0);
+    expect(results.filter(({ status }) => status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find(({ status }) => status === 'rejected') as PromiseRejectedResult;
+    expect(rejected.reason).toMatchObject({ code: 'feature_flag_revision_conflict', status: 409 });
 
     const finalState = (await flags.list()).find((state) => state.key === key)!;
     const payloads = await featureFlagEventPayloads(key);
-    assertTruthfulChain(payloads, { enabled: true, source: 'database' }, {
-      enabled: finalState.enabled,
-      source: finalState.source,
-    });
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0].before).toEqual({ enabled: true, source: 'database' });
+    expect(payloads[0].after).toEqual({ enabled: finalState.enabled, source: finalState.source });
   });
 
   it('rejects unknown keys and a missing or whitespace-only reason without persisting', async () => {
     await request(app.getHttpServer())
       .patch('/feature-flags/unknown.flag')
       .set('Authorization', `Bearer ${tokens.owner}`)
-      .send({ enabled: true, reason: 'not allowlisted' })
+      .send({ enabled: true, reason: 'not allowlisted', expectedRevision: null })
       .expect(422);
     await request(app.getHttpServer())
       .patch(`/feature-flags/${FeatureFlagKey.AutoRefund}`)
       .set('Authorization', `Bearer ${tokens.owner}`)
-      .send({ enabled: true })
+      .send({ enabled: true, expectedRevision: null })
+      .expect(400);
+    await request(app.getHttpServer())
+      .patch(`/feature-flags/${FeatureFlagKey.AutoRefund}`)
+      .set('Authorization', `Bearer ${tokens.owner}`)
+      .send({ enabled: true, reason: 'Missing concurrency token' })
       .expect(400);
     await request(app.getHttpServer())
       .delete(`/feature-flags/${FeatureFlagKey.AutoRefund}`)
       .set('Authorization', `Bearer ${tokens.owner}`)
-      .send({ reason: '   ' })
+      .send({ reason: '   ', expectedRevision: null })
       .expect(400);
 
     expect(await prisma.featureFlagOverride.count()).toBe(0);
@@ -274,20 +302,40 @@ describe('Feature flags (integration)', () => {
     await request(app.getHttpServer())
       .patch(`/feature-flags/${FeatureFlagKey.OwnerResolution}`)
       .set('Authorization', `Bearer ${tokens.admin}`)
-      .send({ enabled: true, reason: 'Admin must not change flags' })
+      .send({ enabled: true, reason: 'Admin must not change flags', expectedRevision: null })
       .expect(403);
     await request(app.getHttpServer())
       .delete(`/feature-flags/${FeatureFlagKey.OwnerResolution}`)
       .set('Authorization', `Bearer ${tokens.admin}`)
-      .send({ reason: 'Admin must not reset flags' })
+      .send({ reason: 'Admin must not reset flags', expectedRevision: null })
       .expect(403);
     await request(app.getHttpServer()).get('/feature-flags').expect(401);
+  });
+
+  it('keeps warehouse supply operations usable without leaking registry metadata or sources', async () => {
+    process.env.TO_ORDER_CHECKOUT_ENABLED = 'true';
+    const response = await request(app.getHttpServer())
+      .get('/procurement/supply-operations')
+      .set('Authorization', `Bearer ${tokens.warehouse}`)
+      .expect(200);
+
+    expect(response.body).not.toHaveProperty('flags');
+    expect(response.body.capabilities).toEqual({
+      financialQueuesVisible: false,
+      ownerResolutionAvailable: false,
+      toOrderCheckoutEnabled: true,
+      cancellationEnabled: false,
+    });
+    const serialized = JSON.stringify(response.body);
+    for (const forbidden of ['"source"', 'legacyEnv', 'overrideRevision', 'TO_ORDER_CHECKOUT_ENABLED']) {
+      expect(serialized).not.toContain(forbidden);
+    }
   });
 
   async function runBehindHeldFeatureFlagLock<T>(
     key: string,
     operations: Array<() => Promise<T>>,
-  ): Promise<{ results: T[]; settledWhileHeld: number }> {
+  ): Promise<{ results: PromiseSettledResult<T>[]; settledWhileHeld: number }> {
     let signalAcquired!: () => void;
     let releaseLock!: () => void;
     const acquired = new Promise<void>((resolve) => { signalAcquired = resolve; });
@@ -315,7 +363,7 @@ describe('Feature flags (integration)', () => {
     const settledWhileHeld = settled;
     releaseLock();
     await holder;
-    return { results: await Promise.all(pending), settledWhileHeld };
+    return { results: await Promise.allSettled(pending), settledWhileHeld };
   }
 
   async function featureFlagEventPayloads(key: string): Promise<FeatureFlagEventPayload[]> {
@@ -323,22 +371,5 @@ describe('Feature flags (integration)', () => {
       where: { type: 'feature_flag.changed', refs: { has: key } },
     });
     return events.map((event) => event.payload as unknown as FeatureFlagEventPayload);
-  }
-
-  function assertTruthfulChain(
-    payloads: FeatureFlagEventPayload[],
-    initial: LedgerState,
-    final: LedgerState,
-  ): void {
-    expect(payloads).toHaveLength(2);
-    const first = payloads.find((payload) => statesEqual(payload.before, initial));
-    expect(first).toBeDefined();
-    const second = payloads.find((payload) => payload !== first && statesEqual(payload.before, first!.after));
-    expect(second).toBeDefined();
-    expect(second!.after).toEqual(final);
-  }
-
-  function statesEqual(left: LedgerState, right: LedgerState): boolean {
-    return left.enabled === right.enabled && left.source === right.source;
   }
 });

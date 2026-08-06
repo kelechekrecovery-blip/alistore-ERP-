@@ -9,6 +9,7 @@ import {
   type FeatureFlagState,
 } from '@/lib/api/feature-flags';
 import { Card } from './Card';
+import { ApiError } from '@/lib/api/http';
 
 type PendingMutation = {
   key: FeatureFlagKey;
@@ -58,16 +59,31 @@ export function FeatureFlagsView({
     }
     setBusy(pending.key);
     setMutationError('');
+    setNotice('');
     try {
+      const current = flags?.find((flag) => flag.key === pending.key);
+      if (!current) throw new Error('Feature flag state is unavailable; refresh and retry');
       const next = pending.action === 'reset'
-        ? await resetFeatureFlag(pending.key, reason, accessToken)
-        : await setFeatureFlag(pending.key, Boolean(pending.enabled), reason, accessToken);
+        ? await resetFeatureFlag(pending.key, reason, current.overrideRevision, accessToken)
+        : await setFeatureFlag(
+          pending.key,
+          Boolean(pending.enabled),
+          reason,
+          current.overrideRevision,
+          accessToken,
+        );
       setFlags((current) => current?.map((flag) => flag.key === next.key ? next : flag) ?? [next]);
       setReasons((current) => ({ ...current, [pending.key]: '' }));
       setNotice(pending.action === 'reset' ? 'Deploy-политика восстановлена' : 'Override применён без перезапуска');
       setPending(null);
     } catch (cause) {
-      setMutationError(cause instanceof Error ? cause.message : 'Изменение не применено');
+      if (cause instanceof ApiError && cause.status === 409) {
+        await load();
+        setPending(null);
+        setMutationError('Флаг уже изменён в другой вкладке. Состояние обновлено — проверьте его и подтвердите заново.');
+      } else {
+        setMutationError(cause instanceof Error ? cause.message : 'Изменение не применено');
+      }
     } finally {
       setBusy(null);
     }
@@ -83,6 +99,8 @@ export function FeatureFlagsView({
   }
 
   if (!flags) return <Card className="p-5"><p className="text-sm text-muted">Загрузка feature flags…</p></Card>;
+
+  const pendingFlag = pending ? flags.find((flag) => flag.key === pending.key) : undefined;
 
   return (
     <div className="space-y-4" data-testid="feature-flags-view">
@@ -138,7 +156,11 @@ export function FeatureFlagsView({
         <div className="fixed inset-0 z-[70] grid place-items-center bg-black/70 p-4" role="presentation">
           <div role="dialog" aria-modal="true" aria-labelledby="feature-flag-confirm-title" className="w-full max-w-md rounded-[14px] border border-surface-3 bg-ink-dark p-5 shadow-2xl">
             <div id="feature-flag-confirm-title" className="font-display text-lg font-bold text-white">Подтвердите изменение</div>
-            <p className="mt-2 text-sm text-muted">{pending.key}: {pending.action === 'reset' ? 'удалить override и вернуть deploy-политику' : pending.enabled ? 'включить' : 'выключить'}.</p>
+            <p className="mt-2 text-sm text-muted">
+              {pending.action === 'reset' && pendingFlag
+                ? `Сброс удалит override и ${pendingFlag.fallback.enabled ? 'ВКЛЮЧИТ' : 'ВЫКЛЮЧИТ'} флаг через ${SOURCE_LABEL[pendingFlag.fallback.source]}.`
+                : `${pending.key}: ${pending.enabled ? 'включить' : 'выключить'}.`}
+            </p>
             <p className="mt-2 text-xs text-subtle">Причина: {reasons[pending.key]?.trim()}</p>
             {mutationError && <p role="alert" className="mt-3 text-sm text-danger-soft">{mutationError}</p>}
             <div className="mt-5 flex justify-end gap-2">

@@ -71,7 +71,9 @@ export class SupplyOperationsService {
       readySupplies,
       cancellations,
       failedRefunds,
-      featureFlagStates,
+      toOrderCheckoutEnabled,
+      cancellationEnabled,
+      ownerResolutionEnabled,
     ] = await Promise.all([
       this.prisma.orderReceivable.findMany({
         where: {
@@ -168,7 +170,9 @@ export class SupplyOperationsService {
             take: 100,
           })
         : Promise.resolve([]),
-      this.featureFlags.list(),
+      this.featureFlags.isEnabled(FeatureFlagKey.ToOrderCheckout),
+      this.featureFlags.isEnabled(FeatureFlagKey.Cancellation),
+      this.featureFlags.isEnabled(FeatureFlagKey.OwnerResolution),
     ]);
 
     const queues: Record<SupplyOperationQueueKey, SupplyOperationRow[]> = {
@@ -241,15 +245,11 @@ export class SupplyOperationsService {
 
     return {
       generatedAt: now,
-      flags: Object.fromEntries(
-        featureFlagStates.map((state) => [state.key, state]),
-      ) as Record<FeatureFlagKey, typeof featureFlagStates[number]>,
       capabilities: {
         financialQueuesVisible,
-        ownerResolutionAvailable: role === 'owner'
-          && featureFlagStates.some((state) => (
-            state.key === FeatureFlagKey.OwnerResolution && state.enabled
-          )),
+        ownerResolutionAvailable: role === 'owner' && ownerResolutionEnabled,
+        toOrderCheckoutEnabled,
+        cancellationEnabled,
       },
       counts: Object.fromEntries(
         SUPPLY_OPERATION_QUEUE_KEYS.map((key) => [key, queues[key].length]),

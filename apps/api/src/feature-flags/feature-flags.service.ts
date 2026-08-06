@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
+import { ConflictError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   FEATURE_FLAGS,
@@ -18,11 +19,19 @@ export type FeatureFlagSource = 'database' | 'environment' | 'default';
 export interface FeatureFlagState extends FeatureFlagDefinition {
   enabled: boolean;
   source: FeatureFlagSource;
+  overrideRevision: number | null;
+  fallback: FeatureFlagFallback;
+}
+
+export interface FeatureFlagFallback {
+  enabled: boolean;
+  source: Exclude<FeatureFlagSource, 'database'>;
 }
 
 interface StoredOverride {
   key: string;
   enabled: boolean;
+  revision: number;
 }
 
 interface EvaluatedValue {
@@ -57,15 +66,22 @@ export class FeatureFlagsService {
     return FEATURE_FLAGS.map((definition) => this.state(definition, stored.get(definition.key)));
   }
 
-  async set(key: string, enabled: boolean, reason: string, actor: string): Promise<FeatureFlagState> {
+  async set(
+    key: string,
+    enabled: boolean,
+    reason: string,
+    actor: string,
+    expectedRevision: number | null,
+  ): Promise<FeatureFlagState> {
     const definition = featureFlagDefinition(key);
     const normalizedReason = this.requireReason(reason);
 
     return this.audit.transaction(async (tx) => {
       await this.lockOverride(tx, definition.key);
       const existing = await tx.featureFlagOverride.findUnique({ where: { key: definition.key } });
+      this.assertExpectedRevision(existing?.revision ?? null, expectedRevision);
       const before = this.evaluate(definition, existing);
-      await tx.featureFlagOverride.upsert({
+      const stored = await tx.featureFlagOverride.upsert({
         where: { key: definition.key },
         create: {
           key: definition.key,
@@ -77,39 +93,56 @@ export class FeatureFlagsService {
           enabled,
           reason: normalizedReason,
           updatedBy: actor,
+          revision: { increment: 1 },
         },
       });
       const after: EvaluatedValue = { enabled, source: 'database' };
       return {
-        result: { ...definition, ...after },
+        result: this.state(definition, stored),
         events: [this.changedEvent(definition.key, normalizedReason, before, after, actor)],
       };
     });
   }
 
-  async reset(key: string, reason: string, actor: string): Promise<FeatureFlagState> {
+  async reset(
+    key: string,
+    reason: string,
+    actor: string,
+    expectedRevision: number | null,
+  ): Promise<FeatureFlagState> {
     const definition = featureFlagDefinition(key);
     const normalizedReason = this.requireReason(reason);
 
     return this.audit.transaction(async (tx) => {
       await this.lockOverride(tx, definition.key);
       const existing = await tx.featureFlagOverride.findUnique({ where: { key: definition.key } });
+      this.assertExpectedRevision(existing?.revision ?? null, expectedRevision);
       const before = this.evaluate(definition, existing);
       await tx.featureFlagOverride.deleteMany({ where: { key: definition.key } });
       const after = this.evaluate(definition);
       return {
-        result: { ...definition, ...after },
+        result: this.state(definition),
         events: [this.changedEvent(definition.key, normalizedReason, before, after, actor)],
       };
     });
   }
 
   private state(definition: FeatureFlagDefinition, row?: StoredOverride): FeatureFlagState {
-    return { ...definition, ...this.evaluate(definition, row) };
+    const fallback = this.fallback(definition);
+    return {
+      ...definition,
+      ...(row ? { enabled: row.enabled, source: 'database' as const } : fallback),
+      overrideRevision: row?.revision ?? null,
+      fallback,
+    };
   }
 
   private evaluate(definition: FeatureFlagDefinition, row?: StoredOverride | null): EvaluatedValue {
     if (row) return { enabled: row.enabled, source: 'database' };
+    return this.fallback(definition);
+  }
+
+  private fallback(definition: FeatureFlagDefinition): FeatureFlagFallback {
     const rawEnvironmentValue = this.config.get<unknown>(definition.legacyEnv);
     if (rawEnvironmentValue !== undefined) {
       return {
@@ -118,6 +151,15 @@ export class FeatureFlagsService {
       };
     }
     return { enabled: definition.defaultEnabled, source: 'default' };
+  }
+
+  private assertExpectedRevision(current: number | null, expected: number | null): void {
+    if (current !== expected) {
+      throw new ConflictError(
+        'feature_flag_revision_conflict',
+        'Feature flag changed since it was loaded; refresh and confirm the latest state',
+      );
+    }
   }
 
   private requireReason(reason: string): string {

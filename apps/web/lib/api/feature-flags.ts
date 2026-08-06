@@ -18,6 +18,11 @@ export interface FeatureFlagState {
   legacyEnv: string;
   enabled: boolean;
   source: FeatureFlagSource;
+  overrideRevision: number | null;
+  fallback: {
+    enabled: boolean;
+    source: Exclude<FeatureFlagSource, 'database'>;
+  };
 }
 
 export function fetchFeatureFlags(accessToken: string): Promise<FeatureFlagState[]> {
@@ -28,15 +33,25 @@ export function setFeatureFlag(
   key: FeatureFlagKey,
   enabled: boolean,
   reason: string,
+  expectedRevision: number | null,
   accessToken: string,
 ): Promise<FeatureFlagState> {
-  return patchAuthJson(`/feature-flags/${encodeURIComponent(key)}`, { enabled, reason }, accessToken);
+  return patchAuthJson(
+    `/feature-flags/${encodeURIComponent(key)}`,
+    { enabled, reason, expectedRevision },
+    accessToken,
+  );
 }
 
 export function resetFeatureFlag(
   key: FeatureFlagKey,
   reason: string,
+  expectedRevision: number | null,
   accessToken: string,
 ): Promise<FeatureFlagState> {
-  return deleteAuthJson(`/feature-flags/${encodeURIComponent(key)}`, { reason }, accessToken);
+  return deleteAuthJson(
+    `/feature-flags/${encodeURIComponent(key)}`,
+    { reason, expectedRevision },
+    accessToken,
+  );
 }

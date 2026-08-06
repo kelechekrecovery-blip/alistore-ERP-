@@ -27,7 +27,7 @@ test('admin is read-only and owner override/reset is reflected without restart',
   await expect(adminRow.getByRole('button', { name: 'Выключить' })).toBeDisabled();
   const forbidden = await request.patch(`${API_BASE}/feature-flags/${KEY}`, {
     headers: { authorization: `Bearer ${admin.accessToken}` },
-    data: { enabled: false, reason: 'Admin must remain read-only' },
+    data: { enabled: false, reason: 'Admin must remain read-only', expectedRevision: null },
   });
   expect(forbidden.status()).toBe(403);
 
@@ -39,9 +39,30 @@ test('admin is read-only and owner override/reset is reflected without restart',
   const ownerRow = page.getByTestId(`feature-flag-${KEY}`);
   await expect(ownerRow).toContainText('deploy env');
   await expect(ownerRow).toContainText('включён');
+
+  const otherTab = await request.patch(`${API_BASE}/feature-flags/${KEY}`, {
+    headers: { authorization: `Bearer ${owner.accessToken}` },
+    data: { enabled: false, reason: 'Simulate a newer owner tab', expectedRevision: null },
+  });
+  expect(otherTab.status()).toBe(200);
   await ownerRow.getByLabel(`Причина ${KEY}`).fill('Pause to-order checkout for E2E verification');
   await ownerRow.getByRole('button', { name: 'Выключить' }).click();
   await expect(page.getByRole('dialog', { name: 'Подтвердите изменение' })).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Подтвердить' }).click();
+
+  await expect(page.getByText('Флаг уже изменён в другой вкладке. Состояние обновлено — проверьте его и подтвердите заново.')).toBeVisible();
+  await expect(ownerRow).toContainText('override базы');
+  await expect(ownerRow).toContainText('выключен');
+
+  await ownerRow.getByLabel(`Причина ${KEY}`).fill('Restore deploy policy after stale-tab verification');
+  await ownerRow.getByRole('button', { name: 'Сбросить к deploy default' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Сброс удалит override и ВКЛЮЧИТ флаг через deploy env.');
+  await page.getByRole('dialog').getByRole('button', { name: 'Подтвердить' }).click();
+  await expect(ownerRow).toContainText('deploy env');
+  await expect(ownerRow).toContainText('включён');
+
+  await ownerRow.getByLabel(`Причина ${KEY}`).fill('Pause to-order checkout after stale-tab verification');
+  await ownerRow.getByRole('button', { name: 'Выключить' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Подтвердить' }).click();
 
   await expect(ownerRow).toContainText('override базы');
@@ -52,10 +73,13 @@ test('admin is read-only and owner override/reset is reflected without restart',
     headers: { authorization: `Bearer ${owner.accessToken}` },
   });
   expect(operations.status()).toBe(200);
-  expect((await operations.json()).flags[KEY]).toMatchObject({ enabled: false, source: 'database' });
+  const operationsReport = await operations.json();
+  expect(operationsReport).not.toHaveProperty('flags');
+  expect(operationsReport.capabilities.toOrderCheckoutEnabled).toBe(false);
 
   await ownerRow.getByLabel(`Причина ${KEY}`).fill('Restore deploy policy after E2E verification');
   await ownerRow.getByRole('button', { name: 'Сбросить к deploy default' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Сброс удалит override и ВКЛЮЧИТ флаг через deploy env.');
   await page.getByRole('dialog').getByRole('button', { name: 'Подтвердить' }).click();
 
   await expect(ownerRow).toContainText('deploy env');
