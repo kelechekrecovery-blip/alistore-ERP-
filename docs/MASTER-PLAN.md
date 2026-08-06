@@ -25,6 +25,13 @@
 §Rollback (bootstrap каталога и откат) · `PRODUCTION-ACTIVATION.md` (гейт
 активации) · `READINESS.md` §внешние доступы · `BACKLOG.md` (307 задач, волны).
 
+**Контракт миграций и отката:** [DATA-MIGRATION-COMPATIBILITY.md](DATA-MIGRATION-COMPATIBILITY.md)
+— единственный источник правил для PostgreSQL/Prisma: расширение → совместимый
+релиз → backfill/dry-run → сверка → при необходимости dual-read/write → отдельный
+retirement. Откат приложения — только совместимый предыдущий образ и no-op
+`prisma migrate deploy`; откат схемы запрещён. Это не возвращает к жизни ни один
+из мёртвых phase-документов выше.
+
 ---
 
 ## §1 Где мы на самом деле

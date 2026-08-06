@@ -73,6 +73,28 @@ npm run preflight -w @alistore/api -- --env-file .env.production --json
 npm run readiness -w @alistore/api -- --env-file .env.production --json
 ```
 
+## 3.1 Database migration release gate
+
+Before any release containing a Prisma/database change, follow the authoritative
+[Data Migration Compatibility Contract](DATA-MIGRATION-COMPATIBILITY.md). The
+required release evidence is: a fresh backup with successful restore verification;
+the exact candidate rehearsed on disposable PostgreSQL 16 through the complete
+database deploy chain; a populated-data probe; the prior/candidate compatibility
+matrix; and post-deploy migration, reconciliation, health, and smoke results.
+Do not treat an empty database rehearsal or a scheduled backup as sufficient.
+
+Deploy only additive, compatible schema changes first. Backfills follow the
+compatible image, must be idempotent and observable, and require reconciliation
+before a required constraint or retirement release. Use dual-read/write whenever
+old and new representations can coexist. For large indexes, use the validated
+concurrent post-deploy pattern rather than a transaction-bound Prisma migration.
+
+If the application must be rolled back, deploy the pre-approved compatible image
+through the normal platform path. `prisma migrate deploy` is allowed only as the
+expected no-op on the already-migrated database. Never run a reverse, down, or
+destructive schema migration during rollback; preserve evidence and ship a
+forward repair after service recovery.
+
 ## 4. Provider QA
 
 Before setting the strict gate to green, verify live callbacks:
