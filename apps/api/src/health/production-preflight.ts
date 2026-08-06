@@ -334,7 +334,7 @@ const CHECKS: CheckDefinition[] = [
     area: 'identity',
     title: 'SMS provider is a value the code understands',
     requiredEnv: ['SMS_PROVIDER'],
-    note: 'Допустимы production (с полным набором SMS_*), android_gateway (мост через телефон, с полным набором SMS_GATEWAY_*), disabled (вход по SMS выключен) и noop вне production.',
+    note: 'Сейчас безопасны disabled или полностью настроенный android_gateway. Режим production остаётся заблокирован до реализации боевого адаптера: одних SMS_* и certification marker недостаточно.',
     evaluate: (env) => {
       // Блюпринт задавал `silent` — значение, которого селектор не знает
       // (`otp-sender-selector.ts`). Вызов стоит в useFactory провайдера
@@ -354,9 +354,10 @@ const CHECKS: CheckDefinition[] = [
           : 'unsafe';
       }
       if (mode !== 'production') return 'unsafe';
-      const complete = ['SMS_API_URL', 'SMS_API_KEY', 'SMS_SENDER_ID']
-        .every((name) => Boolean(env(name)?.trim()));
-      return complete ? 'ready' : 'unsafe';
+      // ProductionOtpSender is intentionally a fail-closed stub and always
+      // throws production_sms_provider_not_activated. Configuration shape can
+      // never be proof that a runtime implementation exists.
+      return 'unsafe';
     },
   },
 ];
