@@ -32,8 +32,13 @@ export interface StaffTotpSetupResult {
   totpEnabled: boolean;
 }
 
-export function staffLogin(username: string, password: string): Promise<StaffLoginResult> {
-  return postJson('/staff-auth/login', { username, password }, { 'x-alistore-staff-web': '1' }, true);
+export function staffLogin(username: string, password: string, totp?: string): Promise<StaffLoginResult> {
+  return postJson(
+    '/staff-auth/login',
+    { username, password, ...(totp?.trim() ? { totp: totp.trim() } : {}) },
+    { 'x-alistore-staff-web': '1' },
+    true,
+  );
 }
 
 /**

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Bell, MapPin } from 'lucide-react';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
-import { authConfirmEmailAttach, authMethods, authRequestEmailAttach, deleteAuthJson, fetchMySettings, getJson, updateMySettings, type CustomerSettings } from '@/lib/api';
+import { authConfirmEmailAttach, authMethods, authRequestEmailAttach, deleteAuthJson, fetchMySettings, getJson, supportsPhoneRegistration, updateMySettings, type CustomerSettings } from '@/lib/api';
 import { describeAuthError } from '@/lib/auth-errors';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -54,7 +54,7 @@ export default function SettingsPage() {
   useEffect(() => {
     let active = true;
     void authMethods()
-      .then((methods) => { if (active) setPhoneCapability(methods.phone.enabled); })
+      .then((methods) => { if (active) setPhoneCapability(supportsPhoneRegistration(methods)); })
       .catch(() => { if (active) setPhoneCapability(false); });
     return () => { active = false; };
   }, []);

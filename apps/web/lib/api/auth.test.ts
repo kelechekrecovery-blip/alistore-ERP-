@@ -10,6 +10,7 @@ import {
   authRequestEmailAttach,
   authRequestEmailOtp,
   authRequestOtp,
+  supportsPhoneRegistration,
   authTelegramLogin,
   authVerifyEmailOtp,
   authVerifyOtp,
@@ -32,6 +33,25 @@ function stubFetch(body: unknown, status = 200) {
 
 beforeEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe('auth capability semantics', () => {
+  it('does not treat a review-only phone login as a registration channel', () => {
+    const methods = {
+      phone: { enabled: true, registers: false },
+      email: { enabled: true, registers: false },
+      telegram: { enabled: false, registers: false, botUsername: null },
+      apple: { enabled: true, registers: true, clientId: 'kg.alistore.web', redirectUri: 'https://ali.kg/login' },
+      google: { enabled: true, registers: true, clientId: 'google-client' },
+      recovery: { enabled: false },
+      anyLoginAvailable: true,
+      registrationAvailable: true,
+    };
+
+    expect(supportsPhoneRegistration(methods)).toBe(false);
+    expect(supportsPhoneRegistration({ ...methods, phone: { enabled: true, registers: true } })).toBe(true);
+    expect(supportsPhoneRegistration(null)).toBe(false);
+  });
 });
 
 describe('email login/attach fetchers', () => {
