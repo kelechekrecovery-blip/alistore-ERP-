@@ -97,6 +97,10 @@ test('ERP desktop visual baseline', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/erp');
   await expect(page.getByText('AliStore ERP', { exact: true })).toBeVisible();
+  // The dashboard loads several protected reports after the shell mounts.
+  // Capture the business state, not whichever loading frame wins the race.
+  await expect(page.getByText('Открытых сигналов нет.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Смен открыто', { exact: true })).toBeVisible();
   await settlePage(page);
   await expect(page).toHaveScreenshot('erp-desktop.png', {
     animations: 'disabled',
