@@ -20,7 +20,7 @@ export interface PaymentIntentView {
 }
 
 export interface GatewayCreateIntentInput {
-  idempotencyKey?: string;
+  idempotencyKey: string;
   orderId: string;
   orderStatus: OrderStatus;
   method: OnlinePaymentMethod;
@@ -29,6 +29,7 @@ export interface GatewayCreateIntentInput {
 }
 
 export interface GatewayWebhookPayload {
+  provider: PaymentProviderName;
   method: OnlinePaymentMethod;
   orderId: string;
   amount: number;
@@ -37,8 +38,10 @@ export interface GatewayWebhookPayload {
   actor?: string;
 }
 
+export type GatewayWebhookInput = Omit<GatewayWebhookPayload, 'provider'>;
+
 export interface GatewayWebhookRequest {
-  payload: GatewayWebhookPayload;
+  payload: GatewayWebhookInput;
   rawBody?: Buffer;
   headers: Readonly<Record<string, string | string[] | undefined>>;
 }

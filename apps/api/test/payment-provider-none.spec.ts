@@ -21,6 +21,7 @@ describe('Payment gateway selector', () => {
     selectPaymentGatewayProvider((name) => values[name]);
 
   const intent = {
+    idempotencyKey: 'none-provider-key',
     orderId: 'order-1',
     orderStatus: 'awaiting_payment' as const,
     method: 'card' as const,

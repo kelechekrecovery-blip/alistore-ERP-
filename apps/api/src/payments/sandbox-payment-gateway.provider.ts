@@ -30,9 +30,7 @@ export class SandboxPaymentGatewayProvider implements PaymentGatewayProvider {
   async createIntent(input: GatewayCreateIntentInput): Promise<PaymentIntentView> {
     const provider = PROVIDER[input.method];
     const issuedAt = Date.now();
-    const replayToken = input.idempotencyKey
-      ? createHash('sha256').update(input.idempotencyKey).digest('hex').slice(0, 16)
-      : issuedAt.toString(36);
+    const replayToken = createHash('sha256').update(input.idempotencyKey).digest('hex').slice(0, 16);
     const txnId = `${provider}-${input.orderId}-${replayToken}`;
     const intentId = `PI-${input.orderId.slice(-8).toUpperCase()}-${replayToken.toUpperCase()}`;
     const expiresAt = new Date(issuedAt + 15 * 60 * 1000).toISOString();
@@ -53,7 +51,7 @@ export class SandboxPaymentGatewayProvider implements PaymentGatewayProvider {
 
   async verifyWebhook(input: GatewayWebhookRequest): Promise<GatewayWebhookPayload> {
     this.assertWebhookSignature(input.rawBody, input.headers);
-    return input.payload;
+    return { ...input.payload, provider: PROVIDER[input.payload.method] };
   }
 
   async refund(input: GatewayRefundInput): Promise<GatewayRefundResult> {

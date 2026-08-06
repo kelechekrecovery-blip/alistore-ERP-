@@ -6,7 +6,7 @@ import type { AuditInput } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ValidationError } from '../common/errors';
 import { ConflictError } from '../common/errors';
-import type { Customer, CustomerAddress } from '@prisma/client';
+import { Prisma, type Customer, type CustomerAddress } from '@prisma/client';
 import { CreateCustomerAddressDto, UpdateCustomerAddressDto, UpdateCustomerSettingsDto, UpsertCustomerDto } from './customers.dto';
 import { buildCustomerOverview, CustomerOverview } from './customer-overview';
 import { warrantyCoverage } from './warranty-coverage';
@@ -402,6 +402,53 @@ export class CustomersService {
         'customer_account_deleted',
         true,
       );
+      const ownedOrderIds = (await tx.order.findMany({
+        where: { customerId },
+        select: { id: true },
+      })).map((order) => order.id);
+      const paymentIntentOwner = {
+        OR: [
+          { customerId },
+          { orderId: { in: ownedOrderIds } },
+        ],
+      } satisfies Prisma.OnlinePaymentIntentCommandWhereInput;
+      const revokedAt = new Date();
+      await tx.onlinePaymentIntentCommand.updateMany({
+        where: { ...paymentIntentOwner, status: 'queued', customerRevokedAt: null },
+        data: {
+          status: 'cancelled',
+          customerRevokedAt: revokedAt,
+          terminalAt: revokedAt,
+          response: Prisma.DbNull,
+        },
+      });
+      // An in-flight provider call keeps its claim so its finalizer can persist
+      // provider evidence, but it may no longer publish the hosted-payment URL.
+      await tx.onlinePaymentIntentCommand.updateMany({
+        where: { ...paymentIntentOwner, status: 'creating', customerRevokedAt: null },
+        data: { customerRevokedAt: revokedAt, response: Prisma.DbNull },
+      });
+      await tx.onlinePaymentIntentCommand.updateMany({
+        where: {
+          ...paymentIntentOwner,
+          customerRevokedAt: null,
+          status: { in: ['creation_unknown', 'requires_action', 'manual_review'] },
+        },
+        data: {
+          status: 'cancel_pending',
+          customerRevokedAt: revokedAt,
+          response: Prisma.DbNull,
+        },
+      });
+      await tx.onlinePaymentIntentCommand.updateMany({
+        where: {
+          ...paymentIntentOwner,
+          customerRevokedAt: null,
+          status: { in: ['paid', 'creation_failed', 'payment_failed', 'cancelled', 'expired'] },
+        },
+        data: { customerRevokedAt: revokedAt, response: Prisma.DbNull },
+      });
+
       if (isAnonymized(customer)) return { result: { id: customer.id, deleted: true }, events: [] };
 
       // Строго до переименования: challenge'ы связаны с клиентом только телефоном

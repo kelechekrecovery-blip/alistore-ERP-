@@ -149,6 +149,9 @@ describe('Customer account deletion and export', () => {
 
   it('anonymizes PII, erases addresses/identities and revokes every session', async () => {
     const owner = await customer('11', true);
+    const legacyOwnedOrder = await prisma.order.create({
+      data: { customerId: owner.id, channel: 'web', total: 1000 },
+    });
     const ownerAccessToken = token(owner);
     const preDeletionGuestCapability = issueGuestCheckoutCapability(owner.id);
     await prisma.customerAddress.create({
@@ -217,6 +220,67 @@ describe('Customer account deletion and export', () => {
         expiresAt: new Date(Date.now() + 86_400_000),
       })),
     });
+    const paymentResponse = {
+      intentId: `intent-${run}`,
+      provider: 'card',
+      orderId: `order-${run}`,
+      orderStatus: 'awaiting_payment',
+      method: 'card',
+      amount: 1000,
+      txnId: `txn-${run}`,
+      status: 'requires_action',
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      paymentUrl: `/api/sandbox/payments/card/intent-${run}`,
+      qrPayload: null,
+    };
+    await prisma.onlinePaymentIntentCommand.createMany({
+      data: [
+        {
+          id: `intent-command-active-${run}`,
+          idempotencyKey: `client-active-${run}`,
+          providerIdempotencyKey: `provider-active-${run}`,
+          requestHash: `request-active-${run}`,
+          customerId: owner.id,
+          orderId: paymentResponse.orderId,
+          method: 'card',
+          amount: 1000,
+          gatewayMode: 'sandbox',
+          status: 'requires_action',
+          providerName: 'card',
+          providerIntentId: paymentResponse.intentId,
+          providerTxnId: paymentResponse.txnId,
+          providerResult: { intentId: paymentResponse.intentId },
+          providerResultHash: `sha256:${'a'.repeat(64)}`,
+          providerResultAt: new Date(),
+          response: paymentResponse,
+          expiresAt: new Date(paymentResponse.expiresAt),
+          attempts: 1,
+          dispatchedAt: new Date(),
+        },
+        {
+          id: `intent-command-paid-${run}`,
+          idempotencyKey: `client-paid-${run}`,
+          providerIdempotencyKey: `provider-paid-${run}`,
+          requestHash: `request-paid-${run}`,
+          customerId: owner.id,
+          orderId: `paid-order-${run}`,
+          method: 'card',
+          amount: 1000,
+          gatewayMode: 'sandbox',
+          status: 'paid',
+          providerName: 'card',
+          providerIntentId: `paid-intent-${run}`,
+          providerTxnId: `paid-txn-${run}`,
+          providerResult: { intentId: `paid-intent-${run}` },
+          providerResultHash: `sha256:${'b'.repeat(64)}`,
+          providerResultAt: new Date(),
+          response: { ...paymentResponse, intentId: `paid-intent-${run}`, txnId: `paid-txn-${run}` },
+          attempts: 1,
+          dispatchedAt: new Date(),
+          terminalAt: new Date(),
+        },
+      ],
+    });
 
     await request(app.getHttpServer())
       .delete('/customers/me')
@@ -246,6 +310,12 @@ describe('Customer account deletion and export', () => {
     expect(await prisma.pushToken.count({ where: { customerId: owner.id } })).toBe(0);
     expect(await prisma.otpChallenge.count({ where: { customerId: owner.id } })).toBe(0);
     expect(await prisma.socialEnrollment.count({ where: { customerId: owner.id } })).toBe(0);
+    expect(await prisma.onlinePaymentIntentCommand.findUnique({
+      where: { id: `intent-command-active-${run}` },
+    })).toMatchObject({ status: 'cancel_pending', response: null, customerRevokedAt: expect.any(Date) });
+    expect(await prisma.onlinePaymentIntentCommand.findUnique({
+      where: { id: `intent-command-paid-${run}` },
+    })).toMatchObject({ status: 'paid', response: null, customerRevokedAt: expect.any(Date) });
     const sessions = await prisma.refreshToken.findMany({ where: { customerId: owner.id } });
     expect(sessions).toHaveLength(2);
     expect(sessions.every((session) => session.revokedAt !== null)).toBe(true);
@@ -280,6 +350,28 @@ describe('Customer account deletion and export', () => {
       .set('Authorization', `Bearer ${ownerAccessToken}`)
       .expect(401);
     await expect(customers.deleteAccount(owner.id)).resolves.toEqual({ id: owner.id, deleted: true });
+    await prisma.onlinePaymentIntentCommand.create({
+      data: {
+        id: `intent-command-legacy-${run}`,
+        idempotencyKey: `legacy-client-${run}`,
+        providerIdempotencyKey: `legacy-provider-${run}`,
+        requestHash: `legacy-columns-v1:${run}`,
+        customerId: 'system:payment-intent',
+        orderId: legacyOwnedOrder.id,
+        method: 'card',
+        amount: 1000,
+        gatewayMode: 'legacy',
+        status: 'manual_review',
+        providerResult: { intentId: `legacy-intent-${run}` },
+        providerResultHash: `legacy-unverified:${run}`,
+        providerResultAt: new Date(),
+        response: paymentResponse,
+      },
+    });
+    await expect(customers.deleteAccount(owner.id)).resolves.toEqual({ id: owner.id, deleted: true });
+    expect(await prisma.onlinePaymentIntentCommand.findUnique({
+      where: { id: `intent-command-legacy-${run}` },
+    })).toMatchObject({ status: 'cancel_pending', response: null, customerRevokedAt: expect.any(Date) });
     expect(await prisma.auditEvent.count({ where: { type: 'customer.deleted', refs: { has: owner.id } } })).toBe(1);
   });
 

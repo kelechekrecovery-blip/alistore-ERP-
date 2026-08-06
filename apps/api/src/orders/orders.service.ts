@@ -1104,8 +1104,9 @@ export class OrdersService {
   }
 
   /** Generic guarded status transition (writes an order.* ledger event). */
-  async transition(orderId: string, to: OrderStatus, actor: string) {
+  async transition(orderId: string, to: OrderStatus, actor: string, customerId?: string) {
     return this.audit.transaction(async (tx) => {
+      if (customerId) await lockActiveCustomerOnTx(tx, customerId);
       await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({
         where: { id: orderId },
@@ -1116,6 +1117,9 @@ export class OrdersService {
         },
       });
       if (!order) {
+        throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
+      }
+      if (customerId && order.customerId !== customerId) {
         throw new ValidationError('order_not_found', `Заказ ${orderId} не найден`);
       }
       this.assertNotDemo(order);

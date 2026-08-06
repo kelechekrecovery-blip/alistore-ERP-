@@ -168,6 +168,7 @@ export class PaymentsController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: CreatePaymentIntentDto,
   ) {
+    if (user.typ !== 'customer') throw new UnauthorizedException('customer_access_required');
     return this.intents.createForCustomer(user.customerId, dto, idempotencyKey);
   }
 

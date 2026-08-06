@@ -78,6 +78,20 @@ enum PaymentStatus {
   voided
 }
 
+enum OnlinePaymentIntentCommandStatus {
+  queued
+  creating
+  creation_unknown
+  requires_action
+  cancel_pending
+  cancelled
+  creation_failed
+  payment_failed
+  paid
+  expired
+  manual_review
+}
+
 enum RefundStatus {
   requested
   approved
@@ -1584,19 +1598,43 @@ model PaymentReceivableAllocation {
 }
 
 model OnlinePaymentIntentCommand {
-  id             String        @id @default(cuid())
-  idempotencyKey String        @unique
-  customerId     String
-  orderId        String
-  method         PaymentMethod
-  amount         Int
-  returnUrl      String?
-  response       Json?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                     String                           @id @default(cuid())
+  idempotencyKey         String                           @unique
+  providerIdempotencyKey String                           @unique
+  requestHash            String
+  customerId             String
+  orderId                String
+  method                 PaymentMethod
+  amount                 Int
+  returnUrl              String?
+  gatewayMode            String
+  status                 OnlinePaymentIntentCommandStatus @default(queued)
+  providerName           String?
+  providerIntentId       String?
+  providerTxnId          String?
+  providerResult         Json?
+  providerResultHash     String?
+  providerResultAt       DateTime?
+  response               Json?
+  expiresAt              DateTime?
+  attempts               Int                              @default(0)
+  claimToken             String?
+  leaseUntil             DateTime?
+  nextAttemptAt          DateTime?
+  dispatchedAt           DateTime?
+  lastErrorCode          String?
+  lastErrorAt            DateTime?
+  customerRevokedAt      DateTime?
+  terminalAt             DateTime?
+  createdAt              DateTime                         @default(now())
+  updatedAt              DateTime                         @updatedAt
 
   @@index([customerId, createdAt])
-  @@index([orderId])
+  @@index([orderId, status])
+  @@index([status, nextAttemptAt])
+  @@index([status, leaseUntil])
+  @@index([providerName, providerIntentId])
+  @@index([providerName, providerTxnId])
 }
 
 model GiftCard {
