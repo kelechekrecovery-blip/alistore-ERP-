@@ -75,6 +75,10 @@ describe('render.yaml · боевой режим', () => {
     expect(blueprint).toMatch(/- key: AUTH_RECOVERY_OTP_ENABLED\n\s+sync: false/);
   });
 
+  it('оставляет Apple/Google регистрацию независимой от недоступного SMS-адаптера', () => {
+    expect(valuesOf('AUTH_SOCIAL_FIRST_SIGNUP_ENABLED')).toEqual(['true']);
+  });
+
   it('фиксирует единый публичный контракт Apple для Web и iOS', () => {
     expect(valuesOf('APPLE_CLIENT_ID')).toEqual(['kg.alistore.web,kg.alistore.client']);
     expect(valuesOf('APPLE_WEB_CLIENT_ID')).toEqual(['kg.alistore.web']);

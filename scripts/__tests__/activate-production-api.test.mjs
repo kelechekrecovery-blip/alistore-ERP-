@@ -24,6 +24,10 @@ test('launchd template configures the public Sign in with Apple audiences withou
     plist,
     /<key>(?:APPLE_PRIVATE_KEY|APPLE_KEY_ID|AUTH_REVIEW_OTP|DATABASE_URL|JWT_SECRET)<\/key>/u,
   );
+  assert.match(
+    plist,
+    /<key>AUTH_SOCIAL_FIRST_SIGNUP_ENABLED<\/key>\s*<string>true<\/string>/u,
+  );
 });
 
 test('launchd template is rendered for the selected stable release checkout', async () => {
@@ -93,10 +97,38 @@ test('green gate installs and restarts the production launch agent', async () =>
     ['npm', 'run', 'launch:check'],
     ['npm', 'run', 'api:build'],
     ['/usr/bin/plutil', '-lint', '/tmp/alistore-api-agent-test/com.alistore.api.plist'],
+    ['npm', 'run', 'db:deploy', '-w', '@alistore/api'],
     ['/bin/launchctl', 'bootout', 'gui/501/com.alistore.api'],
     ['/bin/launchctl', 'bootstrap', 'gui/501', '/tmp/alistore-test-home/Library/LaunchAgents/com.alistore.api.plist'],
     ['/bin/launchctl', 'kickstart', '-k', 'gui/501/com.alistore.api'],
   ]);
+});
+
+test('failed database deployment never touches launchd or the installed plist', async () => {
+  const calls = [];
+  const writes = [];
+  const run = async (command, args) => {
+    calls.push([command, ...args]);
+    if (command === 'npm' && args.includes('db:deploy')) {
+      throw new Error('migration blocked');
+    }
+  };
+
+  await assert.rejects(
+    activateProductionApi({
+      projectRoot,
+      run,
+      write: async (...args) => writes.push(args),
+      remove: async () => {},
+      makeTemporaryDirectory: async () => '/tmp/alistore-api-agent-test',
+      makeDirectory: async () => assert.fail('LaunchAgents must not be created'),
+      isLoaded: async () => assert.fail('launchd must not be queried'),
+    }),
+    /migration blocked/u,
+  );
+
+  assert.equal(writes.length, 1); // temporary rendered plist only
+  assert.equal(calls.some((call) => call[0] === '/bin/launchctl'), false);
 });
 
 test('failed activation restores the previous launch agent', async () => {

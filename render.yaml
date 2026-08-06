@@ -224,6 +224,11 @@ envVarGroups:
       # every Blueprint sync.
       - key: AUTH_EMAIL_LOGIN_ENABLED
         sync: false
+      # Apple/Google verify the identity directly. Keep first signup independent
+      # from the unavailable carrier-SMS adapter so new customers and App Review
+      # do not fall into an impossible phone-enrollment step.
+      - key: AUTH_SOCIAL_FIRST_SIGNUP_ENABLED
+        value: "true"
       # Канал критических алертов. Без этих двух значений alerter.service держит
       # алерты в массиве в памяти процесса (delivered: false) — рестарт их
       # стирает, и о 5xx, смерти relay и падении refund-релея не узнаёт никто.

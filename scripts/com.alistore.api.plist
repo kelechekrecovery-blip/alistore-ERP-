@@ -60,6 +60,11 @@
          launchd values take precedence over the production env file. -->
     <key>APPLE_CLIENT_ID</key>
     <string>kg.alistore.web,kg.alistore.client</string>
+    <!-- Apple/Google identities are already verified by their provider. With
+         carrier SMS disabled, social-first signup is the only honest path for
+         a new App Store reviewer or customer to create an account. -->
+    <key>AUTH_SOCIAL_FIRST_SIGNUP_ENABLED</key>
+    <string>true</string>
     <key>PATH</key>
     <string>/Users/alistore/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     <!-- Так же, как в npm-скрипте start:prod. -->
