@@ -186,6 +186,9 @@ function LoginForm() {
   const phoneValid = /^\+996\d{9}$/.test(phone.trim());
   const emailValid = EMAIL_RE.test(email.trim());
   const identity = channel === 'email' ? email.trim() : phone.trim();
+  const channelRegisters = channel === 'email'
+    ? Boolean(methods?.email.registers)
+    : Boolean(methods?.phone.registers);
   const socialProviderLabel = socialEnrollmentProvider === 'apple'
     ? 'Apple'
     : socialEnrollmentProvider === 'google'
@@ -276,7 +279,7 @@ function LoginForm() {
       cancelled = true;
       slot.replaceChildren();
     };
-  }, [channel, googleClientId, googleEnabled, socialEnrollmentActive]);
+  }, [googleClientId, googleEnabled, socialEnrollmentActive]);
 
   useEffect(() => {
     if (resendSeconds <= 0) return;
@@ -286,28 +289,44 @@ function LoginForm() {
 
   const baseCopy = locale === 'ru'
     ? {
-        title: socialEnrollmentActive ? 'Подтвердите номер телефона' : 'Войти или создать аккаунт',
+        title: socialEnrollmentActive
+          ? 'Подтвердите номер телефона'
+          : methods?.registrationAvailable === false
+            ? 'Войти в аккаунт'
+            : 'Войти или создать аккаунт',
         phoneSubtitle: socialEnrollmentActive
           ? `${socialProviderLabel} подтверждён. Введите номер телефона — мы привяжем ${socialProviderLabel} только после проверки SMS-кода.`
-          : 'Если номер ещё не зарегистрирован, после проверки кода мы создадим аккаунт.',
+          : !phoneLoginEnabled
+            ? 'Код по SMS сейчас недоступен. Выберите доступный способ входа.'
+            : channelRegisters
+              ? 'Если номер ещё не зарегистрирован, после проверки кода мы создадим аккаунт.'
+              : 'Введите номер, который уже привязан к аккаунту.',
         emailSubtitle: 'Войдите по привязанной почте — код придёт на адрес, уже добавленный в аккаунт.',
         phoneLabel: 'Номер телефона',
         emailLabel: 'Email — привязанная почта',
         codeLabel: channel === 'email' ? 'Код из письма' : 'Код из SMS',
-        confirm: socialEnrollmentActive ? 'Подтвердить номер и войти' : 'Войти или создать аккаунт',
+        confirm: socialEnrollmentActive ? 'Подтвердить номер и войти' : channelRegisters ? 'Войти или создать аккаунт' : 'Войти',
         resend: 'Отправить код ещё раз',
         sent: `Код отправлен на ${identity}`,
       }
     : {
-        title: socialEnrollmentActive ? 'Телефон номерин ырастаңыз' : 'Кирүү же аккаунт түзүү',
+        title: socialEnrollmentActive
+          ? 'Телефон номерин ырастаңыз'
+          : methods?.registrationAvailable === false
+            ? 'Аккаунтка кирүү'
+            : 'Кирүү же аккаунт түзүү',
         phoneSubtitle: socialEnrollmentActive
           ? `${socialProviderLabel} ырасталды. Телефон номерин киргизиңиз — SMS код текшерилгенден кийин гана ${socialProviderLabel} байланыштырылат.`
-          : 'Эгер номер каттала элек болсо, код текшерилгенден кийин аккаунт түзөбүз.',
+          : !phoneLoginEnabled
+            ? 'SMS код азыр жеткиликсиз. Жеткиликтүү кирүү ыкмасын тандаңыз.'
+            : channelRegisters
+              ? 'Эгер номер каттала элек болсо, код текшерилгенден кийин аккаунт түзөбүз.'
+              : 'Аккаунтка байланган телефон номерин киргизиңиз.',
         emailSubtitle: 'Байланган почта менен кириңиз — код аккаунтка кошулган дарекке келет.',
         phoneLabel: 'Телефон номери',
         emailLabel: 'Email — байланган почта',
         codeLabel: channel === 'email' ? 'Каттагы код' : 'SMS коду',
-        confirm: socialEnrollmentActive ? 'Номерди ырастап кирүү' : 'Кирүү же аккаунт түзүү',
+        confirm: socialEnrollmentActive ? 'Номерди ырастап кирүү' : channelRegisters ? 'Кирүү же аккаунт түзүү' : 'Кирүү',
         resend: 'Кодду кайра жөнөтүү',
         sent: `Код ${identity} дарегине жөнөтүлдү`,
       };
@@ -678,7 +697,7 @@ function LoginForm() {
                     ? t('login.cta.recovery')
                     : t('login.cta.sms')}
             </button>
-            {channel === 'phone' && (telegramEnabled || appleEnabled) && !socialEnrollmentActive && (
+            {(telegramEnabled || appleEnabled) && !socialEnrollmentActive && (
               <div className="mt-3 flex gap-2.5">
                 {telegramEnabled && (
                   <button
@@ -702,11 +721,11 @@ function LoginForm() {
                 )}
               </div>
             )}
-            {channel === 'phone' && telegramWidgetEnabled && !socialEnrollmentActive && (
+            {telegramWidgetEnabled && !socialEnrollmentActive && (
               // Виджет рисует Telegram своим скриптом — своей кнопки здесь нет.
               <div ref={telegramWidgetSlot} className="mt-3 flex justify-center" />
             )}
-            {channel === 'phone' && googleEnabled && !socialEnrollmentActive && (
+            {googleEnabled && !socialEnrollmentActive && (
               <div ref={googleWidgetSlot} className="mt-3 flex min-h-10 justify-center" aria-label="Войти через Google" />
             )}
             {socialEnrollmentActive && (
