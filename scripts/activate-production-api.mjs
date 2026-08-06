@@ -84,6 +84,10 @@ export async function activateProductionApi({
     await write(temporaryPlist, renderedPlist, { mode: 0o600 });
     await run('/usr/bin/plutil', ['-lint', temporaryPlist]);
     if (dryRun) return { activated: false, reason: 'dry-run', plist: renderedPlist, cleanupWarnings };
+    // The release may depend on a forward-compatible schema migration (for
+    // example nullable phone for social-first customers). Apply migrations
+    // before replacing or restarting launchd, matching Render's preDeploy gate.
+    await run('npm', ['run', 'db:deploy', '-w', '@alistore/api'], { cwd: projectRoot });
 
     const installedPlist = join(userHome, 'Library', 'LaunchAgents', 'com.alistore.api.plist');
     stagedPlist = `${installedPlist}.new`;
