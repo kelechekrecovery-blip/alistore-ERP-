@@ -15,6 +15,7 @@
     "api:dev": "npx --no-install wrangler dev --env local --persist-to .wrangler/state",
     "api:check": "node --check cloudflare/worker.js && node --test functions/**/*.test.js cloudflare/**/*.test.js scripts/__tests__/cloudflare-*.test.mjs",
     "api:contract:matrix": "node scripts/cloudflare-api-contract-matrix.mjs",
+    "gate0:baseline": "node scripts/gate0-baseline.mjs",
     "api:smoke:local": "node scripts/cloudflare-local-smoke.mjs",
     "infra:meili-smoke": "node scripts/meilisearch-smoke.mjs",
     "infra:metabase-smoke": "node scripts/metabase-smoke.mjs",
