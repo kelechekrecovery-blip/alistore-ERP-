@@ -157,74 +157,157 @@ Expected:
 - Storefront returns HTTP 200/308.
 - `Strict-Transport-Security` and `Content-Security-Policy` are present.
 
-## 6. Backup Schedule
+## 6. Production PostgreSQL Backup Schedule
 
-Install the backup script on the DB host:
+The macOS production path is `scripts/production-postgres-backup.mjs`. It:
+
+- reads `apps/api/.env.production.local` first, then
+  `apps/api/.env.production`; root-level equivalents are compatibility
+  fallbacks only, and inherited process variables win over every file;
+- requires `BACKUP_EXPECTED_DATABASE_IDENTITY` to exactly match the canonical
+  `host:port/database` derived from `DATABASE_URL`;
+- produces either a custom dump (default) or plain SQL, verifies it, compresses
+  it, and asks the installed `age` binary to validate the public recipient
+  before PostgreSQL is contacted;
+- uploads only to the private `alistore-backups-prod` R2 bucket over HTTPS,
+  downloads the object again to verify its actual SHA-256 bytes, and checks both
+  Cloudflare public-domain controls and anonymous S3 access before rotating;
+- keeps encrypted local copies and applies the same `BACKUP_KEEP_DAYS` retention
+  to exact script-owned names under `postgres/alistore-production/` only;
+- holds an exclusive local lock and handles SIGINT/SIGTERM so plaintext working
+  files, partial ciphertext, and the lock are cleaned up before launchd's
+  120-second exit timeout.
+
+Required production env keys (names only; never put values in tracked files):
+
+```text
+DATABASE_URL
+BACKUP_EXPECTED_DATABASE_IDENTITY
+S3_ENDPOINT
+BACKUP_AGE_RECIPIENT
+AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY
+  or MINIO_ROOT_USER + MINIO_ROOT_PASSWORD (existing app aliases)
+```
+
+One fail-closed public-surface gate is also required:
+
+```text
+# Preferred: account token with only `Workers R2 Storage Read`
+CLOUDFLARE_ACCOUNT_ID + BACKUP_CLOUDFLARE_READ_TOKEN
+
+# Or an authenticated HTTPS attestation service
+BACKUP_PRIVACY_GATE_URL + BACKUP_PRIVACY_GATE_TOKEN
+```
+
+The Cloudflare gate reads both the managed `r2.dev` domain and all custom R2
+domains; either being enabled/configured blocks the backup. An external gate
+must return a fresh (15 minutes maximum) JSON attestation with
+`bucket="alistore-backups-prod"`, `private=true`,
+`managedDomainEnabled=false`, `customDomains=[]`, and `checkedAt`. A bare
+environment assertion is intentionally not accepted. It must also return the
+exact `s3Endpoint` being attested; the native Cloudflare gate similarly requires
+its account ID to match the account embedded in `S3_ENDPOINT`.
+
+`S3_BACKUP_BUCKET` may be omitted because it safely defaults to
+`alistore-backups-prod`; any other value is rejected. Optional keys are
+`S3_REGION` (default `auto`), `BACKUP_FORMAT` (`custom` or `plain`),
+`BACKUP_DIR`, and `BACKUP_KEEP_DAYS` (default `14`). The `age` private identity
+must be stored separately from the workstation and R2 credentials. Only its
+public recipient belongs in the production environment. R2/Cloudflare/database
+secrets are never inherited by `pg_dump`, `pg_restore`, `age`, or `psql` child
+processes.
+
+Validate tools/configuration and the read-only privacy control-plane gate without
+connecting to PostgreSQL or reading/writing R2 objects:
 
 ```bash
-sudo install -m 0750 infra/backup.sh /opt/alistore/infra/backup.sh
-sudo mkdir -p /var/backups/alistore
+npm run backup:production:check
 ```
 
-Cron example:
-
-```cron
-0 3 * * * DATABASE_NAME=alistore_prod BACKUP_DIR=/var/backups/alistore BACKUP_KEEP_DAYS=14 /opt/alistore/infra/backup.sh
-```
-
-After the first run:
+Validate the generated plist and activation gate without changing launchd:
 
 ```bash
-ls -lh /var/backups/alistore
+npm run backup:production:activate
 ```
 
-The newest file should match:
+After reviewing that dry run, merge/deploy the files to the stable checkout and
+run the activation there. The installer rejects Codex and `/tmp` worktrees so a
+cleaned-up worktree cannot silently break the schedule again. Explicitly
+install/reload the daily 03:17 agent:
 
 ```bash
-alistore_prod-YYYYMMDD-HHMMSS.dump.gz
+npm run backup:production:activate -- --apply
 ```
 
-### Dev machine schedule (macOS, user-level, no sudo)
-
-Template: `infra/macos/kg.alistore.backup.plist` — daily 03:17, logs to
-`~/Library/Logs/alistore-backup{,.err}.log`, retention via `BACKUP_KEEP_DAYS=14`.
+Installation does not run a backup immediately. A first production run is a
+separate, explicit operation; monitor both logs while it runs:
 
 ```bash
-# Install a runnable copy (launchd children are TCC-blocked from ~/Desktop,
-# so point the agent at a path outside Desktop) and refresh it after edits:
-mkdir -p ~/bin && cp infra/backup.sh ~/bin/alistore-backup.sh && chmod 755 ~/bin/alistore-backup.sh
-
-# Load / reload:
-launchctl bootout gui/$(id -u)/kg.alistore.backup 2>/dev/null || true
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/kg.alistore.backup.plist
-
-# Smoke-run now and inspect:
-launchctl kickstart gui/$(id -u)/kg.alistore.backup
-cat ~/Library/Logs/alistore-backup.log
-
-# Unload:
-launchctl bootout gui/$(id -u)/kg.alistore.backup
+npm run backup:production:activate -- --apply --run-now
+tail -f ~/Library/Logs/alistore-production-backup{,.err}.log
 ```
 
-Adjust `DATABASE_NAME`, `BACKUP_DIR` and the script path in the plist for the
-local checkout. This covers the developer machine only; the staging host still
-needs its own cron/schedule per the gate in `BACKLOG.md` (`GAP-BACKUP-OPS-001`).
+The activation script refuses to interrupt a running backup and atomically
+replaces the historic broken `kg.alistore.backup` plist. An installation or
+bootstrap failure restores/re-bootstraps the previous plist. If only the
+explicit `--run-now` kickstart fails, the successfully installed schedule stays
+active and the command reports the failed immediate run for investigation. The
+generated plist contains only paths and safe runtime settings—not database or
+R2 credentials. Do not hand-edit or copy a checkout-specific plist into
+`~/Library/LaunchAgents`.
+
+Activation holds the same coordination lock used by backups/drills and checks
+launchd once more immediately before bootout. This closes the idle-check race
+where a scheduled backup could start while the replacement plist was staged.
+
+The coordination lock records PID, process start token, purpose, and timestamp.
+After a hard kill or power loss, a later run recovers it only after proving the
+PID exited or was reused with a different start token. The stale metadata is
+preserved as `.production-backup.stale-*.json` and an `ALERT` is emitted. An
+unreadable/unverifiable lock fails closed and requires manual process review.
+
+For local-only/self-hosted snapshots without R2, `infra/backup.sh` remains
+available, but it is not an acceptable production backup path.
 
 ## 7. Restore Drill
 
-Run this on a non-production database at least once before launch and monthly
-after launch.
+Run the committed offsite path against an expendable non-production database at
+least once before launch and monthly after launch. This is deliberately more
+than a local file check: it retrieves the selected object from R2, verifies the
+downloaded bytes against its SHA-256 metadata, decrypts it with the separately
+held identity, verifies the dump, and restores it.
+
+First create an empty drill database, give the database object a unique sentinel
+comment, and pin both. The drill database name must differ from the production
+database name regardless of host, DNS alias, tunnel, or alternate endpoint. Put
+the following values in a protected operator environment (never a tracked file
+or shell history):
 
 ```bash
 createdb alistore_restore_check
-gzip -dc /var/backups/alistore/<backup>.dump.gz | pg_restore --clean --if-exists --dbname=alistore_restore_check
+psql postgres -c "COMMENT ON DATABASE alistore_restore_check IS 'alistore-restore-drill:<unique-random-sentinel>'"
+export BACKUP_DRILL_OBJECT_KEY=postgres/alistore-production/<exact-object-key>.dump.gz.age
+export BACKUP_AGE_IDENTITY_FILE=/secure/offline/backup-identity.txt
+export BACKUP_DRILL_DATABASE_URL=postgresql://restore:<secret>@localhost:5432/alistore_restore_check
+export BACKUP_EXPECTED_DRILL_DATABASE_IDENTITY=localhost:5432/alistore_restore_check
+export BACKUP_EXPECTED_DRILL_SENTINEL=alistore-restore-drill:<unique-random-sentinel>
+export BACKUP_ALLOW_DRILL_RESTORE=YES_I_UNDERSTAND
+npm run backup:production:restore-drill
 psql alistore_restore_check -c 'select count(*) from "AuditEvent";'
 dropdb alistore_restore_check
 ```
 
+The script selects `pg_restore --single-transaction --exit-on-error` for a
+`.dump.gz.age` key and `psql --single-transaction --set ON_ERROR_STOP=on` for a
+`.sql.gz.age` key. It refuses keys outside the exact owned prefix/filename
+contract. Before retrieving the object—and before any `pg_restore --clean` or
+restoring `psql`—it runs a read-only catalog query for `current_database()` and
+the server-side database comment. A missing/mismatched sentinel, a different
+server-reported database name, or the production database name fails closed.
+
 Pass criteria:
 
-- `pg_restore` exits 0.
+- remote byte checksum, decryption, dump verification, and restore all exit 0;
 - `AuditEvent` query succeeds.
 - A recent order/customer/payment spot-check matches the source database.
 

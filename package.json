@@ -76,6 +76,11 @@
     "android:ui:all": "npm run android:ui",
     "launch:check": "npm run launch:preflight:strict && npm run launch:readiness:strict",
     "launch:activate:api": "node scripts/activate-production-api.mjs",
+    "backup:production": "node scripts/production-postgres-backup.mjs",
+    "backup:production:check": "node scripts/production-postgres-backup.mjs --check",
+    "backup:production:restore-drill": "node scripts/production-postgres-backup.mjs --restore-drill",
+    "backup:production:activate": "node scripts/activate-production-backup.mjs",
+    "backup:production:test": "node --test scripts/__tests__/production-postgres-backup.test.mjs scripts/__tests__/activate-production-backup.test.mjs",
     "launch:preflight": "npm run preflight -w @alistore/api -- --env-file .env.production",
     "launch:preflight:strict": "npm run preflight -w @alistore/api -- --env-file .env.production --strict",
     "launch:readiness": "npm run readiness -w @alistore/api -- --env-file .env.production",
@@ -147,6 +152,8 @@
     "testcontainers": "^12.0.4"
   },
   "dependencies": {
-    "@nestjs/platform-express": "^11.1.28"
+    "@aws-sdk/client-s3": "^3.1079.0",
+    "@nestjs/platform-express": "^11.1.28",
+    "dotenv": "^16.4.7"
   }
 }
