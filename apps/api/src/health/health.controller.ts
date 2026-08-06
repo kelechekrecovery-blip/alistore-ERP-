@@ -14,7 +14,10 @@ import {
   parseBackupMarker,
 } from '../ops/backup-status';
 import { PrismaService } from '../prisma/prisma.service';
-import { buildExternalReadinessReport } from './external-readiness';
+import {
+  buildExternalReadinessReport,
+  projectLegacyExternalReadinessReport,
+} from './external-readiness';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActiveStaffGuard } from '../auth/active-staff.guard';
 import { PermissionGuard } from '../authz/permission.guard';
@@ -98,6 +101,18 @@ export class HealthController {
   @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
   @RequirePermission('reports', 'read')
   async integrations() {
+    const report = buildExternalReadinessReport((name) => this.config.get<string>(name));
+    return {
+      ...projectLegacyExternalReadinessReport(report),
+      backup: await this.backupFreshness(),
+    };
+  }
+
+  /** Versioned four-state readiness contract for rolling Web/API deploys. */
+  @Get('integrations/v2')
+  @UseGuards(JwtAuthGuard, ActiveStaffGuard, PermissionGuard)
+  @RequirePermission('reports', 'read')
+  async integrationsV2() {
     return {
       ...buildExternalReadinessReport((name) => this.config.get<string>(name)),
       backup: await this.backupFreshness(),

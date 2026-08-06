@@ -2,6 +2,7 @@ import { config } from 'dotenv';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { buildExternalReadinessReport } from '../src/health/external-readiness';
+import { strictReadinessExitCode } from './readiness-cli-policy';
 
 interface Args {
   envFile?: string;
@@ -28,9 +29,7 @@ if (args.json) {
   printTextReport(report, envFile);
 }
 
-if (args.strictExternal && report.status !== 'ready') {
-  process.exit(1);
-}
+process.exitCode = strictReadinessExitCode(report, args.strictExternal);
 
 function parseArgs(argv: string[]): Args {
   const parsed: Args = {
@@ -61,17 +60,20 @@ function printTextReport(
   envFile: string,
 ) {
   console.log(`Readiness env file: ${envFile}`);
+  console.log(`Readiness mode: ${report.mode}`);
   console.log(`External readiness: ${report.status}`);
   console.log(
-    `Summary: ready=${report.summary.ready}, missing=${report.summary.missing}, manual=${report.summary.manualRequired}, optional=${report.summary.optional}, blocking=${report.summary.blockingRemaining}`,
+    `Summary: certified=${report.summary.certified}, configured=${report.summary.configured}, missing=${report.summary.missing}, blocked=${report.summary.blocked}, blocking=${report.summary.blockingRemaining}`,
   );
 
   for (const check of report.checks) {
-    const marker = check.status === 'ready' ? 'OK' : check.blocking ? 'BLOCKED' : 'OPTIONAL';
+    const satisfied = check.status === 'certified'
+      || (!check.attestationRequired && check.status === 'configured');
+    const marker = satisfied ? 'OK' : check.blocking ? 'BLOCKED' : 'OPTIONAL';
     const missing = check.missingEnv.length ? ` missing=${check.missingEnv.join(',')}` : '';
     const configured = check.configuredEnv.length ? ` configured=${check.configuredEnv.join(',')}` : '';
     console.log(`- [${marker}] ${check.id}: ${check.status}.${missing}${configured}`);
-    if (check.status !== 'ready') {
+    if (!satisfied) {
       console.log(`  ${check.note}`);
       for (const manual of check.manualChecks) {
         console.log(`  manual: ${manual}`);

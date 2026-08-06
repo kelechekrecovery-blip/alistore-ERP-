@@ -4,8 +4,10 @@
 тестируются совместно. Расширенные модули 95-экранной экосистемы отслеживаются отдельно
 и не должны смешиваться с готовностью первого магазина к запуску.
 
-- **53 backend-модуля** (NestJS) · **43 веб-роута** (Next.js, `find apps/web/app -name page.tsx`) · **100 миграций**
-- Текущий полный gate (`npm run api:test:isolated`, снято 2026-07-26 на своей БД,
+- **61 backend module file** (`find apps/api/src -mindepth 2 -maxdepth 2 -name '*.module.ts'`) · **43 веб-роута** (Next.js) · **162 каталога миграций**
+  на source snapshot 2026-08-06. Воспроизводимый инвентарь и текущие test/build counts —
+  `docs/acceptance/gate-0-final-2026-08-06.md`; старые числа ниже сохранены только как история.
+- Исторический полный gate (`npm run api:test:isolated`, снято 2026-07-26 на своей БД,
   клонированной из шаблона): **218/218 сьютов, 1299/1299 тестов**, ни одного падения.
   Прошлый замер (23.07, `npm run api:test` на общей `alistore_test`) дал «4 сьюта /
   7 тестов красные», а повторный прогон при работающем рядом втором агенте — 20+;
@@ -29,12 +31,13 @@
 
 Легенда: ✅ готово · 🟡 частично · ⛔ ждёт внешних доступов (ключи/аккаунты/железо)
 
-## Живая проверка интеграций — 2026-07-27 (вызовами к работающему API, не по конфигу)
+## Историческая живая проверка интеграций — 2026-07-27 (не текущий production acceptance)
 
-Снято с процесса, который сейчас слушает `:4000` (`apps/api/dist/main.js`, БД `alistore_dev`,
+Снято с процесса, который слушал `:4000` (`apps/api/dist/main.js`, БД `alistore_dev`,
 uptime ~40 ч). Каждая строка — ответ реального вызова, а не чтение кода. **Платёжные сервисы
 исключены по прямой просьбе владельца.** Машинный источник той же правды —
-`GET /api/health/integrations` (owner-JWT): сейчас `blocked`, `ready 1 / missing 11 / manual 1`.
+`GET /api/health/integrations` (owner-JWT). Счётчики того процесса устарели и не описывают
+Gate 0 API: текущая строка использует `missing|configured|certified|blocked`.
 
 | Сервис | Где в коде | Что вернул живой вызов | Что нужно от владельца |
 |---|---|---|---|
@@ -112,9 +115,14 @@ uptime ~40 ч). Каждая строка — ответ реального вы
 под staff-session token (admin/owner).
 
 ## До запуска первого магазина — внешние доступы ⛔
-Machine-readable статус внешних блокеров: `GET /health/integrations` (показывает только
-configured/missing env-имена и ручные проверки, без значений секретов). В ERP это видно во
-вкладке **Готовность запуска**: blocking, optional, ручная POS-сертификация и strict gate.
+Machine-readable v2 статус внешних блокеров: `GET /health/integrations/v2`; legacy
+`GET /health/integrations` остаётся v1-проекцией на время rolling deploy. V2 показывает только
+env-имена, deploy-owned attestation marker и ручные проверки, без значений секретов. Статус строки —
+ровно `missing|configured|certified|blocked`; credentials/adapter сами по себе никогда не
+дают `certified`. Маркер изменяем: owner/operator утверждает, что criteria проверены и reference
+записан; код не валидирует evidence-файл или SHA. Маркер сбрасывается после release-зависимой
+смены провайдера/model/callback/domain/policy/device. `PUBLIC_DEMO_MODE=true` помечается как demo,
+а strict CLI всегда завершает такой contour ненулевым кодом. В ERP это видно во вкладке **Готовность запуска**.
 Production env-шаблон: `apps/api/.env.production.example`; запусковой runbook:
 [`PRODUCTION-ACTIVATION.md`](./PRODUCTION-ACTIVATION.md).
 Перед внешним readiness запускается core preflight: `npm run launch:preflight` проверяет
@@ -122,13 +130,20 @@ Production env-шаблон: `apps/api/.env.production.example`; запуско�
 
 | Что | Нужен доступ |
 |---|---|
-| **Фискализация ККМ/ОФД** ⚖️ | Договор с ОФД-провайдером и `FISCAL_PROVIDER*`. **Юридический блокер:** розничная продажа в КР требует фискального чека с налоговыми строками, фискальным номером и Z-отчётами. Сейчас чеки информационные (`fiscal-provider.ts` → `certified: false`, `fiscalNumber: null`), подделок нет. Готово, когда POS-продажа даёт фискальный чек с QR и сходится с кабинетом налоговой. **`npm run launch:check` эту строку не проверяет.** См. `docs/MASTER-PLAN.md` §2 |
+| **Фискализация ККМ/ОФД** ⚖️ | Договор с ОФД-провайдером и `FISCAL_PROVIDER*`. **Юридический блокер:** розничная продажа в КР требует фискального чека с налоговыми строками, фискальным номером и Z-отчётами. Сейчас чеки информационные (`fiscal-provider.ts` → `certified: false`, `fiscalNumber: null`), подделок нет. `launch:check` блокирует строку `fiscal_provider`; `FISCAL_PROVIDER_CERTIFIED=true` допустим только после POS-чека с QR и сверки с налоговым кабинетом. |
 | **Боевой платёжный шлюз** | `PAYMENT_PROVIDER`, API URL, merchant ID, API key и webhook secret. `PAYMENT_PROVIDER_CERTIFIED=true` ставится только после live intent, raw-body подписи, replay и refund reconciliation. Provider-neutral port и sandbox готовы. |
 | **Боевой SMS/OTP** | `SMS_PROVIDER`, API URL/key и утверждённый sender ID. `SMS_PROVIDER_CERTIFIED=true` ставится после реальной доставки login/recovery OTP и проверки cleanup при отказе провайдера. |
-| **AI vision/LLM** — оценка Б/У по фото, разведка рыночных цен, обогащение карточек | `AI_PROVIDER_KEY` (сервер). `POST /ai/grade-photos` и `POST /ai/price-scout` уже работают как бесключевые staff-only rules/fallback endpoints; production quality требует ключ, reference dataset и offline eval. |
-| **Apple/Telegram social login** | `APPLE_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, Apple/Telegram callback/client SDK QA. Backend endpoints and identity linking are ready. |
-| **Telegram Mini App / WhatsApp-магазин** | бизнес-аккаунты, токены каналов и webhook/callback QA. Campaign delivery уже включается через `NOTIFICATION_TRANSPORT=channels` + Novu/SMTP/Telegram/WhatsApp env. |
+| **AI vision/LLM** — оценка Б/У по фото, разведка рыночных цен, обогащение карточек | Credentials дают только `configured`; reference prompts, redaction/tool-boundary review и reference `docs/acceptance/provider/ai-provider-<release-sha>.md` позволяют operator attestation `AI_PROVIDER_CERTIFIED=true`. |
+| **Apple/Google/Telegram social login** | Credentials/client IDs дают только `configured`; audience/origin/callback/tamper/identity-link QA записываются в `docs/acceptance/provider/{apple-login,google-login,telegram-login}-<release-sha>.md`, затем operator выставляет соответствующий `*_SOCIAL_LOGIN_CERTIFIED=true`. `APPLE_TEAM_ID` и `ANDROID_APP_LINK_SHA256` зеркалируются в API и Web deployments. |
+| **Telegram Bot / WhatsApp / Campaign delivery** | Токены и transport дают только `configured`; webhook/routing/delivery/retry/consent evidence пишется в `docs/acceptance/provider/{telegram-bot,whatsapp-business,campaign-delivery}-<release-sha>.md`, затем operator выставляет `TELEGRAM_BOT_CERTIFIED`, `WHATSAPP_BUSINESS_CERTIFIED`, `CAMPAIGN_DELIVERY_CERTIFIED`. |
+| **S3 media / Observability** | Credentials/DSN дают только `configured`; production bucket-policy/smoke и controlled error/alert/redaction evidence → `docs/acceptance/operations/{s3-media,observability}-<release-sha>.md`, затем operator выставляет `S3_MEDIA_STORAGE_CERTIFIED` / `OBSERVABILITY_CERTIFIED`. |
 | **Native iOS/Android release** | Swift iOS and Kotlin/Compose Android foundations are real and independently buildable; Staff, Courier and POS software verticals are implemented on both platforms. Final Client provider checks, Apple/Google signing, APNs/FCM credentials and physical-device/hardware QA remain required. |
+| **APNs (iOS)** | Owner: Mobile Release + владелец Apple account. `APNS_KEY_ID`, `APNS_TEAM_ID` дают только `configured`; `APNS_CERTIFIED=true` — после foreground/background delivery и route QA на физическом iPhone. Evidence: `docs/acceptance/provider/apns-<release-sha>.md`. |
+| **Outbox health / DLQ age** | Owner: Platform/Operations. Нужны relay + non-log transport, current pending/failed depth, oldest pending и oldest failed age, heartbeat, delivered/redrive evidence. `/api/observability/status` сейчас не отдаёт oldest failed age — до отдельного query/endpoint artifact строка не сертифицируется. Evidence: `docs/acceptance/operations/outbox-health-<release-sha>.md`. |
+| **Meilisearch** | Owner: Search/Platform. `MEILI_HOST`/`MEILI_API_KEY` дают только `configured`; rebuild, query, fallback и restore evidence → `MEILISEARCH_CERTIFIED=true`. Evidence: `docs/acceptance/operations/meilisearch-<release-sha>.md`. |
+| **Native HTTPS links** | Owner: Mobile Release + Domain/Cloudflare. AASA/assetlinks на production domain и physical iOS/Android release QA → `NATIVE_LINKS_CERTIFIED=true`. Evidence: `docs/acceptance/native/native-links-<release-sha>.md`. |
+| **Backup/restore** | Owner: Platform/Operations + владелец R2. `S3_BACKUP_BUCKET` даёт только `configured`; fresh production-shaped restore + DB/Evidence reconciliation → `BACKUP_RESTORE_CERTIFIED=true`. Evidence: `docs/acceptance/operations/backup-restore-<release-sha>.md`. |
+| **Partner payout provider** | Owner: Finance + владелец + выбранный bank/provider. Provider retry/idempotency/rejection и statement reconciliation → `PARTNER_PAYOUT_PROVIDER_CERTIFIED=true`. Evidence: `docs/acceptance/provider/partner-payout-<release-sha>.md`. |
 | **Боевое железо кассы** — сканер, принтер чеков, платёжный терминал | физические устройства (софт-каркас offline+print готов) |
 
 ## Опциональная полировка v2 (без блокеров)
@@ -144,11 +159,11 @@ npm run launch:preflight              # core production env
 npm run launch:readiness              # отчёт по apps/api/.env.production
 npm run launch:check                  # strict preflight + strict external gate
 npm run launch:readiness:strict       # strict external gate
-cd apps/api && npx jest                 # 123 suites / 487 тестов ✓
+cd apps/api && npx jest                 # exact current count: Gate 0 evidence, not this historical comment
 npm run migration:test:service-payment # legacy refund/point migration regression ✓
 npm run api:build                     # ✓
-cd apps/web && npx next build         # ✓ (37 роутов)
-npm run e2e                           # 36/36 ✓
+cd apps/web && npx next build         # current result: Gate 0 evidence
+npm run e2e                           # current result: Gate 0 evidence
 npm run ecosystem:verify              # web/API + all iOS targets/XCTest + four Android APKs/JVM/Lint
 npm run mobile:store-preflight        # 0 failures; production env warnings only
 cd apps/mobile && npx expo-doctor     # 20/20 ✓

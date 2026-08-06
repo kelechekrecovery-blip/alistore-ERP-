@@ -29,29 +29,45 @@ export function ReadinessView({
     );
   }
 
-  const blocking = report.checks.filter((check) => check.blocking && check.status !== 'ready');
-  const optional = report.checks.filter((check) => !check.blocking && check.status !== 'ready');
-  const ready = report.checks.filter((check) => check.status === 'ready');
+  const isSatisfied = (check: ExternalReadinessReport['checks'][number]) =>
+    check.status === 'certified'
+    || (!check.attestationRequired && check.status === 'configured');
+  const blocking = report.checks.filter((check) => check.blocking && !isSatisfied(check));
+  const optional = report.checks.filter((check) => !check.blocking && !isSatisfied(check));
+  const satisfied = report.checks.filter(isSatisfied);
 
   return (
     <div className="space-y-4">
       <Card>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="text-xs uppercase tracking-wide text-subtle">Production readiness</div>
+            <div className="text-xs uppercase tracking-wide text-subtle">
+              {report.mode === 'demo'
+                ? 'Demo readiness contour'
+                : report.sourceContractVersion === 1
+                  ? 'Legacy readiness compatibility'
+                  : 'Production readiness'}
+            </div>
             <div className="mt-1 font-display text-2xl font-extrabold">
-              {report.status === 'ready' ? 'Готово к запуску' : 'Нужны внешние доступы'}
+              {report.mode === 'demo'
+                ? 'Демо-контур — не production readiness'
+                : report.sourceContractVersion === 1
+                  ? 'API v1 — production assertion заблокирован'
+                  : report.status === 'ready'
+                    ? 'Готово к запуску'
+                    : 'Нужны внешние доступы'}
             </div>
             <div className="mt-2 max-w-2xl text-sm text-muted">
-              Софт-MVP закрыт. Эта панель показывает только внешние credentials, callbacks и
-              ручную сертификацию железа, без раскрытия секретов.
+              Маркер — это отзывчивая operator/deployment attestation по указанным ручным
+              критериям, а не проверенная кодом ссылка или SHA. Его сбрасывают при изменении
+              release-зависимого провайдера, модели, callback, домена или политики.
             </div>
           </div>
           <div className="grid min-w-[320px] grid-cols-4 gap-2 text-center">
-            <ReadinessMetric label="Ready" value={report.summary.ready} tone="good" />
+            <ReadinessMetric label="Certified" value={report.summary.certified} tone="good" />
+            <ReadinessMetric label="Configured" value={report.summary.configured} tone="warn" />
             <ReadinessMetric label="Missing" value={report.summary.missing} tone="bad" />
-            <ReadinessMetric label="Manual" value={report.summary.manualRequired} tone="warn" />
-            <ReadinessMetric label="Optional" value={report.summary.optional} tone="muted" />
+            <ReadinessMetric label="Blocked" value={report.summary.blocked} tone="bad" />
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-subtle">
@@ -62,7 +78,7 @@ export function ReadinessView({
             generated: {new Date(report.generatedAt).toLocaleString('ru-RU')}
           </span>
           <span className="rounded-chip bg-surface-2 px-2.5 py-1">
-            strict gate: npm run mvp:verify -- --strict-external
+            strict gate: npm run launch:readiness:strict
           </span>
         </div>
       </Card>
@@ -102,7 +118,7 @@ export function ReadinessView({
           <Card>
             <div className="mb-3.5 font-display text-[15px] font-bold">Уже готово</div>
             <div className="flex flex-wrap gap-2">
-              {ready.map((check) => (
+              {satisfied.map((check) => (
                 <span
                   key={check.id}
                   className="rounded-chip border border-lime/30 bg-[#18210F] px-2.5 py-1 text-xs font-semibold text-lime"
@@ -110,7 +126,7 @@ export function ReadinessView({
                   {check.title}
                 </span>
               ))}
-              {ready.length === 0 && (
+              {satisfied.length === 0 && (
                 <span className="text-sm text-subtle">Внешние пункты пока не закрыты.</span>
               )}
             </div>
@@ -153,9 +169,9 @@ function ReadinessRow({
 }) {
   const status = {
     missing: ['missing', 'bg-coral text-white'],
-    manual_required: ['manual', 'bg-warn text-[#18110A]'],
-    optional: ['optional', 'bg-surface-3 text-bright'],
-    ready: ['ready', 'bg-[#18210F] text-lime'],
+    configured: ['configured', 'bg-warn text-[#18110A]'],
+    certified: ['certified', 'bg-[#18210F] text-lime'],
+    blocked: ['blocked', 'bg-coral text-white'],
   }[check.status];
 
   return (
@@ -200,6 +216,13 @@ function ReadinessRow({
             </li>
           ))}
         </ul>
+      )}
+
+      {check.attestationRequired && check.status !== 'certified' && (
+        <div className="mt-3 text-[11px] text-subtle">
+          Deployment attestation:{' '}
+          <code className="text-bright">{check.attestationEnv ?? 'API_V2_UPGRADE_REQUIRED'}</code>
+        </div>
       )}
     </div>
   );

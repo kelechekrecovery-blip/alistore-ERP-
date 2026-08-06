@@ -1,9 +1,10 @@
 # AliStore — полная карта готовности (что мешает открыться)
 
-> Что мешает открыться и что осталось до зрелой экосистемы. Снято 2026-07-24.
+> Что мешает открыться и что осталось до зрелой экосистемы. Gate 0 truth refresh: 2026-08-06.
 > Дополняет [`READINESS.md`](./READINESS.md) (снимок фаз) и [`MASTER-PLAN.md`](./MASTER-PLAN.md)
 > (гейты). Источники: `apps/api/src/health/external-readiness.ts`,
-> `OWNER-LAUNCH-CHECKLIST.md`, `BACKLOG.md`, инвентарь кода (55 модулей API, 43
+> `OWNER-LAUNCH-CHECKLIST.md`, `BACKLOG.md`, инвентарь кода (61 backend module file по
+> `find apps/api/src -mindepth 2 -maxdepth 2 -name '*.module.ts'`, 43
 > web-роута, 4 нативных приложения ×2 платформы).
 
 ## Как читать
@@ -13,8 +14,9 @@
 - **Объём:** S = < дня · M = дни · L = недели / много сессий
 - **Горизонт:** [ЗАПУСК] 1-й магазин · [АВАРИЯ] переживёт сбой · [РОСТ] зрелая экосистема
 
-**Главное:** код в основном **функционирует** (гейт зелёный воспроизводимо: 213–214
-сьютов / 1276–1280 тестов на изолированной базе; `api:build` + `next build` ✓).
+**Главное:** локальная software-проверка и production certification — разные гейты.
+Исторические счётчики тестов ниже не являются текущим acceptance; актуальные команды и
+результаты привязаны к SHA в `docs/acceptance/gate-0-final-2026-08-06.md`.
 Магазин **не готов** к запуску: критический путь упирается в владельца и внешние
 договоры, не в код.
 
@@ -39,7 +41,7 @@
 
 ## Слой 2 — Технически живой: внешние доступы [ЗАПУСК]
 
-Машинный гейт `npm run launch:check` = **12 блокирующих проверок**
+Машинный гейт `npm run launch:check` = **21 блокирующая проверка**
 (`external-readiness.ts`). **Фискализация теперь среди них** (blocking-проверка
 `fiscal_provider`, добавлена 24.07) — гейт больше не проходит зелёным без ОФД.
 
@@ -49,8 +51,46 @@
 | telegram_bot · whatsapp_business · apple/telegram social login | 🟥 | P1 — токены каналов/клиентов |
 | s3_media_storage (R2) · observability (Sentry `SENTRY_DSN`) | 🟨 | P1 |
 | campaign_delivery (Novu/SMTP/Telegram/WhatsApp/Expo/FCM) | 🟥 | P1 |
+| native_push_ios (APNs) | 🟨+🟥 | P0 — ключ + физическая доставка/роутинг |
+| outbox_health (pending/DLQ age) | 🟦+🟨 | P0 — текущая наблюдаемость и delivery evidence |
+| meilisearch | 🟦+🟨 | P1 — индекс/rebuild/fallback evidence |
+| native_links | 🟨+🟥 | P0 — production domain + physical release builds |
+| backup_restore | 🟦+🟨 | P0 — recorded production-shaped restore |
+| partner_payout_provider | 🟨+🟥 | P0 — idempotent payout + statement reconciliation |
 | pos_hardware (сканер/ESC-POS-принтер/терминал) `POS_HARDWARE_CERTIFIED` | 🟥 | P1 |
 | ai_provider (keyless-fallback работает и без ключа) | 🟥 | P2 |
+
+Статус каждой строки имеет ровно четыре значения: `missing` (нет обязательной
+конфигурации), `configured` (настроено, но live evidence ещё нет), `certified`
+(явная operator/deployment attestation после ручной проверки) или `blocked` (конфигурация/ручной
+гейт не позволяет продолжать). Credentials и наличие адаптера никогда не дают
+`certified` автоматически.
+
+`*_CERTIFIED=true` — изменяемая deploy-owned аттестация, а не immutable evidence и не
+криптографическая привязка к SHA. Она означает, что названный owner/operator проверил
+close criteria и записал reference по указанному пути. API не открывает и не валидирует
+этот файл или SHA. Маркер обязан быть сброшен при release-зависимой смене провайдера,
+модели, credentials, callback/domain, политики или проверяемого устройства.
+
+### Gate 0: owner, close criteria and evidence
+
+| Row | Exact owner | Close criteria | Evidence location |
+|---|---|---|---|
+| `ai_provider` | AI/Product owner + Security reviewer | Reference prompts cover grading/pricing/moderation/tool boundaries; production-shaped calls redact secrets/PII and cannot mutate money/stock/RBAC; operator records provider/model/config and may then attest `AI_PROVIDER_CERTIFIED=true` | `docs/acceptance/provider/ai-provider-<release-sha>.md` |
+| `telegram_bot` | Channels owner + AliStore BotFather owner | HTTPS webhook secret header, production message and Mini App tenant/account routing pass; operator may then attest `TELEGRAM_BOT_CERTIFIED=true` | `docs/acceptance/provider/telegram-bot-<release-sha>.md` |
+| `whatsapp_business` | Channels owner + AliStore Meta Business owner | Webhook verification/callback handling and production-shaped inbound/outbound customer/order reconciliation pass; operator may then attest `WHATSAPP_BUSINESS_CERTIFIED=true` | `docs/acceptance/provider/whatsapp-business-<release-sha>.md` |
+| `apple_social_login` | Identity/Mobile owner + AliStore Apple owner | Production web/native intended audience succeeds, wrong audience fails, private-email relay links once; operator may then attest `APPLE_SOCIAL_LOGIN_CERTIFIED=true` | `docs/acceptance/provider/apple-login-<release-sha>.md` |
+| `google_social_login` | Identity/Web owner + AliStore Google Cloud owner | Every intended web/native audience and production origin/redirect succeeds, wrong audience fails, identity links once; operator may then attest `GOOGLE_SOCIAL_LOGIN_CERTIFIED=true` | `docs/acceptance/provider/google-login-<release-sha>.md` |
+| `telegram_social_login` | Identity/Channels owner | Current signed production initData succeeds, tampered/expired payload fails, customer identity links once; operator may then attest `TELEGRAM_SOCIAL_LOGIN_CERTIFIED=true` | `docs/acceptance/provider/telegram-login-<release-sha>.md` |
+| `campaign_delivery` | Growth/Channels owner | Production-shaped consented segment delivery, provider rejection/retry/idempotency and unsubscribe reconciliation pass; operator may then attest `CAMPAIGN_DELIVERY_CERTIFIED=true` | `docs/acceptance/provider/campaign-delivery-<release-sha>.md` |
+| `s3_media_storage` | Platform/Operations owner + AliStore R2 owner | Production bucket upload/download/delete, least privilege, URL/retention and outage behavior pass; operator may then attest `S3_MEDIA_STORAGE_CERTIFIED=true` | `docs/acceptance/operations/s3-media-<release-sha>.md` |
+| `observability` | Platform/Operations owner | Controlled API/Web error reaches the production project without secrets/PII and alerts the on-call route; operator may then attest `OBSERVABILITY_CERTIFIED=true` | `docs/acceptance/operations/observability-<release-sha>.md` |
+| `native_push_ios` | Mobile Release owner + AliStore owner (Apple account) | `APNS_KEY_ID`/`APNS_TEAM_ID`; physical iPhone receives foreground/background push and opens the owner-scoped route on the release build; operator may then attest `APNS_CERTIFIED=true` | `docs/acceptance/provider/apns-<release-sha>.md` |
+| `outbox_health` | Platform/Operations owner | Relay enabled with non-log transport; `/api/observability/status` observation records pending depth/oldest pending age under policy, failed/DLQ depth, worker heartbeat and one delivered/redriven message. The endpoint currently lacks oldest failed age, so certification remains blocked until that age is captured by an extended endpoint or an attached query artifact | `docs/acceptance/operations/outbox-health-<release-sha>.md` |
+| `meilisearch` | Search/Platform owner | Rebuild from PostgreSQL succeeds; typo/facet query reports Meilisearch; outage falls back to PostgreSQL; restore runbook rebuilds index; operator may then attest `MEILISEARCH_CERTIFIED=true` | `docs/acceptance/operations/meilisearch-<release-sha>.md` |
+| `native_links` | Mobile Release owner + Domain/Cloudflare owner | Production AASA/assetlinks contain exact release identifiers; physical iOS/Android release builds open trusted HTTPS links and reject wrong hosts; operator may then attest `NATIVE_LINKS_CERTIFIED=true` | `docs/acceptance/native/native-links-<release-sha>.md` |
+| `backup_restore` | Platform/Operations owner + AliStore owner (R2 credentials) | Fresh production-shaped bucket backup restores to isolation; schema/triggers/accounting/table counts reconcile; Evidence objects are restored or independently verified; operator may then attest `BACKUP_RESTORE_CERTIFIED=true` | `docs/acceptance/operations/backup-restore-<release-sha>.md` |
+| `partner_payout_provider` | Finance owner + AliStore owner + selected bank/provider | Retry is idempotent, unique external reference persists, rejection cannot double-settle, provider statement reconciles gross/commission/partner amount; operator may then attest `PARTNER_PAYOUT_PROVIDER_CERTIFIED=true` | `docs/acceptance/provider/partner-payout-<release-sha>.md` |
 
 ---
 

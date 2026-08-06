@@ -1,5 +1,27 @@
 # BACKLOG
 
+## GATE-0-READINESS-2026-08-06 — truth baseline candidate (review/commit pending)
+
+- Readiness now exposes 21 explicit rows and uses only `missing|configured|certified|blocked`
+  per v2 row at `GET /health/integrations/v2`; `GET /health/integrations` remains the rolling-safe
+  legacy v1 projection. Credentials/adapters produce at most `configured`; deploy-owned
+  attestations are not feature flags and are never inferred. They are mutable operator assertions:
+  code does not validate the evidence path/SHA, and release-dependent changes require reset.
+- `PUBLIC_DEMO_MODE=true` is explicitly reported as `mode=demo`; non-strict reporting retains the
+  demo contour, while strict readiness always exits nonzero and ERP never labels it production-ready.
+- Added launch rows: `native_push_ios`, `outbox_health`, `meilisearch`, `native_links`,
+  `backup_restore`, and `partner_payout_provider`. Exact owners, close criteria and evidence
+  paths are authoritative in `docs/LAUNCH-BLOCKERS.md` under “Gate 0”.
+- **Open P0 external/operations evidence:** physical APNs delivery; current Outbox pending and
+  failed/DLQ ages (the current status endpoint lacks oldest failed age); deployed native-link
+  association on physical release builds; production-shaped backup/restore including Evidence;
+  partner payout provider idempotency and statement reconciliation.
+- **Open P1 operations evidence:** Meilisearch rebuild/query/fallback/recovery certification.
+- **Acceptance boundary:** `docs/acceptance/gate-0-final-2026-08-06.md`. Until independent
+  code/TypeScript/security review and a reviewed commit exist, this item is a candidate and
+  must not be called accepted. No provider, hardware, physical-device, live Outbox health,
+  production restore or pilot certification is claimed by local green tests.
+
 ## RUN-2026-08-04 — многоагентный аудит apps/web + apps/ios: что закрыто и что осталось
 
 **Как получено.** Десять параллельных аудитов по поверхностям (5 web, 4 iOS, 1 по самому
