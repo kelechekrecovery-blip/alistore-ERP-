@@ -1,276 +1,75 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { som } from '@/lib/format';
 import { ApiError } from '@/lib/api/http';
 import {
-  businessLogin,
-  clearBusinessSession,
-  fetchBusinessProducts,
-  loadBusinessSession,
-  saveBusinessSession,
-  updateBusinessPrice,
-  type BusinessProduct,
-  type BusinessSession,
+  businessLogin, clearBusinessSession, fetchBusinessProducts, loadBusinessSession,
+  saveBusinessSession, updateBusinessPrice, type BusinessProduct, type BusinessSession,
 } from '@/lib/api/business';
 
-/**
- * AliStore Business — кабинет магазина-партнёра.
- *
- * Отдельное приложение: ни шапки витрины, ни навигации ERP. Партнёр не имеет
- * отношения к ERP, POS и кассе, и интерфейс обязан это показывать — иначе
- * человек ищет здесь склад и отчёты, которых у него нет и не будет.
- */
+type View = 'overview' | 'assortment' | 'orders' | 'finance' | 'settings';
+const NAV: Array<{ id: View; label: string; icon: string }> = [
+  { id: 'overview', label: 'Обзор', icon: '⌂' },
+  { id: 'assortment', label: 'Ассортимент', icon: '▦' },
+  { id: 'orders', label: 'Заказы', icon: '↗' },
+  { id: 'finance', label: 'Финансы', icon: '₽' },
+  { id: 'settings', label: 'Настройки', icon: '⚙' },
+];
+
 export default function BusinessCabinet() {
   const [session, setSession] = useState<BusinessSession | null>(null);
   const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    setSession(loadBusinessSession());
-    setHydrated(true);
-  }, []);
-
-  // До гидратации не показываем ни форму входа, ни кабинет: мигание «войдите» у
-  // вошедшего человека читается как разлогин.
-  if (!hydrated) {
-    return <Shell><p className="text-sm text-white/50">Загрузка…</p></Shell>;
-  }
-
-  if (!session) {
-    return (
-      <Shell>
-        <LoginForm onSuccess={(next) => { saveBusinessSession(next); setSession(next); }} />
-      </Shell>
-    );
-  }
-
-  return (
-    <Shell>
-      <Assortment
-        session={session}
-        onSignOut={() => { clearBusinessSession(); setSession(null); }}
-      />
-    </Shell>
-  );
+  const [view, setView] = useState<View>('overview');
+  useEffect(() => { setSession(loadBusinessSession()); setHydrated(true); }, []);
+  if (!hydrated) return <Shell activeView={view} onViewChange={setView}><p className="text-sm text-white/50">Загрузка…</p></Shell>;
+  if (!session) return <Shell activeView={view} onViewChange={setView}><LoginForm onSuccess={(next) => { saveBusinessSession(next); setSession(next); }} /></Shell>;
+  return <Shell activeView={view} onViewChange={setView} sellerName={session.seller.name} onSignOut={() => { clearBusinessSession(); setSession(null); }}><Workspace session={session} view={view} onViewChange={setView} onSignOut={() => { clearBusinessSession(); setSession(null); }} /></Shell>;
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen bg-[#0b0a08] text-[#e5dcd3]">
-      <header className="border-b border-white/10 px-5 py-4">
-        <div className="mx-auto flex max-w-[1100px] items-center justify-between">
-          <div>
-            <div className="font-display text-[17px] font-extrabold text-white">AliStore Business</div>
-            <div className="text-[11px] text-white/45">Кабинет магазина-партнёра</div>
-          </div>
-        </div>
-      </header>
-      <main className="mx-auto max-w-[1100px] px-5 py-8">{children}</main>
+function Shell({ children, activeView, onViewChange, sellerName, onSignOut }: { children: React.ReactNode; activeView: View; onViewChange: (view: View) => void; sellerName?: string; onSignOut?: () => void }) {
+  return <div className="min-h-screen bg-[#0b0a08] text-[#e5dcd3]">
+    <div className="mx-auto flex min-h-screen max-w-[1440px]">
+      {sellerName && <aside className="hidden w-[248px] shrink-0 border-r border-white/10 bg-[#100e0c] p-5 lg:block">
+        <div className="mb-10"><div className="font-display text-[20px] font-extrabold tracking-tight text-white">Savio<span className="text-[#c6ff3d]">.</span></div><div className="mt-1 text-[11px] text-white/40">Business OS</div></div>
+        <div className="mb-3 text-[10px] font-bold uppercase tracking-[.18em] text-white/30">Рабочее пространство</div>
+        <nav className="space-y-1">{NAV.map((item) => <button key={item.id} type="button" data-testid={`business-nav-${item.id}`} onClick={() => onViewChange(item.id)} className={`flex h-10 w-full items-center gap-3 rounded-[8px] px-3 text-left text-[13px] ${activeView === item.id ? 'bg-[#c6ff3d] font-bold text-black' : 'text-white/55 hover:bg-white/[.05] hover:text-white'}`}><span className="w-5 text-center text-base">{item.icon}</span>{item.label}{item.id === 'orders' && <span className="ml-auto rounded-full bg-white/10 px-1.5 py-0.5 text-[9px]">скоро</span>}</button>)}</nav>
+        <div className="mt-auto border-t border-white/10 pt-4"><div className="truncate text-[12px] font-semibold text-white">{sellerName}</div><button type="button" onClick={onSignOut} className="mt-2 text-[11px] text-white/40 hover:text-white">Выйти из кабинета</button></div>
+      </aside>}
+      <div className="min-w-0 flex-1"><header className="border-b border-white/10 px-5 py-4 lg:px-8"><div className="flex items-center justify-between"><div><div className="font-display text-[17px] font-extrabold text-white lg:hidden">Savio<span className="text-[#c6ff3d]">.</span> Business</div><div className="text-[11px] text-white/45 lg:hidden">Кабинет магазина-партнёра</div></div>{sellerName && <button type="button" onClick={onSignOut} className="text-[12px] text-white/50 lg:hidden">Выйти</button>}</div>{sellerName && <nav className="mt-4 flex gap-1 overflow-x-auto lg:hidden">{NAV.map((item) => <button key={item.id} type="button" data-testid={`business-mobile-nav-${item.id}`} onClick={() => onViewChange(item.id)} className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] ${activeView === item.id ? 'bg-[#c6ff3d] font-bold text-black' : 'bg-white/[.05] text-white/55'}`}>{item.label}</button>)}</nav>}</header><main className="mx-auto max-w-[1180px] px-5 py-7 lg:px-8 lg:py-9">{children}</main></div>
     </div>
-  );
+  </div>;
 }
 
 function LoginForm({ onSuccess }: { onSuccess: (session: BusinessSession) => void }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError('');
-    try {
-      onSuccess(await businessLogin(username, password));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Не удалось войти');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="mx-auto max-w-[380px] rounded-[14px] border border-white/10 bg-white/[.03] p-6">
-      <h1 className="font-display text-[20px] font-extrabold text-white">Вход магазина</h1>
-      <p className="mt-1 text-[12px] leading-5 text-white/45">
-        Логин выдаёт AliStore. Это не учётная запись ERP — здесь только ваш ассортимент.
-      </p>
-      <label className="mt-5 block text-[12px] text-white/55" htmlFor="business-username">Логин</label>
-      <input
-        id="business-username"
-        value={username}
-        onChange={(event) => setUsername(event.target.value)}
-        autoComplete="username"
-        className="mt-1 h-11 w-full rounded-[9px] border border-white/12 bg-white/[.04] px-3 text-sm text-white outline-none focus:border-[#c6ff3d]"
-      />
-      <label className="mt-4 block text-[12px] text-white/55" htmlFor="business-password">Пароль</label>
-      <input
-        id="business-password"
-        type="password"
-        value={password}
-        onChange={(event) => setPassword(event.target.value)}
-        autoComplete="current-password"
-        className="mt-1 h-11 w-full rounded-[9px] border border-white/12 bg-white/[.04] px-3 text-sm text-white outline-none focus:border-[#c6ff3d]"
-      />
-      {error && <p role="alert" className="mt-3 text-[12px] text-[#ff9a6e]">{error}</p>}
-      <button
-        type="submit"
-        disabled={busy || !username || !password}
-        className="mt-5 h-11 w-full rounded-[9px] bg-[#c6ff3d] text-sm font-bold text-black disabled:bg-white/10 disabled:text-white/35"
-      >
-        {busy ? 'Входим…' : 'Войти'}
-      </button>
-    </form>
-  );
+  const [username, setUsername] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [showPassword, setShowPassword] = useState(false);
+  async function submit(event: FormEvent) { event.preventDefault(); setBusy(true); setError(''); try { onSuccess(await businessLogin(username, password)); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Не удалось войти'); } finally { setBusy(false); } }
+  return <div className="mx-auto grid max-w-[820px] overflow-hidden rounded-[18px] border border-white/10 bg-white/[.03] md:grid-cols-[1fr_380px]"><div className="hidden bg-[radial-gradient(circle_at_20%_20%,#28361b,transparent_55%)] p-10 md:block"><div className="font-display text-3xl font-extrabold text-white">Savio<span className="text-[#c6ff3d]">.</span></div><p className="mt-6 max-w-[300px] text-sm leading-6 text-white/55">Понятный кабинет партнёра для управления ассортиментом и ценами.</p><div className="mt-10 text-[11px] uppercase tracking-[.16em] text-[#c6ff3d]">Savio Business OS</div></div><form onSubmit={submit} className="p-6 sm:p-8"><h1 className="font-display text-[22px] font-extrabold text-white">Вход магазина</h1><p className="mt-1 text-[12px] leading-5 text-white/45">Логин выдаёт AliStore. Здесь только ваш ассортимент.</p><label className="mt-5 block text-[12px] text-white/55" htmlFor="business-username">Логин</label><input id="business-username" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" className="mt-1 h-11 w-full rounded-[9px] border border-white/12 bg-white/[.04] px-3 text-sm text-white outline-none focus:border-[#c6ff3d]" /><label className="mt-4 block text-[12px] text-white/55" htmlFor="business-password">Пароль</label><div className="relative"><input id="business-password" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" className="mt-1 h-11 w-full rounded-[9px] border border-white/12 bg-white/[.04] px-3 pr-16 text-sm text-white outline-none focus:border-[#c6ff3d]" /><button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-2 top-2 h-7 px-2 text-[11px] text-white/45">{showPassword ? 'Скрыть' : 'Показать'}</button></div>{error && <p role="alert" className="mt-3 text-[12px] text-[#ff9a6e]">{error}</p>}<button type="submit" disabled={busy || !username || !password} className="mt-5 h-11 w-full rounded-[9px] bg-[#c6ff3d] text-sm font-bold text-black disabled:bg-white/10 disabled:text-white/35">{busy ? 'Входим…' : 'Войти'}</button><p className="mt-4 text-center text-[11px] text-white/35">Нужен доступ? Обратитесь в поддержку AliStore.</p></form></div>;
 }
 
-/** Токен живёт 8 часов без обновления: 401 значит «войдите заново», а не «сбой». */
-function isExpiredSession(cause: unknown): boolean {
-  return cause instanceof ApiError && (cause.status === 401 || cause.status === 403);
-}
+function isExpiredSession(cause: unknown): boolean { return cause instanceof ApiError && (cause.status === 401 || cause.status === 403); }
 
-function Assortment({ session, onSignOut }: { session: BusinessSession; onSignOut: () => void }) {
-  const [rows, setRows] = useState<BusinessProduct[] | null>(null);
-  const [error, setError] = useState('');
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState('');
-  const [toast, setToast] = useState('');
-
-  async function load() {
-    try {
-      setRows(await fetchBusinessProducts(session.accessToken));
-      setError('');
-    } catch (cause) {
-      // Протухшая сессия — не ошибка загрузки. Раньше партнёр, вернувшийся на
-      // следующий день, получал шапку и красную плашку без списка и без формы
-      // входа — и так при каждой перезагрузке, пока сам не нажмёт «Выйти».
-      if (isExpiredSession(cause)) { onSignOut(); return; }
-      // Уже загруженные строки не стираем. Раньше неудачный рефреш после
-      // успешного сохранения обнулял таблицу: партнёр видел зелёное «цена
-      // сохранена» и тут же пустой экран с ошибкой — выглядело как поломка
-      // ровно в момент успеха, хотя цена записалась.
-      setRows((current) => current);
-      setError(cause instanceof Error ? cause.message : 'Список не обновился');
-    }
-  }
-
+function Workspace({ session, view, onViewChange, onSignOut }: { session: BusinessSession; view: View; onViewChange: (view: View) => void; onSignOut: () => void }) {
+  const [rows, setRows] = useState<BusinessProduct[] | null>(null); const [error, setError] = useState(''); const [drafts, setDrafts] = useState<Record<string, string>>({}); const [busy, setBusy] = useState(''); const [toast, setToast] = useState(''); const [query, setQuery] = useState(''); const [status, setStatus] = useState<'all' | 'active' | 'archived'>('all');
+  async function load() { try { setRows(await fetchBusinessProducts(session.accessToken)); setError(''); } catch (cause) { if (isExpiredSession(cause)) { onSignOut(); return; } setError(cause instanceof Error ? cause.message : 'Список не обновился'); } }
   useEffect(() => { void load(); }, [session.accessToken]);
-
-  async function savePrice(row: BusinessProduct) {
-    const draft = drafts[row.id];
-    const next = Number(draft);
-    if (!Number.isInteger(next) || next < 1) {
-      setError('Цена — целое число от 1 сома');
-      return;
-    }
-    setBusy(row.id);
-    setError('');
-    try {
-      await updateBusinessPrice(session.accessToken, row.id, next);
-      // Черновик убираем, только если человек не успел исправить его, пока
-      // летел запрос. Безусловное удаление стирало новые цифры, которых сервер
-      // не видел, — и человек не узнавал, что его правка пропала.
-      setDrafts((current) => {
-        if (current[row.id] !== draft) return current;
-        const copy = { ...current };
-        delete copy[row.id];
-        return copy;
-      });
-      setToast(`${row.name} — цена сохранена`);
-      window.setTimeout(() => setToast(''), 2600);
-      await load();
-    } catch (cause) {
-      if (isExpiredSession(cause)) { onSignOut(); return; }
-      setError(cause instanceof Error ? cause.message : 'Цена не сохранена');
-    } finally {
-      // Снимаем блокировку только со своей строки: общий скаляр позволял
-      // второму сохранению разблокировать кнопку первого, ещё летящего.
-      setBusy((current) => (current === row.id ? '' : current));
-    }
-  }
-
-  return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-[22px] font-extrabold text-white">{session.seller.name}</h1>
-          <p className="text-[12px] text-white/45">Вошли как {session.username}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onSignOut}
-          className="h-9 rounded-[8px] border border-white/12 px-3 text-[12px] font-semibold text-white/70"
-        >
-          Выйти
-        </button>
-      </div>
-
-      {toast && <p className="mt-4 rounded-[9px] bg-[#c6ff3d]/12 px-3 py-2 text-[12px] text-[#c6ff3d]">{toast}</p>}
-      {error && <p role="alert" className="mt-4 rounded-[9px] bg-[#ff9a6e]/10 px-3 py-2 text-[12px] text-[#ff9a6e]">{error}</p>}
-
-      {rows === null && !error && <p className="mt-6 text-sm text-white/50">Загрузка…</p>}
-
-      {rows !== null && rows.length === 0 && (
-        // Пустой ассортимент — нормальное начало, а не сбой. Говорим, что делать
-        // дальше, вместо пустого экрана, который читается как поломка.
-        <div className="mt-6 rounded-[12px] border border-white/10 bg-white/[.03] p-6">
-          <div className="text-sm font-semibold text-white">Пока ни одной позиции</div>
-          <p className="mt-1 text-[12px] leading-5 text-white/50">
-            Товары заводит AliStore при подключении магазина. Как только они появятся,
-            вы сможете менять здесь цену.
-          </p>
-        </div>
-      )}
-
-      {rows !== null && rows.length > 0 && (
-        <div className="mt-6 overflow-x-auto">
-          <table className="w-full min-w-[620px] border-collapse text-left">
-            <thead>
-              <tr className="border-b border-white/10 text-[11px] uppercase tracking-wide text-white/40">
-                <th className="py-2 pr-3 font-semibold">Товар</th>
-                <th className="py-2 pr-3 font-semibold">Артикул</th>
-                <th className="py-2 pr-3 font-semibold">Цена</th>
-                <th className="py-2 font-semibold">Новая цена</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const draft = drafts[row.id] ?? '';
-                const dirty = draft.trim() !== '' && Number(draft) !== row.price;
-                return (
-                  <tr key={row.id} className="border-b border-white/[.06]" data-testid={`business-row-${row.sku}`}>
-                    <td className="py-3 pr-3 text-[13px] text-white">
-                      {row.name}
-                      {row.archived && <span className="ml-2 rounded-chip bg-white/10 px-2 py-0.5 text-[10px] text-white/50">архив</span>}
-                    </td>
-                    <td className="py-3 pr-3 font-mono text-[12px] text-white/50">{row.sku}</td>
-                    <td className="py-3 pr-3 text-[13px] font-semibold text-white">{som(row.price)}</td>
-                    <td className="py-3">
-                      <div className="flex items-center gap-2">
-                        <input
-                          aria-label={`Новая цена: ${row.name}`}
-                          inputMode="numeric"
-                          value={draft}
-                          onChange={(event) => setDrafts({ ...drafts, [row.id]: event.target.value })}
-                          className="h-9 w-28 rounded-[7px] border border-white/12 bg-white/[.04] px-2.5 text-right font-mono text-sm text-white outline-none focus:border-[#c6ff3d]"
-                        />
-                        <button
-                          type="button"
-                          disabled={!dirty || busy === row.id}
-                          onClick={() => void savePrice(row)}
-                          className="h-9 rounded-[7px] bg-[#c6ff3d] px-3 text-[12px] font-bold text-black disabled:bg-white/10 disabled:text-white/35"
-                        >
-                          {busy === row.id ? '…' : 'Сохранить'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
+  async function savePrice(row: BusinessProduct) { const draft = drafts[row.id]; const next = Number(draft); if (!Number.isInteger(next) || next < 1) { setError('Цена — целое число от 1 сома'); return; } setBusy(row.id); setError(''); try { await updateBusinessPrice(session.accessToken, row.id, next); setDrafts((current) => { if (current[row.id] !== draft) return current; const copy = { ...current }; delete copy[row.id]; return copy; }); setToast(`${row.name} — цена сохранена`); window.setTimeout(() => setToast(''), 2600); await load(); } catch (cause) { if (isExpiredSession(cause)) { onSignOut(); return; } setError(cause instanceof Error ? cause.message : 'Цена не сохранена'); } finally { setBusy((current) => current === row.id ? '' : current); } }
+  const visibleRows = useMemo(() => (rows ?? []).filter((row) => (status === 'all' || (status === 'archived' ? row.archived : !row.archived)) && (!query.trim() || `${row.name} ${row.sku} ${row.category}`.toLowerCase().includes(query.trim().toLowerCase()))), [rows, query, status]);
+  const catalogValue = (rows ?? []).reduce((sum, row) => sum + row.price, 0);
+  return <div><div className="mb-7 flex flex-wrap items-end justify-between gap-3"><div><h1 className="font-display text-[25px] font-extrabold text-white">{session.seller.name}</h1><p className="mt-1 text-[12px] text-white/45">Вошли как {session.username}</p></div><div className="hidden rounded-full border border-white/10 px-3 py-1.5 text-[11px] text-white/45 sm:block">Партнёрский кабинет</div></div>{toast && <p role="status" aria-live="polite" className="mb-4 rounded-[9px] bg-[#c6ff3d]/12 px-3 py-2 text-[12px] text-[#c6ff3d]">{toast}</p>}{error && <p role="alert" className="mb-4 rounded-[9px] bg-[#ff9a6e]/10 px-3 py-2 text-[12px] text-[#ff9a6e]">{error}</p>}
+    {view === 'overview' && <Overview rows={rows} onOpen={() => onViewChange('assortment')} />}
+    {view === 'assortment' && <Assortment rows={rows} visibleRows={visibleRows} query={query} setQuery={setQuery} status={status} setStatus={setStatus} drafts={drafts} setDrafts={setDrafts} busy={busy} savePrice={savePrice} onReload={load} />}
+    {(view === 'orders' || view === 'finance' || view === 'settings') && <ComingSoon view={view} />}
+    {rows !== null && view === 'overview' && <p className="mt-5 text-[11px] text-white/30">Каталожная стоимость рассчитана по текущим ценам позиций; это не выручка и не финансовый отчёт.</p>}
+  </div>;
 }
+
+function Overview({ rows, onOpen }: { rows: BusinessProduct[] | null; onOpen: () => void }) { const total = rows?.length ?? 0; const active = rows?.filter((r) => !r.archived).length ?? 0; const archived = rows?.filter((r) => r.archived).length ?? 0; const value = rows?.reduce((sum, r) => sum + r.price, 0) ?? 0; return <div data-testid="business-overview"><div className="mb-5 flex items-center justify-between"><div><h2 className="font-display text-[18px] font-bold text-white">Обзор</h2><p className="mt-1 text-[12px] text-white/45">Состояние вашего каталога сейчас</p></div><button type="button" onClick={onOpen} className="rounded-[8px] bg-[#c6ff3d] px-3 py-2 text-[12px] font-bold text-black">Открыть ассортимент</button></div>{rows === null ? <p className="text-sm text-white/50">Загрузка данных…</p> : <><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[['Позиций', total, 'в каталоге'], ['Активных', active, 'доступны покупателям'], ['В архиве', archived, 'скрыты из каталога'], ['Каталожная стоимость', som(value), 'сумма текущих цен']].map(([label, valueText, hint]) => <div key={String(label)} className="rounded-[12px] border border-white/10 bg-white/[.03] p-4"><div className="text-[11px] text-white/45">{label}</div><div className="mt-2 font-display text-[24px] font-extrabold text-white">{valueText}</div><div className="mt-1 text-[10px] text-white/30">{hint}</div></div>)}</div><div className="mt-5 rounded-[12px] border border-white/10 bg-white/[.03] p-5"><div className="text-sm font-semibold text-white">Следующий шаг</div><p className="mt-1 max-w-[620px] text-[12px] leading-5 text-white/45">Проверьте цены и статус позиций перед публикацией. Заказы и финансовые отчёты появятся после подключения seller-атрибуции в API.</p></div></>}</div>; }
+
+function Assortment({ rows, visibleRows, query, setQuery, status, setStatus, drafts, setDrafts, busy, savePrice, onReload }: { rows: BusinessProduct[] | null; visibleRows: BusinessProduct[]; query: string; setQuery: (v: string) => void; status: 'all' | 'active' | 'archived'; setStatus: (v: 'all' | 'active' | 'archived') => void; drafts: Record<string, string>; setDrafts: React.Dispatch<React.SetStateAction<Record<string, string>>>; busy: string; savePrice: (row: BusinessProduct) => Promise<void>; onReload: () => void }) { return <div data-testid="business-assortment"><div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><h2 className="font-display text-[18px] font-bold text-white">Ассортимент</h2><p className="mt-1 text-[12px] text-white/45">Меняйте цены только у своих позиций</p></div><button type="button" onClick={onReload} className="rounded-[8px] border border-white/12 px-3 py-2 text-[11px] text-white/65">Обновить</button></div>{rows !== null && rows.length > 0 && <div className="mb-4 flex flex-wrap gap-2"><input aria-label="Поиск по ассортименту" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск по товару или SKU" className="h-10 min-w-[220px] flex-1 rounded-[8px] border border-white/10 bg-white/[.03] px-3 text-[12px] text-white outline-none focus:border-[#c6ff3d]" /><div className="flex rounded-[8px] border border-white/10 p-1">{([['all', 'Все'], ['active', 'Активные'], ['archived', 'Архив']] as const).map(([id, label]) => <button key={id} type="button" onClick={() => setStatus(id)} className={`rounded-[6px] px-3 py-1.5 text-[11px] ${status === id ? 'bg-white/15 text-white' : 'text-white/45'}`}>{label}</button>)}</div></div>}{rows === null && <p className="text-sm text-white/50">Загрузка…</p>}{rows !== null && rows.length === 0 && <div className="rounded-[12px] border border-white/10 bg-white/[.03] p-6"><div className="text-sm font-semibold text-white">Пока ни одной позиции</div><p className="mt-1 text-[12px] leading-5 text-white/50">Товары заводит AliStore при подключении магазина. Как только они появятся, вы сможете менять здесь цену.</p></div>}{rows !== null && rows.length > 0 && visibleRows.length === 0 && <div className="rounded-[12px] border border-white/10 p-5 text-sm text-white/50">Ничего не найдено. Измените запрос или фильтр.</div>}{visibleRows.length > 0 && <><div className="hidden overflow-x-auto rounded-[12px] border border-white/10 md:block"><table className="w-full border-collapse text-left"><thead><tr className="border-b border-white/10 text-[11px] uppercase tracking-wide text-white/40"><th scope="col" className="px-4 py-3 font-semibold">Товар</th><th scope="col" className="px-4 py-3 font-semibold">Артикул</th><th scope="col" className="px-4 py-3 font-semibold">Цена</th><th scope="col" className="px-4 py-3 font-semibold">Новая цена</th></tr></thead><tbody>{visibleRows.map((row) => <ProductRow key={row.id} row={row} drafts={drafts} setDrafts={setDrafts} busy={busy} savePrice={savePrice} />)}</tbody></table></div><div className="space-y-3 md:hidden">{visibleRows.map((row) => <ProductCard key={row.id} row={row} drafts={drafts} setDrafts={setDrafts} busy={busy} savePrice={savePrice} />)}</div></>}</div>; }
+
+function ProductRow({ row, drafts, setDrafts, busy, savePrice }: { row: BusinessProduct; drafts: Record<string, string>; setDrafts: React.Dispatch<React.SetStateAction<Record<string, string>>>; busy: string; savePrice: (row: BusinessProduct) => Promise<void> }) { return <tr className="border-b border-white/[.06]" data-testid={`business-row-${row.sku}`}><td className="px-4 py-3 text-[13px] text-white">{row.name}{row.archived && <span className="ml-2 rounded-chip bg-white/10 px-2 py-0.5 text-[10px] text-white/50">архив</span>}</td><td className="px-4 py-3 font-mono text-[12px] text-white/50">{row.sku}</td><td className="px-4 py-3 text-[13px] font-semibold text-white">{som(row.price)}</td><td className="px-4 py-3"><PriceEditor row={row} drafts={drafts} setDrafts={setDrafts} busy={busy} savePrice={savePrice} /></td></tr>; }
+function ProductCard({ row, drafts, setDrafts, busy, savePrice }: { row: BusinessProduct; drafts: Record<string, string>; setDrafts: React.Dispatch<React.SetStateAction<Record<string, string>>>; busy: string; savePrice: (row: BusinessProduct) => Promise<void> }) { return <div className="rounded-[12px] border border-white/10 bg-white/[.03] p-4" data-testid={`business-row-${row.sku}`}><div className="flex items-start justify-between gap-3"><div><div className="text-[13px] font-semibold text-white">{row.name}</div><div className="mt-1 font-mono text-[11px] text-white/40">{row.sku}</div></div>{row.archived && <span className="rounded-chip bg-white/10 px-2 py-0.5 text-[10px] text-white/50">архив</span>}</div><div className="mt-4 flex items-center justify-between"><div><div className="text-[10px] text-white/40">Текущая цена</div><div className="mt-1 text-sm font-semibold text-white">{som(row.price)}</div></div><PriceEditor row={row} drafts={drafts} setDrafts={setDrafts} busy={busy} savePrice={savePrice} /></div></div>; }
+function PriceEditor({ row, drafts, setDrafts, busy, savePrice }: { row: BusinessProduct; drafts: Record<string, string>; setDrafts: React.Dispatch<React.SetStateAction<Record<string, string>>>; busy: string; savePrice: (row: BusinessProduct) => Promise<void> }) { const draft = drafts[row.id] ?? ''; const dirty = draft.trim() !== '' && Number(draft) !== row.price; return <div className="flex items-center gap-2"><input aria-label={`Новая цена: ${row.name}`} inputMode="numeric" value={draft} onChange={(e) => setDrafts((current) => ({ ...current, [row.id]: e.target.value }))} className="h-9 w-28 rounded-[7px] border border-white/12 bg-white/[.04] px-2.5 text-right font-mono text-sm text-white outline-none focus:border-[#c6ff3d]" /><button type="button" disabled={!dirty || busy === row.id} onClick={() => void savePrice(row)} className="h-9 rounded-[7px] bg-[#c6ff3d] px-3 text-[12px] font-bold text-black disabled:bg-white/10 disabled:text-white/35">{busy === row.id ? '…' : 'Сохранить'}</button></div>; }
+
+function ComingSoon({ view }: { view: View }) { const item = NAV.find((entry) => entry.id === view)!; return <div className="rounded-[16px] border border-white/10 bg-white/[.03] p-7 sm:p-10"><div className="mb-4 flex h-11 w-11 items-center justify-center rounded-[10px] bg-[#c6ff3d]/15 text-xl text-[#c6ff3d]">{item.icon}</div><h2 className="font-display text-[20px] font-bold text-white">{item.label} подключается</h2><p className="mt-2 max-w-[520px] text-[13px] leading-6 text-white/50">Этот раздел появится после подключения seller-атрибуции и безопасных API-метрик. Мы не показываем выдуманные заказы или финансовые цифры.</p></div>; }
