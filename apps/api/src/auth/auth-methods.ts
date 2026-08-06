@@ -1,3 +1,5 @@
+import { resolveReviewLoginConfig } from './review-login-config';
+
 export type AuthMethodsEnvReader = (name: string) => string | undefined;
 
 export interface AuthMethodState {
@@ -60,13 +62,19 @@ export interface AuthMethodsView {
  */
 export function describeAuthMethods(env: AuthMethodsEnvReader): AuthMethodsView {
   const production = env('NODE_ENV') === 'production';
-  const phoneEnabled = resolvePhoneChannel(env, production);
+  const phoneChannelEnabled = resolvePhoneChannel(env, production);
+  const reviewLoginEnabled = resolveReviewLoginConfig(env) !== null;
   const socialFirstSignupEnabled = env('AUTH_SOCIAL_FIRST_SIGNUP_ENABLED')?.trim() === 'true';
 
-  // Phone OTP always creates a fully phone-verified Customer. Apple and Google
-  // may also create a phone-less Customer, but only behind the explicit
-  // social-first rollout flag below.
-  const phone: AuthMethodState = { enabled: phoneEnabled, registers: phoneEnabled };
+  // Ordinary phone OTP creates a fully phone-verified Customer. Review login
+  // is the narrow exception: it opens one pre-existing account and therefore
+  // contributes to `enabled`, never to `registers`.
+  const phone: AuthMethodState = {
+    enabled: phoneChannelEnabled || reviewLoginEnabled,
+    // Review credentials open one pre-existing account. They must never imply
+    // that an arbitrary phone can receive an OTP or create a Customer.
+    registers: phoneChannelEnabled,
+  };
 
   const emailFlagAllows = !production || env('AUTH_EMAIL_LOGIN_ENABLED')?.trim() === 'true';
   const emailTransportAllows = !production || Boolean(env('SMTP_HOST')?.trim());
@@ -84,7 +92,7 @@ export function describeAuthMethods(env: AuthMethodsEnvReader): AuthMethodsView 
   const telegramEnabled = Boolean(env('TELEGRAM_BOT_TOKEN')?.trim());
   const telegram: TelegramMethodState = {
     enabled: telegramEnabled,
-    registers: telegramEnabled && phoneEnabled,
+    registers: telegramEnabled && phoneChannelEnabled,
     // Имя без токена бесполезно: подпись проверять нечем, виджет привёл бы к
     // отказу после клика.
     botUsername: telegramEnabled ? env('TELEGRAM_BOT_USERNAME')?.trim() || null : null,
@@ -100,7 +108,7 @@ export function describeAuthMethods(env: AuthMethodsEnvReader): AuthMethodsView 
     : null;
   const apple: AppleMethodState = {
     enabled: appleEnabled,
-    registers: appleEnabled && (phoneEnabled || socialFirstSignupEnabled),
+    registers: appleEnabled && (phoneChannelEnabled || socialFirstSignupEnabled),
     // Не показываем браузерную кнопку, если API не принимает выпущенный для
     // неё audience. Иначе Apple успешно вернёт токен, а наш API отвергнет его.
     clientId: exposedAppleWebClientId,
@@ -115,7 +123,7 @@ export function describeAuthMethods(env: AuthMethodsEnvReader): AuthMethodsView 
   const configuredGoogleWebClientId = env('GOOGLE_WEB_CLIENT_ID')?.trim() || null;
   const google: GoogleMethodState = {
     enabled: googleEnabled,
-    registers: googleEnabled && (phoneEnabled || socialFirstSignupEnabled),
+    registers: googleEnabled && (phoneChannelEnabled || socialFirstSignupEnabled),
     // Не показываем кнопку, если выпущенный для неё token API заведомо
     // отклонит по audience. Native client IDs при этом продолжают работать.
     clientId: configuredGoogleWebClientId && googleTokenAudiences.includes(configuredGoogleWebClientId)
@@ -134,7 +142,7 @@ export function describeAuthMethods(env: AuthMethodsEnvReader): AuthMethodsView 
     apple,
     // Восстановление ходит тем же SMS-каналом, что и обычный вход: без него
     // включённый флаг ничего не даёт, и показывать экран было бы обманом.
-    recovery: { enabled: recoveryRolloutAllows && phoneEnabled },
+    recovery: { enabled: recoveryRolloutAllows && phoneChannelEnabled },
     google,
     anyLoginAvailable: phone.enabled || email.enabled || telegram.enabled || apple.enabled || google.enabled,
     registrationAvailable: phone.registers || telegram.registers || apple.registers || google.registers,

@@ -122,6 +122,11 @@ describe('Auth: App Store review login (integration)', () => {
     await expect(auth.verifyOtp(reviewPhone, reviewOtp)).rejects.toBeInstanceOf(ValidationError);
   });
 
+  it.each(['Xy7Qw2', '42424', '4242424'])('is inert when AUTH_REVIEW_OTP is not exactly six digits: %s', async (otp) => {
+    const auth = makeAuth({ ...configured(), AUTH_REVIEW_OTP: otp });
+    await expect(auth.verifyOtp(reviewPhone, otp)).rejects.toBeInstanceOf(ValidationError);
+  });
+
   it('honours AUTH_REVIEW_UNTIL — expired or unparseable window fails closed', async () => {
     const past = makeAuth({ ...configured(), AUTH_REVIEW_UNTIL: '2000-01-01T00:00:00.000Z' });
     await expect(past.verifyOtp(reviewPhone, reviewOtp)).rejects.toBeInstanceOf(ValidationError);
@@ -329,6 +334,16 @@ describe('Auth: запрос кода для ревьюера при выклю�
   it('инертен после истечения окна', async () => {
     const auth = makeAuth(
       { ...configured(), AUTH_REVIEW_UNTIL: new Date(Date.now() - 1000).toISOString() },
+      new RecordingDisabledSender(),
+    );
+    await expect(auth.requestOtp(reviewPhone)).rejects.toMatchObject({
+      response: { code: 'sms_login_unavailable' },
+    });
+  });
+
+  it('инертен при недоступном для iOS numberPad нецифровом OTP', async () => {
+    const auth = makeAuth(
+      { ...configured(), AUTH_REVIEW_OTP: 'Xy7Qw2' },
       new RecordingDisabledSender(),
     );
     await expect(auth.requestOtp(reviewPhone)).rejects.toMatchObject({

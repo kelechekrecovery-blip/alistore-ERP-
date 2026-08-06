@@ -62,6 +62,7 @@ describe('Staff admin lifecycle: role change, reactivation, password reset', () 
 
   it('owner changes a role and the ledger records from/to', async () => {
     const target = await makeStaff('promote');
+    const oldSession = await staffAuth.login(`${RUN}-promote`, 'pw-12345');
     const res = await request(app.getHttpServer())
       .patch(`/staff-auth/staff/${target.id}/role`)
       .set('Authorization', `Bearer ${ownerToken}`)
@@ -74,6 +75,13 @@ describe('Staff admin lifecycle: role change, reactivation, password reset', () 
       where: { type: 'staff.role_changed', refs: { has: target.id } },
     });
     expect(event?.payload).toMatchObject({ from: 'seller', to: 'senior_seller' });
+    await request(app.getHttpServer())
+      .get('/staff-auth/me')
+      .set('Authorization', `Bearer ${oldSession.accessToken}`)
+      .expect(401);
+    await expect(staffAuth.refresh(oldSession.refreshToken)).rejects.toMatchObject({
+      code: 'staff_refresh_reused',
+    });
   });
 
   it('refuses to demote the last active owner', async () => {
@@ -99,7 +107,16 @@ describe('Staff admin lifecycle: role change, reactivation, password reset', () 
 
   it('lists the full roster including deactivated accounts (owner only)', async () => {
     const target = await makeStaff('roster-inactive');
+    const oldSession = await staffAuth.login(`${RUN}-roster-inactive`, 'pw-12345');
     await staffAuth.deactivateStaff('test-admin', target.id);
+
+    await request(app.getHttpServer())
+      .get('/staff-auth/me')
+      .set('Authorization', `Bearer ${oldSession.accessToken}`)
+      .expect(401);
+    await expect(staffAuth.refresh(oldSession.refreshToken)).rejects.toMatchObject({
+      code: 'staff_refresh_reused',
+    });
 
     await request(app.getHttpServer())
       .get('/staff-auth/staff')
@@ -177,13 +194,21 @@ describe('Staff admin lifecycle: role change, reactivation, password reset', () 
 
   it('password reset kills the old password and the old refresh session', async () => {
     const target = await makeStaff('lost-pw');
-    await staffAuth.login(`${RUN}-lost-pw`, 'pw-12345');
+    const oldSession = await staffAuth.login(`${RUN}-lost-pw`, 'pw-12345');
 
     await request(app.getHttpServer())
       .post(`/staff-auth/staff/${target.id}/password-reset`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ password: 'brand-new-pw-9' })
       .expect(201);
+
+    await request(app.getHttpServer())
+      .get('/staff-auth/me')
+      .set('Authorization', `Bearer ${oldSession.accessToken}`)
+      .expect(401);
+    await expect(staffAuth.refresh(oldSession.refreshToken)).rejects.toMatchObject({
+      code: 'staff_refresh_reused',
+    });
 
     await expect(staffAuth.login(`${RUN}-lost-pw`, 'pw-12345')).rejects.toThrow();
     const relogin = await staffAuth.login(`${RUN}-lost-pw`, 'brand-new-pw-9');

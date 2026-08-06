@@ -14,7 +14,13 @@ import { AuthzService } from '../authz/authz.service';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-type RealtimeSocket = Socket & { data: { principal?: AuthPrincipal } };
+type RealtimeSocket = Socket & {
+  data: { principal?: AuthPrincipal; accessToken?: string };
+};
+type RevalidatableSocket = {
+  data: { principal?: AuthPrincipal; accessToken?: string };
+  disconnect(close?: boolean): unknown;
+};
 
 /**
  * Real-time push (socket.io) — clients subscribe to an order and receive status
@@ -51,6 +57,7 @@ export class RealtimeGateway {
           await this.assertStaffQueueAccess(principal);
         }
         client.data.principal = principal;
+        client.data.accessToken = token;
         next();
       } catch {
         next(new Error('unauthorized'));
@@ -64,7 +71,7 @@ export class RealtimeGateway {
     @ConnectedSocket() client: RealtimeSocket,
     @MessageBody() orderId: string,
   ): Promise<{ subscribed: string }> {
-    const principal = client.data.principal;
+    const principal = await this.revalidateSocket(client);
     if (!principal || !this.prisma) throw new WsException('unauthorized');
     const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { customerId: true } });
     if (!order) throw new WsException('order_not_found');
@@ -77,15 +84,53 @@ export class RealtimeGateway {
   }
 
   /** Push an order status change to its subscribers. */
-  emitOrderStatus(
+  async emitOrderStatus(
     orderId: string,
     status: string,
     payload: Record<string, unknown> = {},
-  ): void {
+  ): Promise<void> {
     if (!this.server) return; // no adapter bound (e.g. unit tests) → no-op
+    const room = `order:${orderId}`;
+    // A socket can outlive its JWT's authorization state. Revalidate every
+    // room member before delivery so account deletion, staff deactivation,
+    // role changes and credential/TOTP resets take effect for already-joined
+    // connections rather than only on the next reconnect.
+    const sockets = await this.server.in(room).fetchSockets();
+    for (const socket of sockets) {
+      try {
+        const principal = await this.revalidateSocket(socket);
+        if (principal.typ === 'staff') await this.assertStaffQueueAccess(principal);
+      } catch {
+        await socket.leave(room);
+        socket.disconnect(true);
+      }
+    }
     this.server
-      .to(`order:${orderId}`)
+      .to(room)
       .emit('order:status', { orderId, status, ...payload });
+  }
+
+  private async revalidateSocket(client: RevalidatableSocket): Promise<AuthPrincipal> {
+    const cached = client.data.principal;
+    // Allows isolated transport tests to construct the gateway without the
+    // auth module; production RealtimeModule always wires AuthService.
+    if (!this.auth) {
+      if (cached) return cached;
+      throw new WsException('unauthorized');
+    }
+    const token = client.data.accessToken;
+    if (!token) {
+      client.disconnect(true);
+      throw new WsException('unauthorized');
+    }
+    try {
+      const current = await this.auth.verifyAccessToken(token);
+      client.data.principal = current;
+      return current;
+    } catch {
+      client.disconnect(true);
+      throw new WsException('unauthorized');
+    }
   }
 
   private readToken(client: Socket): string | undefined {

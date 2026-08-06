@@ -5,7 +5,12 @@ describe('AuthService nullable phone token contract', () => {
     const signAsync = jest.fn().mockResolvedValue('access-token');
     const refreshCreate = jest.fn().mockResolvedValue({ id: 'refresh-row' });
     const auth = new AuthService(
-      { refreshToken: { create: refreshCreate } } as never,
+      {
+        customer: {
+          findUnique: jest.fn().mockResolvedValue({ phone: null }),
+        },
+        refreshToken: { create: refreshCreate },
+      } as never,
       { signAsync } as never,
       { get: jest.fn() } as never,
     );

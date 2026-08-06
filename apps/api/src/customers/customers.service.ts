@@ -13,6 +13,10 @@ import { buildCustomerOverview, CustomerOverview } from './customer-overview';
 import { warrantyCoverage } from './warranty-coverage';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
 import { revokeTelegramAgentAccessOnTx } from '../telegram-agent/telegram-agent-revocation';
+import {
+  authorizeRefreshTokenRevocation,
+  customerAuthLockKey,
+} from '../auth/customer-session';
 
 /**
  * Customers for storefront/guest checkout. Phone is the natural key (unique), so
@@ -307,10 +311,42 @@ export class CustomersService {
    * inbox and Telegram-agent access traces are erased; every refresh session is
    * revoked. One transaction with the customer.deleted ledger event (and
    * consent_changed when consent flips off).
-   */
+  */
   async deleteAccount(customerId: string) {
+    const maxAttempts = 3;
+    let lastDeadlock: unknown;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        return await this.deleteAccountAttempt(customerId);
+      } catch (error) {
+        if (!isDatabaseDeadlock(error) || attempt === maxAttempts) throw error;
+        lastDeadlock = error;
+        // A PostgreSQL deadlock aborts the entire transaction, so retrying is
+        // safe. A short bounded backoff lets the old mixed-version refresh
+        // chain drain before the next attempt acquires the account locks.
+        await new Promise((resolve) => setTimeout(resolve, attempt * 10));
+      }
+    }
+    throw lastDeadlock;
+  }
+
+  private async deleteAccountAttempt(customerId: string) {
     return this.audit.transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'customer-delete:' + customerId}))::text AS locked`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${customerAuthLockKey(customerId)}, 0))::text AS locked`;
+      // Mixed-version lock order: the previous refresh implementation locks
+      // its presented RefreshToken before the compatibility INSERT trigger
+      // locks Customer. Lock the existing token set first as well, otherwise
+      // deletion (Customer -> RefreshToken) and old refresh
+      // (RefreshToken -> Customer) form a deterministic deadlock. The later
+      // updateMany is intentionally a fresh READ COMMITTED statement so it
+      // also sees an old-writer child committed while this lock query waited.
+      await tx.$queryRaw`
+        SELECT id
+        FROM "RefreshToken"
+        WHERE "customerId" = ${customerId}
+        ORDER BY id
+        FOR UPDATE
+      `;
       await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${customerId} FOR UPDATE`;
       const customer = await tx.customer.findUnique({ where: { id: customerId } });
       if (!customer) throw new ValidationError('customer_not_found', `Клиент ${customerId} не найден`);
@@ -378,6 +414,7 @@ export class CustomersService {
           phone: deletedPhone(customerId),
           phoneVerifiedAt: null,
           email: null,
+          emailVerifiedAt: null,
           consent: false,
         },
       });
@@ -426,6 +463,7 @@ export class CustomersService {
         where: { customerId },
         data: { push: false, whatsapp: false, service: false, promos: false },
       });
+      await authorizeRefreshTokenRevocation(tx);
       await tx.refreshToken.updateMany({
         where: { customerId, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -542,6 +580,19 @@ function requiredText(value: string, label: string): string {
 
 const DELETED_CUSTOMER_NAME = 'Удалённый пользователь';
 const DELETED_PHONE_PREFIX = 'deleted:';
+
+function isDatabaseDeadlock(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as {
+    code?: unknown;
+    message?: unknown;
+    meta?: { code?: unknown; database_error?: unknown };
+  };
+  if (candidate.code === 'P2034' || candidate.code === '40P01') return true;
+  if (candidate.meta?.code === '40P01') return true;
+  const detail = `${String(candidate.message ?? '')} ${String(candidate.meta?.database_error ?? '')}`;
+  return detail.includes('40P01') || /deadlock detected/i.test(detail);
+}
 
 function hashGoogleSubjects(subjects: string[]): string[] {
   return [...new Set(subjects.map((subject) => createHash('sha256').update(subject, 'utf8').digest('hex')))]

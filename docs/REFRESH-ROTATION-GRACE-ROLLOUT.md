@@ -28,3 +28,23 @@ return the deterministic replacement and would reintroduce mixed rotation
 semantics. Rotating `AUTH_REFRESH_DERIVATION_SECRET` invalidates deterministic
 grace retries for parents rotated under the old secret; perform such rotation
 only with the gate disabled and all API instances drained.
+
+## Refresh-family and staff-session cutover
+
+The `20260807040000_refresh_token_families` migration is compatible with old
+token inserts and blocks old account-wide replay updates from revoking new
+families. It also serializes customer deletion with old refresh writers and the
+API retries a PostgreSQL deadlock (`40P01`/Prisma `P2034`) at most three times.
+
+This database compatibility does not make an old process understand
+`StaffUser.sessionVersion`. During the short pre-deploy overlap, do not perform
+staff password/TOTP resets, role changes or deactivations. The immediate staff
+access-token revocation guarantee begins only after every old API process is
+drained and the new revision is healthy. Verify this before reopening staff
+administration.
+
+After exact-family tokens have been issued, do not roll back to the old API
+image: it cannot rotate new staff families and intentionally fails closed under
+the database compatibility trigger. Roll forward with the new revision. A
+failed migration before the new image becomes healthy is a release stop, not a
+reason to bypass the trigger or re-enable old refresh behavior.

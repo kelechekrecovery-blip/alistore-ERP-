@@ -63,7 +63,7 @@ describe('Customer PII read policy (required JWT + masking)', () => {
   }
 
   function staffToken(role: string) {
-    return jwt.sign({ sub: `staff-${role}-${RUN}`, typ: 'staff', role });
+    return jwt.sign({ sub: `staff-${role}-${RUN}`, typ: 'staff', role, point: 'BISHKEK-1' });
   }
 
   function customerToken(customerId: string, phone: string | null) {
@@ -117,13 +117,13 @@ describe('Customer PII read policy (required JWT + masking)', () => {
     await request(app.getHttpServer())
       .get(`/customers/${c.id}/overview`)
       .set('Authorization', `Bearer ${staffToken('seller')}`)
-      .expect(403);
+      .expect(401);
 
     await prisma.staffUser.update({ where: { id: sellerId }, data: { active: true, role: 'cashier' } });
     await request(app.getHttpServer())
       .get(`/customers/${c.id}/overview`)
       .set('Authorization', `Bearer ${staffToken('seller')}`)
-      .expect(403);
+      .expect(401);
     await prisma.staffUser.update({ where: { id: sellerId }, data: { role: 'seller' } });
   });
 

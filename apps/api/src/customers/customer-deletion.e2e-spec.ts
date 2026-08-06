@@ -14,6 +14,7 @@ import { OTP_SENDER } from '../auth/otp-sender';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { CustomersModule } from './customers.module';
+import { CustomersService } from './customers.service';
 
 /**
  * GAP-ACCOUNT-DELETE-001 — self-service account deletion and data export.
@@ -26,6 +27,7 @@ describe('Customer account deletion and export', () => {
   let prisma: PrismaService;
   let jwt: JwtService;
   let auth: AuthService;
+  let customers: CustomersService;
   const run = `${Date.now()}${Math.floor(Math.random() * 10_000)}`.slice(-8);
 
   beforeAll(async () => {
@@ -47,6 +49,7 @@ describe('Customer account deletion and export', () => {
     prisma = moduleRef.get(PrismaService);
     jwt = moduleRef.get(JwtService);
     auth = moduleRef.get(AuthService);
+    customers = moduleRef.get(CustomersService);
   });
 
   afterAll(async () => app.close());
@@ -61,6 +64,52 @@ describe('Customer account deletion and export', () => {
     if (!value.phone) throw new Error('Test customer must have a phone');
     return jwt.sign({ sub: value.id, typ: 'customer', phone: value.phone });
   }
+
+  it('serializes account deletion with an old-writer refresh without deadlock or a live child', async () => {
+    const owner = await customer('09');
+    const parentHash = `old-parent-${run}`;
+    const childHash = `old-child-${run}`;
+    await prisma.refreshToken.create({
+      data: {
+        customerId: owner.id,
+        tokenHash: parentHash,
+        expiresAt: new Date(Date.now() + 86_400_000),
+      },
+    });
+
+    let parentLocked!: () => void;
+    let releaseOldWriter!: () => void;
+    const locked = new Promise<void>((resolve) => { parentLocked = resolve; });
+    const released = new Promise<void>((resolve) => { releaseOldWriter = resolve; });
+    const oldWriter = prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT id FROM "RefreshToken" WHERE "tokenHash" = ${parentHash} FOR UPDATE
+      `;
+      parentLocked();
+      await released;
+      await tx.refreshToken.create({
+        data: {
+          customerId: owner.id,
+          tokenHash: childHash,
+          expiresAt: new Date(Date.now() + 86_400_000),
+        },
+      });
+    });
+
+    await locked;
+    const deletion = customers.deleteAccount(owner.id);
+    // Let deletion reach and wait on the token-row lock held above. This
+    // recreates the mixed-version production ordering with two connections.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    releaseOldWriter();
+    await expect(Promise.all([oldWriter, deletion])).resolves.toBeDefined();
+
+    await expect(prisma.refreshToken.findUniqueOrThrow({
+      where: { tokenHash: childHash },
+    })).resolves.toMatchObject({ revokedAt: expect.any(Date) });
+    await expect(prisma.customer.findUniqueOrThrow({ where: { id: owner.id } }))
+      .resolves.toMatchObject({ phone: `deleted:${owner.id}` });
+  });
 
   it('anonymizes PII, erases addresses/identities and revokes every session', async () => {
     const owner = await customer('11', true);
@@ -134,7 +183,7 @@ describe('Customer account deletion and export', () => {
       })),
     });
 
-    const firstDeletion = await request(app.getHttpServer())
+    await request(app.getHttpServer())
       .delete('/customers/me')
       .set('Authorization', `Bearer ${token(owner)}`)
       .expect(200)
@@ -148,6 +197,7 @@ describe('Customer account deletion and export', () => {
     expect(anonymized).toMatchObject({
       name: 'Удалённый пользователь',
       phone: `deleted:${owner.id}`,
+      emailVerifiedAt: null,
       consent: false,
     });
     expect(await prisma.customerAddress.count({ where: { customerId: owner.id } })).toBe(0);
@@ -185,6 +235,16 @@ describe('Customer account deletion and export', () => {
     const sessions = await prisma.refreshToken.findMany({ where: { customerId: owner.id } });
     expect(sessions).toHaveLength(2);
     expect(sessions.every((session) => session.revokedAt !== null)).toBe(true);
+    // Compatibility guard for a previous API revision: even an old writer
+    // that ignores application advisory locks cannot mint a post-deletion
+    // refresh token because the database trigger locks/checks the tombstone.
+    await expect(prisma.refreshToken.create({
+      data: {
+        customerId: owner.id,
+        tokenHash: `late-old-writer-${run}`,
+        expiresAt: new Date(Date.now() + 86_400_000),
+      },
+    })).rejects.toThrow();
     const deletionEvents = await prisma.auditEvent.findMany({
       where: { type: 'customer.deleted', refs: { has: owner.id } },
     });
@@ -197,12 +257,25 @@ describe('Customer account deletion and export', () => {
     // consent flipped true → false, so campaigns see the withdrawal event
     expect(await prisma.auditEvent.count({ where: { type: 'customer.consent_changed', refs: { has: owner.id } } })).toBe(1);
 
-    // repeat deletion is an idempotent no-op (no second ledger event)
-    const replayedDeletion = await request(app.getHttpServer())
+    // The JWT used for deletion is revoked immediately. Keeping the endpoint
+    // idempotent must not resurrect an authenticatable deleted principal.
+    await request(app.getHttpServer())
       .delete('/customers/me')
       .set('Authorization', `Bearer ${token(owner)}`)
-      .expect(200);
-    expect(replayedDeletion.body).toEqual(firstDeletion.body);
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${token(owner)}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/customers/me/export')
+      .set('Authorization', `Bearer ${token(owner)}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/auth/email/attach/request')
+      .set('Authorization', `Bearer ${token(owner)}`)
+      .send({ email: `reattach-${run}@example.test` })
+      .expect(401);
     expect(await prisma.auditEvent.count({ where: { type: 'customer.deleted', refs: { has: owner.id } } })).toBe(1);
   });
 
@@ -250,7 +323,10 @@ describe('Customer account deletion and export', () => {
   it('закрывает и почтовую дверь: по привязанному адресу удалённый аккаунт не воскресает', async () => {
     const email = `deleted${run.slice(-6)}@emaildelete.test`;
     const owner = await customer('88');
-    await prisma.customer.update({ where: { id: owner.id }, data: { email } });
+    await prisma.customer.update({
+      where: { id: owner.id },
+      data: { email, emailVerifiedAt: new Date() },
+    });
     // Предусловие проверяем детерминированным challenge: этот тест отвечает за
     // удаление аккаунта, а не за асинхронный dev-echo транспорт email.
     const emailCode = '482915';
@@ -277,6 +353,7 @@ describe('Customer account deletion and export', () => {
     // полный токен на «удалённый» аккаунт с историей заказов и бонусами.
     const after = await prisma.customer.findUnique({ where: { id: owner.id } });
     expect(after?.email).toBeNull();
+    expect(after?.emailVerifiedAt).toBeNull();
     // Удаление снесло и вызовы по адресу — адрес не должен остаться в базе
     // открытым текстом. Считаем здесь: следующий запрос кода намеренно создаёт
     // строку и для неизвестного адреса, чтобы не выдавать наличие аккаунта.
@@ -379,10 +456,28 @@ describe('Customer account deletion and export', () => {
     expect(JSON.stringify(foreign.body)).not.toContain(owner.phone);
     expect(foreign.body.orders).toHaveLength(0);
 
-    const staffToken = jwt.sign({ sub: 'staff-1', typ: 'staff', role: 'admin' });
-    await request(app.getHttpServer())
-      .get('/customers/me/export')
-      .set('Authorization', `Bearer ${staffToken}`)
-      .expect(403);
+    const point = await prisma.storePoint.findFirstOrThrow({ where: { active: true } });
+    const staff = await prisma.staffUser.create({
+      data: {
+        username: `export-staff-${run}`,
+        passwordHash: await argon2.hash('test-only-password'),
+        role: 'admin',
+        point: point.inventoryLocation,
+      },
+    });
+    try {
+      const staffToken = jwt.sign({
+        sub: staff.id,
+        typ: 'staff',
+        role: staff.role,
+        point: staff.point,
+      });
+      await request(app.getHttpServer())
+        .get('/customers/me/export')
+        .set('Authorization', `Bearer ${staffToken}`)
+        .expect(403);
+    } finally {
+      await prisma.staffUser.delete({ where: { id: staff.id } });
+    }
   });
 });

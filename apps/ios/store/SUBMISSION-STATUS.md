@@ -109,12 +109,16 @@ API environment for the review window, then remove them afterwards — see
 
 ```
 AUTH_REVIEW_PHONE=+996XXXXXXXXX     # throwaway number, never a real customer
-AUTH_REVIEW_OTP=Xy7Qw2              # 6 chars, mixed case
-AUTH_REVIEW_UNTIL=2026-08-15T00:00:00Z
+AUTH_REVIEW_OTP=424242               # exactly 6 digits; iOS uses numberPad
+AUTH_REVIEW_UNTIL=YYYY-MM-DDTHH:mm:ssZ  # required; future, at most 7 days away
 ```
 
+All three values are mandatory. The phone must already belong to the throwaway
+review Customer; this credential is login-only and does not enable registration
+or account recovery when the SMS provider is disabled.
+
 **Staff, Courier and POS do not use that mechanism.** It is customer-scoped
-(`verifyOtp` upserts a `Customer`), and these three sign in through
+(`verifyOtp` only opens the pre-existing review `Customer`), and these three sign in through
 `staff-auth/login` with a user name and a matching credential. Provision three
 real employee accounts in the ERP, one per role — staff, courier, cashier — and:
 
@@ -169,9 +173,10 @@ cashiers, so they are not scripted.
 ## Known risks that remain after submission
 
 - **Build 5 is the rejected binary of record.** The strengthened build 6
-  gate binds the fixed review OTP to `AUTH_REVIEW_CUSTOMER_ID`; deploying that
-  backend change requires setting the matching server variable first. Do not
-  deploy it blindly during review.
+  gate binds the fixed review OTP to the pre-existing Customer selected by
+  `AUTH_REVIEW_PHONE`; deploying it requires the matching six-digit
+  `AUTH_REVIEW_OTP` and short-lived `AUTH_REVIEW_UNTIL`. Do not deploy an
+  incomplete review credential.
 - **Fresh Sign in with Apple enrollment on a physical iPad is not yet proven.**
   A new Apple identity still reaches phone enrollment, which depends on the SMS
   channel. Build 5's fixed demo-account path was live-tested successfully; the

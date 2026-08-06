@@ -10,6 +10,10 @@ import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { resolveActiveStorePoint } from '../common/store-point-identity';
 import { revokeTelegramAgentAccessOnTx } from '../telegram-agent/telegram-agent-revocation';
+import {
+  authorizeRefreshTokenRevocation,
+  customerAuthLockKey,
+} from '../auth/customer-session';
 
 type StaffStorePoint = {
   id: string;
@@ -119,7 +123,30 @@ export class StaffAuthService {
     if (staff.totpEnabled) {
       this.assertLoginTotp(staff, totp);
     }
-    return this.issueTokens(staff);
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockStaffSessions(tx, `${STAFF_REFRESH_PREFIX}${staff.id}`);
+      await tx.$queryRaw`SELECT id FROM "StaffUser" WHERE id = ${staff.id} FOR UPDATE`;
+      const current = await tx.staffUser.findUnique({ where: { id: staff.id } });
+      // Password/TOTP verification is deliberately outside the transaction so
+      // Argon2 cannot hold a database lock. The serialized re-read closes the
+      // gap: if any credential, role, point or active-state mutation committed
+      // while verification ran, this attempt cannot insert a late refresh row.
+      if (
+        !current?.active
+        || current.passwordHash !== staff.passwordHash
+        || current.sessionVersion !== staff.sessionVersion
+        || current.totpEnabled !== staff.totpEnabled
+        || current.totpSecret !== staff.totpSecret
+        || current.role !== staff.role
+        || current.point !== staff.point
+      ) {
+        throw new ValidationError(
+          'staff_session_changed',
+          'Учётные данные изменились во время входа — войдите заново',
+        );
+      }
+      return this.issueTokens(current, tx);
+    });
   }
 
   /**
@@ -152,34 +179,75 @@ export class StaffAuthService {
   async refresh(refreshToken: string): Promise<StaffTokens> {
     const tokenHash = this.hashToken(refreshToken);
     const outcome = await this.prisma.$transaction(async (tx) => {
+      const owner = await tx.refreshToken.findUnique({
+        where: { tokenHash },
+        select: { customerId: true },
+      });
+      if (!owner?.customerId.startsWith(STAFF_REFRESH_PREFIX)) {
+        throw new ValidationError('staff_refresh_invalid', 'Staff-сессия недействительна');
+      }
+      await this.lockStaffSessions(tx, owner.customerId);
       const locked = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT id FROM "RefreshToken" WHERE "tokenHash" = ${tokenHash} FOR UPDATE
       `;
-      if (locked.length === 0) throw new ValidationError('staff_refresh_invalid', 'Staff-сессия недействительна');
+      if (locked.length === 0) {
+        throw new ValidationError('staff_refresh_invalid', 'Staff-сессия недействительна');
+      }
       const record = await tx.refreshToken.findUnique({ where: { tokenHash } });
       if (!record || record.expiresAt < new Date() || !record.customerId.startsWith(STAFF_REFRESH_PREFIX)) {
         throw new ValidationError('staff_refresh_invalid', 'Staff-сессия недействительна');
       }
       if (record.revokedAt) {
-        await tx.refreshToken.updateMany({ where: { customerId: record.customerId, revokedAt: null }, data: { revokedAt: new Date() } });
+        await authorizeRefreshTokenRevocation(tx);
+        await tx.refreshToken.updateMany({
+          where: this.staffFamilyRevocationWhere(record),
+          data: { revokedAt: new Date() },
+        });
         return { kind: 'reused' as const };
       }
-      await tx.refreshToken.update({ where: { id: record.id }, data: { revokedAt: new Date() } });
+      const rotatedAt = new Date();
+      await tx.refreshToken.update({
+        where: { id: record.id },
+        data: { revokedAt: rotatedAt, rotatedAt },
+      });
       const staff = await tx.staffUser.findUnique({ where: { id: record.customerId.slice(STAFF_REFRESH_PREFIX.length) } });
       if (!staff?.active) throw new ValidationError('staff_inactive', 'Сотрудник деактивирован');
-      return { kind: 'rotated' as const, tokens: await this.issueTokens(staff, tx) };
+      return {
+        kind: 'rotated' as const,
+        tokens: await this.issueTokens(staff, tx, record.familyId),
+      };
     });
     if (outcome.kind === 'reused') throw new ValidationError('staff_refresh_reused', 'Повторное использование staff-сессии — вход выполнен заново');
     return outcome.tokens;
   }
 
   async logout(refreshToken: string): Promise<void> {
-    await this.prisma.refreshToken.updateMany({ where: { tokenHash: this.hashToken(refreshToken), revokedAt: null }, data: { revokedAt: new Date() } });
+    const tokenHash = this.hashToken(refreshToken);
+    await this.prisma.$transaction(async (tx) => {
+      const owner = await tx.refreshToken.findUnique({
+        where: { tokenHash },
+        select: { customerId: true },
+      });
+      if (!owner?.customerId.startsWith(STAFF_REFRESH_PREFIX)) return;
+      await this.lockStaffSessions(tx, owner.customerId);
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM "RefreshToken" WHERE "tokenHash" = ${tokenHash} FOR UPDATE
+      `;
+      if (locked.length === 0) return;
+      const record = await tx.refreshToken.findUnique({ where: { tokenHash } });
+      if (!record) return;
+      await authorizeRefreshTokenRevocation(tx);
+      await tx.refreshToken.updateMany({
+        where: this.staffFamilyRevocationWhere(record),
+        data: { revokedAt: new Date() },
+      });
+    });
   }
 
   private async issueTokens(
     staff: StaffUser,
     db: Pick<Prisma.TransactionClient, 'refreshToken'> = this.prisma,
+    familyId = randomBytes(16).toString('hex'),
   ): Promise<StaffTokens> {
     const storePoint = await resolveActiveStorePoint(
       this.prisma,
@@ -193,6 +261,7 @@ export class StaffAuthService {
         typ: 'staff',
         point: storePoint.inventoryLocation,
         storePointId: storePoint.id,
+        sessionVersion: staff.sessionVersion,
       },
       { expiresIn: '15m' },
     );
@@ -200,6 +269,7 @@ export class StaffAuthService {
     await db.refreshToken.create({
       data: {
         customerId: `${STAFF_REFRESH_PREFIX}${staff.id}`,
+        familyId,
         tokenHash: this.hashToken(refreshToken),
         expiresAt: new Date(Date.now() + STAFF_REFRESH_TTL_MS),
       },
@@ -219,6 +289,47 @@ export class StaffAuthService {
       },
       totpEnabled: staff.totpEnabled,
     };
+  }
+
+  private staffFamilyRevocationWhere(record: {
+    customerId: string;
+    familyId: string;
+    revokedAt?: Date | null;
+  }) {
+    if (record.familyId.startsWith('legacy:')) {
+      return {
+        customerId: record.customerId,
+        familyId: { startsWith: 'legacy:' },
+        revokedAt: null,
+      };
+    }
+    return {
+      customerId: record.customerId,
+      ...(record.revokedAt
+        ? {
+            OR: [
+              { familyId: record.familyId },
+              // An old server rotating this new-family parent creates a
+              // legacy-marked child. Replaying/logging out the parent must
+              // close that compatibility branch without touching newer hex
+              // families.
+              { familyId: { startsWith: 'legacy:' } },
+            ],
+          }
+        : { familyId: record.familyId }),
+      revokedAt: null,
+    };
+  }
+
+  private async lockStaffSessions(
+    tx: Pick<Prisma.TransactionClient, '$queryRaw'>,
+    customerId: string,
+  ): Promise<void> {
+    await tx.$queryRaw`
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(${customerAuthLockKey(customerId)}, 0)
+      )::text AS locked
+    `;
   }
 
   private hashToken(token: string): string {
@@ -295,9 +406,21 @@ export class StaffAuthService {
       throw new ForbiddenError('staff_2fa_invalid_token', 'Неверный код 2FA');
     }
     const updated = await this.prisma.$transaction(async (tx) => {
+      await this.lockStaffSessions(tx, `${STAFF_REFRESH_PREFIX}${staff.id}`);
+      await tx.$queryRaw`SELECT id FROM "StaffUser" WHERE id = ${staff.id} FOR UPDATE`;
       const result = await tx.staffUser.update({
         where: { id: staff.id },
-        data: { totpEnabled: false, totpSecret: null, totpLastToken: null },
+        data: {
+          totpEnabled: false,
+          totpSecret: null,
+          totpLastToken: null,
+          sessionVersion: { increment: 1 },
+        },
+      });
+      await authorizeRefreshTokenRevocation(tx);
+      await tx.refreshToken.updateMany({
+        where: { customerId: `${STAFF_REFRESH_PREFIX}${staff.id}`, revokedAt: null },
+        data: { revokedAt: new Date() },
       });
       await revokeTelegramAgentAccessOnTx(
         tx,
@@ -311,17 +434,30 @@ export class StaffAuthService {
 
   /**
    * STAFF-002: admin reset of a staff member's 2FA (lost authenticator) — no current
-   * code required because the caller holds `staff:manage`. The TOTP secret is cleared
-   * and the ledger event is written in the same transaction.
-   * NOTE: this branch has no staff refresh tokens yet, so there are no sessions to
-   * revoke — access JWTs die on expiry or on deactivation (STAFF-001).
+   * code required because the caller holds `staff:manage`. The TOTP secret and all
+   * refresh sessions are cleared in the same serialized transaction.
    */
   async resetTotpByAdmin(actorId: string, targetStaffId: string) {
-    const target = await this.getActiveStaff(targetStaffId);
     const updated = await this.auditLedger().transaction(async (tx) => {
+      await this.lockStaffSessions(tx, `${STAFF_REFRESH_PREFIX}${targetStaffId}`);
+      await tx.$queryRaw`SELECT id FROM "StaffUser" WHERE id = ${targetStaffId} FOR UPDATE`;
+      const target = await tx.staffUser.findUnique({ where: { id: targetStaffId } });
+      if (!target?.active) {
+        throw new ForbiddenError('staff_not_found', 'Сотрудник не найден или отключён');
+      }
       const staff = await tx.staffUser.update({
         where: { id: target.id },
-        data: { totpEnabled: false, totpSecret: null, totpLastToken: null },
+        data: {
+          totpEnabled: false,
+          totpSecret: null,
+          totpLastToken: null,
+          sessionVersion: { increment: 1 },
+        },
+      });
+      await authorizeRefreshTokenRevocation(tx);
+      const revoked = await tx.refreshToken.updateMany({
+        where: { customerId: `${STAFF_REFRESH_PREFIX}${target.id}`, revokedAt: null },
+        data: { revokedAt: new Date() },
       });
       await revokeTelegramAgentAccessOnTx(
         tx,
@@ -334,7 +470,11 @@ export class StaffAuthService {
           {
             type: EventType.StaffTotpReset,
             actor: actorId,
-            payload: { targetStaffId: target.id, username: target.username },
+            payload: {
+              targetStaffId: target.id,
+              username: target.username,
+              revokedSessions: revoked.count,
+            },
             refs: [target.id],
           },
         ],
@@ -353,12 +493,18 @@ export class StaffAuthService {
    */
   async deactivateStaff(actorId: string, targetStaffId: string) {
     const updated = await this.auditLedger().transaction(async (tx) => {
+      await this.lockStaffSessions(tx, `${STAFF_REFRESH_PREFIX}${targetStaffId}`);
       await tx.$queryRaw`SELECT id FROM "StaffUser" WHERE id = ${targetStaffId} FOR UPDATE`;
       const target = await tx.staffUser.findUnique({ where: { id: targetStaffId } });
       if (!target) {
         throw new ValidationError('staff_not_found', 'Сотрудник не найден');
       }
       if (!target.active) {
+        await authorizeRefreshTokenRevocation(tx);
+        await tx.refreshToken.updateMany({
+          where: { customerId: `${STAFF_REFRESH_PREFIX}${target.id}`, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
         await revokeTelegramAgentAccessOnTx(
           tx,
           { staffId: target.id },
@@ -394,7 +540,12 @@ export class StaffAuthService {
       }
       const staff = await tx.staffUser.update({
         where: { id: target.id },
-        data: { active: false },
+        data: { active: false, sessionVersion: { increment: 1 } },
+      });
+      await authorizeRefreshTokenRevocation(tx);
+      await tx.refreshToken.updateMany({
+        where: { customerId: `${STAFF_REFRESH_PREFIX}${target.id}`, revokedAt: null },
+        data: { revokedAt: new Date() },
       });
       await revokeTelegramAgentAccessOnTx(
         tx,
@@ -423,6 +574,7 @@ export class StaffAuthService {
    */
   async changeRole(actorId: string, targetStaffId: string, role: Role) {
     const updated = await this.auditLedger().transaction(async (tx) => {
+      await this.lockStaffSessions(tx, `${STAFF_REFRESH_PREFIX}${targetStaffId}`);
       await tx.$queryRaw`SELECT id FROM "StaffUser" WHERE id = ${targetStaffId} FOR UPDATE`;
       const target = await tx.staffUser.findUnique({ where: { id: targetStaffId } });
       if (!target) throw new ValidationError('staff_not_found', 'Сотрудник не найден');
@@ -442,7 +594,15 @@ export class StaffAuthService {
           throw new ConflictError('last_owner_protected', 'Нельзя снять роль у последнего активного владельца');
         }
       }
-      const staff = await tx.staffUser.update({ where: { id: target.id }, data: { role } });
+      const staff = await tx.staffUser.update({
+        where: { id: target.id },
+        data: { role, sessionVersion: { increment: 1 } },
+      });
+      await authorizeRefreshTokenRevocation(tx);
+      await tx.refreshToken.updateMany({
+        where: { customerId: `${STAFF_REFRESH_PREFIX}${target.id}`, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
       if (!['admin', 'owner'].includes(role)) {
         await revokeTelegramAgentAccessOnTx(
           tx,
@@ -491,14 +651,20 @@ export class StaffAuthService {
   async resetPasswordByAdmin(actorId: string, targetStaffId: string, password: string) {
     const passwordHash = await argon2.hash(password);
     const updated = await this.auditLedger().transaction(async (tx) => {
+      await this.lockStaffSessions(tx, `${STAFF_REFRESH_PREFIX}${targetStaffId}`);
+      await tx.$queryRaw`SELECT id FROM "StaffUser" WHERE id = ${targetStaffId} FOR UPDATE`;
       const target = await tx.staffUser.findUnique({ where: { id: targetStaffId } });
       if (!target) throw new ValidationError('staff_not_found', 'Сотрудник не найден');
-      const staff = await tx.staffUser.update({ where: { id: target.id }, data: { passwordHash } });
+      const staff = await tx.staffUser.update({
+        where: { id: target.id },
+        data: { passwordHash, sessionVersion: { increment: 1 } },
+      });
       await revokeTelegramAgentAccessOnTx(
         tx,
         { staffId: target.id },
         'staff_password_reset',
       );
+      await authorizeRefreshTokenRevocation(tx);
       const revoked = await tx.refreshToken.updateMany({
         where: { customerId: `${STAFF_REFRESH_PREFIX}${target.id}`, revokedAt: null },
         data: { revokedAt: new Date() },

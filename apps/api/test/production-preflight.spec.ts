@@ -81,6 +81,43 @@ describe('Production preflight report', () => {
     ).toBe('ready');
   });
 
+  it('rejects production-wide throttle bypasses', () => {
+    const check = (value?: string) => buildProductionPreflightReport(
+      (name) => name === 'E2E_TEST' ? value : undefined,
+    ).checks.find((item) => item.id === 'e2e_throttle_bypass');
+
+    expect(check()?.status).toBe('ready');
+    expect(check('false')?.status).toBe('ready');
+    expect(check('true')?.status).toBe('unsafe');
+  });
+
+  it('requires a strong derivation secret when refresh grace is enabled', () => {
+    const check = (values: Record<string, string>) => buildProductionPreflightReport(
+      (name) => values[name],
+    ).checks.find((item) => item.id === 'refresh_rotation_grace_secret');
+
+    expect(check({})?.status).toBe('ready');
+    expect(check({ AUTH_REFRESH_ROTATION_GRACE_ENABLED: 'true' })?.status).toBe('missing');
+    expect(check({
+      AUTH_REFRESH_ROTATION_GRACE_ENABLED: 'true',
+      AUTH_REFRESH_DERIVATION_SECRET: 'short',
+    })?.status).toBe('unsafe');
+    expect(check({
+      AUTH_REFRESH_ROTATION_GRACE_ENABLED: 'true',
+      AUTH_REFRESH_DERIVATION_SECRET: '0123456789abcdef0123456789abcdef',
+    })?.status).toBe('ready');
+  });
+
+  it('rejects non-Apple JWKS overrides in production', () => {
+    const check = (value?: string) => buildProductionPreflightReport(
+      (name) => name === 'APPLE_JWKS_URL' ? value : undefined,
+    ).checks.find((item) => item.id === 'apple_jwks_origin');
+
+    expect(check()?.status).toBe('ready');
+    expect(check('https://appleid.apple.com/auth/keys')?.status).toBe('ready');
+    expect(check('https://attacker.example/keys')?.status).toBe('unsafe');
+  });
+
   it('requires complete Apple revocation credentials when Apple login is enabled', () => {
     const appleCheck = (values: Record<string, string>) =>
       buildProductionPreflightReport((name) => values[name]).checks.find(

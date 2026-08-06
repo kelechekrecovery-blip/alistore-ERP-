@@ -27,10 +27,10 @@ function quoteIdentifier(identifier) {
   return `"${identifier}"`;
 }
 
-async function ensurePlainConcurrentIndex(name, columns) {
+async function ensurePlainConcurrentIndex(table, name, columns) {
   const inspect = () => client.query(`
     SELECT index.indisvalid, index.indisready, index.indislive,
-           table_class.relname = 'OrderBundleAllocation' AND table_namespace.nspname = current_schema() AS correct_table,
+           table_class.relname = $3 AND table_namespace.nspname = current_schema() AS correct_table,
            access_method.amname = 'btree' AS correct_method,
            NOT index.indisunique AS correct_uniqueness,
            index.indnatts = $2 AND index.indnkeyatts = $2 AS correct_width,
@@ -52,7 +52,7 @@ async function ensurePlainConcurrentIndex(name, columns) {
     JOIN pg_am access_method ON access_method.oid = index_class.relam
     WHERE index_namespace.nspname = current_schema()
       AND index_class.relname = $1
-  `, [name, columns.length]);
+  `, [name, columns.length, table]);
   const existing = await inspect();
   const metadataValid = existing.rowCount === 1
     && existing.rows[0].indisvalid
@@ -71,7 +71,7 @@ async function ensurePlainConcurrentIndex(name, columns) {
   if (!metadataValid) {
     const columnSql = columns.map(quoteIdentifier).join(', ');
     await client.query(
-      `CREATE INDEX CONCURRENTLY IF NOT EXISTS ${quoteIdentifier(name)} ON "OrderBundleAllocation"(${columnSql})`,
+      `CREATE INDEX CONCURRENTLY IF NOT EXISTS ${quoteIdentifier(name)} ON ${quoteIdentifier(table)}(${columnSql})`,
     );
   }
   const verified = await inspect();
@@ -292,8 +292,9 @@ try {
     throw new Error('Reservation_active_expiresAt_idx is not ready and valid');
   }
 
-  await ensurePlainConcurrentIndex('OrderBundleAllocation_orderId_active_idx', ['orderId', 'active']);
-  await ensurePlainConcurrentIndex('OrderBundleAllocation_imei_idx', ['imei']);
+  await ensurePlainConcurrentIndex('OrderBundleAllocation', 'OrderBundleAllocation_orderId_active_idx', ['orderId', 'active']);
+  await ensurePlainConcurrentIndex('OrderBundleAllocation', 'OrderBundleAllocation_imei_idx', ['imei']);
+  await ensurePlainConcurrentIndex('RefreshToken', 'RefreshToken_customerId_familyId_idx', ['customerId', 'familyId']);
 
   await acquireAdvisoryLock('postdeploy:OrderBundleAllocation_active_imei_key');
   const existingActiveBundleImeiIndex = await client.query(`

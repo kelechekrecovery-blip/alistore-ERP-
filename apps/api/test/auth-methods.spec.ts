@@ -29,6 +29,42 @@ describe('describeAuthMethods: что реально пустит человек
       expect(methods.phone).toEqual({ enabled: false, registers: false });
     });
 
+    it('валидная review-конфигурация открывает только вход в готовую учётку', () => {
+      const methods = describeAuthMethods(env({
+        NODE_ENV: 'production',
+        SMS_PROVIDER: 'disabled',
+        AUTH_REVIEW_PHONE: '+996700000001',
+        AUTH_REVIEW_OTP: '042424',
+        AUTH_REVIEW_UNTIL: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        AUTH_RECOVERY_OTP_ENABLED: 'true',
+      }));
+
+      expect(methods.phone).toEqual({ enabled: true, registers: false });
+      expect(methods.recovery.enabled).toBe(false);
+      expect(methods.anyLoginAvailable).toBe(true);
+      expect(methods.registrationAvailable).toBe(false);
+    });
+
+    it.each([
+      ['без обязательного срока', undefined, '424242'],
+      ['с истёкшим сроком', new Date(Date.now() - 1000).toISOString(), '424242'],
+      ['со сроком больше семи дней', new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(), '424242'],
+      ['с буквами в OTP', new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), 'Xy7Qw2'],
+      ['с пятизначным OTP', new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), '42424'],
+      ['с семизначным OTP', new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), '4242424'],
+    ])('не рекламирует review-вход %s', (_case, until, otp) => {
+      const methods = describeAuthMethods(env({
+        NODE_ENV: 'production',
+        SMS_PROVIDER: 'disabled',
+        AUTH_REVIEW_PHONE: '+996700000001',
+        AUTH_REVIEW_OTP: otp,
+        AUTH_REVIEW_UNTIL: until,
+      }));
+
+      expect(methods.phone).toEqual({ enabled: false, registers: false });
+      expect(methods.anyLoginAvailable).toBe(false);
+    });
+
     /**
      * Мина, ради которой этот тест написан. `SMS_PROVIDER=production` проходит
      * селектор и рапортует `ready` в production-preflight, но

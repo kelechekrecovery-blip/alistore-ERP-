@@ -6,7 +6,7 @@ describe('RealtimeNotificationTransport (outbox → socket.io)', () => {
     const gateway = new RealtimeGateway();
     const spy = jest
       .spyOn(gateway, 'emitOrderStatus')
-      .mockImplementation(() => undefined);
+      .mockResolvedValue(undefined);
     const transport = new RealtimeNotificationTransport(gateway);
 
     await transport.deliver({
@@ -57,7 +57,59 @@ describe('RealtimeNotificationTransport (outbox → socket.io)', () => {
     await middleware(client, next);
 
     expect(verifyAccessToken).toHaveBeenCalledWith('access-token');
-    expect(client.data).toEqual({ principal: { customerId: 'customer-1', typ: 'customer' } });
+    expect(client.data).toEqual({
+      accessToken: 'access-token',
+      principal: { customerId: 'customer-1', typ: 'customer' },
+    });
     expect(next).toHaveBeenCalledWith();
+  });
+
+  it('disconnects an already-connected socket when its session is revoked before subscribe', async () => {
+    const verifyAccessToken = jest.fn().mockRejectedValue(new Error('staff_session_revoked'));
+    const gateway = new RealtimeGateway(
+      { verifyAccessToken } as never,
+      { order: { findUnique: jest.fn() } } as never,
+    );
+    const client = {
+      data: {
+        accessToken: 'stale-access-token',
+        principal: { customerId: 'staff-1', typ: 'staff', role: 'owner' },
+      },
+      disconnect: jest.fn(),
+      join: jest.fn(),
+    };
+
+    await expect(gateway.subscribeOrder(client as never, 'order-1')).rejects.toThrow('unauthorized');
+    expect(verifyAccessToken).toHaveBeenCalledWith('stale-access-token');
+    expect(client.disconnect).toHaveBeenCalledWith(true);
+    expect(client.join).not.toHaveBeenCalled();
+  });
+
+  it('disconnects revoked room members before emitting an order update', async () => {
+    const verifyAccessToken = jest.fn().mockRejectedValue(new Error('customer_session_revoked'));
+    const socket = {
+      data: {
+        accessToken: 'deleted-customer-token',
+        principal: { customerId: 'customer-1', typ: 'customer' },
+      },
+      leave: jest.fn().mockResolvedValue(undefined),
+      disconnect: jest.fn(),
+    };
+    const emit = jest.fn();
+    const server = {
+      in: jest.fn().mockReturnValue({ fetchSockets: jest.fn().mockResolvedValue([socket]) }),
+      to: jest.fn().mockReturnValue({ emit }),
+    };
+    const gateway = new RealtimeGateway({ verifyAccessToken } as never);
+    gateway.server = server as never;
+
+    await gateway.emitOrderStatus('order-1', 'paid');
+
+    expect(socket.leave).toHaveBeenCalledWith('order:order-1');
+    expect(socket.disconnect).toHaveBeenCalledWith(true);
+    expect(emit).toHaveBeenCalledWith('order:status', {
+      orderId: 'order-1',
+      status: 'paid',
+    });
   });
 });
