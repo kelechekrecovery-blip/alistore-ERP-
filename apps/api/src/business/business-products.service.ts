@@ -15,6 +15,18 @@ export interface BusinessProductView {
   archived: boolean;
 }
 
+/**
+ * Единственная проекция позиции для партнёра — и на чтение, и на запись.
+ *
+ * Prisma без `select` возвращает строку целиком: `cost` (маржа AliStore),
+ * `supplierId`, `sellerId`. Список это учитывал, а ответ на смену цены — нет,
+ * и партнёр видел закупочную цену. Один объект на оба пути, чтобы они не
+ * разошлись снова.
+ */
+const PARTNER_FIELDS = {
+  id: true, sku: true, name: true, price: true, category: true, archived: true,
+} as const;
+
 @Injectable()
 export class BusinessProductsService {
   constructor(
@@ -45,7 +57,7 @@ export class BusinessProductsService {
     const rows = await this.prisma.product.findMany({
       where: { sellerId },
       orderBy: [{ archived: 'asc' }, { name: 'asc' }],
-      select: { id: true, sku: true, name: true, price: true, category: true, archived: true },
+      select: PARTNER_FIELDS,
     });
     return rows;
   }
@@ -68,7 +80,14 @@ export class BusinessProductsService {
     return this.audit.transaction(async (tx) => {
       const product = await tx.product.findFirst({ where: { id: productId, sellerId } });
       if (!product) throw new NotFoundException(`Товар ${productId} не найден`);
-      const updated = await tx.product.update({ where: { id: productId }, data: { price } });
+      // `sellerId` в `where` вместе с `id`: инвариант владения держится самим
+      // запросом, а не только предшествующей проверкой. Появится передача
+      // товара между магазинами — эта строка не станет дырой.
+      const updated = await tx.product.update({
+        where: { id: productId, sellerId },
+        data: { price },
+        select: PARTNER_FIELDS,
+      });
       return {
         result: updated,
         events: [

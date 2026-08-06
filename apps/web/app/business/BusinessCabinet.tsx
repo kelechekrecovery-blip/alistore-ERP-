@@ -135,8 +135,12 @@ function Assortment({ session, onSignOut }: { session: BusinessSession; onSignOu
       setRows(await fetchBusinessProducts(session.accessToken));
       setError('');
     } catch (cause) {
-      setRows(null);
-      setError(cause instanceof Error ? cause.message : 'Ассортимент не загрузился');
+      // Уже загруженные строки не стираем. Раньше неудачный рефреш после
+      // успешного сохранения обнулял таблицу: партнёр видел зелёное «цена
+      // сохранена» и тут же пустой экран с ошибкой — выглядело как поломка
+      // ровно в момент успеха, хотя цена записалась.
+      setRows((current) => current);
+      setError(cause instanceof Error ? cause.message : 'Список не обновился');
     }
   }
 

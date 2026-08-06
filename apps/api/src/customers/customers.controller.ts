@@ -143,7 +143,11 @@ export class CustomersController {
   // Маршрут объявлен ДО `:id` намеренно: иначе Nest примет «lookup» за
   // идентификатор клиента и сюда никогда не дойдёт.
   @Get('lookup')
-  @UseGuards(JwtAuthGuard)
+  // Без лимита любой сотрудник с `customers:read` — а это продавцы и сервис,
+  // не только владелец — перебирал бы диапазон +996 и собирал базу телефонов
+  // по кодам ответа. Соседний `exportData` уже стоит под тем же ограничением.
+  @UseGuards(JwtAuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   async lookup(@Query('phone') phone: string, @CurrentUser() user: AuthPrincipal) {
     // Телефон — персональные данные, и перебор номеров с клиентского токена
     // собрал бы базу целиком. Поэтому здесь только сотрудник с `customers:read`,

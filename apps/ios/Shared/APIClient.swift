@@ -5,6 +5,16 @@ public enum APIError: Error, LocalizedError, Sendable {
     case rejected(status: Int, message: String)
     case decoding(String)
 
+    /// Сервер сказал «нет такой сущности», а не «что-то пошло не так».
+    ///
+    /// Экранам это нужно, чтобы не выдавать сетевой сбой за отсутствие данных:
+    /// «клиент не найден» отправляет оператора заводить карточку, и на обрыве
+    /// связи он заведёт дубликат тому, у кого она есть.
+    public var isNotFound: Bool {
+        if case let .rejected(status, _) = self { return status == 404 }
+        return false
+    }
+
     public var errorDescription: String? {
         switch self {
         case .invalidResponse:

@@ -14,6 +14,15 @@ import {
 
 export interface SettingView extends SettingDefinition {
   /**
+   * Сохранённое значение существует, но больше не проходит проверку.
+   *
+   * Без этого флага экран показывал чип «изменён» и подпись «изменил Алиса»
+   * рядом с дефолтом: владелец видел чужую фамилию и дату у значения, которое
+   * в действительности отброшено и нигде не применяется. Молчание здесь дороже
+   * тревоги — по такому параметру считают деньги.
+   */
+  corrupted?: boolean;
+  /**
    * Effective value: the stored one, or the constant that was in force before.
    *
    * Строка у ссылочных параметров (`kind: 'url'`) — экран настроек рисует их
@@ -51,6 +60,7 @@ export class SettingsService {
     try {
       return parseSettingValue(definition, row.value);
     } catch {
+      console.warn(`[settings] значение ключа ${key} отброшено как невалидное, действует дефолт`);
       return Number(definition.fallback);
     }
   }
@@ -72,6 +82,7 @@ export class SettingsService {
     try {
       return parseSettingText(definition, row.value);
     } catch {
+      console.warn(`[settings] текст ключа ${key} отброшен как невалидный, действует дефолт`);
       return String(definition.fallback);
     }
   }
@@ -101,18 +112,26 @@ export class SettingsService {
     return SETTINGS.map((definition) => {
       const row = stored.get(definition.key);
       let value: number | string = definition.fallback;
+      let corrupted = false;
       if (row) {
         try {
           value = isTextSetting(definition)
             ? parseSettingText(definition, row.value)
             : parseSettingValue(definition, row.value);
         } catch {
+          // Сохранённое значение больше не проходит проверку — например,
+          // владелец сузил допустимый диапазон уже после записи. Возвращаем
+          // дефолт (иначе экран настроек падал бы целиком), но говорим об этом
+          // вслух: и в ответе, и в логе.
           value = definition.fallback;
+          corrupted = true;
+          console.warn(`[settings] значение ключа ${definition.key} отброшено как невалидное`);
         }
       }
       return {
         ...definition,
         value,
+        corrupted,
         overridden: Boolean(row),
         updatedBy: row?.updatedBy ?? null,
         updatedAt: row?.updatedAt.toISOString() ?? null,

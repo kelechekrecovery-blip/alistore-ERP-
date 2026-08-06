@@ -93,6 +93,19 @@ describe('AliStore Business: кабинет партнёра', () => {
     expect(updated.price).toBe(12_500);
   });
 
+  it('ответ на смену цены не отдаёт закупочную цену и внутренние поля', async () => {
+    // Prisma без `select` возвращает строку целиком, и партнёр видел бы `cost` —
+    // то есть вашу маржу — плюс `supplierId` и `sellerId`. Список уже отдаёт
+    // узкую проекцию; ответ на запись обязан отдавать ровно ту же.
+    const a = await seedSellerWithUser('Альфа');
+    const own = await seedProduct('BIZ-A-5', a.seller.id, 10_000);
+
+    const updated = await products.updatePrice(sellerPrincipal(a.seller.id), own.id, 11_000);
+    expect(Object.keys(updated).sort()).toEqual(
+      ['archived', 'category', 'id', 'name', 'price', 'sku'],
+    );
+  });
+
   it('партнёр не меняет чужую цену — позиция для него не существует', async () => {
     const a = await seedSellerWithUser('Альфа');
     const b = await seedSellerWithUser('Бета');

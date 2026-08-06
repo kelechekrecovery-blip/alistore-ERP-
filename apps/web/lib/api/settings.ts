@@ -16,6 +16,8 @@ export interface BusinessSetting {
   hint: string;
   source: string;
   value: number | string;
+  /** Сохранённое значение существует, но не проходит проверку и не применяется. */
+  corrupted?: boolean;
   /** False while the parameter still runs on its original hardcoded default. */
   overridden: boolean;
   updatedBy: string | null;

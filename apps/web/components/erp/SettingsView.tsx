@@ -145,7 +145,13 @@ export function SettingsView({ accessToken, canEdit }: { accessToken: string; ca
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[13px] font-semibold text-white">{setting.label}</span>
                         <span className="rounded-chip bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-subtle">{display(setting)}</span>
-                        {setting.overridden
+                        {/* Сохранённое, но невалидное значение молча заменялось
+                            дефолтом, а чип продолжал говорить «изменён» — владелец
+                            видел свою же фамилию и дату у цифры, которая на самом
+                            деле не применяется. */}
+                        {setting.corrupted
+                          ? <span className="rounded-chip bg-danger-soft/15 px-2 py-0.5 text-[10px] font-semibold text-danger-soft">значение отброшено — действует дефолт</span>
+                          : setting.overridden
                           ? <span className="rounded-chip bg-lime/15 px-2 py-0.5 text-[10px] font-semibold text-lime">изменён</span>
                           : <span className="rounded-chip bg-surface-2 px-2 py-0.5 text-[10px] text-subtle">
                               {/* У строковых параметров дефолт — пустота, и

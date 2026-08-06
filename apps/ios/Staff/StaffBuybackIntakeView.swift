@@ -30,6 +30,14 @@ struct StaffBuybackIntakeView: View {
     @State private var isEstimating = false
     @State private var isSubmitting = false
     @State private var submitError: String?
+    /// Ключ идемпотентности живёт со временем попытки, а не с вызовом функции.
+    ///
+    /// Он генерировался прямо в `submit()`, то есть новый на каждый тап. Приёмка
+    /// выдаёт наличные: если первый запрос успел создать заявку, а ответ
+    /// потерялся, повторный тап уходил с другим ключом и заводил **вторую**
+    /// заявку с повторной выплатой — и выглядело это как обычный успех.
+    /// Ключ меняется только после того, как заявка действительно создана.
+    @State private var submitKey = UUID().uuidString
 
     private let environment = AppEnvironment.live()
     private let grades = [("A", "Отличное"), ("B", "Хорошее"), ("C", "С дефектами")]
@@ -183,8 +191,17 @@ struct StaffBuybackIntakeView: View {
             customer = try await APIClient(baseURL: environment.apiBaseURL)
                 .get("customers/lookup?phone=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query)",
                      token: session.accessToken)
+        } catch let error as APIError {
+            // Одно сообщение на все причины отправляло оператора заводить
+            // карточку клиенту, у которого она есть: сетевой сбой и отказ по
+            // правам читались как «такого клиента нет», и в Customer 360
+            // появлялся дубликат. «Не найден» говорим только когда сервер
+            // действительно так ответил.
+            lookupError = error.isNotFound
+                ? "Клиент не найден. Заведите карточку в Customer 360 и повторите."
+                : error.localizedDescription
         } catch {
-            lookupError = "Клиент не найден. Заведите карточку в Customer 360 и повторите."
+            lookupError = error.localizedDescription
         }
     }
 
@@ -226,8 +243,9 @@ struct StaffBuybackIntakeView: View {
                 "tradeins/intake",
                 body: request,
                 token: session.accessToken,
-                idempotencyKey: UUID().uuidString
+                idempotencyKey: submitKey
             )
+            submitKey = UUID().uuidString
             onCreated(created)
         } catch {
             submitError = error.localizedDescription

@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { JwtService } from '@nestjs/jwt';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsInt, IsString, Min, MinLength } from 'class-validator';
@@ -34,6 +35,11 @@ export class BusinessController {
   ) {}
 
   @Post('auth/login')
+  // Единственный логин в проекте, оставшийся без защиты от перебора: пароль
+  // партнёра можно было подбирать с любой скоростью, какую пустит сеть.
+  // Планка та же, что у входа сотрудника (`staff-auth.controller.ts`).
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Вход магазина-партнёра' })
   async login(@Body() dto: BusinessLoginDto) {
     const session = await this.auth.login(dto.username, dto.password);
