@@ -49,7 +49,13 @@ const canonicalDirectory = (directory, label) => {
   return absolute;
 };
 
-const generatedWorkspaceNames = new Set(['.artifacts', '.cache', '.next', 'coverage']);
+const generatedWorkspaceNames = new Set([
+  '.artifacts',
+  '.cache',
+  '.next',
+  'coverage',
+  'next-env.d.ts',
+]);
 const generatedWorkspacePrefixes = ['.next-e2e-'];
 const nonReproducibleNativeOutputPaths = [
   path.join('node_modules', 'cpu-features', 'build'),

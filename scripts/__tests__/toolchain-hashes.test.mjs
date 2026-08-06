@@ -145,6 +145,38 @@ test('ignored generated workspace outputs must be absent before trust verificati
   }));
 });
 
+test('Next type bootstrap is rejected before and ignored only after trusted execution', (t) => {
+  const repository = fixture(t, 'alistore-next-env-output-');
+  const nodeModules = path.join(repository, 'node_modules');
+  const api = path.join(repository, 'apps', 'api');
+  const web = path.join(repository, 'apps', 'web');
+  fs.mkdirSync(path.join(nodeModules, '@alistore'), { recursive: true });
+  fs.mkdirSync(api, { recursive: true });
+  fs.mkdirSync(web, { recursive: true });
+  fs.writeFileSync(path.join(api, 'package.json'), '{"name":"@alistore/api"}\n');
+  fs.writeFileSync(path.join(web, 'package.json'), '{"name":"@alistore/web"}\n');
+  fs.symlinkSync(api, path.join(nodeModules, '@alistore', 'api'));
+  fs.symlinkSync(web, path.join(nodeModules, '@alistore', 'web'));
+
+  const before = hashDependencyTree(
+    nodeModules,
+    trustedWorkspaceSymlinkOptions(repository, { allowGeneratedOutputs: true }),
+  );
+  fs.writeFileSync(path.join(web, 'next-env.d.ts'), 'generated\n');
+
+  assert.throws(
+    () => trustedWorkspaceSymlinkOptions(repository),
+    /Generated workspace output must be absent/u,
+  );
+  assert.equal(
+    hashDependencyTree(
+      nodeModules,
+      trustedWorkspaceSymlinkOptions(repository, { allowGeneratedOutputs: true }),
+    ),
+    before,
+  );
+});
+
 test('generated Prisma metadata hashes identically across canonical repository roots', (t) => {
   const first = prismaRepositoryFixture(t, 'alistore-prisma-root-a-');
   const second = prismaRepositoryFixture(t, 'alistore-prisma-root-b-');
