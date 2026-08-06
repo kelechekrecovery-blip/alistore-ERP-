@@ -60,4 +60,35 @@ scripts/record-ecosystem-evidence.mjs reconciled-e2e
 
 The visual gate compares deterministic fixed-data storefront desktop/mobile and ERP desktop screenshots against committed Playwright PNG goldens. It is a bounded regression contract for currently implemented shells, not owner approval of absent `.dc.html` references.
 
-The committed bootstrap verifies its pinned Node runtime manifest with system `shasum` before Node starts, clears the process environment, and then the recorder/audit verifies the repository, toolchain and evidence contracts. Direct execution of the worktree bootstrap, direct Node execution and `npm run` are not authoritative evidence entrypoints.
+The committed bootstrap verifies its pinned Node runtime manifest with system `shasum` before Node starts, extracts the selected entrypoint and its transitive trust modules from `HEAD` into a private read-only runtime, clears the process environment, and then the recorder/audit verifies the selected worktree, toolchain and evidence contracts. Direct execution of worktree JavaScript, direct Node execution and `npm run` are not authoritative evidence entrypoints.
+
+## Refreshing the toolchain lock
+
+Refresh `scripts/ecosystem-toolchain-lock.json` only as a reviewed toolchain change, never as
+an automatic CI repair and never by hand-editing hashes. Start from the tracked lockfile, restore
+the install, then reproduce the generated Prisma state that is intentionally part of the locked
+dependency tree:
+
+```bash
+npm ci
+npm run prisma:generate -w @alistore/api
+npm run ecosystem:lock:check
+```
+
+`ecosystem:lock:check` exits nonzero and lists every differing field. Review that list against
+the intended `package-lock.json`, Node, system Git, npm, Chrome, Playwright, Jest and generated
+dependency state. If every drift is expected, regenerate through the canonical writer and prove
+the resulting lock is stable:
+
+```bash
+npm run ecosystem:lock:write
+npm run ecosystem:lock:check
+node --test scripts/__tests__/trusted-toolchain-lock.test.mjs
+```
+
+The writer has no alternate output path, preserves no unknown fields, uses the same versioned,
+length-framed hashing primitives as the trusted verifier, rejects unbound or dangling symlinks,
+and refuses a non-canonical dependency root, runtime or browser app. Its same-directory write is
+fsynced and atomically renamed only after the destination is revalidated.
+Commit the reviewed lock change before running the committed-HEAD bootstrap above. Updating the
+lock only establishes what was executed; it does not refresh or accept stale ecosystem evidence.

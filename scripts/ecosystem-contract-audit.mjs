@@ -8,7 +8,9 @@ import { fileURLToPath } from 'node:url';
 import { inspectHeadWorktree, resolveTrustedGit, trustedGitArgs } from './trusted-git.mjs';
 import { resolveTrustedNpm, verifyTrustedBootstrap } from './trusted-npm.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const root = process.env.ALISTORE_TRUSTED_WORK_TREE
+  ? fs.realpathSync(process.env.ALISTORE_TRUSTED_WORK_TREE)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const screensDir = path.join(root, 'design_handoff_alistore', 'screens');
 const args = new Set(process.argv.slice(2));
 const strict = args.has('--strict');

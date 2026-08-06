@@ -85,6 +85,8 @@
     "ecosystem:audit": "sh scripts/run-trusted-ecosystem-node.sh scripts/ecosystem-contract-audit.mjs",
     "ecosystem:audit:strict": "sh scripts/run-trusted-ecosystem-node.sh scripts/ecosystem-contract-audit.mjs --strict",
     "ecosystem:audit:json": "sh scripts/run-trusted-ecosystem-node.sh scripts/ecosystem-contract-audit.mjs --json --output .artifacts/ecosystem-audit.json",
+    "ecosystem:lock:check": "node scripts/regenerate-toolchain-lock.mjs --check",
+    "ecosystem:lock:write": "node scripts/regenerate-toolchain-lock.mjs --write",
     "ecosystem:matrix": "node scripts/ecosystem-surface-matrix.mjs",
     "ecosystem:matrix:strict": "node scripts/ecosystem-surface-matrix.mjs --strict",
     "ecosystem:component-verify": "node scripts/ecosystem-verify.mjs",

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -14,6 +14,10 @@ const bootstrapSource = fs.readFileSync(
   'utf8',
 );
 const trustedGitSource = fs.readFileSync(path.join(projectRoot, 'scripts', 'trusted-git.mjs'), 'utf8');
+const evidenceRecorderSource = fs.readFileSync(
+  path.join(projectRoot, 'scripts', 'record-ecosystem-evidence.mjs'),
+  'utf8',
+);
 const systemGit = fs.realpathSync('/usr/bin/git');
 const systemGitSha256 = crypto
   .createHash('sha256')
@@ -90,10 +94,37 @@ const createRepository = (t) => {
   );
   write(mainRoot, 'scripts/trusted-git.mjs', 'export const marker = "trusted-git";\n');
   write(mainRoot, 'scripts/trusted-npm.mjs', 'export const marker = "trusted-npm";\n');
+  write(mainRoot, 'scripts/toolchain-hashes.mjs', 'export const marker = "toolchain-hashes";\n');
   write(
     mainRoot,
     'scripts/ecosystem-contract-audit.mjs',
     'console.log(JSON.stringify({ marker: "main", cwd: process.cwd() }));\n',
+  );
+  write(
+    mainRoot,
+    'scripts/record-ecosystem-evidence.mjs',
+    `import path from 'node:path';
+import process from 'node:process';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+const root = process.env.ALISTORE_TRUSTED_WORK_TREE;
+if (process.env.ALISTORE_TEST_EVIDENCE_LOCKED !== '1') {
+  const child = spawnSync('/usr/bin/lockf', [
+    '-t', '0', path.join(root, '.test-evidence.lock'), process.execPath, fileURLToPath(import.meta.url),
+  ], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      ALISTORE_TEST_EVIDENCE_LOCKED: '1',
+      ALISTORE_TRUSTED_WORK_TREE: root,
+    },
+  });
+  if (child.stdout) process.stdout.write(child.stdout);
+  if (child.stderr) process.stderr.write(child.stderr);
+  process.exit(child.status ?? 1);
+}
+console.log(JSON.stringify({ root, runtime: fileURLToPath(import.meta.url) }));
+`,
   );
   commitAll(mainRoot, 'main audit');
 
@@ -107,9 +138,13 @@ const createRepository = (t) => {
   return { linkedRoot, mainRoot };
 };
 
-const runBootstrapFrom = (bootstrapRoot, workTree) => spawnSync(
+const runBootstrapFrom = (
+  bootstrapRoot,
+  workTree,
+  script = 'scripts/ecosystem-contract-audit.mjs',
+) => spawnSync(
   '/bin/sh',
-  [path.join(bootstrapRoot, 'scripts', 'run-trusted-ecosystem-node.sh'), 'scripts/ecosystem-contract-audit.mjs'],
+  [path.join(bootstrapRoot, 'scripts', 'run-trusted-ecosystem-node.sh'), script],
   { cwd: workTree, encoding: 'utf8', env: { ...process.env } },
 );
 const runBootstrap = (root) => runBootstrapFrom(root, root);
@@ -160,6 +195,23 @@ test('committed-HEAD runbook binds the extracted bootstrap to the selected workt
   );
 });
 
+test('committed recorder self-respawn preserves the bootstrap-validated worktree root', (t) => {
+  assert.match(
+    evidenceRecorderSource,
+    /ALISTORE_EVIDENCE_LOCK_HELD: '1',[\s\S]*ALISTORE_TRUSTED_WORK_TREE: root,/u,
+  );
+  const { linkedRoot } = createRepository(t);
+  const run = runBootstrapFrom(
+    linkedRoot,
+    linkedRoot,
+    'scripts/record-ecosystem-evidence.mjs',
+  );
+  assert.equal(run.status, 0, run.stderr);
+  const result = JSON.parse(run.stdout);
+  assert.equal(result.root, linkedRoot);
+  assert.notEqual(path.dirname(path.dirname(result.runtime)), linkedRoot);
+});
+
 test('bootstrap bytes from a different worktree HEAD fail closed', (t) => {
   const { linkedRoot, mainRoot } = createRepository(t);
   fs.appendFileSync(
@@ -189,6 +241,66 @@ test('same-byte dependency symlinked outside the selected worktree fails closed'
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Could not resolve a trusted canonical Git worktree/u);
   assert.doesNotMatch(result.stdout, /"marker":"linked"/u);
+});
+
+test('dirty shared toolchain hashing code is rejected before Node executes', (t) => {
+  const { linkedRoot } = createRepository(t);
+  fs.appendFileSync(
+    path.join(linkedRoot, 'scripts', 'toolchain-hashes.mjs'),
+    '// claimant-controlled hashing bypass\n',
+  );
+
+  const result = runBootstrap(linkedRoot);
+  assert.notEqual(result.status, 0);
+  assert.match(
+    result.stderr,
+    /Bootstrap dependency differs from committed HEAD: scripts\/toolchain-hashes\.mjs/u,
+  );
+  assert.doesNotMatch(result.stdout, /"marker":"linked"/u);
+});
+
+test('a worktree swap after verification cannot replace the committed runtime', async (t) => {
+  const { linkedRoot } = createRepository(t);
+  const bootstrapPath = path.join(linkedRoot, 'scripts', 'run-trusted-ecosystem-node.sh');
+  const readyPath = path.join(linkedRoot, '.bootstrap-snapshot-ready');
+  const releasePath = path.join(linkedRoot, '.bootstrap-snapshot-release');
+  const bootstrap = fs.readFileSync(bootstrapPath, 'utf8');
+  const coordinated = bootstrap.replace(
+    'actual_node_sha256=',
+    `: > "$ROOT/.bootstrap-snapshot-ready"\nwhile [ ! -f "$ROOT/.bootstrap-snapshot-release" ]; do /bin/sleep 0.01; done\nactual_node_sha256=`,
+  );
+  assert.notEqual(coordinated, bootstrap);
+  fs.writeFileSync(bootstrapPath, coordinated);
+  commitAll(linkedRoot, 'coordinate committed runtime test');
+
+  let stdout = '';
+  let stderr = '';
+  const child = spawn(
+    '/bin/sh',
+    [bootstrapPath, 'scripts/ecosystem-contract-audit.mjs'],
+    { cwd: linkedRoot, env: { ...process.env } },
+  );
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', (chunk) => { stdout += chunk; });
+  child.stderr.on('data', (chunk) => { stderr += chunk; });
+  const result = new Promise((resolve) => child.on('close', (status) => resolve({ status, stdout, stderr })));
+
+  const deadline = Date.now() + 5_000;
+  while (!fs.existsSync(readyPath) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.ok(fs.existsSync(readyPath), 'bootstrap did not reach the post-snapshot checkpoint');
+  fs.writeFileSync(
+    path.join(linkedRoot, 'scripts', 'ecosystem-contract-audit.mjs'),
+    'console.log(JSON.stringify({ marker: "claimant-swap", cwd: process.cwd() }));\n',
+  );
+  fs.writeFileSync(releasePath, 'release\n');
+
+  const completed = await result;
+  assert.equal(completed.status, 0, completed.stderr);
+  assert.deepEqual(JSON.parse(completed.stdout), { marker: 'linked', cwd: linkedRoot });
+  assert.doesNotMatch(completed.stdout, /claimant-swap/u);
 });
 
 test('valid hostile repository metadata cannot replace the pinned common Git directory', async (t) => {

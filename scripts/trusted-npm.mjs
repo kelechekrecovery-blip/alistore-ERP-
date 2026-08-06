@@ -2,26 +2,14 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { execFileSync } from 'node:child_process';
+import {
+  hashDependencyTree,
+  hashNodeRuntimeLibraries,
+  sha256File,
+  trustedNodeKegSymlinkOptions,
+  trustedWorkspaceSymlinkOptions,
+} from './toolchain-hashes.mjs';
 
-const updateHashWithFile = (hash, filePath) => {
-  const descriptor = fs.openSync(filePath, 'r');
-  const buffer = Buffer.allocUnsafe(1024 * 1024);
-  try {
-    let bytesRead;
-    do {
-      bytesRead = fs.readSync(descriptor, buffer, 0, buffer.length, null);
-      if (bytesRead > 0) hash.update(buffer.subarray(0, bytesRead));
-    } while (bytesRead > 0);
-  } finally {
-    fs.closeSync(descriptor);
-  }
-};
-const sha256File = (filePath) => {
-  const hash = crypto.createHash('sha256');
-  updateHashWithFile(hash, filePath);
-  return hash.digest('hex');
-};
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
 export const verifyTrustedBootstrap = (root) => {
@@ -51,84 +39,6 @@ export const verifyTrustedBootstrap = (root) => {
     throw new Error('The runtime manifest does not match the ecosystem toolchain lock.');
   }
   return digest;
-};
-
-export const hashDependencyTree = (directory) => {
-  const hash = crypto.createHash('sha256');
-  const visit = (current, relative = '') => {
-    const entries = fs.readdirSync(current, { withFileTypes: true })
-      .filter((entry) => entry.name !== '.cache')
-      .sort((left, right) => left.name.localeCompare(right.name));
-    for (const entry of entries) {
-      const entryPath = path.join(current, entry.name);
-      const relativePath = path.join(relative, entry.name);
-      // Check links first: npm leaves dangling optional-dependency links for
-      // non-host platforms (e.g. lightningcss-android on macOS). Following
-      // one as a directory makes the reproducibility hash crash instead of
-      // reporting the actual tree.
-      if (entry.isSymbolicLink()) {
-        hash.update('l\0').update(relativePath).update('\0').update(fs.readlinkSync(entryPath)).update('\0');
-      } else if (entry.isDirectory()) {
-        hash.update('d\0').update(relativePath).update('\0');
-        visit(entryPath, relativePath);
-      } else if (entry.isFile()) {
-        hash.update('f\0').update(relativePath).update('\0');
-        updateHashWithFile(hash, entryPath);
-        hash.update('\0');
-      } else {
-        throw new Error(`Unsupported dependency-tree entry: ${entryPath}`);
-      }
-    }
-  };
-  visit(directory);
-  return hash.digest('hex');
-};
-
-export const resolveNodeRuntimeLibraries = (nodePath, nodeRoot) => {
-  const pending = [fs.realpathSync(nodePath)];
-  const visited = new Set();
-  const resolveLibrary = (library, loaderPath) => {
-    if (library.startsWith('/usr/lib/') || library.startsWith('/System/Library/')) return null;
-    const suffix = library.replace(/^@(?:rpath|loader_path|executable_path)\/?/u, '');
-    const candidates = library.startsWith('@rpath/')
-      ? [path.join(nodeRoot, 'lib', suffix), path.join(path.dirname(loaderPath), suffix)]
-      : library.startsWith('@loader_path/')
-        ? [path.join(path.dirname(loaderPath), suffix)]
-        : library.startsWith('@executable_path/')
-          ? [path.join(path.dirname(nodePath), suffix)]
-          : [library];
-    const candidate = candidates.find((entry) => fs.existsSync(entry));
-    if (!candidate) throw new Error(`Could not resolve Node runtime library: ${library}`);
-    return fs.realpathSync(candidate);
-  };
-
-  while (pending.length > 0) {
-    const current = pending.pop();
-    if (visited.has(current)) continue;
-    visited.add(current);
-    const output = execFileSync('/usr/bin/otool', ['-L', current], {
-      encoding: 'utf8',
-      env: { LANG: 'C', PATH: '/usr/bin:/bin' },
-    });
-    for (const line of output.split('\n').slice(1)) {
-      const library = /^\s+(.+?)\s+\(compatibility version/u.exec(line)?.[1];
-      if (!library) continue;
-      const resolved = resolveLibrary(library, current);
-      if (resolved && !visited.has(resolved)) pending.push(resolved);
-    }
-  }
-
-  return [...visited].sort();
-};
-
-export const hashNodeRuntimeLibraries = (nodePath, nodeRoot) => {
-  const hash = crypto.createHash('sha256');
-  for (const filePath of resolveNodeRuntimeLibraries(nodePath, nodeRoot)) {
-    hash.update(filePath).update('\0');
-    updateHashWithFile(hash, filePath);
-    hash.update('\0');
-  }
-  return hash.digest('hex');
 };
 
 const resolveBoundShim = (root, name, expectedTarget) => {
@@ -176,26 +86,37 @@ const assertNoNextEnvironmentFiles = (root) => {
   }
 };
 
-export const resolveTrustedNpm = (root = process.cwd()) => {
+export const resolveTrustedNpm = (
+  root = process.cwd(),
+  { allowGeneratedWorkspaceOutputs = false } = {},
+) => {
   assertNoLifecycleShadowing(root);
   assertNoNextEnvironmentFiles(root);
   const toolchainLock = JSON.parse(
     fs.readFileSync(path.join(root, 'scripts', 'ecosystem-toolchain-lock.json'), 'utf8'),
   );
+  const npmCandidate = path.join(path.dirname(process.execPath), 'npm');
+  const cliPath = fs.realpathSync(npmCandidate);
+  const npmRoot = path.dirname(path.dirname(cliPath));
   const packageLockSha256 = sha256File(path.join(root, 'package-lock.json'));
-  const nodeModulesTreeSha256 = hashDependencyTree(path.join(root, 'node_modules'));
+  const nodeModulesTreeSha256 = hashDependencyTree(
+    path.join(root, 'node_modules'),
+    trustedWorkspaceSymlinkOptions(root, {
+      allowGeneratedOutputs: allowGeneratedWorkspaceOutputs,
+    }),
+  );
   const packageLock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
   const nodePath = fs.realpathSync(process.execPath);
   const nodeRoot = path.dirname(path.dirname(nodePath));
   const nodeSha256 = sha256File(nodePath);
-  const nodeKegSha256 = hashDependencyTree(nodeRoot);
+  const nodeKegSha256 = hashDependencyTree(nodeRoot, trustedNodeKegSymlinkOptions(npmRoot));
   const nodeRuntimeLibrariesSha256 = hashNodeRuntimeLibraries(nodePath, nodeRoot);
   const browserPath = toolchainLock.runtime?.browserPath;
   const browserAppRoot = path.dirname(path.dirname(path.dirname(browserPath)));
   const browserAppTreeSha256 = hashDependencyTree(browserAppRoot);
   const acceptanceDatabaseIdentity = toolchainLock.acceptance?.databaseIdentity;
   if (
-    toolchainLock.schemaVersion !== 1 ||
+    toolchainLock.schemaVersion !== 2 ||
     toolchainLock.packageLockSha256 !== packageLockSha256 ||
     toolchainLock.nodeModulesTreeSha256 !== nodeModulesTreeSha256 ||
     toolchainLock.runtime?.platform !== process.platform ||
@@ -213,15 +134,12 @@ export const resolveTrustedNpm = (root = process.cwd()) => {
   ) {
     throw new Error('The ecosystem test toolchain lock does not match package-lock.json.');
   }
-  const npmCandidate = path.join(path.dirname(process.execPath), 'npm');
   const scriptShellPath = fs.realpathSync('/bin/sh');
   const scriptShellStat = fs.lstatSync(scriptShellPath);
   if (!scriptShellStat.isFile()) {
     throw new Error('The system script shell is not a regular file.');
   }
 
-  const cliPath = fs.realpathSync(npmCandidate);
-  const npmRoot = path.dirname(path.dirname(cliPath));
   const stat = fs.lstatSync(cliPath);
   const cliSha256 = sha256File(cliPath);
   const npmTreeSha256 = hashDependencyTree(npmRoot);

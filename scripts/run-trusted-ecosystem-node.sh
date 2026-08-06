@@ -103,9 +103,19 @@ case "$1" in
     ;;
 esac
 
-HEAD_BLOB=$(/usr/bin/mktemp -t alistore-head-blob)
+TRUSTED_RUNTIME=$(/usr/bin/mktemp -d -t alistore-committed-runtime)
+/bin/mkdir "$TRUSTED_RUNTIME/scripts"
 cleanup() {
-  /bin/rm -f "$HEAD_BLOB"
+  /bin/chmod 700 "$TRUSTED_RUNTIME" "$TRUSTED_RUNTIME/scripts" 2>/dev/null || true
+  /bin/rm -f \
+    "$TRUSTED_RUNTIME/bootstrap-head" \
+    "$TRUSTED_RUNTIME/scripts/ecosystem-contract-audit.mjs" \
+    "$TRUSTED_RUNTIME/scripts/record-ecosystem-evidence.mjs" \
+    "$TRUSTED_RUNTIME/scripts/trusted-npm.mjs" \
+    "$TRUSTED_RUNTIME/scripts/toolchain-hashes.mjs" \
+    "$TRUSTED_RUNTIME/scripts/trusted-git.mjs"
+  /bin/rmdir "$TRUSTED_RUNTIME/scripts" 2>/dev/null || true
+  /bin/rmdir "$TRUSTED_RUNTIME" 2>/dev/null || true
 }
 trap cleanup EXIT HUP INT TERM
 case "$0" in
@@ -117,9 +127,15 @@ for committed_file in \
   scripts/run-trusted-ecosystem-node.sh \
   "$1" \
   scripts/trusted-npm.mjs \
+  scripts/toolchain-hashes.mjs \
   scripts/trusted-git.mjs
 do
-  if ! trusted_git show "HEAD:$committed_file" >"$HEAD_BLOB"; then
+  if [ "$committed_file" = 'scripts/run-trusted-ecosystem-node.sh' ]; then
+    committed_snapshot="$TRUSTED_RUNTIME/bootstrap-head"
+  else
+    committed_snapshot="$TRUSTED_RUNTIME/$committed_file"
+  fi
+  if ! trusted_git show "HEAD:$committed_file" >"$committed_snapshot"; then
     echo "Could not read committed bootstrap dependency: $committed_file" >&2
     exit 1
   fi
@@ -132,13 +148,13 @@ do
     [ "$canonical_parent" = "$worktree_parent" ] || repository_error
   fi
   [ -f "$worktree_file" ] && [ ! -L "$worktree_file" ] || repository_error
-  if ! /usr/bin/cmp -s "$HEAD_BLOB" "$worktree_file"; then
+  if ! /usr/bin/cmp -s "$committed_snapshot" "$worktree_file"; then
     echo "Bootstrap dependency differs from committed HEAD: $committed_file" >&2
     exit 1
   fi
+  /bin/chmod 400 "$committed_snapshot"
 done
-cleanup
-trap - EXIT HUP INT TERM
+/bin/chmod 500 "$TRUSTED_RUNTIME" "$TRUSTED_RUNTIME/scripts"
 
 actual_node_sha256=$(/usr/bin/shasum -a 256 "$NODE" | /usr/bin/awk '{print $1}')
 if [ "$actual_node_sha256" != "$NODE_SHA256" ]; then
@@ -155,7 +171,7 @@ fi
 script=$1
 shift
 exec 3<"$MANIFEST"
-set -- "$NODE" "$ROOT/$script" "$@"
+set -- "$NODE" "$TRUSTED_RUNTIME/$script" "$@"
 
 for port_name in E2E_API_PORT E2E_WEB_PORT; do
   port_value=$(eval "printf '%s' \"\${$port_name:-}\"")
@@ -180,9 +196,10 @@ fi
 
 set -- \
   'ALISTORE_TRUSTED_BOOTSTRAP_FD=3' \
+  "ALISTORE_TRUSTED_WORK_TREE=$ROOT" \
   "HOME=${HOME:-$ROOT}" \
   'LANG=C' \
   'PATH=/opt/homebrew/Cellar/node/25.9.0_3/bin:/usr/bin:/bin:/usr/sbin:/sbin' \
   "TMPDIR=${TMPDIR:-/tmp}" \
   "$@"
-exec /usr/bin/env -i "$@"
+/usr/bin/env -i "$@"

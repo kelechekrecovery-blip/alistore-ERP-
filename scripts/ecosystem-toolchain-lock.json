@@ -1,22 +1,22 @@
 {
-  "schemaVersion": 1,
-  "packageLockSha256": "915928f44b6b92d0df4b6068688c0db7bd28be30d2a9a3b470489b88ecc22aa1",
-  "nodeModulesTreeSha256": "a1cd808c9736e8fd884ce5f6f9210536922abe19ad057c9426798057bd725e5c",
+  "schemaVersion": 2,
+  "packageLockSha256": "fa99e785934cf73375844e58f7463926ad9e9a4ea43832b5510fce72809d366d",
+  "nodeModulesTreeSha256": "b9f5019ff27b082314c5d70a60b5824f9cfa66bc59c1729083a40a9365e77cf8",
   "runtime": {
     "platform": "darwin",
     "architecture": "arm64",
     "nodeSha256": "fba87e4402c55ea4fc7ca9b9838790c32534e3e77c9c7834c37073752d070678",
-    "nodeKegSha256": "65c4bb19d66915f662bc6ae9ba9d8dd7488ee97978105e2bcf288af29e9d0c34",
-    "nodeRuntimeLibrariesSha256": "9c394a51b03c0909bc87e05d2d738b06fda4a2a0500d8d7b9f8f9d39c383819a",
+    "nodeKegSha256": "92bee99fc51d99ee36b704be7ddce729152a99fced10383f7b1ca132b28ee560",
+    "nodeRuntimeLibrariesSha256": "5d5af7f9b6ee9959fed1d84dd6c5e4e76631f109e56d8b65b1ea670e0608ef4d",
     "nodeRuntimeManifestSha256": "617430f62efe9d84295d25d3dd57b0b43a6264b57352805e21990512c57f5c90",
     "gitPath": "/usr/bin/git",
     "gitSha256": "a961f78075d8e7621ef4f5d764c64ef8a41bf66c0a98ab5cb6ca39b85ce31c93",
     "npmCliPath": "/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js",
     "npmCliSha256": "8e5f6f3429f8cdbe693cdc29904e9d5a7b127a494bd15c804bd54c7403bfcbe7",
-    "npmTreeSha256": "e67a8e00660f73aa621c1ddada5d5d28972e5118c50835b29d2731ce5b37a2e2",
+    "npmTreeSha256": "eb22fcb601e2568980f764f40b2686b79c0cb4dc3081d98813a980b9138e92e9",
     "browserPath": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "browserSha256": "cae4e80362c81da067c83c7ad6d87c87942a4d63b1b9da3d934195d9eba3c913",
-    "browserAppTreeSha256": "4110614bd7b13afa561eb4a7eb0a8781676dca2e84027d4885cdad4d72619c71"
+    "browserSha256": "a995a39f7997f5cf7ecbf514b87bf0c31aed607bf399ab0b723304dbba6f8576",
+    "browserAppTreeSha256": "1c3eaf83aa3fee4ee8ec014d9c9c56b252691c4370d32a0251f789b4ae260ae2"
   },
   "playwright": {
     "version": "1.61.1",

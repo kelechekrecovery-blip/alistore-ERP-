@@ -8,7 +8,9 @@ import { fileURLToPath } from 'node:url';
 import { inspectHeadWorktree, resolveTrustedGit, trustedGitArgs } from './trusted-git.mjs';
 import { resolveTrustedNpm, trustedNpmEnvironment, verifyTrustedBootstrap } from './trusted-npm.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const root = process.env.ALISTORE_TRUSTED_WORK_TREE
+  ? fs.realpathSync(process.env.ALISTORE_TRUSTED_WORK_TREE)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const gateId = process.argv[2];
 const gateScripts = new Map([
   ['visual', 'visual:e2e'],
@@ -147,6 +149,7 @@ if (process.env.ALISTORE_EVIDENCE_LOCK_HELD !== '1') {
         ...trustedNpmEnvironment(npm),
         ALISTORE_EVIDENCE_LOCK_HELD: '1',
         ALISTORE_TRUSTED_BOOTSTRAP_FD: '3',
+        ALISTORE_TRUSTED_WORK_TREE: root,
       },
       shell: false,
       stdio: ['inherit', 'inherit', 'inherit', 3],
@@ -215,7 +218,7 @@ if (dirtySource() || !sourceHeadStatus().matches || sourceTreeSha256() !== befor
   console.error('Source tree changed while the gate was running; no evidence was recorded.');
   process.exit(1);
 }
-const npmAfterRun = resolveTrustedNpm(root);
+const npmAfterRun = resolveTrustedNpm(root, { allowGeneratedWorkspaceOutputs: true });
 if (JSON.stringify(npmAfterRun) !== JSON.stringify(npm)) {
   console.error('The verified test toolchain changed while the gate was running; no evidence was recorded.');
   process.exit(1);
