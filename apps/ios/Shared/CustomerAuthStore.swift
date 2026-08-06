@@ -1,6 +1,30 @@
 import Foundation
 import Observation
 
+/// Разделяет обычный выход из приложения и удаление аккаунта у внешнего
+/// провайдера. Logout очищает только локальную SDK-сессию; после успешного
+/// удаления AliStore-аккаунта запускается отзыв provider grant. Отзыв является
+/// best-effort: его асинхронная ошибка не может отменить уже подтверждённое
+/// сервером удаление персональных данных AliStore.
+public enum SocialIdentitySessionCleanup {
+    @MainActor
+    public static func logout(signOut: () -> Void) {
+        signOut()
+    }
+
+    @MainActor
+    public static func deleteAccount<Response>(
+        deleting: () async throws -> Response,
+        disconnect: (@escaping @Sendable (Error?) -> Void) -> Void
+    ) async rethrows -> Response {
+        // Provider session stays intact while the AliStore request is pending.
+        // Only a confirmed server deletion is allowed to revoke the grant.
+        let response = try await deleting()
+        disconnect { _ in }
+        return response
+    }
+}
+
 @MainActor
 @Observable
 public final class CustomerAuthStore {
