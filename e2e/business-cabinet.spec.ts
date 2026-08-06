@@ -119,3 +119,33 @@ test('неверный пароль не пускает и не подсказы
   expect(knownLogin).toBe(unknownLogin);
   await expect(page.getByRole('heading', { name: 'Вход магазина' })).toBeVisible();
 });
+
+test('кнопка «Показать» не наезжает на текст пароля', async ({ page }) => {
+  // Кнопка лежит поверх поля абсолютом, а место под неё поле резервирует
+  // правым padding'ом. Связи между этими двумя числами нет никакой, и на
+  // проде разъехалось: padding 64px против кнопки 66px + отступ 8px, то есть
+  // длинный пароль уезжал под кнопку. Меряем оба числа, а не смотрим глазами.
+  await resetDb();
+  await page.goto('/business');
+  await page.getByLabel('Пароль').fill('пароль-достаточно-длинный-чтобы-дойти-до-кнопки');
+
+  const overlap = async () =>
+    page.evaluate(() => {
+      const field = document.getElementById('business-password') as HTMLInputElement;
+      const toggle = Array.from(document.querySelectorAll('button')).find((b) =>
+        /Показать|Скрыть/.test(b.textContent ?? ''),
+      )!;
+      const f = field.getBoundingClientRect();
+      const t = toggle.getBoundingClientRect();
+      return { reserved: parseFloat(getComputedStyle(field).paddingRight), needed: t.width + (f.right - t.right) };
+    });
+
+  const hidden = await overlap();
+  expect(hidden.reserved, `под кнопку нужно ${hidden.needed}px, поле резервирует ${hidden.reserved}px`).toBeGreaterThanOrEqual(hidden.needed);
+
+  // «Скрыть» короче «Показать», но проверяем оба: правку легко сделать под
+  // одну надпись и не заметить, что вторая всё ещё не помещается.
+  await page.getByRole('button', { name: 'Показать' }).click();
+  const shown = await overlap();
+  expect(shown.reserved, `под кнопку нужно ${shown.needed}px, поле резервирует ${shown.reserved}px`).toBeGreaterThanOrEqual(shown.needed);
+});
