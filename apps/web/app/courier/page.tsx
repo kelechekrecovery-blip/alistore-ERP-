@@ -147,7 +147,7 @@ export default function CourierPage() {
           <CourierNavigation tab={tab} setTab={setTab} />
           <div className="mt-auto border-t border-white/10 pt-4">
             <p className="truncate text-sm font-semibold">{session.username}</p>
-            <p className="mt-1 text-xs text-white/45">Курьер · {session.staffId.slice(-6)}</p>
+            <p className="mt-1 text-xs text-white/50">Курьер · {session.staffId.slice(-6)}</p>
             <button type="button" onClick={logout} className="mt-4 flex items-center gap-2 text-sm text-white/55 hover:text-white">
               <LogOut className="h-4 w-4" aria-hidden /> Выйти
             </button>
@@ -231,7 +231,7 @@ function RouteWorkspace({
         <div>
           <p className="text-xs font-semibold uppercase text-[#ff7657]">Сегодня · Бишкек</p>
           <h1 className="mt-1 font-display text-2xl font-black sm:text-3xl">Мой маршрут</h1>
-          <p className="mt-1 text-sm text-white/45">{active.length} активных · {deliveries.filter((delivery) => delivery.status === 'delivered').length} завершено</p>
+          <p className="mt-1 text-sm text-white/50">{active.length} активных · {deliveries.filter((delivery) => delivery.status === 'delivered').length} завершено</p>
         </div>
         <div className="hidden rounded-[6px] border border-white/10 bg-[#211d18] px-4 py-2 text-right sm:block">
           <span className="block text-[10px] uppercase text-white/40">К получению</span>
@@ -401,11 +401,11 @@ function DeliveryCard({
           <div key={`${item.sku}:${item.imei ?? ''}`} className="flex items-center gap-2 py-1 text-xs">
             <Box className="h-3.5 w-3.5 text-white/35" aria-hidden />
             <span className="min-w-0 flex-1 truncate">{item.sku}</span>
-            <span className="text-white/45">{item.qty} шт.</span>
+            <span className="text-white/50">{item.qty} шт.</span>
           </div>
         ))}
         <div className="mt-2 flex items-center justify-between text-sm">
-          <span className="text-white/45">Получить COD</span>
+          <span className="text-white/50">Получить COD</span>
           <strong className="font-mono text-[#c8ff38]">{som(outstanding)}</strong>
         </div>
       </div>
@@ -514,7 +514,7 @@ function CodWorkspace({
     <div className="px-4 py-6 lg:px-7 lg:py-8">
       <p className="text-xs font-semibold uppercase text-[#ff7657]">Финансовая операция</p>
       <h1 className="mt-1 font-display text-2xl font-black sm:text-3xl">Сверка COD</h1>
-      <p className="mt-2 max-w-xl text-sm text-white/45">Сдавайте только фактически собранные наличные. Итог и расхождение подтверждает сервер и Event Ledger.</p>
+      <p className="mt-2 max-w-xl text-sm text-white/50">Сдавайте только фактически собранные наличные. Итог и расхождение подтверждает сервер и Event Ledger.</p>
       {error && <ErrorPanel message={error} retry={reload} />}
       {loading ? <LoadingRows /> : runs.length === 0 ? <EmptyCod /> : (
         <div className="mt-6 grid gap-4 xl:grid-cols-2">
@@ -604,7 +604,7 @@ function LoadingRows() {
 function EmptyRoute() {
   return (
     <div className="mt-6 grid min-h-72 place-items-center rounded-[8px] border border-dashed border-white/15 bg-[#16130f] p-6 text-center">
-      <div><MapPinned className="mx-auto h-10 w-10 text-[#c8ff38]" aria-hidden /><h2 className="mt-3 font-display font-bold">Маршрут пока пуст</h2><p className="mt-1 text-sm text-white/45">Новая доставка появится после назначения диспетчером.</p></div>
+      <div><MapPinned className="mx-auto h-10 w-10 text-[#c8ff38]" aria-hidden /><h2 className="mt-3 font-display font-bold">Маршрут пока пуст</h2><p className="mt-1 text-sm text-white/50">Новая доставка появится после назначения диспетчером.</p></div>
     </div>
   );
 }
@@ -612,7 +612,7 @@ function EmptyRoute() {
 function EmptyCod() {
   return (
     <div className="mt-6 grid min-h-60 place-items-center rounded-[8px] border border-dashed border-white/15 bg-[#16130f] p-6 text-center">
-      <div><Banknote className="mx-auto h-10 w-10 text-[#c8ff38]" aria-hidden /><h2 className="mt-3 font-display font-bold">Нет рейсов для сверки</h2><p className="mt-1 text-sm text-white/45">COD появится после назначения рейса.</p></div>
+      <div><Banknote className="mx-auto h-10 w-10 text-[#c8ff38]" aria-hidden /><h2 className="mt-3 font-display font-bold">Нет рейсов для сверки</h2><p className="mt-1 text-sm text-white/50">COD появится после назначения рейса.</p></div>
     </div>
   );
 }

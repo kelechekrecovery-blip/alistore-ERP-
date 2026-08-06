@@ -87,7 +87,7 @@ export default function ComparePage() {
       <main className="mx-auto min-h-[620px] max-w-[1400px] px-5 py-10">
         <div className="text-xs text-white/40">Главная / Сравнение</div>
         <h1 className="mt-3 text-[34px] font-extrabold text-white">Сравнение</h1>
-        <p className="mt-2 text-white/45">
+        <p className="mt-2 text-white/50">
           Сопоставьте цены, состояние, память и наличие.
         </p>
         {loadError !== '' ? <LoadFailure what="сравнение" detail={loadError.trim()} onRetry={() => { setLoadError(''); setReloadToken((value) => value + 1); }} /> : products === null ? (
@@ -97,7 +97,7 @@ export default function ComparePage() {
             <div>
               <GitCompareArrows className="mx-auto text-faint" size={40} />
               <h2 className="mt-5 text-2xl font-bold text-white">Нечего сравнивать</h2>
-              <p className="mt-2 text-white/45">
+              <p className="mt-2 text-white/50">
                 Добавьте до четырёх товаров из карточки товара.
               </p>
               <Link

@@ -104,11 +104,11 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
             `min-h-4` на строке рейтинга оставлен: он держит одинаковую высоту
             карточек в сетке независимо от наличия отзывов. */}
         <Link href={href} className={`min-h-[38px] text-[13px] font-medium leading-[1.4] transition hover:text-coral ${design3 ? 'text-white' : 'text-ink'}`}>{product.name}</Link>
-        <div className={`mt-1.5 flex min-h-4 items-center gap-1 text-[11px] ${design3 ? 'text-white/45' : 'text-faint'}`}>
+        <div className={`mt-1.5 flex min-h-4 items-center gap-1 text-[11px] ${design3 ? 'text-white/50' : 'text-faint'}`}>
           {product.reviewCount > 0 && product.avgRating !== null ? <><Star size={12} className="text-warn" fill="currentColor" /><span>{product.avgRating.toFixed(1)}</span><span>·</span><span>{product.reviewCount} отзывов</span></> : <span>Отзывов пока нет</span>}
         </div>
         <div className="mt-2 flex flex-wrap gap-1">{productSpecEntries(product).slice(0, 3).map(([key, value]) => <span key={key} className={`rounded-[4px] px-2 py-1 text-[10px] ${design3 ? 'bg-white/[.06] text-white/50' : 'bg-sand text-faint'}`}>{String(value)}</span>)}</div>
-        <div className={`mt-2 flex items-center gap-1 text-[11px] ${inStock ? 'text-[#c6ff3d]' : design3 ? 'text-white/45' : 'text-faint'}`}>
+        <div className={`mt-2 flex items-center gap-1 text-[11px] ${inStock ? 'text-[#c6ff3d]' : design3 ? 'text-white/50' : 'text-faint'}`}>
           {inStock ? (<><span className="text-[8px]">●</span>{availabilityLabel(availability, product.availableUnits)}</>) : toOrder ? (<StatusPill status="info">{availabilityLabel(availability, product.availableUnits)}</StatusPill>) : (<><span className="text-[8px]">●</span>{availabilityLabel(availability, product.availableUnits)}</>)}
         </div>
         <div className={`mt-2 font-display tabular text-[18px] font-extrabold ${design3 ? 'text-white' : 'text-ink'}`}>{som(product.price)}</div>
@@ -125,7 +125,7 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
             реально начислит заказ, — иначе карточка обещала бы одно, а
             кабинет показывал другое. */}
         {typeof product.bonusPoints === 'number' && product.bonusPoints > 0 && (
-          <div className={`mt-1 text-[11px] ${design3 ? 'text-white/45' : 'text-faint'}`}>
+          <div className={`mt-1 text-[11px] ${design3 ? 'text-white/50' : 'text-faint'}`}>
             +{product.bonusPoints.toLocaleString('ru-RU')} бонусов
           </div>
         )}
@@ -134,7 +134,7 @@ export function ProductCard({ product, variant = 'light' }: { product: CatalogPr
             и так ясно, у кого он покупает. Метка появляется ровно тогда, когда
             продавец другой, и это единственное, что она должна сообщать. */}
         {product.seller && (
-          <div className={`mt-1 text-[11px] ${design3 ? 'text-white/45' : 'text-faint'}`}>
+          <div className={`mt-1 text-[11px] ${design3 ? 'text-white/50' : 'text-faint'}`}>
             Продавец: <span className={design3 ? 'text-white/70' : 'text-ink'}>{product.seller.name}</span>
           </div>
         )}
