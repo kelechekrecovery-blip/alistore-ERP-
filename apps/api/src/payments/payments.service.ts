@@ -14,6 +14,7 @@ import { PayDto, SettleOrderReceivableDto, VoidPaymentDto } from './payments.dto
 import { CampaignAttributionService } from '../campaigns/campaign-attribution.service';
 import { OutboxService } from '../outbox/outbox.service';
 import { enqueueConsentedCustomerNotice } from '../outbox/customer-notifications';
+import { assertVerifiedCustomerPhone } from '../customers/verified-phone';
 import { paymentAccountCode, postAccountingEntryOnTx, postPaymentEntryOnTx } from '../finance/accounting-journal';
 import { cumulativeTaxDelta, outputTaxMetadata } from '../finance/sales-tax';
 import {
@@ -52,6 +53,10 @@ export class PaymentsService {
     @Optional() private readonly campaignAttribution?: CampaignAttributionService,
     @Optional() private readonly outbox?: OutboxService,
   ) {}
+
+  assertVerifiedPhone(customerId: string): Promise<void> {
+    return assertVerifiedCustomerPhone(this.prisma, customerId);
+  }
 
   get(id: string) {
     return this.prisma.payment.findUnique({ where: { id } });

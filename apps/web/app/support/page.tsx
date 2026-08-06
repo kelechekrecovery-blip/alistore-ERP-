@@ -45,7 +45,10 @@ export default function SupportPage() {
       .catch(() => setStorefrontError(true));
   }, []);
 
-  useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user?.phone]);
+  useEffect(() => {
+    const verifiedPhone = user?.phone;
+    if (verifiedPhone) setPhone((p) => p || verifiedPhone);
+  }, [user?.phone]);
   useEffect(() => {
     if (!user?.customerId) return;
     // `setTickets([])` просто убирал блок «Мои обращения»: клиент не видел

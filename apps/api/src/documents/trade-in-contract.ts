@@ -2,7 +2,7 @@ export interface TradeInContractData {
   id: string;
   contractId: string | null;
   issuedAt: Date;
-  customer: { name: string; phone: string };
+  customer: { name: string; phone: string | null };
   sellerPassport: string;
   model: string;
   imei?: string | null;
@@ -17,7 +17,7 @@ export function buildTradeInContractLines(trade: TradeInContractData): string[] 
     `Дата: ${formatDate(trade.issuedAt)}`,
     '',
     'Продавец (физическое лицо):',
-    `  ${trade.customer.name} · тел. ${trade.customer.phone}`,
+    `  ${trade.customer.name} · тел. ${trade.customer.phone ?? 'не указан'}`,
     `  Паспорт: ${trade.sellerPassport}`,
     '',
     'Покупатель: AliStore (ИП), г. Бишкек, Кыргызстан',

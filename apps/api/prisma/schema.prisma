@@ -582,7 +582,8 @@ enum CampaignCreativeType {
 // ---------- CORE ----------
 model Customer {
   id                      String                  @id @default(cuid())
-  phone                   String                  @unique // PII — маскировать младшим ролям
+  phone                   String?                 @unique // PII — маскировать младшим ролям
+  phoneVerifiedAt         DateTime? // set only after a successful phone OTP proof
   // Второй канал входа в тот же аккаунт, а не вторая личность: телефон остаётся
   // первичным идентификатором (доставка и COD без него не работают). Хранится
   // нормализованным в нижнем регистре, поэтому @unique ловит и Ivan@… и ivan@….

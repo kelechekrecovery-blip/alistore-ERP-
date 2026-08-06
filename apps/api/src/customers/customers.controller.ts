@@ -262,7 +262,8 @@ export class CustomersController {
     return false;
   }
 
-  private maskPhone(phone: string): string {
+  private maskPhone(phone: string | null): string | null {
+    if (!phone) return null;
     const digits = phone.replace(/\D/g, '');
     if (digits.length <= 4) return '***';
     const prefix = phone.startsWith('+') ? `+${digits.slice(0, 3)}` : digits.slice(0, 3);

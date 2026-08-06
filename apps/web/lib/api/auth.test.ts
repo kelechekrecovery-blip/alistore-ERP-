@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  authAttachPhone,
   authAppleLogin,
   authConfirmEmailAttach,
   authCompleteSocialEnrollment,
@@ -124,6 +125,19 @@ describe('phone OTP fetchers', () => {
       phone: '+996700000000',
       code: '123456',
     });
+  });
+
+  it('attaches an OTP-verified phone to the current social account', async () => {
+    const calls = stubFetch({ accessToken: 'next', tokenType: 'Bearer', expiresIn: '15m' });
+    await authAttachPhone('+996700000000', '123456', 'access', 'phone-challenge');
+    expect(calls[0].url).toMatch(/\/auth\/phone\/attach\/complete$/);
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({
+      phone: '+996700000000',
+      code: '123456',
+      challengeId: 'phone-challenge',
+    });
+    expect((calls[0].init.headers as Record<string, string>).authorization).toBe('Bearer access');
+    expect((calls[0].init.headers as Record<string, string>)['x-alistore-web']).toBe('1');
   });
 });
 

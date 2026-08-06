@@ -30,7 +30,7 @@ const AUDIENCE_SCAN_LIMIT = 5_000;
 type CustomerSpendRow = {
   id: string;
   name: string;
-  phone: string;
+  phone: string | null;
   consent: boolean;
   segments: string[];
   ltv: number;
@@ -230,7 +230,11 @@ export class CampaignsService {
       }
       const normalized = parseSegmentLabel(campaign.segment);
       const matched = buildSegmentAudience(await this.loadCustomersWithSpend(tx), normalized);
-      const audience = this.eligibleAudience(matched, normalized.limit ?? 500);
+      const audience = this.eligibleAudience(
+        matched,
+        normalized.limit ?? 500,
+        (customer) => this.recipientFor(campaign.channel, customer) !== null,
+      );
       if (audience.length === 0) {
         throw new ValidationError('campaign_empty_audience', 'В сегменте нет клиентов с согласием на рассылку');
       }
@@ -248,6 +252,7 @@ export class CampaignsService {
       const trackingUrl = this.trackingUrl(campaign);
       for (const customer of audience) {
         const recipient = this.recipientFor(campaign.channel, customer);
+        if (!recipient) continue;
         if (sentRecipients.has(recipient)) continue;
         await this.outbox.enqueueOnTx(tx, {
           campaignId: id,
@@ -623,11 +628,15 @@ export class CampaignsService {
   private eligibleAudience(
     matched: { customer: AudienceCustomer; eligible: boolean }[],
     limit: number,
+    isReachable: (customer: AudienceCustomer) => boolean = () => true,
   ): AudienceCustomer[] {
-    return matched.filter((row) => row.eligible).slice(0, limit).map((row) => row.customer);
+    return matched
+      .filter((row) => row.eligible && isReachable(row.customer))
+      .slice(0, limit)
+      .map((row) => row.customer);
   }
 
-  private recipientFor(channel: string, customer: AudienceCustomer): string {
+  private recipientFor(channel: string, customer: AudienceCustomer): string | null {
     if (channel === 'push') return customer.id;
     if (channel === 'telegram') return this.segmentValue(customer, ['telegram:', 'tg:']) ?? customer.phone;
     return customer.phone;

@@ -285,6 +285,37 @@ describe('describeAuthMethods: что реально пустит человек
     });
   });
 
+  describe('social-first registration rollout', () => {
+    it('lets configured Apple and Google register without SMS only behind the explicit flag', () => {
+      const methods = describeAuthMethods(env({
+        NODE_ENV: 'production',
+        SMS_PROVIDER: 'disabled',
+        AUTH_SOCIAL_FIRST_SIGNUP_ENABLED: 'true',
+        APPLE_CLIENT_ID: 'kg.alistore.client',
+        GOOGLE_CLIENT_ID: 'native.apps.googleusercontent.com',
+      }));
+      expect(methods.apple.registers).toBe(true);
+      expect(methods.google.registers).toBe(true);
+      expect(methods.telegram.registers).toBe(false);
+      expect(methods.registrationAvailable).toBe(true);
+    });
+
+    it('is fail-closed in production when the flag is absent or misspelled', () => {
+      for (const value of [undefined, 'false', 'TRUE', '1']) {
+        const methods = describeAuthMethods(env({
+          NODE_ENV: 'production',
+          SMS_PROVIDER: 'disabled',
+          AUTH_SOCIAL_FIRST_SIGNUP_ENABLED: value,
+          APPLE_CLIENT_ID: 'kg.alistore.client',
+          GOOGLE_CLIENT_ID: 'native.apps.googleusercontent.com',
+        }));
+        expect(methods.apple.registers).toBe(false);
+        expect(methods.google.registers).toBe(false);
+        expect(methods.registrationAvailable).toBe(false);
+      }
+    });
+  });
+
   /**
    * Слепок ровно того, что стоит в боевом блюпринте на момент написания теста:
    * `render.yaml` отдаёт `SMS_PROVIDER=disabled`, `AUTH_EMAIL_LOGIN_ENABLED=false`

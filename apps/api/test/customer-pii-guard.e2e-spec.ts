@@ -66,7 +66,8 @@ describe('Customer PII read policy (required JWT + masking)', () => {
     return jwt.sign({ sub: `staff-${role}-${RUN}`, typ: 'staff', role });
   }
 
-  function customerToken(customerId: string, phone: string) {
+  function customerToken(customerId: string, phone: string | null) {
+    if (!phone) throw new Error('Test customer must have a phone');
     return jwt.sign({ sub: customerId, typ: 'customer', phone });
   }
 

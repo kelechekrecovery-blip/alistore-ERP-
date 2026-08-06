@@ -66,9 +66,12 @@ describe('Logistics zones, capacity and dispatch (integration + RBAC)', () => {
     const zone = await request(app.getHttpServer()).post('/logistics/zones').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `zone-${run}`).send(zonePayload).expect(201);
     const slot = await request(app.getHttpServer()).post('/logistics/slots').set('Authorization', `Bearer ${ownerToken}`).set('Idempotency-Key', `slot-${run}`).send({ zoneId: zone.body.id, startsAt: `${date}T04:00:00.000Z`, endsAt: `${date}T06:00:00.000Z`, capacity: 1 }).expect(201);
     const product = await prisma.product.create({ data: { sku: `LOG-${run}`, name: 'Logistics phone', price: 1000, cost: 700, category: 'phones', attrs: {}, trackingMode: 'quantity', published: true, balances: { create: { location: fulfillmentLocation, onHand: 2 } } } });
-    const customerA = await prisma.customer.create({ data: { phone: `+996701${run}1`, name: 'A' } });
-    const customerB = await prisma.customer.create({ data: { phone: `+996701${run}2`, name: 'B' } });
-    const token = (id: string, phone: string) => sign({ sub: id, typ: 'customer', phone }, process.env.JWT_SECRET ?? 'dev-insecure-change-me', { expiresIn: '15m' });
+    const customerA = await prisma.customer.create({ data: { phone: `+996701${run}1`, phoneVerifiedAt: new Date(), name: 'A' } });
+    const customerB = await prisma.customer.create({ data: { phone: `+996701${run}2`, phoneVerifiedAt: new Date(), name: 'B' } });
+    const token = (id: string, phone: string | null) => {
+      if (!phone) throw new Error('Test customer must have a phone');
+      return sign({ sub: id, typ: 'customer', phone }, process.env.JWT_SECRET ?? 'dev-insecure-change-me', { expiresIn: '15m' });
+    };
     const payload = { channel: 'web', fulfillmentType: 'courier', paymentMode: 'cod', storePointId: pointId, deliveryAddress: 'Бишкек, Киевская 95', deliverySlot: '10:00–12:00', deliveryZoneId: zone.body.id, deliverySlotId: slot.body.id, piiConsent: true, total: 1, items: [{ sku: product.sku, qty: 1, price: 1 }] };
     await request(app.getHttpServer()).post('/orders/mine')
       .set('Authorization', `Bearer ${token(customerA.id, customerA.phone)}`)

@@ -6,13 +6,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { Bell, MapPin } from 'lucide-react';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import { useAuth } from '@/lib/auth';
-import { authConfirmEmailAttach, authRequestEmailAttach, deleteAuthJson, fetchMySettings, getJson, updateMySettings, type CustomerSettings } from '@/lib/api';
+import { authConfirmEmailAttach, authMethods, authRequestEmailAttach, deleteAuthJson, fetchMySettings, getJson, updateMySettings, type CustomerSettings } from '@/lib/api';
 import { describeAuthError } from '@/lib/auth-errors';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^\+?\d{9,15}$/;
 
 export default function SettingsPage() {
-  const { user, authed, logout } = useAuth();
+  const { user, authed, logout, requestOtp, attachPhone } = useAuth();
   const router = useRouter();
   const [settings, setSettings] = useState<CustomerSettings | null>(null);
   const [name, setName] = useState('');
@@ -32,6 +33,14 @@ export default function SettingsPage() {
   const [emailBusy, setEmailBusy] = useState(false);
   const [emailError, setEmailError] = useState('');
   const emailValid = EMAIL_RE.test(emailInput.trim());
+  const [phoneInput, setPhoneInput] = useState('');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [phoneChallengeId, setPhoneChallengeId] = useState<string | null>(null);
+  const [phoneCodeStep, setPhoneCodeStep] = useState(false);
+  const [phoneDevCode, setPhoneDevCode] = useState<string | null>(null);
+  const [phoneBusy, setPhoneBusy] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
+  const [phoneCapability, setPhoneCapability] = useState<boolean | null>(null);
 
   const reload = useCallback(() => {
     if (!user) return Promise.resolve();
@@ -42,6 +51,13 @@ export default function SettingsPage() {
   }, [user, authed]);
 
   useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => {
+    let active = true;
+    void authMethods()
+      .then((methods) => { if (active) setPhoneCapability(methods.phone.enabled); })
+      .catch(() => { if (active) setPhoneCapability(false); });
+    return () => { active = false; };
+  }, []);
 
   async function save() {
     if (!settings) return;
@@ -54,6 +70,46 @@ export default function SettingsPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function requestPhoneAttach() {
+    if (!PHONE_RE.test(phoneInput.trim())) {
+      setPhoneError('Введите номер в международном формате, например +996700123456.');
+      return;
+    }
+    setPhoneBusy(true); setPhoneError('');
+    try {
+      const challenge = await requestOtp(phoneInput.trim());
+      setPhoneChallengeId(challenge.challengeId);
+      setPhoneDevCode(challenge.devCode ?? null);
+      if (challenge.devCode) setPhoneCode(challenge.devCode);
+      setPhoneCodeStep(true);
+    } catch (value) {
+      setPhoneError(describeAuthError(value, 'Не удалось отправить SMS-код.'));
+    } finally {
+      setPhoneBusy(false);
+    }
+  }
+
+  async function confirmPhoneAttach() {
+    setPhoneBusy(true); setPhoneError('');
+    try {
+      await attachPhone(phoneInput.trim(), phoneCode, phoneChallengeId ?? undefined);
+      setPhoneCodeStep(false); setPhoneCode(''); setPhoneChallengeId(null); setPhoneDevCode(null);
+      await reload();
+    } catch (value) {
+      setPhoneError(describeAuthError(value, 'Не удалось подтвердить телефон.'));
+    } finally {
+      setPhoneBusy(false);
+    }
+  }
+
+  function changePhoneAttachNumber() {
+    setPhoneCodeStep(false);
+    setPhoneCode('');
+    setPhoneChallengeId(null);
+    setPhoneDevCode(null);
+    setPhoneError('');
   }
 
   function openEmailForm() {
@@ -159,7 +215,7 @@ export default function SettingsPage() {
 
       <div className="rounded-[14px] border border-surface-3 bg-surface-2 p-4">
         <div className="text-[12px] uppercase text-subtle">Аккаунт</div>
-        <div className="mt-2 font-display text-lg font-bold">{settings?.phone ?? user?.phone ?? 'Гость'}</div>
+        <div className="mt-2 font-display text-lg font-bold">{settings?.phone ?? user?.phone ?? 'Телефон не подтверждён'}</div>
         <div className="mt-1 font-mono text-[11px] text-faint">{user?.customerId ?? 'Войдите по OTP'}</div>
         {settings && <>
           <label htmlFor="customer-name" className="mt-4 block text-[12px] text-muted">Имя</label>
@@ -183,8 +239,60 @@ export default function SettingsPage() {
         <div className="text-sm font-semibold">Безопасность</div>
         <div className="mt-2 flex items-center justify-between py-2 text-[13px] text-muted">
           <span>Вход по телефону и OTP</span>
-          <span className="text-lime">активен</span>
+          <span className={settings?.phone ? 'text-lime' : 'text-warning'}>{settings?.phone ? 'активен' : 'не привязан'}</span>
         </div>
+        {settings && !settings.phone && phoneCapability === false && (
+          <p className="border-t border-surface-3 py-3 text-[13px] text-warning">
+            Подтверждение телефона сейчас недоступно. Покупки остаются в гостевом режиме; мы не будем просить код, пока SMS-канал не восстановлен.
+          </p>
+        )}
+        {settings && !settings.phone && phoneCapability === null && (
+          <p className="border-t border-surface-3 py-3 text-[13px] text-muted">Проверяем доступность SMS…</p>
+        )}
+        {settings && !settings.phone && phoneCapability === true && (
+          <div className="border-t border-surface-3 py-3 text-[13px]">
+            <p className="text-muted">Подтвердите номер перед оформлением доставки или оплатой.</p>
+            <input
+              type="tel"
+              value={phoneInput}
+              onChange={(event) => { setPhoneInput(event.target.value.replace(/[^+\d]/g, '').slice(0, 16)); setPhoneChallengeId(null); }}
+              placeholder="+996700123456"
+              aria-label="Телефон для привязки"
+              disabled={phoneCodeStep}
+              className="mt-2.5 w-full rounded-[8px] border border-surface-3 bg-ink-dark p-3 font-mono text-sm outline-none focus:border-lime disabled:text-faint"
+            />
+            {phoneCodeStep && (
+              <input
+                inputMode="numeric"
+                value={phoneCode}
+                onChange={(event) => setPhoneCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="6-значный SMS-код"
+                aria-label="Код подтверждения телефона"
+                className="mt-2 w-full rounded-[8px] border border-surface-3 bg-ink-dark p-3 text-center font-mono text-lg tracking-[0.4em] outline-none focus:border-lime"
+              />
+            )}
+            {phoneDevCode && <p className="mt-2 rounded-[8px] bg-ink-dark px-3 py-2 text-center font-mono text-[11px] text-lime">dev-код: {phoneDevCode}</p>}
+            {phoneError && <p className="mt-2 text-[12px] text-danger-soft">{phoneError}</p>}
+            <button
+              type="button"
+              disabled={phoneBusy || (phoneCodeStep ? phoneCode.length !== 6 : !PHONE_RE.test(phoneInput.trim()))}
+              onClick={phoneCodeStep ? confirmPhoneAttach : requestPhoneAttach}
+              className="mt-2.5 w-full rounded-[8px] bg-lime py-2.5 text-[13px] font-bold text-lime-ink disabled:bg-line disabled:text-faint"
+            >
+              {phoneBusy ? 'Проверяем…' : phoneCodeStep ? 'Подтвердить телефон' : 'Получить SMS-код'}
+            </button>
+            {phoneCodeStep && (
+              <div className="mt-2 flex gap-2">
+                <button type="button" disabled={phoneBusy} onClick={requestPhoneAttach} className="flex-1 rounded-[8px] border border-surface-3 py-2 text-[12px] text-muted disabled:text-faint">
+                  Отправить ещё раз
+                </button>
+                <button type="button" disabled={phoneBusy} onClick={changePhoneAttachNumber} className="flex-1 rounded-[8px] border border-surface-3 py-2 text-[12px] text-muted disabled:text-faint">
+                  Изменить номер
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         <div className="border-t border-surface-3 py-3 text-[13px]">
           <div className="flex items-center justify-between text-muted">
             <span>Вход по почте</span>

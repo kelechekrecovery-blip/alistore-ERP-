@@ -9,6 +9,9 @@ import { ApiError } from './api/http';
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   email_invalid: 'Введите корректный email.',
   phone_invalid: 'Введите корректный номер телефона.',
+  phone_already_linked: 'Этот номер уже принадлежит другому аккаунту. Войдите по номеру телефона.',
+  phone_already_attached: 'К этому аккаунту телефон уже привязан.',
+  phone_verification_required: 'Подтвердите телефон в настройках аккаунта.',
   otp_not_found: 'Код не найден или истёк. Запросите новый.',
   otp_invalid: 'Неверный код.',
   otp_locked: 'Слишком много попыток. Запросите новый код.',

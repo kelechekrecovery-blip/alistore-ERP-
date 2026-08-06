@@ -85,3 +85,6 @@ export class CompleteSocialEnrollmentDto extends VerifyOtpDto {
   @Length(32, 256)
   enrollmentToken!: string;
 }
+
+/** Complete phone attachment with an existing login-purpose SMS challenge. */
+export class CompletePhoneAttachDto extends VerifyOtpDto {}

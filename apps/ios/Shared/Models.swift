@@ -677,9 +677,9 @@ public struct CustomerSession: Codable, Sendable {
     public let accessToken: String
     public let refreshToken: String
     public let customerId: String
-    public let phone: String
+    public let phone: String?
 
-    public init(accessToken: String, refreshToken: String, customerId: String, phone: String) {
+    public init(accessToken: String, refreshToken: String, customerId: String, phone: String?) {
         self.accessToken = accessToken
         self.refreshToken = refreshToken
         self.customerId = customerId
@@ -791,7 +791,7 @@ public struct UpdateCustomerAddressRequest: Encodable, Sendable {
 
 public struct CustomerSettings: Decodable, Sendable {
     public let id: String
-    public let phone: String
+    public let phone: String?
     /// Привязанный адрес входа. Необязателен: у большинства аккаунтов его нет,
     /// а старые сборки сервера поле не присылают вовсе.
     public let email: String?
@@ -802,7 +802,7 @@ public struct CustomerSettings: Decodable, Sendable {
     public let service: Bool
     public let promos: Bool
 
-    public init(id: String, phone: String, email: String? = nil, name: String, consent: Bool, push: Bool, whatsapp: Bool, service: Bool, promos: Bool) {
+    public init(id: String, phone: String?, email: String? = nil, name: String, consent: Bool, push: Bool, whatsapp: Bool, service: Bool, promos: Bool) {
         self.id = id
         self.phone = phone
         self.email = email

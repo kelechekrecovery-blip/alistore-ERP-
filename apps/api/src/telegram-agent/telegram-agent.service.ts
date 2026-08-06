@@ -435,7 +435,7 @@ export class TelegramAgentService implements OnModuleInit {
           where: { provider_subject: { provider: 'telegram', subject: telegramUserId } },
         }),
       ]);
-      if (!customer || customer.phone.startsWith('deleted:') || !stillLinked) return null;
+      if (!customer?.phone || customer.phone.startsWith('deleted:') || !stillLinked) return null;
       return tx.telegramAgentIdentity.upsert({
         where: { customerId: social.customerId },
         create: {
@@ -1188,7 +1188,7 @@ export class TelegramAgentService implements OnModuleInit {
         ['admin', 'owner'].includes(identity.staff.role),
       );
     }
-    return Boolean(identity.customer && !identity.customer.phone.startsWith('deleted:'));
+    return Boolean(identity.customer?.phone && !identity.customer.phone.startsWith('deleted:'));
   }
 
   private assertEnabled(): void {

@@ -13,6 +13,7 @@ import {
   PaymentIntentView,
 } from './payment-gateway-provider';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
+import { assertVerifiedCustomerPhone } from '../customers/verified-phone';
 
 export type { PaymentIntentView } from './payment-gateway-provider';
 
@@ -24,6 +25,10 @@ export class PaymentIntentsService {
     private readonly payments: PaymentsService,
     @Inject(PAYMENT_GATEWAY_PROVIDER) private readonly gateway: PaymentGatewayProvider,
   ) {}
+
+  assertVerifiedPhone(customerId: string): Promise<void> {
+    return assertVerifiedCustomerPhone(this.prisma, customerId);
+  }
 
   async create(dto: CreatePaymentIntentDto, idempotencyKey?: string): Promise<PaymentIntentView> {
     const order = await this.prisma.order.findUnique({ where: { id: dto.orderId } });

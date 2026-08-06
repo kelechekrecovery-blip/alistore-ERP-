@@ -106,6 +106,7 @@ export class PaymentsController {
       throw new UnauthorizedException('payment_requires_auth');
     }
     if (user?.typ === 'customer') {
+      await this.payments.assertVerifiedPhone(user.customerId);
       return this.payments.payForCustomer(user.customerId, dto, user.customerId);
     }
     if (user?.typ === 'staff') {
@@ -161,11 +162,12 @@ export class PaymentsController {
   @Post('intents/mine')
   @UseGuards(JwtAuthGuard, ThrottlerGuard)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  customerIntent(
+  async customerIntent(
     @CurrentUser() user: AuthPrincipal,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: CreatePaymentIntentDto,
   ) {
+    await this.intents.assertVerifiedPhone(user.customerId);
     return this.intents.createForCustomer(user.customerId, dto, idempotencyKey);
   }
 

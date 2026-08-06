@@ -7,7 +7,7 @@ export interface CustomerOverview {
   customer: {
     id: string;
     name: string;
-    phone: string;
+    phone: string | null;
     consent: boolean;
     segments: string[];
     ltv: number;

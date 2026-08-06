@@ -192,7 +192,8 @@ export default function CheckoutPage() {
   // это ещё не ввод, поэтому она уступает данным аккаунта; всё, что человек
   // действительно набрал, по-прежнему неприкосновенно.
   useEffect(() => {
-    if (user?.phone) setPhone((p) => (p && p !== PHONE_PREFIX ? p : user.phone));
+    const verifiedPhone = user?.phone;
+    if (verifiedPhone) setPhone((p) => (p && p !== PHONE_PREFIX ? p : verifiedPhone));
   }, [user]);
   useEffect(() => {
     let active = true;
@@ -730,10 +731,19 @@ export default function CheckoutPage() {
         {step === 1 && (
           <>
             <div className="mb-3 font-display text-base font-bold">Контакты</div>
-            <input type="tel" value={phone} onChange={(e) => setPhone(normalizePhone(e.target.value))} placeholder="+996 700 12 34 56" className="checkout-field mb-2.5 w-full rounded-[12px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-sm text-white outline-none focus:border-lime" />
+            {user ? user.phone ? (
+              <div className="checkout-field mb-2.5 w-full rounded-[12px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-sm text-white">{user.phone}</div>
+            ) : (
+              <div role="alert" className="mb-2.5 rounded-[12px] border border-warn/50 bg-warn/10 p-3.5 text-sm text-warn">
+                Для заказа нужен подтверждённый телефон.{' '}
+                <Link href="/account/settings" className="font-semibold underline">Подтвердить в настройках</Link>
+              </div>
+            ) : (
+              <input type="tel" value={phone} onChange={(e) => setPhone(normalizePhone(e.target.value))} placeholder="+996 700 12 34 56" className="checkout-field mb-2.5 w-full rounded-[12px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-sm text-white outline-none focus:border-lime" />
+            )}
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя" className="checkout-field mb-2.5 w-full rounded-[12px] border border-surface-3 bg-surface-2 p-3.5 text-sm text-white outline-none focus:border-lime" />
             {error && <p className="text-sm text-danger-soft">{error}</p>}
-            <button type="button" disabled={!phoneValid} onClick={() => setStep(2)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:bg-line disabled:text-faint">Далее</button>
+            <button type="button" disabled={user ? !user.phone : !phoneValid} onClick={() => setStep(2)} className="checkout-primary mt-2 w-full rounded-[13px] bg-lime py-3.5 text-center text-[15px] font-bold text-lime-ink disabled:bg-line disabled:text-faint">Далее</button>
           </>
         )}
         {step === 2 && (

@@ -19,7 +19,7 @@ export interface CustomerAddress {
 
 export interface CustomerSettings {
   id: string;
-  phone: string;
+  phone: string | null;
   /** Second login channel into the same account; null when none is attached. */
   email: string | null;
   /** True once ownership was confirmed via the email OTP attach flow. */

@@ -129,8 +129,10 @@ describe('Service Center diagnostics and estimate (integration + RBAC)', () => {
     return { customer, warrantyCase, product, order, imei };
   }
 
-  const customerToken = (customer: { id: string; phone: string }) =>
-    jwt.sign({ sub: customer.id, typ: 'customer', phone: customer.phone });
+  const customerToken = (customer: { id: string; phone: string | null }) => {
+    if (!customer.phone) throw new Error('Test customer must have a phone');
+    return jwt.sign({ sub: customer.id, typ: 'customer', phone: customer.phone });
+  };
 
   it('runs intake → diagnostics → customer approval with replay and Ledger', async () => {
     const { customer, warrantyCase } = await fixture('1');

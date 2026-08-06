@@ -180,11 +180,14 @@ describe('Staff session rollout for operational endpoints', () => {
         items: { create: { sku: `IDOR-${RUN}`, qty: 1, price: 100 } },
       },
     });
-    const customerToken = (id: string, phone: string) => sign(
-      { sub: id, typ: 'customer', phone },
-      process.env.JWT_SECRET ?? 'dev-insecure-change-me',
-      { expiresIn: '15m' },
-    );
+    const customerToken = (id: string, phone: string | null) => {
+      if (!phone) throw new Error('Test customer must have a phone');
+      return sign(
+        { sub: id, typ: 'customer', phone },
+        process.env.JWT_SECRET ?? 'dev-insecure-change-me',
+        { expiresIn: '15m' },
+      );
+    };
 
     await request(app.getHttpServer()).get(`/orders/${order.id}`).expect(401);
     await request(app.getHttpServer())
