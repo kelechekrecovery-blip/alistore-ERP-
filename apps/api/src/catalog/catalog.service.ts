@@ -525,15 +525,19 @@ export class CatalogService {
   private async enrichSellers(items: CatalogProductDto[]): Promise<CatalogProductDto[]> {
     if (items.length === 0) return items;
     const ids = [...new Set(items.map((item) => item.sellerId).filter((id): id is string => Boolean(id)))];
-    if (ids.length === 0) return items;
-    const rows = await this.prisma.seller.findMany({
+    const rows = ids.length === 0 ? [] : await this.prisma.seller.findMany({
       where: { id: { in: ids } },
       select: { id: true, name: true },
     });
     const byId = new Map(rows.map((row) => [row.id, row]));
     return items.map((item) => {
-      const seller = item.sellerId ? byId.get(item.sellerId) : undefined;
-      return seller ? { ...item, seller } : item;
+      // `sellerId` — транспорт внутри сервиса, наружу он не идёт: публичному
+      // каталогу нужно имя магазина, а не его идентификатор. Набор полей
+      // проекции стережёт `product-supply-mode.e2e-spec`, и он прав —
+      // сюда одинаково легко просачиваются и закупочная цена, и чужой ключ.
+      const { sellerId, ...publicFields } = item;
+      const seller = sellerId ? byId.get(sellerId) : undefined;
+      return seller ? { ...publicFields, seller } : publicFields;
     });
   }
 
