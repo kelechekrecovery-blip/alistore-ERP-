@@ -98,7 +98,7 @@ function loadAppleSdk(): Promise<void> {
   if (typeof window === 'undefined' || window.AppleID) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    script.src = 'https://appleid.cdn-apple.com/appleauth/js/SignInWithApple.js';
+    script.src = 'https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js';
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error('apple-sdk-load-failed'));
