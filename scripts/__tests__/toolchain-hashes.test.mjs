@@ -14,6 +14,32 @@ const fixture = (t, prefix) => {
   return root;
 };
 
+const prismaGeneratedSource = (repositoryRoot) => `const config = {
+  "generator": {
+    "output": {
+      "value": ${JSON.stringify(path.join(repositoryRoot, 'node_modules', '@prisma', 'client'))},
+      "fromEnvVar": null
+    },
+    "previewFeatures": [],
+    "sourceFilePath": ${JSON.stringify(path.join(repositoryRoot, 'apps', 'api', 'prisma', 'schema.prisma'))}
+  },
+  "relativePath": "../../../apps/api/prisma"
+};
+`;
+
+const prismaRepositoryFixture = (t, prefix) => {
+  const repository = fixture(t, prefix);
+  const clientRoot = path.join(repository, 'node_modules', '.prisma', 'client');
+  fs.mkdirSync(clientRoot, { recursive: true });
+  fs.mkdirSync(path.join(repository, 'apps', 'api'), { recursive: true });
+  fs.mkdirSync(path.join(repository, 'apps', 'web'), { recursive: true });
+  const source = prismaGeneratedSource(repository);
+  for (const name of ['index.js', 'edge.js']) {
+    fs.writeFileSync(path.join(clientRoot, name), source);
+  }
+  return { clientRoot, repository, source };
+};
+
 test('tree records are length-framed against delimiter-shifting collisions', (t) => {
   const first = fixture(t, 'alistore-tree-frame-a-');
   const second = fixture(t, 'alistore-tree-frame-b-');
@@ -117,4 +143,110 @@ test('ignored generated workspace outputs must be absent before trust verificati
   assert.doesNotThrow(() => trustedWorkspaceSymlinkOptions(repository, {
     allowGeneratedOutputs: true,
   }));
+});
+
+test('generated Prisma metadata hashes identically across canonical repository roots', (t) => {
+  const first = prismaRepositoryFixture(t, 'alistore-prisma-root-a-');
+  const second = prismaRepositoryFixture(t, 'alistore-prisma-root-b-');
+
+  assert.equal(
+    hashDependencyTree(
+      path.join(first.repository, 'node_modules'),
+      trustedWorkspaceSymlinkOptions(first.repository),
+    ),
+    hashDependencyTree(
+      path.join(second.repository, 'node_modules'),
+      trustedWorkspaceSymlinkOptions(second.repository),
+    ),
+  );
+});
+
+test('generated Prisma normalization rejects missing, duplicate, or unexpected fields', (t) => {
+  const expectedOutput = (repository) => JSON.stringify(
+    path.join(repository, 'node_modules', '@prisma', 'client'),
+  );
+  const expectedSchema = (repository) => JSON.stringify(
+    path.join(repository, 'apps', 'api', 'prisma', 'schema.prisma'),
+  );
+  const cases = [
+    ['missing output', (source) => source.replace('"output": {', '"renamedOutput": {')],
+    ['duplicate output', (source) => source.replace('"previewFeatures": []', `"output": {
+      "value": "duplicate",
+      "fromEnvVar": null
+    },
+    "previewFeatures": []`)],
+    ['unexpected output', (source, repository) => source.replace(
+      expectedOutput(repository),
+      '"/tmp/claimant-output"',
+    )],
+    ['missing source', (source) => source.replace('"sourceFilePath":', '"renamedSourceFilePath":')],
+    ['duplicate source', (source) => source.replace('"sourceFilePath":', '"sourceFilePath": "duplicate",\n    "sourceFilePath":')],
+    ['unexpected source', (source, repository) => source.replace(
+      expectedSchema(repository),
+      '"/tmp/claimant-schema.prisma"',
+    )],
+  ];
+
+  for (const [label, mutate] of cases) {
+    const current = prismaRepositoryFixture(t, `alistore-prisma-invalid-${label.replaceAll(' ', '-')}-`);
+    fs.writeFileSync(path.join(current.clientRoot, 'index.js'), mutate(current.source, current.repository));
+    assert.throws(
+      () => hashDependencyTree(
+        path.join(current.repository, 'node_modules'),
+        trustedWorkspaceSymlinkOptions(current.repository),
+      ),
+      /Prisma generated metadata/u,
+      label,
+    );
+  }
+});
+
+test('normalization keeps all non-metadata dependency bytes bound', (t) => {
+  const first = prismaRepositoryFixture(t, 'alistore-prisma-bound-a-');
+  const second = prismaRepositoryFixture(t, 'alistore-prisma-bound-b-');
+  fs.appendFileSync(path.join(second.clientRoot, 'index.js'), 'claimant-controlled\n');
+
+  const firstHash = hashDependencyTree(
+    path.join(first.repository, 'node_modules'),
+    trustedWorkspaceSymlinkOptions(first.repository),
+  );
+  assert.notEqual(
+    firstHash,
+    hashDependencyTree(
+      path.join(second.repository, 'node_modules'),
+      trustedWorkspaceSymlinkOptions(second.repository),
+    ),
+  );
+
+  fs.writeFileSync(path.join(second.clientRoot, 'index.js'), second.source);
+  fs.writeFileSync(path.join(first.clientRoot, 'browser.js'), first.repository);
+  fs.writeFileSync(path.join(second.clientRoot, 'browser.js'), second.repository);
+  assert.notEqual(
+    hashDependencyTree(
+      path.join(first.repository, 'node_modules'),
+      trustedWorkspaceSymlinkOptions(first.repository),
+    ),
+    hashDependencyTree(
+      path.join(second.repository, 'node_modules'),
+      trustedWorkspaceSymlinkOptions(second.repository),
+    ),
+  );
+});
+
+test('non-reproducible optional native lifecycle outputs are rejected', (t) => {
+  for (const [label, relativePath] of [
+    ['cpu-features', ['cpu-features', 'build']],
+    ['ssh2', ['ssh2', 'lib', 'protocol', 'crypto', 'build']],
+  ]) {
+    const current = prismaRepositoryFixture(t, `alistore-native-${label}-`);
+    fs.mkdirSync(path.join(current.repository, 'node_modules', ...relativePath), {
+      recursive: true,
+    });
+
+    assert.throws(
+      () => trustedWorkspaceSymlinkOptions(current.repository),
+      /Native dependency lifecycle output must be absent/u,
+      label,
+    );
+  }
 });

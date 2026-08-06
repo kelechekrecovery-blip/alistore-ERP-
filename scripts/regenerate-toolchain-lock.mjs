@@ -362,7 +362,7 @@ export const parseToolchainLockMode = (args) => {
 
 export const assertSupportedToolchainLockPolicy = (tracked) => {
   if (
-    ![1, 2].includes(tracked?.schemaVersion)
+    ![1, 2, 3].includes(tracked?.schemaVersion)
     || tracked.acceptance?.databaseIdentity !== acceptanceDatabaseIdentity
   ) {
     throw new Error('Existing toolchain lock has an unsupported trust policy');
@@ -429,7 +429,7 @@ export const generateToolchainLock = (root = defaultRoot) => {
   assertRegularFile(jestCliPath, 'Jest CLI');
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     packageLockSha256: sha256File(packageLockPath),
     nodeModulesTreeSha256: hashDependencyTree(
       nodeModulesPath,

@@ -23,6 +23,8 @@ export const sha256File = (filePath) => {
   return hash.digest('hex');
 };
 
+const sha256Bytes = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
+
 const updateFrame = (hash, recordType, fields) => {
   hash.update(Buffer.from([recordType]));
   for (const value of fields) {
@@ -49,6 +51,110 @@ const canonicalDirectory = (directory, label) => {
 
 const generatedWorkspaceNames = new Set(['.artifacts', '.cache', '.next', 'coverage']);
 const generatedWorkspacePrefixes = ['.next-e2e-'];
+const nonReproducibleNativeOutputPaths = [
+  path.join('node_modules', 'cpu-features', 'build'),
+  path.join('node_modules', 'ssh2', 'lib', 'protocol', 'crypto', 'build'),
+];
+const normalizedPrismaClientPaths = new Set([
+  path.join('.prisma', 'client', 'edge.js'),
+  path.join('.prisma', 'client', 'index.js'),
+]);
+
+const countBufferOccurrences = (source, needle) => {
+  let count = 0;
+  let offset = 0;
+  while (offset <= source.length - needle.length) {
+    const index = source.indexOf(needle, offset);
+    if (index === -1) break;
+    count += 1;
+    offset = index + needle.length;
+  }
+  return count;
+};
+
+const replacePrismaMetadataValue = (
+  source,
+  {
+    expectedValue,
+    fieldMarker,
+    label,
+    prefix,
+    suffix,
+    token,
+  },
+) => {
+  const markerBytes = Buffer.from(fieldMarker);
+  const prefixBytes = Buffer.from(prefix);
+  const suffixBytes = Buffer.from(suffix);
+  if (
+    countBufferOccurrences(source, markerBytes) !== 1
+    || countBufferOccurrences(source, prefixBytes) !== 1
+  ) {
+    throw new Error(`Prisma generated metadata must contain exactly one ${label}`);
+  }
+
+  const prefixIndex = source.indexOf(prefixBytes);
+  const valueStart = prefixIndex + prefixBytes.length;
+  const expectedBytes = Buffer.from(JSON.stringify(expectedValue));
+  const valueEnd = valueStart + expectedBytes.length;
+  if (
+    !source.subarray(valueStart, valueEnd).equals(expectedBytes)
+    || !source.subarray(valueEnd, valueEnd + suffixBytes.length).equals(suffixBytes)
+  ) {
+    throw new Error(`Prisma generated metadata has an unexpected ${label}`);
+  }
+
+  return Buffer.concat([
+    source.subarray(0, valueStart),
+    Buffer.from(JSON.stringify(token)),
+    source.subarray(valueEnd),
+  ]);
+};
+
+const normalizePrismaGeneratedMetadata = (filePath, repositoryRoot) => {
+  const outputPath = path.join(repositoryRoot, 'node_modules', '@prisma', 'client');
+  const schemaPath = path.join(repositoryRoot, 'apps', 'api', 'prisma', 'schema.prisma');
+  const encodedRoot = Buffer.from(JSON.stringify(repositoryRoot).slice(1, -1));
+  let source = fs.readFileSync(filePath);
+  if (countBufferOccurrences(source, encodedRoot) !== 2) {
+    throw new Error('Prisma generated metadata must contain exactly two canonical repository roots');
+  }
+  source = replacePrismaMetadataValue(source, {
+    expectedValue: outputPath,
+    fieldMarker: '"output":',
+    label: 'client output field',
+    prefix: '"output": {\n      "value": ',
+    suffix: ',\n      "fromEnvVar": null\n    },',
+    token: '<ALISTORE_PRISMA_CLIENT_OUTPUT>',
+  });
+  source = replacePrismaMetadataValue(source, {
+    expectedValue: schemaPath,
+    fieldMarker: '"sourceFilePath":',
+    label: 'schema source field',
+    prefix: '"previewFeatures": [],\n    "sourceFilePath": ',
+    suffix: '\n  },',
+    token: '<ALISTORE_PRISMA_SCHEMA_SOURCE>',
+  });
+  if (countBufferOccurrences(source, encodedRoot) !== 0) {
+    throw new Error('Prisma generated metadata contains an unapproved canonical repository root');
+  }
+  return source;
+};
+
+const assertNoNativeLifecycleOutputs = (repositoryRoot) => {
+  for (const relativePath of nonReproducibleNativeOutputPaths) {
+    const outputPath = path.join(repositoryRoot, relativePath);
+    try {
+      fs.lstatSync(outputPath);
+    } catch (error) {
+      if (error?.code === 'ENOENT') continue;
+      throw error;
+    }
+    throw new Error(
+      `Native dependency lifecycle output must be absent before trust verification: ${outputPath}`,
+    );
+  }
+};
 
 const assertNoWorkspaceGeneratedOutputs = (repositoryRoot) => {
   for (const workspace of ['apps/api', 'apps/web']) {
@@ -68,24 +174,31 @@ export const trustedWorkspaceSymlinkOptions = (
   repositoryRoot,
   { allowGeneratedOutputs = false } = {},
 ) => {
-  if (!allowGeneratedOutputs) assertNoWorkspaceGeneratedOutputs(repositoryRoot);
+  const canonicalRoot = canonicalDirectory(repositoryRoot, 'Repository root');
+  if (!allowGeneratedOutputs) assertNoWorkspaceGeneratedOutputs(canonicalRoot);
+  assertNoNativeLifecycleOutputs(canonicalRoot);
   const ignoredPaths = allowGeneratedOutputs ? [...generatedWorkspaceNames] : [];
   const ignoredPathPrefixes = allowGeneratedOutputs ? generatedWorkspacePrefixes : [];
   return {
     externalSymlinks: new Map([
-    ['@alistore/api', {
-      expectedPath: path.join(repositoryRoot, 'apps', 'api'),
-      identity: 'workspace:apps/api',
-      ignoredPaths,
-      ignoredPathPrefixes,
-    }],
-    ['@alistore/web', {
-      expectedPath: path.join(repositoryRoot, 'apps', 'web'),
-      identity: 'workspace:apps/web',
-      ignoredPaths,
-      ignoredPathPrefixes,
-    }],
+      ['@alistore/api', {
+        expectedPath: path.join(canonicalRoot, 'apps', 'api'),
+        identity: 'workspace:apps/api',
+        ignoredPaths,
+        ignoredPathPrefixes,
+      }],
+      ['@alistore/web', {
+        expectedPath: path.join(canonicalRoot, 'apps', 'web'),
+        identity: 'workspace:apps/web',
+        ignoredPaths,
+        ignoredPathPrefixes,
+      }],
     ]),
+    normalizeFileContent: (filePath, relativePath) => (
+      normalizedPrismaClientPaths.has(relativePath)
+        ? normalizePrismaGeneratedMetadata(filePath, canonicalRoot)
+        : undefined
+    ),
   };
 };
 
@@ -107,8 +220,9 @@ export const hashDependencyTree = (directory, options = {}) => {
   const ignoredPaths = new Set(options.ignoredPaths ?? []);
   const ignoredPathPrefixes = options.ignoredPathPrefixes ?? [];
   const externalSymlinks = options.externalSymlinks ?? new Map();
+  const normalizeFileContent = options.normalizeFileContent;
   const hash = crypto.createHash('sha256');
-  hash.update('alistore-dependency-tree-v2\0');
+  hash.update('alistore-dependency-tree-v3\0');
 
   const isIgnoredRelativePath = (relativePath) => {
     const parts = relativePath.split(path.sep);
@@ -182,7 +296,14 @@ export const hashDependencyTree = (directory, options = {}) => {
         updateFrame(hash, 2, [relativePath]);
         visit(entryPath, relativePath);
       } else if (entry.isFile()) {
-        updateFrame(hash, 1, [relativePath, sha256File(entryPath)]);
+        const normalized = normalizeFileContent?.(entryPath, relativePath);
+        if (normalized !== undefined && !Buffer.isBuffer(normalized)) {
+          throw new Error('Dependency-tree file normalizer must return a Buffer or undefined');
+        }
+        updateFrame(hash, 1, [
+          relativePath,
+          normalized === undefined ? sha256File(entryPath) : sha256Bytes(normalized),
+        ]);
       } else {
         throw new Error(`Unsupported dependency-tree entry: ${entryPath}`);
       }

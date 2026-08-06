@@ -116,7 +116,7 @@ export const resolveTrustedNpm = (
   const browserAppTreeSha256 = hashDependencyTree(browserAppRoot);
   const acceptanceDatabaseIdentity = toolchainLock.acceptance?.databaseIdentity;
   if (
-    toolchainLock.schemaVersion !== 2 ||
+    toolchainLock.schemaVersion !== 3 ||
     toolchainLock.packageLockSha256 !== packageLockSha256 ||
     toolchainLock.nodeModulesTreeSha256 !== nodeModulesTreeSha256 ||
     toolchainLock.runtime?.platform !== process.platform ||

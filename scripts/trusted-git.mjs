@@ -94,7 +94,7 @@ export const resolveTrustedGit = (root) => {
   };
 
   if (
-    lock.schemaVersion !== 1 ||
+    lock.schemaVersion !== 3 ||
     lock.runtime?.gitPath !== executablePath ||
     lock.runtime?.gitSha256 !== executableSha256 ||
     commonDirectory !== trustedCommonDirectory

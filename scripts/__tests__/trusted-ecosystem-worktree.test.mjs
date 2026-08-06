@@ -77,7 +77,7 @@ const createRepository = (t) => {
   git(mainRoot, ['init', '--initial-branch=main']);
 
   write(mainRoot, 'scripts/ecosystem-toolchain-lock.json', `${JSON.stringify({
-    schemaVersion: 1,
+    schemaVersion: 3,
     runtime: {
       gitPath: systemGit,
       gitSha256: systemGitSha256,
