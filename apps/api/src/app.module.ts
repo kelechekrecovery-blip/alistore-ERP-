@@ -59,6 +59,7 @@ import { RefundsModule } from './refunds/refunds.module';
 import { StoreOperationsModule } from './store-operations/store-operations.module';
 import { CameraGatewayModule } from './camera-gateway/camera-gateway.module';
 import { resolveRuntimeEnvFiles } from './config/runtime-env-files';
+import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 
 @Module({
   imports: [
@@ -115,6 +116,7 @@ import { resolveRuntimeEnvFiles } from './config/runtime-env-files';
     FinanceModule,
     StaffTasksModule,
     SettingsModule,
+    FeatureFlagsModule,
     HrModule,
     LogisticsModule,
     ServiceCenterModule,

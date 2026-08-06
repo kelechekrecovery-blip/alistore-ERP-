@@ -247,6 +247,7 @@ export const EventType = {
 
   // settings — owner-editable business parameters (was: TypeScript constants)
   SettingChanged: 'settings.changed',
+  FeatureFlagChanged: 'feature_flag.changed',
   HrScheduleCreated: 'hr.schedule_created',
   HrScheduleUpdated: 'hr.schedule_updated',
   HrScheduleCancelled: 'hr.schedule_cancelled',

@@ -3923,3 +3923,19 @@ model Setting {
 
   @@index([updatedAt])
 }
+
+/// Audited, allowlisted server feature-flag overrides.
+///
+/// No row means deployment policy remains in control: readers fall back to the
+/// corresponding legacy environment alias and then to the registry's safe
+/// disabled default. Keys are validated by FeatureFlagsService before writes.
+model FeatureFlagOverride {
+  key       String   @id
+  enabled   Boolean
+  reason    String
+  updatedBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}
