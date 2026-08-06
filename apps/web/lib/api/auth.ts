@@ -46,6 +46,15 @@ export function authMethods(): Promise<AuthMethodsView> {
   return getPublicJson('/auth/methods');
 }
 
+/**
+ * `phone.enabled` may be true only for a fixed App Review login. New accounts
+ * and phone attachment require an OTP channel that accepts arbitrary numbers,
+ * which the API exposes separately as `phone.registers`.
+ */
+export function supportsPhoneRegistration(methods: AuthMethodsView | null): boolean {
+  return methods?.phone.registers === true;
+}
+
 export interface AuthUser {
   customerId: string;
   phone: string | null;

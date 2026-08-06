@@ -6,7 +6,7 @@ import { useT } from '@/lib/i18n/locale';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { authMethods, type AuthMethodsView } from '@/lib/api/auth';
+import { authMethods, supportsPhoneRegistration, type AuthMethodsView } from '@/lib/api/auth';
 import { telegramWidgetInitData } from '@/lib/telegram-widget';
 import { describeAuthError } from '@/lib/auth-errors';
 import { SiteHeader } from '@/components/SiteHeader';
@@ -182,6 +182,7 @@ function LoginForm() {
   // Пока ответа нет — форма телефона на месте: мигать заглушкой на каждой
   // загрузке хуже, чем на секунду показать основной путь.
   const phoneLoginEnabled = methods?.phone.enabled ?? true;
+  const phoneRegistrationEnabled = supportsPhoneRegistration(methods);
   // API-wide `enabled` may describe a native-only method. The website needs
   // the public Apple Services ID or Telegram Mini App/widget material too.
   const webLoginAvailable = phoneLoginEnabled
@@ -550,7 +551,7 @@ function LoginForm() {
      * уже ПОСЛЕ успешного входа у провайдера. Сервер знает это заранее и
      * присылает `registers: false` — говорим прямо, вместо тупика.
      */
-    if (!phoneLoginEnabled) {
+    if (!phoneRegistrationEnabled) {
       setError(
         `Вход через ${provider === 'apple' ? 'Apple' : provider === 'google' ? 'Google' : 'Telegram'} сейчас доступен только тем, `
         + 'кто уже привязал номер телефона: первая привязка требует кода по SMS, а его отправка не работает.',

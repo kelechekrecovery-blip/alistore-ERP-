@@ -70,6 +70,37 @@ test('customer attaches an email in settings, then signs back in with it', async
   await expect(page.getByText(email, { exact: true })).toBeVisible();
 });
 
+test('review-only phone login never exposes phone attachment without a registration channel', async ({ page }) => {
+  await resetDb();
+  const customer = await prisma.customer.create({ data: { phone: null, name: 'Social customer' } });
+  const accessToken = sign(
+    { sub: customer.id, phone: null, typ: 'customer' },
+    'dev-secret-alistore-local',
+    { expiresIn: '1h' },
+  );
+  await page.addInitScript((token) => {
+    localStorage.setItem('alistore.auth.v1', JSON.stringify({ accessToken: token }));
+  }, accessToken);
+  await page.route('**/api/auth/methods', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      phone: { enabled: true, registers: false },
+      email: { enabled: true, registers: false },
+      telegram: { enabled: false, registers: false, botUsername: null },
+      apple: { enabled: true, registers: true, clientId: 'kg.alistore.web', redirectUri: 'https://ali.kg/login' },
+      google: { enabled: true, registers: true, clientId: 'google-client' },
+      recovery: { enabled: false },
+      anyLoginAvailable: true,
+      registrationAvailable: true,
+    }),
+  }));
+
+  await page.goto('/account/settings');
+  await expect(page.getByText(/Подтверждение телефона сейчас недоступно/)).toBeVisible();
+  await expect(page.getByLabel('Телефон для привязки')).toHaveCount(0);
+});
+
 test('an unattached email cannot be used to sign in', async ({ page }) => {
   await resetDb();
   await page.goto('/login');

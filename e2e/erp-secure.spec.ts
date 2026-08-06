@@ -1,5 +1,31 @@
 import { expect, test } from '@playwright/test';
-import { resetDb, seedStaffCredentials } from './helpers';
+import { TotpService } from '../apps/api/src/auth/totp.service';
+import { prisma, resetDb, seedStaffCredentials } from './helpers';
+
+test('ERP web login accepts TOTP and remains retryable after the MFA challenge', async ({ page }) => {
+  await resetDb();
+  const credentials = await seedStaffCredentials('owner', 'e2e-erp-mfa');
+  const totp = new TotpService();
+  const secret = totp.generateSecret();
+  await prisma.staffUser.update({
+    where: { id: credentials.staffId },
+    data: { totpEnabled: true, totpSecret: secret },
+  });
+
+  await page.goto('/erp');
+  await page.getByPlaceholder('username').fill(credentials.username);
+  await page.getByPlaceholder('password').fill(credentials.password);
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await expect(page.getByText('Нужен код двухфакторной аутентификации')).toBeVisible();
+
+  await page.getByPlaceholder('Код 2FA, если включён').fill(
+    // The service and login verifier intentionally share the same RFC 6238
+    // implementation; this journey verifies the browser transports its code.
+    (await import('../apps/api/node_modules/otplib/index.js')).authenticator.generate(secret),
+  );
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await expect(page.getByText('AliStore ERP').first()).toBeVisible();
+});
 
 test('ERP loads protected reports and AI with a staff session', async ({ page, request }) => {
   await resetDb();

@@ -44,11 +44,12 @@ export function StaffSessionLogin({
     const values = new FormData(e.currentTarget as HTMLFormElement);
     const username = String(values.get('username') ?? '').trim();
     const password = String(values.get('password') ?? '');
+    const totp = String(values.get('totp') ?? '').trim();
     const point = String(values.get('point') ?? '');
     try {
       const session = needsBootstrap
         ? await staffBootstrapOwner(username, password, point)
-        : await staffLogin(username, password);
+        : await staffLogin(username, password, totp);
       saveStaffSession(session);
       onAuthenticated(session);
     } catch (err) {
@@ -111,6 +112,20 @@ export function StaffSessionLogin({
             : 'mt-3 w-full rounded-btn border border-ink/15 px-4 py-3 text-sm outline-none focus:border-ink/40'
         }
       />
+      {!needsBootstrap && (
+        <input
+          name="totp"
+          placeholder="Код 2FA, если включён"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={16}
+          className={
+            dark
+              ? 'mt-3 w-full rounded-[11px] border border-surface-3 bg-ink-dark px-4 py-3 text-sm text-white outline-none placeholder:text-faint focus:border-lime'
+              : 'mt-3 w-full rounded-btn border border-ink/15 px-4 py-3 text-sm outline-none focus:border-ink/40'
+          }
+        />
+      )}
       {error && <div className={dark ? 'mt-3 text-sm text-danger-soft' : 'mt-3 text-sm text-danger'}>{error}</div>}
       <button
         type="submit"
