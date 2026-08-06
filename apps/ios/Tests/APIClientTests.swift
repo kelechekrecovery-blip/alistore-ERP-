@@ -67,6 +67,51 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(store.session?.refreshToken, fixture.refreshToken)
     }
 
+    @MainActor
+    func testStaffRefreshClearsSessionForTerminalUnprocessableCodes() async throws {
+        for code in [
+            "staff_refresh_invalid",
+            "staff_refresh_reused",
+            "staff_inactive",
+            "staff_session_revoked",
+            "staff_role_revoked",
+        ] {
+            let started = expectation(description: "terminal refresh attempted: \(code)")
+            StaffAuthTestURLProtocol.reset(
+                refreshStarted: started,
+                suspendRefresh: false,
+                refreshStatus: 422,
+                refreshBody: #"{"code":"\#(code)","message":"terminal"}"#
+            )
+            let store = makeStaffAuthStore()
+            let fixture = staffFixture()
+
+            await store.restoreTestSession(fixture)
+            await fulfillment(of: [started], timeout: 2)
+
+            XCTAssertNil(store.session, "\(code) must clear the local staff session")
+        }
+    }
+
+    @MainActor
+    func testStaffRefreshKeepsSessionForNonterminalUnprocessableCode() async throws {
+        let started = expectation(description: "nonterminal refresh attempted")
+        StaffAuthTestURLProtocol.reset(
+            refreshStarted: started,
+            suspendRefresh: false,
+            refreshStatus: 422,
+            refreshBody: #"{"code":"staff_refresh_throttled","message":"retry later"}"#
+        )
+        let store = makeStaffAuthStore()
+        let fixture = staffFixture()
+
+        await store.restoreTestSession(fixture)
+        await fulfillment(of: [started], timeout: 2)
+
+        XCTAssertEqual(store.session?.accessToken, fixture.accessToken)
+        XCTAssertEqual(store.session?.refreshToken, fixture.refreshToken)
+    }
+
     func testStaffLoginContractCarriesOptionalTOTP() throws {
         let withoutTOTP = try JSONSerialization.jsonObject(
             with: JSONEncoder().encode(StaffLogin(username: "seller", password: "secret"))
@@ -373,6 +418,25 @@ final class APIClientTests: XCTestCase {
             XCTFail("Expected API rejection")
         } catch let error as APIError {
             XCTAssertEqual(error.errorDescription, "IMEI уже продан")
+        }
+    }
+
+    func testPreservesServerErrorCode() async throws {
+        let session = makeSession(
+            status: 422,
+            body: #"{"statusCode":422,"code":"staff_refresh_reused","message":"Войдите заново"}"#
+        )
+        let client = APIClient(baseURL: URL(string: "https://api.example.test/api")!, session: session)
+
+        do {
+            let _: CatalogResponse = try await client.get("catalog/products")
+            XCTFail("Expected API rejection")
+        } catch let APIError.rejected(status, message, code) {
+            XCTAssertEqual(status, 422)
+            XCTAssertEqual(message, "Войдите заново")
+            XCTAssertEqual(code, "staff_refresh_reused")
+        } catch {
+            XCTFail("Expected APIError.rejected, got \(error)")
         }
     }
 

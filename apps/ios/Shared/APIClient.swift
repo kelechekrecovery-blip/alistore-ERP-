@@ -2,7 +2,7 @@ import Foundation
 
 public enum APIError: Error, LocalizedError, Sendable {
     case invalidResponse
-    case rejected(status: Int, message: String)
+    case rejected(status: Int, message: String, code: String? = nil)
     case decoding(String)
 
     /// Сервер сказал «нет такой сущности», а не «что-то пошло не так».
@@ -11,15 +11,21 @@ public enum APIError: Error, LocalizedError, Sendable {
     /// «клиент не найден» отправляет оператора заводить карточку, и на обрыве
     /// связи он заведёт дубликат тому, у кого она есть.
     public var isNotFound: Bool {
-        if case let .rejected(status, _) = self { return status == 404 }
+        if case let .rejected(status, _, _) = self { return status == 404 }
         return false
+    }
+
+    /// Stable backend domain code, when the JSON error payload provides one.
+    public var code: String? {
+        if case let .rejected(_, _, code) = self { return code }
+        return nil
     }
 
     public var errorDescription: String? {
         switch self {
         case .invalidResponse:
             return "Сервер вернул некорректный ответ"
-        case let .rejected(_, message):
+        case let .rejected(_, message, _):
             return message
         case let .decoding(message):
             return "Не удалось прочитать ответ: \(message)"
@@ -127,7 +133,11 @@ public actor APIClient {
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
             let payload = try? JSONDecoder().decode(ErrorPayload.self, from: data)
-            throw APIError.rejected(status: http.statusCode, message: payload?.message ?? "Ошибка сервера \(http.statusCode)")
+            throw APIError.rejected(
+                status: http.statusCode,
+                message: payload?.message ?? "Ошибка сервера \(http.statusCode)",
+                code: payload?.code
+            )
         }
         return data
     }
@@ -217,7 +227,11 @@ public actor APIClient {
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
             let payload = try? JSONDecoder().decode(ErrorPayload.self, from: data)
-            throw APIError.rejected(status: http.statusCode, message: payload?.message ?? "Ошибка сервера \(http.statusCode)")
+            throw APIError.rejected(
+                status: http.statusCode,
+                message: payload?.message ?? "Ошибка сервера \(http.statusCode)",
+                code: payload?.code
+            )
         }
         do {
             return try decoder.decode(EvidenceAttachment.self, from: data)
@@ -281,7 +295,11 @@ public actor APIClient {
                 }
             }
             let payload = try? JSONDecoder().decode(ErrorPayload.self, from: data)
-            throw APIError.rejected(status: http.statusCode, message: payload?.message ?? "Ошибка сервера \(http.statusCode)")
+            throw APIError.rejected(
+                status: http.statusCode,
+                message: payload?.message ?? "Ошибка сервера \(http.statusCode)",
+                code: payload?.code
+            )
         }
         if Response.self == EmptyResponse.self, data.isEmpty {
             guard let emptyResponse = EmptyResponse() as? Response else {
@@ -307,9 +325,11 @@ private struct EmptyResponse: Decodable, Sendable {}
 /// пользователь не узнавал, какое поле сервер не принял.
 private struct ErrorPayload: Decodable {
     let message: String
+    let code: String?
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        code = try? container.decode(String.self, forKey: .code)
         if let single = try? container.decode(String.self, forKey: .message), !single.isEmpty {
             message = single
             return
@@ -328,6 +348,6 @@ private struct ErrorPayload: Decodable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case message
+        case message, code
     }
 }

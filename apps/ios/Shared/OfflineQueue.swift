@@ -126,7 +126,7 @@ public enum OfflineOrderQueue {
             context.delete(mutation)
             try context.save()
         } catch let error as APIError {
-            if case let .rejected(status, message) = error {
+            if case let .rejected(status, message, _) = error {
                 mutation.state = status == 409 || status == 422 ? "conflict" : "failed"
                 mutation.lastError = message
             } else {
@@ -236,7 +236,7 @@ public enum OfflineCourierQueue {
             context.delete(mutation)
             try context.save()
         } catch let error as APIError {
-            if case let .rejected(status, message) = error {
+            if case let .rejected(status, message, _) = error {
                 mutation.state = status == 409 || status == 422 ? "conflict" : "failed"
                 mutation.lastError = message
             } else {
@@ -397,7 +397,7 @@ public enum OfflinePOSQueue {
             }
             try context.save()
         } catch let error as APIError {
-            if case let .rejected(status, message) = error {
+            if case let .rejected(status, message, _) = error {
                 mutation.state = status == 409 || status == 422 ? "conflict" : "failed"
                 mutation.lastError = message
             } else {
