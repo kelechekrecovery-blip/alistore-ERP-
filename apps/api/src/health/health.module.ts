@@ -4,6 +4,7 @@ import { TerminusModule } from '@nestjs/terminus';
 import { HealthController } from './health.controller';
 import { AuthzModule } from '../authz/authz.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
+import { WorkerRuntimeHeartbeatService } from './worker-runtime-heartbeat.service';
 
 /**
  * Health checks (@nestjs/terminus): GET /health readiness (DB ping + heap),
@@ -14,5 +15,6 @@ import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 @Module({
   imports: [ConfigModule, TerminusModule, StaffAuthModule, AuthzModule],
   controllers: [HealthController],
+  providers: [WorkerRuntimeHeartbeatService],
 })
 export class HealthModule {}

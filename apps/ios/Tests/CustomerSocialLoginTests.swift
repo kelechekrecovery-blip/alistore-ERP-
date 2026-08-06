@@ -2,6 +2,22 @@ import AliStoreCore
 import Foundation
 import XCTest
 
+private actor StartupCleanupGate {
+    private var isOpen = false
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        if isOpen { return }
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func open() {
+        isOpen = true
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
 /// Контракт нативного социального входа со стороны клиента.
 ///
 /// Проверяем отправленный запрос, а не установленную сессию: под
@@ -9,7 +25,156 @@ import XCTest
 /// содержимое запроса — сервер сверяет `nonce` из тела с тем, что Apple положила
 /// в токен, и любое расхождение даёт «nonce mismatch» уже на проде.
 @MainActor
+// swiftlint:disable:next type_body_length
 final class CustomerSocialLoginTests: XCTestCase {
+    func testBackgroundProviderCleanupDoesNotBlockStartup() async {
+        let cleanupStarted = expectation(description: "cleanup started")
+        let cleanupFinished = expectation(description: "cleanup finished")
+        let gate = StartupCleanupGate()
+
+        BackgroundStartupWork.launch {
+            cleanupStarted.fulfill()
+            await gate.wait()
+            cleanupFinished.fulfill()
+        }
+
+        await fulfillment(of: [cleanupStarted], timeout: 1)
+        // Reaching this line while the cleanup is still parked on `gate`
+        // proves launch returned instead of joining provider work.
+        await gate.open()
+        await fulfillment(of: [cleanupFinished], timeout: 1)
+    }
+
+    func testOrdinaryLogoutSignsOutWithoutDisconnectingProviderGrant() {
+        var signOutCalls = 0
+        let disconnectCalls = 0
+
+        SocialIdentitySessionCleanup.logout {
+            signOutCalls += 1
+        }
+
+        XCTAssertEqual(signOutCalls, 1)
+        XCTAssertEqual(disconnectCalls, 0)
+    }
+
+    func testSuccessfulAccountDeletionDisconnectsAfterServerDelete() async {
+        var events: [String] = []
+
+        let result = await SocialIdentitySessionCleanup.deleteAccount(
+            deleting: {
+                events.append("delete")
+                return "deleted"
+            },
+            didDelete: {
+                events.append("pending")
+            },
+            disconnect: { completion in
+                events.append("disconnect")
+                completion(nil)
+            }
+        )
+
+        XCTAssertEqual(result.response, "deleted")
+        XCTAssertNil(result.providerDisconnectError)
+        XCTAssertEqual(events, ["delete", "pending", "disconnect"])
+    }
+
+    func testAccountDeletionPersistsRetryIntentBeforeProviderCallbackStarts() async {
+        var retryIntentPersisted = false
+
+        let result = await SocialIdentitySessionCleanup.deleteAccount(
+            deleting: { "deleted" },
+            didDelete: { retryIntentPersisted = true },
+            disconnectAttempts: 1,
+            disconnect: { completion in
+                // This is the termination-safe boundary: even if the process
+                // dies after the SDK call starts, durable retry intent already
+                // exists and is available to the next launch.
+                XCTAssertTrue(retryIntentPersisted)
+                completion(NSError(domain: "GoogleSignIn", code: -1))
+            }
+        )
+
+        XCTAssertTrue(retryIntentPersisted)
+        XCTAssertNotNil(result.providerDisconnectError)
+    }
+
+    func testAccountDeletionReportsProviderDisconnectFailureForRetry() async {
+        var disconnectCalls = 0
+
+        let result = await SocialIdentitySessionCleanup.deleteAccount(
+            deleting: { "deleted" },
+            disconnectAttempts: 1,
+            disconnect: { completion in
+                disconnectCalls += 1
+                completion(NSError(domain: "GoogleSignIn", code: -1))
+            }
+        )
+
+        XCTAssertEqual(result.response, "deleted")
+        XCTAssertNotNil(result.providerDisconnectError)
+        XCTAssertEqual(disconnectCalls, 1)
+    }
+
+    func testProviderDisconnectCallbackHasBoundedTimeout() async {
+        let startedAt = Date()
+
+        let error = await SocialIdentitySessionCleanup.disconnectWithRetry(
+            attempts: 1,
+            callbackTimeout: 0.1,
+            disconnect: { _ in
+                // Simulates SDK/process behavior where the callback is never
+                // delivered. The cleanup path must still release its waiter.
+            }
+        )
+
+        XCTAssertEqual((error as? URLError)?.code, .timedOut)
+        XCTAssertLessThan(Date().timeIntervalSince(startedAt), 1)
+    }
+
+    func testProviderCleanupNeverMatchesAnUnrelatedCurrentSubject() {
+        let previous = ProviderSubjectCleanupPolicy.fingerprint(subject: "previously-deleted-google-subject")
+        let authoritative = ProviderSubjectCleanupPolicy.fingerprint(subject: "authoritative-deleted-google-subject")
+        let pending = ProviderSubjectCleanupPolicy.merging(
+            pending: [previous],
+            deletedFingerprints: [authoritative, "", "not-a-fingerprint"]
+        )
+
+        XCTAssertFalse(
+            ProviderSubjectCleanupPolicy.canDisconnect(
+                currentSubject: "unrelated-current-google-subject",
+                pending: pending
+            )
+        )
+        XCTAssertTrue(
+            ProviderSubjectCleanupPolicy.canDisconnect(
+                currentSubject: "authoritative-deleted-google-subject",
+                pending: pending
+            )
+        )
+        XCTAssertEqual(
+            ProviderSubjectCleanupPolicy.remaining(
+                afterDisconnecting: "authoritative-deleted-google-subject",
+                pending: pending
+            ),
+            [previous]
+        )
+    }
+
+    func testFailedServerDeletionKeepsProviderSessionConnected() async {
+        var disconnectCalls = 0
+
+        do {
+            let _: SocialIdentitySessionCleanup.Result<String> = try await SocialIdentitySessionCleanup.deleteAccount(
+                deleting: { throw URLError(.notConnectedToInternet) },
+                disconnect: { _ in disconnectCalls += 1 }
+            )
+            XCTFail("Expected delete failure")
+        } catch {
+            XCTAssertEqual(disconnectCalls, 0)
+        }
+    }
+
     override func setUp() {
         super.setUp()
         SocialLoginMockURLProtocol.reset()
@@ -203,8 +368,13 @@ final class CustomerSocialLoginTests: XCTestCase {
         {"customerId":"google-customer","phone":"+996700123456","typ":"customer"}
         """)
         let store = makeStore()
+        await prepareGoogle(store)
 
-        await store.signInWithGoogle(identityToken: "google.id.token", nonce: "raw-google-nonce")
+        await store.signInWithGoogle(
+            identityToken: "google.id.token",
+            nonce: "raw-google-nonce",
+            serverClientID: googleServerClientID
+        )
 
         let request = SocialLoginMockURLProtocol.request(for: "/api/auth/v2/social/google")
         XCTAssertEqual(request?.httpMethod, "POST")
@@ -229,8 +399,13 @@ final class CustomerSocialLoginTests: XCTestCase {
         {"customerId":"google-new-customer","phone":"+996700123456","typ":"customer"}
         """)
         let store = makeStore()
+        await prepareGoogle(store)
 
-        await store.signInWithGoogle(identityToken: "google-new-token", nonce: "raw-nonce")
+        await store.signInWithGoogle(
+            identityToken: "google-new-token",
+            nonce: "raw-nonce",
+            serverClientID: googleServerClientID
+        )
         XCTAssertEqual(store.socialEnrollmentProvider, .google)
         XCTAssertTrue(store.requiresSocialPhoneEnrollment)
         XCTAssertTrue(store.requiresGooglePhoneEnrollment)
@@ -255,8 +430,13 @@ final class CustomerSocialLoginTests: XCTestCase {
         {"message":"Неверный код"}
         """)
         let store = makeStore()
+        await prepareGoogle(store)
 
-        await store.signInWithGoogle(identityToken: "google-token", nonce: "raw-nonce")
+        await store.signInWithGoogle(
+            identityToken: "google-token",
+            nonce: "raw-nonce",
+            serverClientID: googleServerClientID
+        )
         await store.completeSocialEnrollment(phone: "+996700123456", code: "000000")
         XCTAssertEqual(store.socialEnrollmentProvider, .google)
         XCTAssertNotNil(store.errorMessage)
@@ -271,7 +451,12 @@ final class CustomerSocialLoginTests: XCTestCase {
         XCTAssertEqual(store.session?.customerId, "retry-customer")
 
         let cancelStore = makeStore()
-        await cancelStore.signInWithGoogle(identityToken: "google-token-2", nonce: "raw-nonce-2")
+        await prepareGoogle(cancelStore)
+        await cancelStore.signInWithGoogle(
+            identityToken: "google-token-2",
+            nonce: "raw-nonce-2",
+            serverClientID: googleServerClientID
+        )
         cancelStore.cancelSocialEnrollment()
         XCTAssertNil(cancelStore.socialEnrollmentProvider)
         await cancelStore.completeSocialEnrollment(phone: "+996700123456", code: "123456")
@@ -284,9 +469,18 @@ final class CustomerSocialLoginTests: XCTestCase {
 
     func testGoogleEmptyTokenOrNonceDoesNotUseNetwork() async {
         let store = makeStore()
+        await prepareGoogle(store)
 
-        await store.signInWithGoogle(identityToken: "", nonce: "raw-nonce")
-        await store.signInWithGoogle(identityToken: "google-token", nonce: "   ")
+        await store.signInWithGoogle(
+            identityToken: "",
+            nonce: "raw-nonce",
+            serverClientID: googleServerClientID
+        )
+        await store.signInWithGoogle(
+            identityToken: "google-token",
+            nonce: "   ",
+            serverClientID: googleServerClientID
+        )
 
         XCTAssertEqual(SocialLoginMockURLProtocol.requestCount(for: "/api/auth/v2/social/google"), 0)
         XCTAssertNotNil(store.errorMessage)
@@ -300,6 +494,7 @@ final class CustomerSocialLoginTests: XCTestCase {
         {"status":"enrollment_required","enrollmentToken":"google-enrollment-token-1234567890","expiresIn":300}
         """)
         let store = makeStore()
+        await prepareGoogle(store)
 
         await store.signInWithApple(
             identityToken: "apple-token",
@@ -308,12 +503,31 @@ final class CustomerSocialLoginTests: XCTestCase {
             name: nil
         )
         XCTAssertEqual(store.socialEnrollmentProvider, .apple)
-        await store.signInWithGoogle(identityToken: "google-token", nonce: "google-nonce")
+        await store.signInWithGoogle(
+            identityToken: "google-token",
+            nonce: "google-nonce",
+            serverClientID: googleServerClientID
+        )
 
         XCTAssertEqual(store.socialEnrollmentProvider, .google)
         XCTAssertTrue(store.requiresGooglePhoneEnrollment)
         XCTAssertNil(store.appleEnrollmentExpiresAt)
         XCTAssertNotNil(store.googleEnrollmentExpiresAt)
+    }
+
+    func testGoogleClientIDMismatchFailsClosedBeforeSDKTokenExchange() async {
+        let store = makeStore()
+        await prepareGoogle(store, advertisedClientID: "different-client.apps.googleusercontent.com")
+
+        XCTAssertFalse(store.isGoogleSignInEnabled(serverClientID: googleServerClientID))
+        await store.signInWithGoogle(
+            identityToken: "google-token",
+            nonce: "google-nonce",
+            serverClientID: googleServerClientID
+        )
+
+        XCTAssertEqual(SocialLoginMockURLProtocol.requestCount(for: "/api/auth/v2/social/google"), 0)
+        XCTAssertNotNil(store.errorMessage)
     }
 
     func testAuthMethodsLoadsServerAuthoritativeMixedAvailability() async {
@@ -344,6 +558,102 @@ final class CustomerSocialLoginTests: XCTestCase {
         XCTAssertTrue(methods.anyLoginAvailable)
         XCTAssertFalse(methods.registrationAvailable)
         XCTAssertEqual(SocialLoginMockURLProtocol.request(for: "/api/auth/methods")?.httpMethod, "GET")
+    }
+
+    func testRecoveryRequestPostsPhoneOnlyWhenServerEnablesCapability() async {
+        stubAuthMethods(recoveryEnabled: true)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/recovery/request", status: 201, body: """
+        {"challengeId":"recovery-challenge-1","devCode":"123456"}
+        """)
+        let store = makeStore()
+        await store.loadAuthMethods()
+
+        let issued = await store.requestRecoveryOTP(phone: "+996700123456")
+
+        XCTAssertTrue(issued)
+        XCTAssertEqual(store.recoveryChallengeId, "recovery-challenge-1")
+        XCTAssertEqual(store.devCode, "123456")
+        let request = SocialLoginMockURLProtocol.request(for: "/api/auth/recovery/request")
+        XCTAssertEqual(request?.httpMethod, "POST")
+        XCTAssertEqual(
+            SocialLoginMockURLProtocol.jsonBody(for: "/api/auth/recovery/request")?["phone"],
+            "+996700123456"
+        )
+    }
+
+    func testRecoveryVerifyPostsChallengeAndBuildsSessionThroughAuthMe() async {
+        stubAuthMethods(recoveryEnabled: true)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/recovery/request", status: 201, body: """
+        {"challengeId":"recovery-challenge-2"}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/recovery/verify", status: 200, body: """
+        {"accessToken":"recovery-access","refreshToken":"recovery-refresh","tokenType":"Bearer","expiresIn":"15m"}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/me", status: 200, body: """
+        {"customerId":"recovered-customer","phone":"+996700123456","typ":"customer"}
+        """)
+        let store = makeStore()
+        await store.loadAuthMethods()
+        _ = await store.requestRecoveryOTP(phone: "+996700123456")
+
+        await store.verifyRecovery(phone: "+996700123456", code: "654321")
+
+        let body = SocialLoginMockURLProtocol.jsonBody(for: "/api/auth/recovery/verify")
+        XCTAssertEqual(body?["phone"], "+996700123456")
+        XCTAssertEqual(body?["code"], "654321")
+        XCTAssertEqual(body?["challengeId"], "recovery-challenge-2")
+        XCTAssertEqual(
+            SocialLoginMockURLProtocol.request(for: "/api/auth/me")?.value(forHTTPHeaderField: "Authorization"),
+            "Bearer recovery-access"
+        )
+        XCTAssertEqual(store.session?.customerId, "recovered-customer")
+        XCTAssertEqual(store.session?.refreshToken, "recovery-refresh")
+        XCTAssertNil(store.recoveryChallengeId)
+        XCTAssertNil(store.errorMessage)
+    }
+
+    func testRecoveryVerifyDoesNotExposeWhetherAccountExists() async {
+        stubAuthMethods(recoveryEnabled: true)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/recovery/request", status: 201, body: """
+        {"challengeId":"opaque-recovery-challenge"}
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/recovery/verify", status: 422, body: """
+        {"message":"Аккаунт не найден"}
+        """)
+        let store = makeStore()
+        await store.loadAuthMethods()
+        _ = await store.requestRecoveryOTP(phone: "+996700123456")
+
+        await store.verifyRecovery(phone: "+996700123456", code: "123456")
+
+        XCTAssertNil(store.session)
+        XCTAssertEqual(
+            store.errorMessage,
+            "Не удалось восстановить доступ. Проверьте код и попробуйте снова."
+        )
+        XCTAssertFalse(store.errorMessage?.contains("Аккаунт") == true)
+    }
+
+    func testRecoveryDisabledOrUnknownCapabilityBlocksNetworkCalls() async {
+        stubAuthMethods(recoveryEnabled: false)
+        let disabledStore = makeStore()
+        await disabledStore.loadAuthMethods()
+
+        let disabledIssued = await disabledStore.requestRecoveryOTP(phone: "+996700123456")
+        XCTAssertFalse(disabledIssued)
+        await disabledStore.verifyRecovery(phone: "+996700123456", code: "123456")
+        XCTAssertEqual(SocialLoginMockURLProtocol.requestCount(for: "/api/auth/recovery/request"), 0)
+        XCTAssertEqual(SocialLoginMockURLProtocol.requestCount(for: "/api/auth/recovery/verify"), 0)
+        XCTAssertEqual(disabledStore.errorMessage, "Восстановление доступа сейчас недоступно. Попробуйте позже.")
+
+        SocialLoginMockURLProtocol.reset()
+        let unavailableStore = makeStore()
+        let unavailableIssued = await unavailableStore.requestRecoveryOTP(phone: "+996700123456")
+        XCTAssertFalse(unavailableIssued)
+        await unavailableStore.verifyRecovery(phone: "+996700123456", code: "123456")
+        XCTAssertEqual(SocialLoginMockURLProtocol.requestCount(for: "/api/auth/recovery/request"), 0)
+        XCTAssertEqual(SocialLoginMockURLProtocol.requestCount(for: "/api/auth/recovery/verify"), 0)
+        XCTAssertEqual(unavailableStore.errorMessage, "Восстановление доступа сейчас недоступно. Попробуйте позже.")
     }
 
     func testAuthMethodsSupportsFullyUnavailableCombination() async {
@@ -446,6 +756,45 @@ final class CustomerSocialLoginTests: XCTestCase {
             restoresStoredSession: false,
             session: URLSession(configuration: configuration)
         )
+    }
+
+    private var googleServerClientID: String {
+        "123456789-alistore-web.apps.googleusercontent.com"
+    }
+
+    private func prepareGoogle(
+        _ store: CustomerAuthStore,
+        advertisedClientID: String? = nil
+    ) async {
+        let clientID = advertisedClientID ?? googleServerClientID
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/methods", status: 200, body: """
+        {
+          "phone":{"enabled":true,"registers":true},
+          "email":{"enabled":true,"registers":false},
+          "telegram":{"enabled":false,"registers":false,"botUsername":null},
+          "apple":{"enabled":true,"registers":true,"clientId":null},
+          "google":{"enabled":true,"registers":true,"clientId":"\(clientID)"},
+          "recovery":{"enabled":true},
+          "anyLoginAvailable":true,
+          "registrationAvailable":true
+        }
+        """)
+        await store.loadAuthMethods(force: true)
+    }
+
+    private func stubAuthMethods(recoveryEnabled: Bool) {
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/methods", status: 200, body: """
+        {
+          "phone":{"enabled":true,"registers":true},
+          "email":{"enabled":true,"registers":false},
+          "telegram":{"enabled":false,"registers":false,"botUsername":null},
+          "apple":{"enabled":true,"registers":true,"clientId":null},
+          "google":{"enabled":true,"registers":true,"clientId":null},
+          "recovery":{"enabled":\(recoveryEnabled)},
+          "anyLoginAvailable":true,
+          "registrationAvailable":true
+        }
+        """)
     }
 }
 

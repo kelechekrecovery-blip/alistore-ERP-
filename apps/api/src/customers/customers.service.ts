@@ -1,4 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { SettingsService } from '../settings/settings.service';
@@ -319,7 +320,38 @@ export class CustomersService {
         'customer_account_deleted',
         true,
       );
-      if (isAnonymized(customer)) return { result: { id: customer.id, deleted: true }, events: [] };
+      if (isAnonymized(customer)) {
+        const deletionEvent = await tx.auditEvent.findFirst({
+          where: { type: EventType.CustomerDeleted, refs: { has: customerId } },
+          orderBy: { ts: 'desc' },
+          select: { payload: true },
+        });
+        return {
+          result: {
+            id: customer.id,
+            deleted: true,
+            providerCleanup: {
+              googleSubjectHashes: googleSubjectHashesFromDeletionEvent(
+                deletionEvent?.payload,
+              ),
+            },
+          },
+          events: [],
+        };
+      }
+
+      // Capture only stable, one-way fingerprints before unlinking. Native
+      // clients fingerprint the Google SDK's current subject and disconnect only
+      // on an exact match. Persisting the fingerprints in the append-only delete
+      // event makes a lost-response retry deterministic without retaining the
+      // provider's plaintext account identifier after deletion.
+      const googleIdentities = await tx.customerIdentity.findMany({
+        where: { customerId, provider: 'google' },
+        select: { subject: true },
+      });
+      const googleSubjectHashes = hashGoogleSubjects(
+        googleIdentities.map(({ subject }) => subject),
+      );
 
       // Строго до переименования: challenge'ы связаны с клиентом только телефоном
       // и адресом, после подмены на `deleted:<id>` и обнуления email их уже не
@@ -411,12 +443,27 @@ export class CustomersService {
       });
 
       const events: AuditInput[] = [
-        { type: EventType.CustomerDeleted, actor: customerId, payload: { customerId }, refs: [customerId] },
+        {
+          type: EventType.CustomerDeleted,
+          actor: customerId,
+          payload: {
+            customerId,
+            providerCleanup: { googleSubjectHashes },
+          },
+          refs: [customerId],
+        },
       ];
       if (customer.consent) {
         events.push({ type: EventType.ConsentChanged, actor: customerId, payload: { customerId, from: true, to: false }, refs: [customerId] });
       }
-      return { result: { id: customer.id, deleted: true }, events };
+      return {
+        result: {
+          id: customer.id,
+          deleted: true,
+          providerCleanup: { googleSubjectHashes },
+        },
+        events,
+      };
     });
   }
 
@@ -494,6 +541,24 @@ function requiredText(value: string, label: string): string {
 
 const DELETED_CUSTOMER_NAME = 'Удалённый пользователь';
 const DELETED_PHONE_PREFIX = 'deleted:';
+
+function hashGoogleSubjects(subjects: string[]): string[] {
+  return [...new Set(subjects.map((subject) => createHash('sha256').update(subject, 'utf8').digest('hex')))]
+    .sort();
+}
+
+function googleSubjectHashesFromDeletionEvent(payload: unknown): string[] {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return [];
+  const providerCleanup = (payload as Record<string, unknown>).providerCleanup;
+  if (!providerCleanup || typeof providerCleanup !== 'object' || Array.isArray(providerCleanup)) return [];
+  const hashes = (providerCleanup as Record<string, unknown>).googleSubjectHashes;
+  if (!Array.isArray(hashes)) return [];
+  return [...new Set(hashes.filter(isSha256Hash))].sort();
+}
+
+function isSha256Hash(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+}
 
 /** Unique non-reversible phone placeholder; frees the real phone for re-registration. */
 function deletedPhone(customerId: string): string {

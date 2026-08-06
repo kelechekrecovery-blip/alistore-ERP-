@@ -65,6 +65,7 @@ type Channel = 'phone' | 'email';
  * человек отзывает ВСЕ прежние refresh-сессии. Нужен тому, у кого угнали доступ.
  */
 type Mode = 'login' | 'recover';
+type OtpChallengeContext = { channel: Channel; mode: Mode; identity: string };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -98,7 +99,7 @@ function loadAppleSdk(): Promise<void> {
   if (typeof window === 'undefined' || window.AppleID) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    script.src = 'https://appleid.cdn-apple.com/appleauth/js/SignInWithApple.js';
+    script.src = 'https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js';
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error('apple-sdk-load-failed'));
@@ -144,9 +145,16 @@ function LoginForm() {
   const [code, setCode] = useState('');
   const [devCode, setDevCode] = useState<string | null>(null);
   const [challengeId, setChallengeId] = useState<string | null>(null);
+  const [challengeContext, setChallengeContext] = useState<OtpChallengeContext | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Every OTP request belongs to the exact login/recovery intent that created
+  // it. A late response must not install its challenge after the customer has
+  // switched mode or channel (a queued click can still run before React paints
+  // the disabled controls).
+  const requestGeneration = useRef(0);
+  const requestInFlight = useRef(false);
   const [resendSeconds, setResendSeconds] = useState(0);
   const [telegramInitData, setTelegramInitData] = useState('');
   const [socialEnrollmentToken, setSocialEnrollmentToken] = useState<string | null>(null);
@@ -213,7 +221,16 @@ function LoginForm() {
         // Экран открывается на телефоне, но если именно этот канал выключен, а
         // почта жива — начинаем с почты. Иначе человек упирается в заблокированную
         // кнопку и должен сам догадаться переключить вкладку.
-        if (!available.phone.enabled && available.email.enabled) setChannel('email');
+        if (!available.phone.enabled && available.email.enabled) {
+          requestGeneration.current += 1;
+          requestInFlight.current = false;
+          setBusy(false);
+          setChannel('email');
+          setMode('login');
+          setStepCode(false);
+          setChallengeId(null);
+          setChallengeContext(null);
+        }
       })
       // Недоступный справочник не должен запирать дверь: оставляем основной
       // путь по телефону, а реальную причину покажет сам запрос кода.
@@ -336,36 +353,53 @@ function LoginForm() {
     : baseCopy;
 
   async function requestCode() {
-    if (busy) return;
+    // React state is not a synchronous mutex: two programmatic/same-task clicks
+    // can both observe the previous `busy` render and send duplicate SMS.
+    if (busy || requestInFlight.current) return;
+    const generation = ++requestGeneration.current;
+    const requestedChannel = channel;
+    const requestedMode = mode;
+    const requestedIdentity = requestedChannel === 'email' ? email.trim() : phone.trim();
     setError(null);
     setStatus(null);
-    if (channel === 'email' && !emailValid) {
+    if (requestedChannel === 'email' && !emailValid) {
       setError('Введите корректный email.');
       return;
     }
-    if (channel === 'phone' && !phoneValid) {
+    if (requestedChannel === 'phone' && !phoneValid) {
       setError('Введите корректный номер.');
       return;
     }
+    requestInFlight.current = true;
     setBusy(true);
     try {
-      const challenge = channel === 'email'
-        ? await requestEmailOtp(email.trim())
-        : recovering
-          ? await requestRecoveryOtp(phone.trim())
-          : await requestOtp(phone.trim());
+      const challenge = requestedChannel === 'email'
+        ? await requestEmailOtp(requestedIdentity)
+        : requestedMode === 'recover'
+          ? await requestRecoveryOtp(requestedIdentity)
+          : await requestOtp(requestedIdentity);
+      if (generation !== requestGeneration.current) return;
       setChallengeId(challenge.challengeId);
+      setChallengeContext({ channel: requestedChannel, mode: requestedMode, identity: requestedIdentity });
       setDevCode(challenge.devCode ?? null);
       if (challenge.devCode) setCode(challenge.devCode);
       setStepCode(true);
       setResendSeconds(60);
-      setStatus(copy.sent);
+      setStatus(locale === 'ru'
+        ? `Код отправлен на ${requestedIdentity}`
+        : `Код ${requestedIdentity} дарегине жөнөтүлдү`);
     } catch (err) {
-      // Machine-readable gateway errors contain no phone or credentials and
-      // let the customer distinguish an offline gateway from invalid input.
-      setError(describeAuthError(err, 'Не удалось отправить код.'));
+      if (generation !== requestGeneration.current) return;
+      // Recovery must not reveal account existence even if a backend or proxy
+      // regresses and returns customer_not_found during the request step.
+      setError(requestedMode === 'recover'
+        ? 'Не удалось отправить код восстановления. Попробуйте позже.'
+        : describeAuthError(err, 'Не удалось отправить код.'));
     } finally {
-      setBusy(false);
+      if (generation === requestGeneration.current) {
+        requestInFlight.current = false;
+        setBusy(false);
+      }
     }
   }
 
@@ -376,7 +410,7 @@ function LoginForm() {
 
   async function confirm(e: React.FormEvent) {
     e.preventDefault();
-    if (busy || code.length !== 6) return;
+    if (busy || code.length !== 6 || !challengeContext) return;
     setError(null);
     setStatus(null);
     setBusy(true);
@@ -384,18 +418,24 @@ function LoginForm() {
       if (socialEnrollmentToken) {
         await completeSocialEnrollment(
           socialEnrollmentToken,
-          phone.trim(),
+          challengeContext.identity,
           code.trim(),
           challengeId ?? undefined,
         );
         setSocialEnrollmentToken(null);
-      } else if (channel === 'email') await verifyEmailOtp(email.trim(), code.trim(), challengeId ?? undefined);
-      else if (recovering) await verifyRecoveryOtp(phone.trim(), code.trim(), challengeId ?? undefined);
-      else await verifyOtp(phone.trim(), code.trim(), challengeId ?? undefined);
+      } else if (challengeContext.channel === 'email') {
+        await verifyEmailOtp(challengeContext.identity, code.trim(), challengeId ?? undefined);
+      } else if (challengeContext.mode === 'recover') {
+        await verifyRecoveryOtp(challengeContext.identity, code.trim(), challengeId ?? undefined);
+      } else {
+        await verifyOtp(challengeContext.identity, code.trim(), challengeId ?? undefined);
+      }
       router.push(next);
     }
     catch (err) {
-      setError(describeAuthError(err, 'Не удалось подтвердить код. Проверьте связь и попробуйте ещё раз.'));
+      setError(recovering
+        ? 'Не удалось восстановить доступ. Проверьте код и попробуйте ещё раз.'
+        : describeAuthError(err, 'Не удалось подтвердить код. Проверьте связь и попробуйте ещё раз.'));
     } finally { setBusy(false); }
   }
 
@@ -518,6 +558,7 @@ function LoginForm() {
       return;
     }
     setSocialEnrollmentProvider(provider);
+    requestInFlight.current = false;
     setSocialEnrollmentToken(token);
     setChannel('phone');
     setStepCode(false);
@@ -525,23 +566,31 @@ function LoginForm() {
     setCode('');
     setDevCode(null);
     setChallengeId(null);
+    setChallengeContext(null);
     setResendSeconds(0);
     setStatus(null);
   }
 
   function switchMode(nextMode: Mode) {
+    requestGeneration.current += 1;
+    requestInFlight.current = false;
+    setBusy(false);
     setSocialEnrollmentToken(null);
     setMode(nextMode);
     setStepCode(false);
     setCode('');
     setDevCode(null);
     setChallengeId(null);
+    setChallengeContext(null);
     setResendSeconds(0);
     setError(null);
     setStatus(null);
   }
 
   function switchChannel(nextChannel: Channel) {
+    requestGeneration.current += 1;
+    requestInFlight.current = false;
+    setBusy(false);
     setSocialEnrollmentToken(null);
     // Восстановление живёт только на телефонном канале — уходя на почту,
     // возвращаем обычный вход, иначе экран остался бы в противоречивом виде.
@@ -551,18 +600,22 @@ function LoginForm() {
     setCode('');
     setDevCode(null);
     setChallengeId(null);
+    setChallengeContext(null);
     setResendSeconds(0);
     setError(null);
     setStatus(null);
   }
 
   function cancelSocialEnrollment() {
+    requestGeneration.current += 1;
+    requestInFlight.current = false;
     setSocialEnrollmentToken(null);
     setStepCode(false);
     setPhone('+996');
     setCode('');
     setDevCode(null);
     setChallengeId(null);
+    setChallengeContext(null);
     setResendSeconds(0);
     setError(null);
     setStatus(null);
@@ -595,20 +648,22 @@ function LoginForm() {
           >
             <button
               type="button"
+              disabled={busy}
               aria-pressed={channel === 'phone'}
               data-testid="login-channel-phone"
               onClick={() => switchChannel('phone')}
-              className={`flex items-center justify-center gap-1.5 rounded-[10px] px-3 py-2.5 text-sm font-bold transition-colors ${channel === 'phone' ? 'bg-coral text-white' : 'text-muted hover:text-white'}`}
+              className={`flex items-center justify-center gap-1.5 rounded-[10px] px-3 py-2.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${channel === 'phone' ? 'bg-coral text-white' : 'text-muted hover:text-white'}`}
             >
               <Phone size={15} /> {t('login.channel.phone')}
             </button>
             {emailLoginEnabled && (
               <button
                 type="button"
+                disabled={busy}
                 aria-pressed={channel === 'email'}
                 data-testid="login-channel-email"
                 onClick={() => switchChannel('email')}
-                className={`flex items-center justify-center gap-1.5 rounded-[10px] px-3 py-2.5 text-sm font-bold transition-colors ${channel === 'email' ? 'bg-coral text-white' : 'text-muted hover:text-white'}`}
+                className={`flex items-center justify-center gap-1.5 rounded-[10px] px-3 py-2.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${channel === 'email' ? 'bg-coral text-white' : 'text-muted hover:text-white'}`}
               >
                 <Mail size={15} /> {t('login.channel.email')}
               </button>
@@ -623,19 +678,21 @@ function LoginForm() {
           >
             <button
               type="button"
+              disabled={busy}
               aria-pressed={mode === 'login'}
               data-testid="login-mode-login"
               onClick={() => switchMode('login')}
-              className={`rounded-[10px] px-3 py-2.5 text-sm font-bold transition-colors ${mode === 'login' ? 'bg-coral text-white' : 'text-muted hover:text-white'}`}
+              className={`rounded-[10px] px-3 py-2.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${mode === 'login' ? 'bg-coral text-white' : 'text-muted hover:text-white'}`}
             >
               {t('login.mode.login')}
             </button>
             <button
               type="button"
+              disabled={busy}
               aria-pressed={mode === 'recover'}
               data-testid="login-mode-recover"
               onClick={() => switchMode('recover')}
-              className={`rounded-[10px] px-3 py-2.5 text-sm font-bold transition-colors ${mode === 'recover' ? 'bg-coral text-white' : 'text-muted hover:text-white'}`}
+              className={`rounded-[10px] px-3 py-2.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${mode === 'recover' ? 'bg-coral text-white' : 'text-muted hover:text-white'}`}
             >
               {t('login.mode.recover')}
             </button>
@@ -668,12 +725,12 @@ function LoginForm() {
             {channel === 'phone' ? (
               <label className="block text-sm font-semibold text-white">
                 {copy.phoneLabel}
-                <input type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(normalizePhone(e.target.value))} placeholder="+996 555 000 000" className="login-field mt-2 w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-[15px] text-white outline-none focus:border-lime" autoFocus />
+                <input type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(normalizePhone(e.target.value))} disabled={busy} placeholder="+996 555 000 000" className="login-field mt-2 w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 font-mono text-[15px] text-white outline-none focus:border-lime disabled:opacity-60" autoFocus />
               </label>
             ) : (
               <label className="block text-sm font-semibold text-white">
                 {copy.emailLabel}
-                <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="login-field mt-2 w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 text-[15px] text-white outline-none focus:border-lime" autoFocus />
+                <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={busy} placeholder="you@example.com" className="login-field mt-2 w-full rounded-[13px] border border-surface-3 bg-surface-2 p-3.5 text-[15px] text-white outline-none focus:border-lime disabled:opacity-60" autoFocus />
               </label>
             )}
             {channel === 'phone' && !phoneLoginEnabled && (
@@ -752,7 +809,7 @@ function LoginForm() {
             <button type="button" onClick={requestCode} disabled={busy || resendSeconds > 0} className="mt-3 w-full text-center text-[13px] text-muted disabled:text-faint">
               {resendSeconds > 0 ? `${copy.resend} (${resendSeconds})` : copy.resend}
             </button>
-            <button type="button" onClick={() => { setStepCode(false); setChallengeId(null); setResendSeconds(0); setDevCode(null); setError(null); setStatus(null); }} className="mt-3 w-full text-center text-[13px] text-muted">{channel === 'email' ? t('login.code.changeEmail') : t('login.code.changePhone')}</button>
+            <button type="button" onClick={() => { setStepCode(false); setChallengeId(null); setChallengeContext(null); setResendSeconds(0); setDevCode(null); setError(null); setStatus(null); }} className="mt-3 w-full text-center text-[13px] text-muted">{channel === 'email' ? t('login.code.changeEmail') : t('login.code.changePhone')}</button>
             {socialEnrollmentActive && (
               <button type="button" onClick={cancelSocialEnrollment} className="mt-3 w-full text-center text-[13px] text-muted">
                 Отменить вход через {socialProviderLabel}

@@ -17,7 +17,7 @@ import java.util.Base64
 
 internal class GoogleCredentialSignInProvider(
   private val activity: ComponentActivity,
-  private val serverClientId: String,
+  override val serverClientId: String,
   private val credentialManager: CredentialManager = CredentialManager.create(activity),
   private val nonceFactory: () -> String = ::secureGoogleNonce,
 ) : GoogleSignInProvider {

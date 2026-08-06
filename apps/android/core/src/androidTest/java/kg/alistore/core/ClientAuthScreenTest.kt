@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextReplacement
 import org.junit.Rule
 import org.junit.Test
@@ -49,6 +50,123 @@ class ClientAuthScreenTest {
   }
 
   @Test
+  fun recoveryEntryIsHiddenWhenApiDisablesIt() {
+    val api = UiAuthGateway().apply { methods = uiAuthMethods(recovery = false) }
+    compose.setContent {
+      MaterialTheme {
+        ClientAccount(AuthState.Guest, AuthSessionManager(api, UiSessionStore()), {}, 0, 0, {})
+      }
+    }
+
+    compose.waitUntil(5_000) {
+      runCatching { compose.onNodeWithTag("auth-phone").fetchSemanticsNode() }.isSuccess
+    }
+    compose.onNodeWithTag("auth-recovery-open").assertDoesNotExist()
+  }
+
+  @Test
+  fun recoveryUsesGenericRequestMessageAndSignsInWithPinnedChallenge() {
+    val api = UiAuthGateway().apply { methods = uiAuthMethods(recovery = true) }
+    var state: AuthState by mutableStateOf(AuthState.Guest)
+    compose.setContent {
+      MaterialTheme {
+        ClientAccount(state, AuthSessionManager(api, UiSessionStore()), { state = it }, 0, 0, {})
+      }
+    }
+
+    compose.waitUntil(5_000) {
+      runCatching { compose.onNodeWithTag("auth-recovery-open").fetchSemanticsNode() }.isSuccess
+    }
+    compose.onNodeWithTag("auth-recovery-open").performScrollTo().performClick()
+    compose.onNodeWithTag("auth-recovery-title").assertIsDisplayed()
+    compose.onNodeWithTag("auth-recovery-phone").performTextReplacement("+996700123456")
+    compose.onNodeWithTag("auth-recovery-action").performScrollTo().assertIsEnabled().performClick()
+    compose.waitUntil(5_000) {
+      runCatching { compose.onNodeWithTag("auth-recovery-code").fetchSemanticsNode() }.isSuccess
+    }
+    compose.onNodeWithTag("auth-recovery-message")
+      .assertTextEquals("Если аккаунт существует, код восстановления отправлен")
+    compose.onNodeWithTag("auth-recovery-code").assertTextContains("987654")
+    compose.onNodeWithTag("auth-recovery-action").performScrollTo().assertIsEnabled().performClick()
+    compose.waitUntil(5_000) { state is AuthState.SignedIn }
+
+    assertEquals(listOf("+996700123456"), api.recoveryRequests)
+    assertEquals(listOf(Triple("+996700123456", "987654", "recovery-challenge")), api.recoveryVerifications)
+  }
+
+  @Test
+  fun guestOnlySeesApiConfirmedEmailMethod() {
+    val api = UiAuthGateway().apply {
+      methods = uiAuthMethods(phone = false, email = true, google = false, googleClientId = null)
+    }
+    val provider = object : GoogleSignInProvider {
+      override val serverClientId = "google-web.apps.googleusercontent.com"
+      override suspend fun signIn() = GoogleIdentityCredential("google-token", "raw-nonce")
+      override suspend fun clearCredentialState() = Unit
+    }
+    compose.setContent {
+      MaterialTheme {
+        ClientAccount(AuthState.Guest, AuthSessionManager(api, UiSessionStore()), {}, 0, 0, {}, googleSignInProvider = provider)
+      }
+    }
+
+    compose.waitUntil(5_000) {
+      runCatching { compose.onNodeWithTag("auth-email").fetchSemanticsNode() }.isSuccess
+    }
+    compose.onNodeWithTag("auth-email").assertIsDisplayed()
+    compose.onNodeWithTag("auth-phone").assertDoesNotExist()
+    compose.onNodeWithTag("auth-google").assertDoesNotExist()
+    compose.onNodeWithTag("auth-registration-unavailable").assertIsDisplayed()
+  }
+
+  @Test
+  fun capabilityFailureKeepsGuestPathAndHidesEveryLoginControl() {
+    val api = UiAuthGateway().apply { authMethodsFailure = ApiException(503, "unavailable") }
+    compose.setContent {
+      MaterialTheme {
+        ClientAccount(AuthState.Guest, AuthSessionManager(api, UiSessionStore()), {}, 0, 0, {})
+      }
+    }
+
+    compose.waitUntil(5_000) {
+      runCatching { compose.onNodeWithTag("auth-methods-unavailable").fetchSemanticsNode() }.isSuccess
+    }
+    compose.onNodeWithTag("auth-methods-unavailable").assertIsDisplayed()
+    compose.onNodeWithTag("auth-methods-retry").assertIsDisplayed()
+    compose.onNodeWithTag("auth-phone").assertDoesNotExist()
+    compose.onNodeWithTag("auth-email").assertDoesNotExist()
+  }
+
+  @Test
+  fun googleAudienceMismatchHidesButtonAndNeverOpensProvider() {
+    val api = UiAuthGateway().apply {
+      methods = uiAuthMethods(phone = false, email = false, google = true)
+    }
+    var signInCalls = 0
+    val provider = object : GoogleSignInProvider {
+      override val serverClientId = "other-client.apps.googleusercontent.com"
+      override suspend fun signIn(): GoogleIdentityCredential {
+        signInCalls += 1
+        return GoogleIdentityCredential("google-token", "raw-nonce")
+      }
+      override suspend fun clearCredentialState() = Unit
+    }
+    val manager = AuthSessionManager(api, UiSessionStore(), provider)
+    compose.setContent {
+      MaterialTheme {
+        ClientAccount(AuthState.Guest, manager, {}, 0, 0, {}, googleSignInProvider = provider)
+      }
+    }
+
+    compose.waitUntil(5_000) {
+      runCatching { compose.onNodeWithTag("auth-methods-none").fetchSemanticsNode() }.isSuccess
+    }
+    compose.onNodeWithTag("auth-methods-none").assertIsDisplayed()
+    compose.onNodeWithTag("auth-google").assertDoesNotExist()
+    assertEquals(0, signInCalls)
+  }
+
+  @Test
   fun guestSwitchesToEmailChannelAndSignsInWithMailedCode() {
     val api = UiAuthGateway()
     val manager = AuthSessionManager(api, UiSessionStore())
@@ -78,12 +196,13 @@ class ClientAuthScreenTest {
     val api = UiAuthGateway().apply {
       googleResult = SocialAuthResult.EnrollmentRequired("memory-ticket", 600)
     }
-    val manager = AuthSessionManager(api, UiSessionStore())
     var state: AuthState by mutableStateOf(AuthState.Guest)
     val provider = object : GoogleSignInProvider {
+      override val serverClientId = "google-web.apps.googleusercontent.com"
       override suspend fun signIn() = GoogleIdentityCredential("google-token", "raw-nonce")
       override suspend fun clearCredentialState() = Unit
     }
+    val manager = AuthSessionManager(api, UiSessionStore(), provider)
     compose.setContent {
       MaterialTheme {
         ClientAccount(state, manager, { state = it }, 0, 0, {}, googleSignInProvider = provider)
@@ -160,7 +279,8 @@ class ClientAuthScreenTest {
     }
 
     compose.onNodeWithTag("account-title").assertIsDisplayed()
-    compose.onNodeWithTag("auth-logout").assertIsDisplayed().assertTextContains("Выйти").performClick()
+    compose.onNodeWithTag("account-list").performScrollToIndex(12)
+    compose.onNodeWithTag("auth-logout").performScrollTo().assertIsDisplayed().assertTextContains("Выйти").performClick()
     compose.waitUntil(5_000) { logoutRequest != null }
     assertEquals(state, logoutRequest)
   }
@@ -420,13 +540,32 @@ private class UiAuthGateway : AuthGateway {
   val emailVerifications = mutableListOf<Pair<String, String>>()
   val emailAttachRequests = mutableListOf<String>()
   val emailAttachConfirms = mutableListOf<Pair<String, String>>()
+  val recoveryRequests = mutableListOf<String>()
+  val recoveryVerifications = mutableListOf<Triple<String, String, String?>>()
   var googleResult: SocialAuthResult = SocialAuthResult.Authenticated(AuthTokens("access", "refresh"))
   var googleLoginCall: Pair<String, String>? = null
   val completedEnrollmentTickets = mutableListOf<String>()
+  var methods = uiAuthMethods()
+  var authMethodsFailure: Throwable? = null
+
+  override suspend fun authMethods(): CustomerAuthMethods {
+    authMethodsFailure?.let { throw it }
+    return methods
+  }
 
   override suspend fun requestOtp(phone: String) = OtpChallenge("123456")
   override suspend fun verifyOtp(phone: String, code: String, challengeId: String?) =
     AuthTokens("access", "refresh")
+
+  override suspend fun requestRecoveryOtp(phone: String): OtpChallenge {
+    recoveryRequests += phone
+    return OtpChallenge("987654", "recovery-challenge")
+  }
+
+  override suspend fun verifyRecoveryOtp(phone: String, code: String, challengeId: String?): AuthTokens {
+    recoveryVerifications += Triple(phone, code, challengeId)
+    return AuthTokens("recovery-access", "recovery-refresh")
+  }
 
   override suspend fun requestEmailOtp(email: String): EmailOtpChallenge {
     emailRequests += email
@@ -469,6 +608,21 @@ private class UiAuthGateway : AuthGateway {
     return AuthTokens("access", "refresh")
   }
 }
+
+private fun uiAuthMethods(
+  phone: Boolean = true,
+  email: Boolean = true,
+  google: Boolean = true,
+  googleClientId: String? = "google-web.apps.googleusercontent.com",
+  recovery: Boolean = true,
+): CustomerAuthMethods = CustomerAuthMethods(
+  phone = CustomerAuthMethodAvailability(phone, phone),
+  email = CustomerAuthMethodAvailability(email, false),
+  google = CustomerSocialAuthMethodAvailability(google, google && phone, googleClientId),
+  recovery = CustomerRecoveryAuthMethodAvailability(recovery),
+  anyLoginAvailable = phone || email || google,
+  registrationAvailable = phone || (google && phone),
+)
 
 private class UiOrdersGateway(private val result: List<CustomerOrder>) : CustomerOrdersGateway {
   override suspend fun orders(token: String) = result

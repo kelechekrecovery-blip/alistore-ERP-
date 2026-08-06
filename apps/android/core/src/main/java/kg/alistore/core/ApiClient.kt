@@ -58,6 +58,9 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
   suspend fun quotePromotion(request: PromotionQuoteRequest, token: String? = null): PromotionQuote =
     request("promotions/quote", "POST", request.toJson(), token).promotionQuote()
 
+  override suspend fun authMethods(): CustomerAuthMethods =
+    request("auth/methods", "GET").customerAuthMethods()
+
   override suspend fun requestOtp(phone: String): OtpChallenge = request("auth/otp/request", "POST", JSONObject().put("phone", phone)).let {
     OtpChallenge(
       devCode = it.optString("devCode").takeIf(String::isNotBlank),
@@ -67,6 +70,17 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
 
   override suspend fun verifyOtp(phone: String, code: String, challengeId: String?): AuthTokens =
     request("auth/otp/verify", "POST", otpVerificationPayload(phone, code, challengeId)).tokens()
+
+  override suspend fun requestRecoveryOtp(phone: String): OtpChallenge =
+    request("auth/recovery/request", "POST", JSONObject().put("phone", phone)).let {
+      OtpChallenge(
+        devCode = it.optString("devCode").takeIf(String::isNotBlank),
+        challengeId = it.optString("challengeId").takeIf(String::isNotBlank),
+      )
+    }
+
+  override suspend fun verifyRecoveryOtp(phone: String, code: String, challengeId: String?): AuthTokens =
+    request("auth/recovery/verify", "POST", recoveryVerificationPayload(phone, code, challengeId)).tokens()
 
   override suspend fun requestEmailOtp(email: String): EmailOtpChallenge =
     request("auth/email/request", "POST", JSONObject().put("email", email)).emailChallenge()
@@ -796,6 +810,33 @@ internal fun JSONObject.promotionQuote() = PromotionQuote(
   discount = getInt("discount"),
 )
 
+internal fun JSONObject.customerAuthMethods(): CustomerAuthMethods {
+  fun method(name: String): CustomerAuthMethodAvailability = getJSONObject(name).let {
+    CustomerAuthMethodAvailability(
+      enabled = it.getBoolean("enabled"),
+      registers = it.getBoolean("registers"),
+    )
+  }
+
+  val google = getJSONObject("google")
+  return CustomerAuthMethods(
+    phone = method("phone"),
+    email = method("email"),
+    google = CustomerSocialAuthMethodAvailability(
+      enabled = google.getBoolean("enabled"),
+      registers = google.getBoolean("registers"),
+      clientId = if (google.has("clientId") && !google.isNull("clientId")) {
+        google.getString("clientId").trim().takeIf(String::isNotBlank)
+      } else null,
+    ),
+    recovery = CustomerRecoveryAuthMethodAvailability(
+      enabled = getJSONObject("recovery").getBoolean("enabled"),
+    ),
+    anyLoginAvailable = getBoolean("anyLoginAvailable"),
+    registrationAvailable = getBoolean("registrationAvailable"),
+  )
+}
+
 private fun JSONObject.tokens() = AuthTokens(getString("accessToken"), getString("refreshToken"))
 
 private fun JSONObject.socialAuthResult(): SocialAuthResult = when (getString("status")) {
@@ -811,6 +852,9 @@ private fun JSONObject.putOptional(key: String, value: String?): JSONObject =
   apply { value?.let { put(key, it) } }
 
 internal fun otpVerificationPayload(phone: String, code: String, challengeId: String?): JSONObject =
+  JSONObject().put("phone", phone).put("code", code).putOptional("challengeId", challengeId)
+
+internal fun recoveryVerificationPayload(phone: String, code: String, challengeId: String?): JSONObject =
   JSONObject().put("phone", phone).put("code", code).putOptional("challengeId", challengeId)
 
 internal fun googleLoginPayload(identityToken: String, nonce: String): JSONObject =

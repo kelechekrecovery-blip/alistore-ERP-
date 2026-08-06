@@ -307,10 +307,14 @@ private enum GoogleSignInNonce {
 
 @MainActor
 private enum GoogleCustomerSession {
+    private static let pendingDisconnectKey = "kg.alistore.google-disconnect-pending"
+
     /// Удаляет только локальную Google-сессию. OAuth grant остаётся связанным:
     /// отзыв доступа (`disconnect`) относится к unlink/delete, а не к logout.
     static func signOut() {
-        GIDSignIn.sharedInstance.signOut()
+        SocialIdentitySessionCleanup.logout {
+            GIDSignIn.sharedInstance.signOut()
+        }
     }
 
     /// Google Keychain очищается синхронно до первого suspension point.
@@ -318,6 +322,55 @@ private enum GoogleCustomerSession {
     static func logout(_ auth: CustomerAuthStore) async {
         signOut()
         await auth.logout()
+    }
+
+    static func markAccountDeletionDisconnectPending(subjectFingerprints: [String]) {
+        let merged = ProviderSubjectCleanupPolicy.merging(
+            pending: pendingAccountDeletionSubjectFingerprints,
+            deletedFingerprints: subjectFingerprints
+        )
+        guard !merged.isEmpty else { return }
+        UserDefaults.standard.set(merged, forKey: pendingDisconnectKey)
+    }
+
+    private static var pendingAccountDeletionSubjectFingerprints: [String] {
+        UserDefaults.standard.stringArray(forKey: pendingDisconnectKey) ?? []
+    }
+
+    static func retryPendingAccountDeletionDisconnect() async {
+        let pendingFingerprints = pendingAccountDeletionSubjectFingerprints
+        guard !pendingFingerprints.isEmpty else { return }
+        if GIDSignIn.sharedInstance.currentUser == nil {
+            do {
+                _ = try await GIDSignIn.sharedInstance.restorePreviousSignIn()
+            } catch {
+                return
+            }
+        }
+        // Never revoke whichever Google account merely happens to be current.
+        // The subject must have come from the authoritative account-deletion
+        // response captured before the API unlinked customer identities.
+        guard
+            let currentSubject = GIDSignIn.sharedInstance.currentUser?.userID,
+            ProviderSubjectCleanupPolicy.canDisconnect(
+                currentSubject: currentSubject,
+                pending: pendingFingerprints
+            )
+        else { return }
+        let error = await SocialIdentitySessionCleanup.disconnectWithRetry { completion in
+            GIDSignIn.sharedInstance.disconnect(completion: completion)
+        }
+        guard error == nil else { return }
+        let remaining = ProviderSubjectCleanupPolicy.remaining(
+            afterDisconnecting: currentSubject,
+            pending: pendingFingerprints
+        )
+        if remaining.isEmpty {
+            UserDefaults.standard.removeObject(forKey: pendingDisconnectKey)
+        } else {
+            UserDefaults.standard.set(remaining, forKey: pendingDisconnectKey)
+        }
+        GIDSignIn.sharedInstance.signOut()
     }
 }
 
@@ -332,6 +385,7 @@ private struct ClientLoginView: View {
     @State private var email = ""
     @State private var code = ""
     @State private var requested = false
+    @State private var recovering = false
     @State private var resendAvailableAt: Date?
     @State private var resendSeconds = 0
 
@@ -358,7 +412,7 @@ private struct ClientLoginView: View {
                         authAvailabilityPanel
                             .padding(.top, 16)
                     }
-                    if !auth.requiresSocialPhoneEnrollment && authControlsReady && !availableLoginChannels.isEmpty {
+                    if !auth.requiresSocialPhoneEnrollment && !recovering && authControlsReady && !availableLoginChannels.isEmpty {
                         channelSwitcher
                             .padding(.top, 22)
                     }
@@ -428,15 +482,26 @@ private struct ClientLoginView: View {
                                         await requestCode()
                                     }
                                 } else {
-                                    switch (channel, requested) {
-                                    case (.phone, true):
-                                        await auth.verify(phone: normalizedPhone, code: code.filter(\.isNumber))
-                                    case (.phone, false):
-                                        await requestCode()
-                                    case (.email, true):
-                                        await auth.verifyEmail(email: email, code: code.filter(\.isNumber))
-                                    case (.email, false):
-                                        await requestCode()
+                                    if recovering {
+                                        if requested {
+                                            await auth.verifyRecovery(
+                                                phone: normalizedPhone,
+                                                code: code.filter(\.isNumber)
+                                            )
+                                        } else {
+                                            await requestCode()
+                                        }
+                                    } else {
+                                        switch (channel, requested) {
+                                        case (.phone, true):
+                                            await auth.verify(phone: normalizedPhone, code: code.filter(\.isNumber))
+                                        case (.phone, false):
+                                            await requestCode()
+                                        case (.email, true):
+                                            await auth.verifyEmail(email: email, code: code.filter(\.isNumber))
+                                        case (.email, false):
+                                            await requestCode()
+                                        }
                                     }
                                 }
                             }
@@ -483,6 +548,21 @@ private struct ClientLoginView: View {
                             .lineSpacing(3)
                             .padding(.top, 10)
                     }
+                    if !auth.requiresSocialPhoneEnrollment && recoveryEnabled {
+                        Button(recovering ? "Вернуться ко входу" : "Восстановить доступ") {
+                            if recovering {
+                                cancelRecovery()
+                            } else {
+                                beginRecovery()
+                            }
+                        }
+                        .disabled(auth.isLoading)
+                        .font(ClientTheme.body(13, weight: .semibold))
+                        .foregroundStyle(ClientTheme.lime)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 14)
+                        .accessibilityIdentifier(recovering ? "client-recovery-cancel" : "client-recovery-start")
+                    }
                     // Кнопки «Войти по Face ID» здесь быть не может: на экране входа нет
                     // сессии, которую можно разблокировать, а эндпоинта биометрического
                     // входа на сервере не существует. Прежняя версия при успешной
@@ -501,7 +581,7 @@ private struct ClientLoginView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.top, 14)
                         .accessibilityIdentifier("client-social-enrollment-cancel")
-                    } else if authControlsReady {
+                    } else if authControlsReady && !recovering {
                         if appleEnabled {
                             SignInWithAppleButton(.signIn) { request in
                                 let raw = AppleSignInNonce.random()
@@ -573,7 +653,9 @@ private struct ClientLoginView: View {
         let issued: Bool
         switch channel {
         case .phone:
-            issued = await auth.requestOTP(phone: normalizedPhone)
+            issued = recovering
+                ? await auth.requestRecoveryOTP(phone: normalizedPhone)
+                : await auth.requestOTP(phone: normalizedPhone)
         case .email:
             issued = await auth.requestEmailOTP(email: email)
         }
@@ -616,7 +698,7 @@ private struct ClientLoginView: View {
     }
 
     private func startGoogleSignIn() {
-        guard googleSignInConfigured else {
+        guard googleEnabled, let serverClientID = googleServerClientID else {
             auth.reportSignInFailure("Вход через Google пока не настроен")
             return
         }
@@ -652,7 +734,11 @@ private struct ClientLoginView: View {
                     auth.reportSignInFailure("Google не вернул токен входа")
                     return
                 }
-                await auth.signInWithGoogle(identityToken: identityToken, nonce: rawNonce)
+                await auth.signInWithGoogle(
+                    identityToken: identityToken,
+                    nonce: rawNonce,
+                    serverClientID: serverClientID
+                )
                 if auth.requiresSocialPhoneEnrollment { resetSocialEnrollmentEntry() }
             }
         }
@@ -660,6 +746,7 @@ private struct ClientLoginView: View {
 
     private func resetSocialEnrollmentEntry() {
         channel = .phone
+        recovering = false
         requested = false
         code = ""
         resendAvailableAt = nil
@@ -670,6 +757,25 @@ private struct ClientLoginView: View {
         auth.cancelSocialEnrollment()
         if cancelsGoogle { GoogleCustomerSession.signOut() }
         resetSocialEnrollmentEntry()
+    }
+
+    private func beginRecovery() {
+        guard recoveryEnabled else { return }
+        auth.cancelRecovery()
+        channel = .phone
+        recovering = true
+        requested = false
+        code = ""
+        resendAvailableAt = nil
+    }
+
+    private func cancelRecovery() {
+        auth.cancelRecovery()
+        recovering = false
+        requested = false
+        code = ""
+        resendAvailableAt = nil
+        selectFirstAvailableChannel()
     }
 
     private var googlePresentingViewController: UIViewController? {
@@ -684,11 +790,15 @@ private struct ClientLoginView: View {
 
     private var googleSignInConfigured: Bool {
         let iosClientID = Bundle.main.object(forInfoDictionaryKey: "GIDClientID") as? String
-        let serverClientID = Bundle.main.object(forInfoDictionaryKey: "GIDServerClientID") as? String
+        let serverClientID = googleServerClientID
         return [iosClientID, serverClientID].allSatisfy {
             $0?.range(of: #"^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$"#,
                      options: .regularExpression) != nil
         }
+    }
+
+    private var googleServerClientID: String? {
+        Bundle.main.object(forInfoDictionaryKey: "GIDServerClientID") as? String
     }
 
     private var methods: CustomerAuthMethods? {
@@ -698,11 +808,17 @@ private struct ClientLoginView: View {
 
     private var authControlsReady: Bool { methods != nil }
     private var phoneEnabled: Bool {
-        auth.requiresSocialPhoneEnrollment || methods?.phone.enabled == true
+        auth.requiresSocialPhoneEnrollment
+            || (recovering && recoveryEnabled)
+            || methods?.phone.enabled == true
     }
     private var emailEnabled: Bool { methods?.email.enabled == true }
     private var appleEnabled: Bool { methods?.apple.enabled == true }
-    private var googleEnabled: Bool { methods?.google.enabled == true && googleSignInConfigured }
+    private var googleEnabled: Bool {
+        googleSignInConfigured
+            && auth.isGoogleSignInEnabled(serverClientID: googleServerClientID)
+    }
+    private var recoveryEnabled: Bool { methods?.recovery.enabled == true }
     private var selectedChannelEnabled: Bool {
         channel == .phone ? phoneEnabled : emailEnabled
     }
@@ -710,7 +826,7 @@ private struct ClientLoginView: View {
         LoginChannel.allCases.filter { $0 == .phone ? phoneEnabled : emailEnabled }
     }
     private var nativeLoginAvailable: Bool {
-        phoneEnabled || emailEnabled || appleEnabled || googleEnabled
+        phoneEnabled || emailEnabled || appleEnabled || googleEnabled || recoveryEnabled
     }
     private var nativeRegistrationAvailable: Bool {
         guard let methods else { return false }
@@ -825,6 +941,11 @@ private struct ClientLoginView: View {
     }
 
     private var subtitle: String {
+        if recovering {
+            return requested
+                ? "Введите код из SMS. Мы не сообщаем, зарегистрирован ли этот номер, до безопасного подтверждения."
+                : "Введите номер аккаунта. Ответ не раскроет, зарегистрирован ли он в AliStore."
+        }
         if auth.requiresSocialPhoneEnrollment {
             return requested
                 ? "Введите код из SMS, чтобы завершить создание или привязку аккаунта."
@@ -846,6 +967,7 @@ private struct ClientLoginView: View {
     }
 
     private var loginTitle: String {
+        if recovering { return "Восстановить доступ" }
         if auth.requiresSocialPhoneEnrollment { return "Подтвердите номер телефона" }
         switch auth.authMethodsState {
         case .unavailable:
@@ -859,7 +981,10 @@ private struct ClientLoginView: View {
     }
 
     private var actionTitle: String {
-        if requested { return auth.requiresSocialPhoneEnrollment ? "Завершить регистрацию" : "Войти" }
+        if requested {
+            if auth.requiresSocialPhoneEnrollment { return "Завершить регистрацию" }
+            return recovering ? "Восстановить доступ" : "Войти"
+        }
         return channel == .phone ? "Получить код по SMS" : "Получить код на почту"
     }
 
@@ -1605,6 +1730,9 @@ private struct ClientRootView: View {
         }
         .task {
             restoreLocalState()
+            BackgroundStartupWork.launch {
+                await GoogleCustomerSession.retryPendingAccountDeletionDisconnect()
+            }
             // До этого 401 никем не перехватывался: через 15 минут работы
             // истекал access-токен, и оформление заказа падало «Ошибка сервера 401»
             // без пути назад, кроме перезапуска приложения.
@@ -4902,14 +5030,23 @@ private struct AccountView: View {
     @MainActor
     private func deleteAccount() async {
         guard let token = auth.session?.accessToken else { return }
-        // Удаление начинается с сети. Очищаем Google раньше DELETE, чтобы
-        // timeout/termination не оставили стороннюю сессию на устройстве.
-        GoogleCustomerSession.signOut()
         isDeletingAccount = true
         accountDataError = nil
         do {
-            let _: DeleteAccountResponse = try await APIClient(baseURL: environment.apiBaseURL).delete("customers/me", token: token)
-            await GoogleCustomerSession.logout(auth)
+            let response: DeleteAccountResponse = try await APIClient(baseURL: environment.apiBaseURL).delete(
+                "customers/me",
+                token: token
+            )
+            // The server captured these subjects before unlinking identities.
+            // Persist them before any provider call or suspension so a process
+            // termination cannot lose the revocation retry intent.
+            GoogleCustomerSession.markAccountDeletionDisconnectPending(
+                subjectFingerprints: response.providerCleanup?.googleSubjectHashes ?? []
+            )
+            // Clearing AliStore credentials is authoritative and must not wait
+            // for an external SDK callback or its bounded retry window.
+            await auth.logout()
+            await GoogleCustomerSession.retryPendingAccountDeletionDisconnect()
             onLogout()
         } catch is CancellationError {
             isDeletingAccount = false
@@ -5608,8 +5745,15 @@ private struct DeleteCustomerAddressResponse: Decodable, Sendable {
 }
 
 private struct DeleteAccountResponse: Decodable, Sendable {
+    struct ProviderCleanup: Decodable, Sendable {
+        let googleSubjectHashes: [String]
+    }
+
     let id: String
     let deleted: Bool
+    /// Optional for safe rolling deployment: an older API response means there
+    /// is no authoritative Google subject, therefore iOS performs no disconnect.
+    let providerCleanup: ProviderCleanup?
 }
 
 /// Wraps the exported JSON file so `.sheet(item:)` can present the system share sheet.

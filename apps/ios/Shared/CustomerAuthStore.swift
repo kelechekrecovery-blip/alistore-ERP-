@@ -1,8 +1,124 @@
+import CryptoKit
 import Foundation
 import Observation
 
+private final class SocialDisconnectCompletionGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Error?, Never>?
+
+    init(_ continuation: CheckedContinuation<Error?, Never>) {
+        self.continuation = continuation
+    }
+
+    func resume(returning error: Error?) {
+        lock.lock()
+        let continuation = self.continuation
+        self.continuation = nil
+        lock.unlock()
+        continuation?.resume(returning: error)
+    }
+}
+
+/// Pure subject-binding rules shared by durable provider cleanup and tests.
+/// Provider grants may only be revoked for an exact, server-authoritative
+/// subject; a merely current SDK account is never sufficient evidence.
+public enum ProviderSubjectCleanupPolicy {
+    public static func fingerprint(subject: String) -> String {
+        SHA256.hash(data: Data(subject.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    public static func merging(pending: [String], deletedFingerprints: [String]) -> [String] {
+        let validFingerprints = deletedFingerprints.filter {
+            $0.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil
+        }
+        return Array(Set(pending).union(validFingerprints)).sorted()
+    }
+
+    public static func canDisconnect(currentSubject: String?, pending: [String]) -> Bool {
+        guard let currentSubject else { return false }
+        return pending.contains(fingerprint(subject: currentSubject))
+    }
+
+    public static func remaining(afterDisconnecting subject: String, pending: [String]) -> [String] {
+        let completed = fingerprint(subject: subject)
+        return pending.filter { $0 != completed }
+    }
+}
+
+/// Separates ordinary sign-out from deleting an account at an external
+/// identity provider. Logout clears only the local SDK session. A confirmed
+/// AliStore account deletion additionally disconnects the provider grant.
+public enum SocialIdentitySessionCleanup {
+    public struct Result<Response> {
+        public let response: Response
+        public let providerDisconnectError: Error?
+    }
+
+    @MainActor
+    public static func logout(signOut: () -> Void) {
+        signOut()
+    }
+
+    @MainActor
+    public static func deleteAccount<Response>(
+        deleting: () async throws -> Response,
+        didDelete: () -> Void = {},
+        disconnectAttempts: Int = 2,
+        disconnect: (@escaping @Sendable (Error?) -> Void) -> Void
+    ) async rethrows -> Result<Response> {
+        // Keep the provider session intact while the authoritative server
+        // deletion is pending. Once deletion succeeds, await provider
+        // revocation so the app can persist a retry marker instead of silently
+        // losing a failed callback while dismissing the account screen.
+        let response = try await deleting()
+        // Persist the durable retry intent synchronously after the server has
+        // committed deletion and before starting an external SDK callback. If
+        // the process is terminated while Google is revoking the grant, the
+        // next launch can still finish that revocation.
+        didDelete()
+        let providerDisconnectError = await disconnectWithRetry(
+            attempts: disconnectAttempts,
+            disconnect: disconnect
+        )
+        return Result(response: response, providerDisconnectError: providerDisconnectError)
+    }
+
+    @MainActor
+    public static func disconnectWithRetry(
+        attempts: Int = 2,
+        callbackTimeout: TimeInterval = 10,
+        disconnect: (@escaping @Sendable (Error?) -> Void) -> Void
+    ) async -> Error? {
+        var lastError: Error?
+        for _ in 0..<max(1, attempts) {
+            let error = await withCheckedContinuation { continuation in
+                let gate = SocialDisconnectCompletionGate(continuation)
+                DispatchQueue.global(qos: .utility).asyncAfter(
+                    deadline: .now() + max(0.1, callbackTimeout)
+                ) {
+                    gate.resume(returning: URLError(.timedOut))
+                }
+                disconnect { error in gate.resume(returning: error) }
+            }
+            if error == nil { return nil }
+            lastError = error
+        }
+        return lastError
+    }
+}
+
+/// Launches durable provider cleanup outside the authentication/catalog startup
+/// critical path. A provider outage must never hold the first usable screen.
+@MainActor
+public enum BackgroundStartupWork {
+    public static func launch(_ operation: @escaping @MainActor @Sendable () async -> Void) {
+        Task { await operation() }
+    }
+}
+
 @MainActor
 @Observable
+// swiftlint:disable:next type_body_length
 public final class CustomerAuthStore {
     private struct RefreshFlight {
         let id: UUID
@@ -17,6 +133,7 @@ public final class CustomerAuthStore {
     public private(set) var errorMessage: String?
     public private(set) var devCode: String?
     public private(set) var phoneChallengeId: String?
+    public private(set) var recoveryChallengeId: String?
     public private(set) var emailChallengeId: String?
     public private(set) var emailAttachChallengeId: String?
     public private(set) var socialEnrollmentProvider: CustomerSocialProvider?
@@ -119,6 +236,70 @@ public final class CustomerAuthStore {
         }
     }
 
+    /// Запрашивает отдельный recovery-код только после подтверждения capability
+    /// сервером. Ответ API намеренно одинаков для известного и неизвестного
+    /// номера, поэтому клиент не делает локальных проверок существования аккаунта.
+    public func requestRecoveryOTP(phone: String) async -> Bool {
+        guard recoveryCapabilityEnabled else {
+            reportRecoveryUnavailable()
+            return false
+        }
+        isLoading = true
+        errorMessage = nil
+        recoveryChallengeId = nil
+        devCode = nil
+        defer { isLoading = false }
+        do {
+            let challenge: OTPChallenge = try await api.post(
+                "auth/recovery/request",
+                body: OTPRequest(phone: phone)
+            )
+            recoveryChallengeId = challenge.challengeId
+            devCode = challenge.devCode
+            return true
+        } catch {
+            // Recovery is enumeration-sensitive: even an unexpected backend
+            // message must not tell the caller whether this phone exists.
+            errorMessage = "Не удалось отправить код восстановления. Попробуйте позже."
+            return false
+        }
+    }
+
+    /// Подтверждает recovery-код, затем получает серверный principal через
+    /// `/auth/me` и активирует сессию тем же путём, что phone/social login.
+    public func verifyRecovery(phone: String, code: String) async {
+        guard recoveryCapabilityEnabled else {
+            reportRecoveryUnavailable()
+            return
+        }
+        guard let recoveryChallengeId else {
+            errorMessage = "Сначала запросите новый код восстановления."
+            return
+        }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let auth: CustomerAuthTokens = try await api.post(
+                "auth/recovery/verify",
+                body: OTPVerification(phone: phone, code: code, challengeId: recoveryChallengeId)
+            )
+            try await finishAuthentication(auth, fallbackPhone: phone)
+            self.recoveryChallengeId = nil
+        } catch {
+            // Keep the challenge for a corrected-code retry. The message comes
+            // from the client instead of forwarding `customer_not_found`, so
+            // account existence is never exposed by this flow.
+            errorMessage = "Не удалось восстановить доступ. Проверьте код и попробуйте снова."
+        }
+    }
+
+    public func cancelRecovery() {
+        recoveryChallengeId = nil
+        devCode = nil
+        errorMessage = nil
+    }
+
     /// Показывает ошибку входа, случившуюся до обращения к серверу — например
     /// когда Apple не вернула токен. Иначе экран молчит, и человек не понимает,
     /// нажалась кнопка или нет.
@@ -170,7 +351,30 @@ public final class CustomerAuthStore {
 
     /// Вход через Google. `nonce` — исходная одноразовая строка, переданная
     /// Google SDK при выпуске ID token; сервер сравнивает её с claim токена.
-    public func signInWithGoogle(identityToken: String, nonce: String) async {
+    /// The API-advertised Google audience must exactly match the Web client ID
+    /// embedded as `GIDServerClientID`. A syntactically valid but different ID
+    /// would produce an ID token for an audience the server did not advertise,
+    /// so both the UI and this invocation boundary fail closed.
+    public func isGoogleSignInEnabled(serverClientID: String?) -> Bool {
+        guard
+            let serverClientID,
+            !serverClientID.isEmpty,
+            case .available(let methods) = authMethodsState,
+            methods.google.enabled,
+            methods.google.clientId == serverClientID
+        else { return false }
+        return true
+    }
+
+    public func signInWithGoogle(
+        identityToken: String,
+        nonce: String,
+        serverClientID: String?
+    ) async {
+        guard isGoogleSignInEnabled(serverClientID: serverClientID) else {
+            errorMessage = "Вход через Google пока недоступен. Обновите способы входа и попробуйте снова."
+            return
+        }
         guard validSocialCredentials(identityToken: identityToken, nonce: nonce) else {
             errorMessage = "Не удалось подтвердить безопасный вход Google. Попробуйте ещё раз."
             return
@@ -369,6 +573,7 @@ public final class CustomerAuthStore {
         errorMessage = nil
         devCode = nil
         phoneChallengeId = nil
+        recoveryChallengeId = nil
         emailChallengeId = nil
         emailAttachChallengeId = nil
         clearSocialEnrollment()
@@ -553,6 +758,17 @@ public final class CustomerAuthStore {
     private func beginSocialRequest() {
         isLoading = true
         errorMessage = nil
+    }
+
+    private var recoveryCapabilityEnabled: Bool {
+        guard case .available(let methods) = authMethodsState else { return false }
+        return methods.recovery.enabled
+    }
+
+    private func reportRecoveryUnavailable() {
+        recoveryChallengeId = nil
+        devCode = nil
+        errorMessage = "Восстановление доступа сейчас недоступно. Попробуйте позже."
     }
 
     private func validSocialCredentials(identityToken: String, nonce: String) -> Bool {

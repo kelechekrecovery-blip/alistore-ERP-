@@ -22,10 +22,11 @@ services:
         value: api
       - key: APPLE_REVOCATION_RELAY_ENABLED
         value: "false"
-      # Expand/switch auth rollout: leave false while the previous API revision
-      # drains after the additive enum migration, then enable explicitly.
+      # Recovery uses the same live SMS provider as login. Keep the rollout
+      # owner-controlled: a hard-coded false here would silently undo a verified
+      # production activation on the next Blueprint sync.
       - key: AUTH_RECOVERY_OTP_ENABLED
-        value: "false"
+        sync: false
       - key: DATABASE_URL
         fromDatabase:
           name: alistore-postgres-prod
@@ -218,9 +219,11 @@ envVarGroups:
       # session after a page reload.
       - key: AUTH_COOKIE_DOMAIN
         value: .ali.kg
-      # Keep disabled until email OTP delivery moves to a durable encrypted job.
+      # Owner-controlled because the value must move together with verified
+      # SMTP delivery. Hard-coding false here would revert a working login on
+      # every Blueprint sync.
       - key: AUTH_EMAIL_LOGIN_ENABLED
-        value: "false"
+        sync: false
       # Канал критических алертов. Без этих двух значений alerter.service держит
       # алерты в массиве в памяти процесса (delivered: false) — рестарт их
       # стирает, и о 5xx, смерти relay и падении refund-релея не узнаёт никто.
@@ -251,13 +254,12 @@ envVarGroups:
         value: "false"
       - key: PAYMENTS_SANDBOX_CONFIRM_ENABLED
         value: "false"
-      # `silent` селектор не знает: otp-sender-selector.ts принимает `noop` и
-      # `production`. Вызов стоит в useFactory провайдера OTP_SENDER, поэтому
-      # неизвестное значение роняло контейнер Nest до первого запроса — снаружи
-      # это выглядело как 502 без объяснения. Покрыто тестом, который читает
-      # этот файл: apps/api/test/otp-sender-selector.spec.ts
+      # Значение задаёт владелец после live-delivery проверки. Blueprint не
+      # должен возвращать рабочий android_gateway обратно в disabled при sync.
+      # Пустое/неверное значение fail-closed роняет preflight вместо ложной
+      # доступности регистрации.
       - key: SMS_PROVIDER
-        value: disabled
+        sync: false
       - key: SMS_PROVIDER_CERTIFIED
         value: "false"
       # Мост через Android-телефон. Чтобы включить: SMS_PROVIDER=android_gateway
@@ -267,7 +269,7 @@ envVarGroups:
       # совпадения телефон его не расшифрует. Покрыто otp-sender-selector.spec.ts
       # и production-preflight.spec.ts.
       - key: SMS_GATEWAY_URL
-        sync: false
+        value: https://api.sms-gate.app/3rdparty/v1
       - key: SMS_GATEWAY_USERNAME
         sync: false
       - key: SMS_GATEWAY_PASSWORD
@@ -287,13 +289,13 @@ envVarGroups:
       # для кнопки на сайте: угадать по виду строки, где Services ID, а где
       # bundle id, нельзя, и вывода из APPLE_CLIENT_ID нет намеренно.
       - key: APPLE_CLIENT_ID
-        sync: false
+        value: kg.alistore.web,kg.alistore.client
       - key: APPLE_WEB_CLIENT_ID
-        sync: false
+        value: kg.alistore.web
       - key: APPLE_REDIRECT_URI
-        sync: false
+        value: https://ali.kg/login
       - key: APPLE_TEAM_ID
-        sync: false
+        value: ZYU3F8W56P
       - key: APPLE_KEY_ID
         sync: false
       - key: APPLE_PRIVATE_KEY

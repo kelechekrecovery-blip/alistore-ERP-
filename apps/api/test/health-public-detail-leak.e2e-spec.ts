@@ -10,6 +10,7 @@ import { StaffAuthModule } from '../src/staff-auth/staff-auth.module';
 import { StaffAuthService } from '../src/staff-auth/staff-auth.service';
 import { AuthzModule } from '../src/authz/authz.module';
 import { HealthController } from '../src/health/health.controller';
+import { WORKER_RUNTIME_HEARTBEAT_ID } from '../src/health/worker-runtime-heartbeat.service';
 
 /**
  * S-07 — публичные health-пробы не описывают внутренности сервиса.
@@ -56,6 +57,7 @@ describe('Health — публичные пробы не раскрывают с�
   });
 
   afterAll(async () => {
+    await prisma.workerHeartbeat.deleteMany({ where: { id: WORKER_RUNTIME_HEARTBEAT_ID } });
     await app.close();
     await prisma.$disconnect();
   });
@@ -76,6 +78,61 @@ describe('Health — публичные пробы не раскрывают с�
       expect(payload).not.toContain('details');
     },
   );
+
+  it('публикует только revision header для привязки CD к фактическому deploy', async () => {
+    const previous = process.env.RENDER_GIT_COMMIT;
+    process.env.RENDER_GIT_COMMIT = '0123456789abcdef';
+    try {
+      const res = await request(app.getHttpServer()).get('/health/live').expect(200);
+      expect(res.headers['x-alistore-revision']).toBe('0123456789abcdef');
+      expect(res.body).toEqual({ status: 'ok' });
+    } finally {
+      if (previous === undefined) delete process.env.RENDER_GIT_COMMIT;
+      else process.env.RENDER_GIT_COMMIT = previous;
+    }
+  });
+
+  it('подтверждает отдельную revision worker через свежий heartbeat без внутренних деталей', async () => {
+    await prisma.workerHeartbeat.upsert({
+      where: { id: WORKER_RUNTIME_HEARTBEAT_ID },
+      create: { id: WORKER_RUNTIME_HEARTBEAT_ID, meta: { revision: 'worker-sha-123' } },
+      update: { meta: { revision: 'worker-sha-123' } },
+    });
+
+    const res = await request(app.getHttpServer()).get('/health/worker').expect(200);
+
+    expect(res.headers['x-alistore-revision']).toBe('worker-sha-123');
+    expect(res.body).toEqual({ status: 'ok' });
+  });
+
+  it.each([
+    ['missing', null],
+    ['malformed', { wrong: 'shape' }],
+  ])('worker health отвечает 503 для %s heartbeat', async (_label, meta) => {
+    await prisma.workerHeartbeat.deleteMany({ where: { id: WORKER_RUNTIME_HEARTBEAT_ID } });
+    if (meta) {
+      await prisma.workerHeartbeat.create({
+        data: { id: WORKER_RUNTIME_HEARTBEAT_ID, meta },
+      });
+    }
+
+    const res = await request(app.getHttpServer()).get('/health/worker').expect(503);
+    expect(JSON.stringify(res.body)).not.toContain('revision');
+  });
+
+  it('worker health отвечает 503 для stale heartbeat', async () => {
+    await prisma.workerHeartbeat.upsert({
+      where: { id: WORKER_RUNTIME_HEARTBEAT_ID },
+      create: { id: WORKER_RUNTIME_HEARTBEAT_ID, meta: { revision: 'old-worker-sha' } },
+      update: { meta: { revision: 'old-worker-sha' } },
+    });
+    await prisma.workerHeartbeat.update({
+      where: { id: WORKER_RUNTIME_HEARTBEAT_ID },
+      data: { lastSeenAt: new Date(Date.now() - 10 * 60_000) },
+    });
+
+    await request(app.getHttpServer()).get('/health/worker').expect(503);
+  });
 
   it('деградация зависимости всё ещё даёт 503 — но не говорит, какая именно', async () => {
     memory.checkHeap.mockRejectedValue(

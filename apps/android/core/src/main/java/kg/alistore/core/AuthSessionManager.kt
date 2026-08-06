@@ -17,10 +17,18 @@ import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 interface AuthGateway {
+  suspend fun authMethods(): CustomerAuthMethods =
+    throw UnsupportedOperationException("Authentication capabilities are unavailable")
   suspend fun requestOtp(phone: String): OtpChallenge
   suspend fun verifyOtp(phone: String, code: String): AuthTokens =
     verifyOtp(phone, code, null)
   suspend fun verifyOtp(phone: String, code: String, challengeId: String?): AuthTokens
+  suspend fun requestRecoveryOtp(phone: String): OtpChallenge =
+    throw UnsupportedOperationException("Account recovery is unavailable")
+  suspend fun verifyRecoveryOtp(phone: String, code: String): AuthTokens =
+    verifyRecoveryOtp(phone, code, null)
+  suspend fun verifyRecoveryOtp(phone: String, code: String, challengeId: String?): AuthTokens =
+    throw UnsupportedOperationException("Account recovery is unavailable")
   /** Код на почту, уже привязанную к аккаунту (вход вторым каналом). */
   suspend fun requestEmailOtp(email: String): EmailOtpChallenge
   suspend fun verifyEmailOtp(email: String, code: String): AuthTokens =
@@ -75,6 +83,7 @@ class AuthSessionManager(
   private var refreshFlight: RefreshFlight? = null
   private var sessionGeneration = 0L
   private var phoneChallengeId: String? = null
+  private var recoveryChallengeId: String? = null
   private var emailChallengeId: String? = null
   private var emailAttachChallengeId: String? = null
   private var socialEnrollmentToken: String? = null
@@ -87,6 +96,27 @@ class AuthSessionManager(
   // (`authManager.requiresQuickUnlock`) would not reliably recompose on its own.
   var requiresQuickUnlock: Boolean by mutableStateOf(false)
     private set
+
+  var authMethodsState: CustomerAuthMethodsState by mutableStateOf(CustomerAuthMethodsState.Loading)
+    private set
+
+  /**
+   * Loads the API capability contract used by every customer login surface.
+   * Failure is deliberately fail-closed: guest browsing remains available,
+   * but no OTP or OAuth method is advertised or invoked without confirmation.
+   */
+  suspend fun loadAuthMethods(force: Boolean = false) {
+    if (!force && authMethodsState is CustomerAuthMethodsState.Available) return
+    authMethodsState = CustomerAuthMethodsState.Loading
+    try {
+      authMethodsState = CustomerAuthMethodsState.Available(api.authMethods())
+    } catch (cancelled: CancellationException) {
+      throw cancelled
+    } catch (_: Throwable) {
+      authMethodsState = CustomerAuthMethodsState.Unavailable
+    }
+  }
+
   suspend fun restore(): AuthState {
     val stored = store.readSession() ?: return AuthState.Guest
     return runCatching { requiresQuickUnlock = true; signedIn(stored) }.getOrElse { initialError ->
@@ -99,23 +129,53 @@ class AuthSessionManager(
     }
   }
 
-  suspend fun requestOtp(phone: String): OtpChallenge =
-    api.requestOtp(phone.normalizedPhone()).also { phoneChallengeId = it.challengeId }
+  suspend fun requestOtp(phone: String): OtpChallenge {
+    requirePhoneLogin()
+    return api.requestOtp(phone.normalizedPhone()).also { phoneChallengeId = it.challengeId }
+  }
 
   suspend fun verify(phone: String, code: String): AuthState = runCatching {
+    requirePhoneLogin()
     val tokens = api.verifyOtp(phone.normalizedPhone(), code.trim(), phoneChallengeId)
     requiresQuickUnlock = false
     signedIn(tokens).also { phoneChallengeId = null }
   }.getOrElse(::failAndClear)
 
-  suspend fun requestEmailOtp(email: String): EmailOtpChallenge =
-    api.requestEmailOtp(email.normalizedEmail()).also { emailChallengeId = it.challengeId }
+  suspend fun requestRecoveryOtp(phone: String): OtpChallenge {
+    requireRecovery()
+    return try {
+      api.requestRecoveryOtp(phone.normalizedPhone()).also {
+        recoveryChallengeId = it.challengeId
+      }
+    } catch (cancelled: CancellationException) {
+      throw cancelled
+    } catch (_: Throwable) {
+      throw IllegalStateException("Не удалось отправить код восстановления. Попробуйте позже")
+    }
+  }
+
+  suspend fun verifyRecovery(phone: String, code: String): AuthState = try {
+    requireRecovery()
+    val tokens = api.verifyRecoveryOtp(phone.normalizedPhone(), code.trim(), recoveryChallengeId)
+    requiresQuickUnlock = false
+    signedIn(tokens).also { recoveryChallengeId = null }
+  } catch (cancelled: CancellationException) {
+    throw cancelled
+  } catch (error: Throwable) {
+    failAndClear(error, "Не удалось восстановить доступ. Проверьте код и попробуйте ещё раз")
+  }
+
+  suspend fun requestEmailOtp(email: String): EmailOtpChallenge {
+    requireEmailLogin()
+    return api.requestEmailOtp(email.normalizedEmail()).also { emailChallengeId = it.challengeId }
+  }
 
   /**
    * Вход по почте. Аккаунт здесь никогда не создаётся: адрес без телефона не
    * может быть клиентом, поэтому неизвестная почта возвращает `customer_not_found`.
    */
   suspend fun verifyEmail(email: String, code: String): AuthState = runCatching {
+    requireEmailLogin()
     val tokens = api.verifyEmailOtp(email.normalizedEmail(), code.trim(), emailChallengeId)
     requiresQuickUnlock = false
     signedIn(tokens).also { emailChallengeId = null }
@@ -132,6 +192,7 @@ class AuthSessionManager(
     }
 
   suspend fun loginWithGoogle(credential: GoogleIdentityCredential): AuthState = try {
+    requireGoogleLogin()
     require(credential.identityToken.isNotBlank()) { "Google не вернул токен аккаунта" }
     require(credential.nonce.isNotBlank()) { "Google nonce отсутствует" }
     when (val result = api.googleLogin(credential.identityToken, credential.nonce)) {
@@ -158,6 +219,7 @@ class AuthSessionManager(
   suspend fun requestSocialEnrollmentOtp(phone: String): OtpChallenge {
     checkNotNull(socialEnrollmentToken) { "Регистрация через Google уже отменена. Начните вход заново" }
     checkSocialEnrollmentFresh()
+    requireGoogleRegistration()
     val normalized = phone.normalizedPhone()
     return api.requestOtp(normalized).also {
       socialEnrollmentPhone = normalized
@@ -174,6 +236,7 @@ class AuthSessionManager(
     }
     return try {
       checkSocialEnrollmentFresh()
+      requireGoogleRegistration()
       val tokens = api.completeSocialEnrollment(
         token,
         normalized,
@@ -344,6 +407,41 @@ class AuthSessionManager(
     if (nowMillis() >= expiresAt) {
       clearSocialEnrollment()
       throw IllegalStateException("Срок подтверждения Google истёк. Начните вход заново")
+    }
+  }
+
+  private suspend fun confirmedAuthMethods(): CustomerAuthMethods {
+    if (authMethodsState !is CustomerAuthMethodsState.Available) loadAuthMethods()
+    return (authMethodsState as? CustomerAuthMethodsState.Available)?.methods
+      ?: throw IllegalStateException("Не удалось проверить доступные способы входа. Попробуйте ещё раз")
+  }
+
+  private suspend fun requirePhoneLogin() {
+    check(confirmedAuthMethods().phone.enabled) { "Вход по телефону сейчас недоступен" }
+  }
+
+  private suspend fun requireEmailLogin() {
+    check(confirmedAuthMethods().email.enabled) { "Вход по почте сейчас недоступен" }
+  }
+
+  private suspend fun requireRecovery() {
+    check(confirmedAuthMethods().recovery.enabled) { "Восстановление доступа сейчас недоступно" }
+  }
+
+  private suspend fun requireGoogleLogin() {
+    val google = confirmedAuthMethods().google
+    val configuredClientId = googleSignInProvider?.serverClientId
+    check(
+      google.enabled
+        && !google.clientId.isNullOrBlank()
+        && configuredClientId == google.clientId
+    ) { "Вход через Google сейчас недоступен" }
+  }
+
+  private suspend fun requireGoogleRegistration() {
+    val methods = confirmedAuthMethods()
+    check(methods.phone.enabled && methods.google.registers) {
+      "Регистрация через Google сейчас недоступна. Начните вход заново позже"
     }
   }
 }

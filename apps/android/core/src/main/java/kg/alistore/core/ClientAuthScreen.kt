@@ -90,33 +90,112 @@ private fun OtpLogin(
   googleSignInProvider: GoogleSignInProvider?,
   modifier: Modifier,
 ) {
-  var channel by remember { mutableStateOf(AuthChannel.Phone) }
+  val scope = rememberCoroutineScope()
+  LaunchedEffect(manager) { manager.loadAuthMethods() }
+
+  when (val methodsState = manager.authMethodsState) {
+    CustomerAuthMethodsState.Loading -> AuthMethodsMessage(
+      title = "Проверяем способы входа",
+      detail = "Магазином можно пользоваться как гость, пока идёт проверка.",
+      tag = "auth-methods-loading",
+      modifier = modifier,
+      loading = true,
+    )
+    CustomerAuthMethodsState.Unavailable -> AuthMethodsMessage(
+      title = "Не удалось проверить способы входа",
+      detail = "Мы скрыли неподтверждённые способы входа. Магазином можно пользоваться как гость.",
+      tag = "auth-methods-unavailable",
+      modifier = modifier,
+      action = {
+        Button(
+          onClick = { scope.launch { manager.loadAuthMethods(force = true) } },
+          modifier = Modifier.fillMaxWidth().padding(top = 14.dp).testTag("auth-methods-retry"),
+          colors = ButtonDefaults.buttonColors(containerColor = AuthLime, contentColor = AuthInk),
+          shape = RoundedCornerShape(8.dp),
+        ) { Text("Проверить ещё раз", fontWeight = FontWeight.Bold) }
+      },
+    )
+    is CustomerAuthMethodsState.Available -> OtpLoginMethods(
+      state = state,
+      manager = manager,
+      onState = onState,
+      googleSignInProvider = googleSignInProvider,
+      methods = methodsState.methods,
+      modifier = modifier,
+    )
+  }
+}
+
+@Composable
+private fun OtpLoginMethods(
+  state: AuthState,
+  manager: AuthSessionManager,
+  onState: (AuthState) -> Unit,
+  googleSignInProvider: GoogleSignInProvider?,
+  methods: CustomerAuthMethods,
+  modifier: Modifier,
+) {
+  val channels = buildList {
+    if (methods.phone.enabled) add(AuthChannel.Phone)
+    if (methods.email.enabled) add(AuthChannel.Email)
+  }
+  val googleProvider = googleSignInProvider?.takeIf {
+    methods.google.enabled && it.serverClientId == methods.google.clientId
+  }
+  val googleEnabled = googleProvider != null
+  val nativeLoginAvailable = channels.isNotEmpty() || googleEnabled
+  val nativeRegistrationAvailable = methods.phone.registers
+    || (googleEnabled && methods.google.registers)
+  var channel by remember(methods) { mutableStateOf(channels.firstOrNull() ?: AuthChannel.Phone) }
+  var recovering by remember(methods) { mutableStateOf(false) }
   val scope = rememberCoroutineScope()
   var googleBusy by remember { mutableStateOf(false) }
   var googleError by remember { mutableStateOf<String?>(null) }
+
+  if (!nativeLoginAvailable) {
+    AuthMethodsMessage(
+      title = "Вход сейчас недоступен",
+      detail = "Сервер не подтвердил ни один способ входа для Android. Магазином можно пользоваться как гость.",
+      tag = "auth-methods-none",
+      modifier = modifier,
+    )
+    return
+  }
+
   LazyColumn(modifier.fillMaxSize().background(AuthInk).padding(20.dp), verticalArrangement = Arrangement.Center) {
     item {
-      Text("Войти или создать аккаунт", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Black)
+      Text(if (nativeRegistrationAvailable) "Войти или создать аккаунт" else "Войти в аккаунт", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Black)
       Text(
-        if (channel == AuthChannel.Phone) "Введите телефон и код из SMS. Если аккаунта ещё нет, мы создадим его автоматически."
-        else "Почта — дополнительный вход в тот же аккаунт. Код придёт только на ранее привязанный адрес.",
+        when {
+          channels.isEmpty() -> "Продолжите через подтверждённый Google-аккаунт."
+          channel == AuthChannel.Phone -> "Введите телефон и код из SMS. Если аккаунта ещё нет, мы создадим его автоматически."
+          else -> "Почта — дополнительный вход в тот же аккаунт. Код придёт только на ранее привязанный адрес."
+        },
         color = AuthMuted,
         fontSize = 13.sp,
         modifier = Modifier.padding(top = 7.dp, bottom = 14.dp),
       )
-      if (googleSignInProvider != null) {
+      if (!nativeRegistrationAvailable) {
+        Text(
+          "Сейчас доступен только вход в существующий аккаунт. Создание нового аккаунта временно недоступно; покупки можно продолжить как гость.",
+          color = AuthMuted,
+          fontSize = 12.sp,
+          modifier = Modifier.padding(bottom = 12.dp).testTag("auth-registration-unavailable"),
+        )
+      }
+      if (googleProvider != null) {
         Button(
           onClick = {
             scope.launch {
               googleBusy = true
               googleError = null
               try {
-                val credential = googleSignInProvider.signIn()
-                  when (val next = manager.loginWithGoogle(credential)) {
-                    is AuthState.SignedIn, is AuthState.SocialEnrollment -> onState(next)
-                    is AuthState.Failed -> googleError = next.message
-                    else -> Unit
-                  }
+                val credential = googleProvider.signIn()
+                when (val next = manager.loginWithGoogle(credential)) {
+                  is AuthState.SignedIn, is AuthState.SocialEnrollment -> onState(next)
+                  is AuthState.Failed -> googleError = next.message
+                  else -> Unit
+                }
               } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
               } catch (error: Throwable) {
@@ -134,14 +213,51 @@ private fun OtpLogin(
         googleError?.let {
           Text(it, color = AuthCoral, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp).testTag("auth-google-error"))
         }
-        Text("или", color = AuthMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
+        if (channels.isNotEmpty()) {
+          Text("или", color = AuthMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
+        }
       }
-      AuthChannelSwitch(channel) { channel = it }
-      when (channel) {
-        AuthChannel.Phone -> PhoneOtpLogin(state, manager, onState)
-        AuthChannel.Email -> EmailOtpLogin(manager, onState)
+      if (channels.isNotEmpty()) {
+        AuthChannelSwitch(channel, channels) {
+          channel = it
+          recovering = false
+        }
+        when (channel) {
+          AuthChannel.Phone -> if (recovering) {
+            RecoveryOtpLogin(manager, onState) { recovering = false }
+          } else {
+            PhoneOtpLogin(
+              state = state,
+              manager = manager,
+              onState = onState,
+              recoveryEnabled = methods.recovery.enabled,
+              onRecovery = { recovering = true },
+            )
+          }
+          AuthChannel.Email -> EmailOtpLogin(manager, onState)
+        }
       }
     }
+  }
+}
+
+@Composable
+private fun AuthMethodsMessage(
+  title: String,
+  detail: String,
+  tag: String,
+  modifier: Modifier,
+  loading: Boolean = false,
+  action: (@Composable () -> Unit)? = null,
+) {
+  Column(
+    modifier.fillMaxSize().background(AuthInk).padding(20.dp).testTag(tag),
+    verticalArrangement = Arrangement.Center,
+  ) {
+    if (loading) CircularProgressIndicator(color = AuthLime, modifier = Modifier.padding(bottom = 14.dp))
+    Text(title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
+    Text(detail, color = AuthMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+    action?.invoke()
   }
 }
 
@@ -288,10 +404,14 @@ private val SocialProvider.displayName: String
   }
 
 @Composable
-private fun AuthChannelSwitch(channel: AuthChannel, onChannel: (AuthChannel) -> Unit) {
+private fun AuthChannelSwitch(channel: AuthChannel, channels: List<AuthChannel>, onChannel: (AuthChannel) -> Unit) {
   Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-    AuthChannelTab("Телефон", "auth-channel-phone", channel == AuthChannel.Phone, Modifier.weight(1f)) { onChannel(AuthChannel.Phone) }
-    AuthChannelTab("Почта", "auth-channel-email", channel == AuthChannel.Email, Modifier.weight(1f)) { onChannel(AuthChannel.Email) }
+    if (AuthChannel.Phone in channels) {
+      AuthChannelTab("Телефон", "auth-channel-phone", channel == AuthChannel.Phone, Modifier.weight(1f)) { onChannel(AuthChannel.Phone) }
+    }
+    if (AuthChannel.Email in channels) {
+      AuthChannelTab("Почта", "auth-channel-email", channel == AuthChannel.Email, Modifier.weight(1f)) { onChannel(AuthChannel.Email) }
+    }
   }
 }
 
@@ -407,7 +527,13 @@ private fun EmailOtpLogin(manager: AuthSessionManager, onState: (AuthState) -> U
 }
 
 @Composable
-private fun PhoneOtpLogin(state: AuthState, manager: AuthSessionManager, onState: (AuthState) -> Unit) {
+private fun PhoneOtpLogin(
+  state: AuthState,
+  manager: AuthSessionManager,
+  onState: (AuthState) -> Unit,
+  recoveryEnabled: Boolean,
+  onRecovery: () -> Unit,
+) {
   val scope = rememberCoroutineScope()
   var phone by remember { mutableStateOf("+996") }
   var code by remember { mutableStateOf("") }
@@ -514,7 +640,152 @@ private fun PhoneOtpLogin(state: AuthState, manager: AuthSessionManager, onState
       colors = ButtonDefaults.buttonColors(containerColor = AuthSurface, contentColor = Color.White),
       shape = RoundedCornerShape(8.dp),
     ) { Text("Изменить номер") }
+  } else if (recoveryEnabled) {
+    TextButton(
+      onClick = onRecovery,
+      enabled = !busy,
+      modifier = Modifier.fillMaxWidth().padding(top = 6.dp).testTag("auth-recovery-open"),
+    ) { Text("Восстановить доступ", color = Color.White) }
   }
+}
+
+@Composable
+private fun RecoveryOtpLogin(
+  manager: AuthSessionManager,
+  onState: (AuthState) -> Unit,
+  onBack: () -> Unit,
+) {
+  val scope = rememberCoroutineScope()
+  var phone by remember { mutableStateOf("+996") }
+  var code by remember { mutableStateOf("") }
+  var codeRequested by remember { mutableStateOf(false) }
+  var busy by remember { mutableStateOf(false) }
+  var message by remember { mutableStateOf<String?>(null) }
+  var resendAvailableAtMillis by remember { mutableStateOf<Long?>(null) }
+  var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+  val resendSeconds = resendSeconds(resendAvailableAtMillis, nowMillis)
+  val validPhone = phone.filter(Char::isDigit).length == 12
+  val validCode = code.length == 6 && code.all(Char::isDigit)
+
+  LaunchedEffect(resendAvailableAtMillis) {
+    val deadline = resendAvailableAtMillis ?: return@LaunchedEffect
+    do {
+      nowMillis = System.currentTimeMillis()
+      if (nowMillis >= deadline) break
+      delay(1_000)
+    } while (true)
+  }
+
+  Text(
+    "Восстановление доступа",
+    color = Color.White,
+    fontSize = 20.sp,
+    fontWeight = FontWeight.Black,
+    modifier = Modifier.testTag("auth-recovery-title"),
+  )
+  Text(
+    "После подтверждения номера все старые сессии будут отозваны.",
+    color = AuthMuted,
+    fontSize = 12.sp,
+    modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
+  )
+  OutlinedTextField(
+    value = phone,
+    onValueChange = { phone = it.take(18); message = null },
+    enabled = !busy && !codeRequested,
+    label = { Text("Телефон аккаунта") },
+    placeholder = { Text("+996 700 12 34 56") },
+    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+    singleLine = true,
+    modifier = Modifier.fillMaxWidth().testTag("auth-recovery-phone"),
+    colors = authFieldColors(),
+  )
+  if (codeRequested) {
+    OutlinedTextField(
+      value = code,
+      onValueChange = { code = it.filter(Char::isDigit).take(6); message = null },
+      label = { Text("Код восстановления") },
+      keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+      singleLine = true,
+      modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+        .contentType(ContentType.SmsOtpCode)
+        .testTag("auth-recovery-code"),
+      colors = authFieldColors(),
+    )
+  }
+  message?.let {
+    Text(it, color = AuthCoral, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp).testTag("auth-recovery-message"))
+  }
+  Button(
+    onClick = {
+      scope.launch {
+        busy = true
+        try {
+          if (!codeRequested) {
+            try {
+              val challenge = manager.requestRecoveryOtp(phone)
+              codeRequested = true
+              challenge.devCode?.let { code = it }
+              resendAvailableAtMillis = System.currentTimeMillis() + OTP_RESEND_DELAY_MILLIS
+              message = "Если аккаунт существует, код восстановления отправлен"
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+              throw cancelled
+            } catch (error: Throwable) {
+              message = error.message ?: "Не удалось отправить код восстановления"
+            }
+          } else {
+            val next = manager.verifyRecovery(phone, code)
+            if (next is AuthState.SignedIn) onState(next) else message = (next as AuthState.Failed).message
+          }
+        } finally {
+          busy = false
+        }
+      }
+    },
+    enabled = !busy && if (codeRequested) validCode else validPhone,
+    modifier = Modifier.fillMaxWidth().padding(top = 14.dp).testTag("auth-recovery-action"),
+    colors = ButtonDefaults.buttonColors(containerColor = AuthLime, contentColor = AuthInk),
+    shape = RoundedCornerShape(8.dp),
+  ) {
+    Text(
+      if (busy) "Подождите…" else if (codeRequested) "Восстановить доступ" else "Получить код восстановления",
+      fontWeight = FontWeight.Bold,
+    )
+  }
+  if (codeRequested) {
+    Button(
+      onClick = {
+        scope.launch {
+          busy = true
+          try {
+            try {
+              val challenge = manager.requestRecoveryOtp(phone)
+              challenge.devCode?.let { code = it }
+              resendAvailableAtMillis = System.currentTimeMillis() + OTP_RESEND_DELAY_MILLIS
+              message = "Если аккаунт существует, новый код восстановления отправлен"
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+              throw cancelled
+            } catch (error: Throwable) {
+              message = error.message ?: "Не удалось отправить код восстановления"
+            }
+          } finally {
+            busy = false
+          }
+        }
+      },
+      enabled = !busy && resendSeconds == 0,
+      modifier = Modifier.fillMaxWidth().padding(top = 6.dp).testTag("auth-recovery-resend"),
+      colors = ButtonDefaults.buttonColors(containerColor = AuthSurface, contentColor = Color.White),
+      shape = RoundedCornerShape(8.dp),
+    ) {
+      Text(if (resendSeconds > 0) "Отправить ещё раз через $resendSeconds сек." else "Отправить код ещё раз")
+    }
+  }
+  TextButton(
+    onClick = onBack,
+    enabled = !busy,
+    modifier = Modifier.fillMaxWidth().padding(top = 6.dp).testTag("auth-recovery-back"),
+  ) { Text("Вернуться ко входу", color = Color.White) }
 }
 
 internal fun resendSeconds(deadlineMillis: Long?, nowMillis: Long): Int {
@@ -608,7 +879,10 @@ private fun SignedInAccount(
     return attempt.getOrThrow()
   }
 
-  LazyColumn(modifier.fillMaxSize().background(AuthInk).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+  LazyColumn(
+    modifier.fillMaxSize().background(AuthInk).padding(18.dp).testTag("account-list"),
+    verticalArrangement = Arrangement.spacedBy(10.dp),
+  ) {
     item {
       Text("Кабинет", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black, modifier = Modifier.testTag("account-title"))
       Text(state.user.phone ?: "Профиль AliStore", color = AuthLime, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))

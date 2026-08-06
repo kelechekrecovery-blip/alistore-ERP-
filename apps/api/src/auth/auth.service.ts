@@ -977,6 +977,13 @@ export class AuthService implements OnModuleInit {
       });
     } catch (error) {
       if (error instanceof AppleOAuthError) {
+        // Never log the authorization code, identity token, refresh token or
+        // subject. The public client id and provider-classified reason are
+        // sufficient to distinguish portal/config drift from a transient
+        // outage when production reports only apple_token_exchange_failed.
+        this.logger.warn(
+          `Apple authorization exchange failed: code=${error.code} reason=${error.reason ?? 'unknown'} clientId=${profile.clientId}`,
+        );
         throw new ValidationError(error.code, 'Apple authorization could not be completed');
       }
       throw error;
