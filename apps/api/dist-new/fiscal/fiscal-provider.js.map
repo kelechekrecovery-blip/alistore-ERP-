@@ -1,0 +1,1 @@
+{"version":3,"file":"fiscal-provider.js","sourceRoot":"","sources":["../../src/fiscal/fiscal-provider.ts"],"names":[],"mappings":";;;AA6Ba,QAAA,6BAA6B,GAAmB;IAC3D,IAAI,EAAE,eAAe;IACrB,SAAS,EAAE,KAAK;IAChB,KAAK,CAAC,KAAK;QACT,OAAO;YACL,MAAM,EAAE,eAAe;YACvB,YAAY,EAAE,IAAI;YAClB,SAAS,EAAE,IAAI;YACf,iBAAiB,EAAE,IAAI;SACxB,CAAC;IACJ,CAAC;CACF,CAAC"}

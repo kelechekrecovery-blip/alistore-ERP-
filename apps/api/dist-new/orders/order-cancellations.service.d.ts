@@ -1,0 +1,62 @@
+import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { OutboxService } from '../outbox/outbox.service';
+export declare class OrderCancellationsService {
+    private readonly prisma;
+    private readonly audit;
+    private readonly config;
+    private readonly outbox?;
+    constructor(prisma: PrismaService, audit: AuditService, config: ConfigService, outbox?: OutboxService | undefined);
+    preview(orderId: string, customerId: string): Promise<{
+        requestEnabled: boolean;
+        automaticRefundEnabled: boolean;
+        orderId: string;
+        canCancel: boolean;
+        blockedReason: string | null;
+        policy: string;
+        purchaseOrderSent: boolean;
+        depositPaid: number;
+        estimatedRefundAmount: number;
+        supplierExpenseDeduction: number;
+        ownerReviewRequired: boolean;
+        note: string;
+    } | null>;
+    current(orderId: string, customerId: string): Prisma.Prisma__OrderCancellationClient<{
+        id: string;
+        orderId: string;
+        status: import(".prisma/client").$Enums.OrderCancellationStatus;
+        createdAt: Date;
+        completedAt: Date | null;
+        refundId: string | null;
+        policySnapshot: import(".prisma/client").$Enums.OrderCancellationPolicy;
+        purchaseOrderSentSnapshot: boolean;
+        depositPaidSnapshot: number;
+        requestedRefundAmount: number;
+        approvedRefundAmount: number | null;
+        customerReason: string;
+        ownerReason: string | null;
+        resolvedAt: Date | null;
+    } | null, null, import("@prisma/client/runtime/library").DefaultArgs>;
+    request(orderId: string, customerId: string, reason: string, idempotencyKey: string): Promise<{
+        id: string;
+        orderId: string;
+        status: import(".prisma/client").$Enums.OrderCancellationStatus;
+        createdAt: Date;
+        completedAt: Date | null;
+        refundId: string | null;
+        policySnapshot: import(".prisma/client").$Enums.OrderCancellationPolicy;
+        purchaseOrderSentSnapshot: boolean;
+        depositPaidSnapshot: number;
+        requestedRefundAmount: number;
+        approvedRefundAmount: number | null;
+        customerReason: string;
+        ownerReason: string | null;
+        resolvedAt: Date | null;
+    }>;
+    private cancellationEnabled;
+    private autoRefundEnabled;
+    private readSource;
+    private applyAutomaticCancellationOnTx;
+}

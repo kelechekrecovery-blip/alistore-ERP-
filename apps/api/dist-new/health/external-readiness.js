@@ -1,0 +1,314 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.buildExternalReadinessReport = buildExternalReadinessReport;
+const CHECKS = [
+    {
+        id: 'sms_provider',
+        area: 'auth',
+        title: 'Production SMS/OTP provider',
+        requiredAny: [
+            ['SMS_PROVIDER', 'SMS_API_URL', 'SMS_API_KEY', 'SMS_SENDER_ID'],
+            ['SMS_PROVIDER', 'SMS_GATEWAY_URL', 'SMS_GATEWAY_USERNAME', 'SMS_GATEWAY_PASSWORD', 'SMS_GATEWAY_ENCRYPTION_PASSPHRASE'],
+        ],
+        completionMarkerEnv: 'SMS_PROVIDER_CERTIFIED',
+        manualChecks: [
+            'Login and recovery OTP delivered to a real Kyrgyzstan phone number',
+            'Sender ID approved and visible on the handset (n/a for the phone bridge — sender is a number)',
+            'Provider outage returns an error without leaving a usable challenge',
+            'Bridge only: SIM operator permits this A2P traffic and the volume stays within OTP-only limits',
+        ],
+        blocking: true,
+        note: 'OTP sender port is ready. Certified activation needs a provider contract, sender ID, credentials and live delivery. The Android phone bridge (SMS_PROVIDER=android_gateway) delivers OTP end-to-end encrypted but is not a certified A2P channel.',
+    },
+    {
+        id: 'payment_gateway',
+        area: 'payments',
+        title: 'Production payment gateway',
+        requiredEnv: [
+            'PAYMENT_PROVIDER',
+            'PAYMENT_API_URL',
+            'PAYMENT_MERCHANT_ID',
+            'PAYMENT_API_KEY',
+            'PAYMENT_WEBHOOK_SECRET',
+        ],
+        completionMarkerEnv: 'PAYMENT_PROVIDER_CERTIFIED',
+        manualChecks: [
+            'Real intent creation and amount/order reconciliation verified',
+            'Invalid webhook signature rejected using raw request bytes',
+            'Duplicate provider event delivered twice and applied once',
+            'Approved online refund reconciled with the provider account',
+        ],
+        blocking: true,
+        note: 'Provider port and sandbox are ready; production activation requires a merchant contract, credentials, signed webhook specification, and live refund reconciliation.',
+    },
+    {
+        id: 'fiscal_provider',
+        area: 'fiscal',
+        title: 'Fiscalization (OFD/KKM)',
+        requiredEnv: ['FISCAL_PROVIDER', 'FISCAL_API_URL', 'FISCAL_API_KEY'],
+        completionMarkerEnv: 'FISCAL_PROVIDER_CERTIFIED',
+        manualChecks: [
+            'POS sale issues a fiscal receipt with a fiscal number and QR, reconciled with the tax cabinet',
+            'Fiscal lines present on refund and exchange',
+            'Z-report and the offline KKM queue verified',
+        ],
+        blocking: true,
+        note: 'Retail sale in KG legally requires a fiscal receipt with tax lines, a fiscal number and Z-reports. Receipts are informational only until a certified OFD/KKM contract and FISCAL_PROVIDER* credentials are in place; FISCAL_PROVIDER_CERTIFIED=true is set only after live tax-cabinet reconciliation.',
+    },
+    {
+        id: 'ai_provider',
+        area: 'ai',
+        title: 'Hosted AI provider',
+        requiredAny: [['ANTHROPIC_API_KEY'], ['AI_PROVIDER_KEY'], ['OPENROUTER_API_KEY']],
+        optionalEnv: ['AI_PROVIDER', 'ANTHROPIC_MODEL', 'AI_MODEL', 'AI_FAST_MODEL'],
+        blocking: true,
+        note: 'Unlocks LLM/vision/tool-use/moderation paths (Anthropic or OpenRouter); keyless rule engines remain available.',
+    },
+    {
+        id: 'telegram_bot',
+        area: 'channels',
+        title: 'Telegram bot activation',
+        requiredEnv: ['TELEGRAM_BOT_TOKEN'],
+        optionalEnv: ['TELEGRAM_WEBHOOK_SECRET', 'TELEGRAM_WEBHOOK_URL'],
+        blocking: true,
+        note: '/tg Mini App shell is live; bot token/webhook activate production launch.',
+    },
+    {
+        id: 'telegram_ai_agent',
+        area: 'ai',
+        title: 'Telegram AI support/admin agent',
+        requiredEnv: [
+            'TELEGRAM_AGENT_ENABLED',
+            'TELEGRAM_BOT_TOKEN',
+            'TELEGRAM_WEBHOOK_SECRET',
+            'TELEGRAM_WEBHOOK_URL',
+            'TELEGRAM_MINI_APP_URL',
+            'OUTBOX_RELAY_ENABLED',
+            'NOTIFICATION_TRANSPORT',
+        ],
+        completionMarkerEnv: 'TELEGRAM_AGENT_CERTIFIED',
+        optionalEnv: [
+            'TELEGRAM_AGENT_MODEL',
+            'TELEGRAM_AGENT_CUSTOMER_AI_ENABLED',
+            'CUSTOMER_AI_DATA_CERTIFIED',
+        ],
+        manualChecks: [
+            'BotFather webhook is configured with the secret-token header',
+            'Admin/owner pairing requires a fresh TOTP and the one-time code cannot be replayed',
+            'Customer message creates one idempotent support ticket and reveals no other customer data',
+            'Read-only AI tools cannot execute money, stock, RBAC, settings or release mutations',
+            'Staff disconnect immediately disables Telegram access',
+        ],
+        blocking: true,
+        note: 'The agent is fail-closed and remains disabled until a newly issued bot token, HTTPS webhook and live security certification are complete.',
+    },
+    {
+        id: 'whatsapp_business',
+        area: 'channels',
+        title: 'WhatsApp Business channel',
+        requiredEnv: [
+            'WHATSAPP_ACCESS_TOKEN',
+            'WHATSAPP_PHONE_NUMBER_ID',
+            'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
+        ],
+        blocking: true,
+        note: 'Required before WhatsApp storefront/order notifications can be enabled.',
+    },
+    {
+        id: 'apple_social_login',
+        area: 'identity',
+        title: 'Apple social login',
+        requiredEnv: ['APPLE_CLIENT_ID'],
+        optionalEnv: [
+            'APPLE_JWKS_URL',
+            'APPLE_TEAM_ID',
+            'APPLE_KEY_ID',
+            'APPLE_PRIVATE_KEY',
+            'APPLE_REDIRECT_URI',
+        ],
+        blocking: true,
+        note: 'Backend verifies Sign in with Apple identity tokens via JWKS; client setup still needs the Apple service/app id and callback configuration.',
+    },
+    {
+        id: 'google_social_login',
+        area: 'identity',
+        title: 'Google social login',
+        requiredEnv: ['GOOGLE_CLIENT_ID', 'GOOGLE_WEB_CLIENT_ID'],
+        blocking: true,
+        validate: (env) => {
+            const webClientId = env('GOOGLE_WEB_CLIENT_ID')?.trim();
+            return Boolean(webClientId && (env('GOOGLE_CLIENT_ID') ?? '')
+                .split(',')
+                .map((value) => value.trim())
+                .includes(webClientId));
+        },
+        note: 'Backend verifies Google ID tokens against the allowed client IDs; the web client ID and ali.kg JavaScript origins must be configured in Google Cloud.',
+    },
+    {
+        id: 'telegram_social_login',
+        area: 'identity',
+        title: 'Telegram social login',
+        requiredEnv: ['TELEGRAM_BOT_TOKEN'],
+        optionalEnv: ['TELEGRAM_AUTH_MAX_AGE_SECONDS', 'TELEGRAM_LOGIN_REDIRECT_URI'],
+        blocking: true,
+        note: 'Backend verifies Telegram Mini App/Login Widget signed initData; callback URL must be configured for web launch.',
+    },
+    {
+        id: 'campaign_delivery',
+        area: 'growth',
+        title: 'Campaign delivery transport',
+        requiredAny: [
+            ['NOTIFICATION_TRANSPORT', 'NOVU_API_KEY'],
+            ['NOTIFICATION_TRANSPORT', 'SMTP_HOST'],
+            ['NOTIFICATION_TRANSPORT', 'TELEGRAM_BOT_TOKEN'],
+            [
+                'NOTIFICATION_TRANSPORT',
+                'WHATSAPP_ACCESS_TOKEN',
+                'WHATSAPP_PHONE_NUMBER_ID',
+            ],
+            ['NOTIFICATION_TRANSPORT', 'EXPO_PUBLIC_EAS_PROJECT_ID'],
+            ['NOTIFICATION_TRANSPORT', 'FCM_SERVICE_ACCOUNT_JSON'],
+            ['NOTIFICATION_TRANSPORT', 'FCM_SERVICE_ACCOUNT_KEY_PATH'],
+        ],
+        optionalEnv: [
+            'NOVU_API_URL',
+            'SMTP_PORT',
+            'SMTP_USER',
+            'SMTP_FROM',
+            'SMTP_SECURE',
+            'TELEGRAM_API_URL',
+            'WHATSAPP_API_URL',
+            'WHATSAPP_API_VERSION',
+        ],
+        blocking: true,
+        note: 'Segment Builder and ROI are ready; set NOTIFICATION_TRANSPORT=channels/providers or a single transport with Novu, SMTP, Expo Push, Telegram, or WhatsApp credentials.',
+    },
+    {
+        id: 'native_push_android',
+        area: 'mobile',
+        title: 'Android FCM push credentials',
+        requiredAny: [['FCM_SERVICE_ACCOUNT_JSON'], ['FCM_SERVICE_ACCOUNT_KEY_PATH']],
+        completionMarkerEnv: 'FCM_PROVIDER_CERTIFIED',
+        optionalEnv: [
+            'EXPO_PUBLIC_EAS_PROJECT_ID',
+            'EXPO_TOKEN',
+        ],
+        manualChecks: [
+            'Staff token registered under an active staff JWT on a physical Android device',
+            'Foreground and background task notifications open the native Tasks screen',
+            'Revoked tokens are disabled after a provider rejection',
+        ],
+        blocking: true,
+        note: 'Native Staff FCM registration, delivery and routing are implemented; production service account and physical-device delivery must be certified before release.',
+    },
+    {
+        id: 'pos_hardware',
+        area: 'hardware',
+        title: 'Physical POS certification',
+        completionMarkerEnv: 'POS_HARDWARE_CERTIFIED',
+        manualChecks: [
+            'Silent ESC/POS or QZ Tray receipt print verified on store printer',
+            'Bank terminal SDK/payment handoff verified with provider account',
+            'Real scanner QA completed for SKU/barcode and IMEI input',
+        ],
+        blocking: true,
+        note: 'Software fallbacks are ready; this requires devices/provider accounts on site.',
+    },
+    {
+        id: 's3_media_storage',
+        area: 'production',
+        title: 'S3/MinIO media storage',
+        requiredEnv: ['S3_ENDPOINT', 'MINIO_BUCKET', 'MINIO_ROOT_USER', 'MINIO_ROOT_PASSWORD'],
+        optionalEnv: ['S3_REGION', 'S3_PUBLIC_BASE'],
+        blocking: true,
+        note: 'Local disk storage works in dev; configure S3-compatible storage for production evidence.',
+    },
+    {
+        id: 'observability',
+        area: 'production',
+        title: 'Sentry/GlitchTip error reporting',
+        requiredEnv: ['SENTRY_DSN'],
+        blocking: true,
+        note: 'Optional for dev, recommended before production launch.',
+    },
+];
+function buildExternalReadinessReport(env, now = new Date()) {
+    const demoMode = env('PUBLIC_DEMO_MODE')?.trim().toLowerCase() === 'true';
+    const checks = CHECKS.map((definition) => evaluateCheck(definition, env, demoMode));
+    const blockingRemaining = checks.filter((check) => check.blocking && check.status !== 'ready').length;
+    return {
+        status: blockingRemaining === 0 ? 'ready' : 'blocked',
+        generatedAt: now.toISOString(),
+        summary: {
+            ready: checks.filter((check) => check.status === 'ready').length,
+            missing: checks.filter((check) => check.status === 'missing').length,
+            manualRequired: checks.filter((check) => check.status === 'manual_required').length,
+            optional: checks.filter((check) => check.status === 'optional').length,
+            blockingRemaining,
+        },
+        checks,
+        nextActions: checks
+            .filter((check) => check.blocking && check.status !== 'ready')
+            .map((check) => `${check.title}: ${check.note}`),
+    };
+}
+function evaluateCheck(definition, env, demoMode) {
+    const blocking = demoMode
+        ? definition.id === 's3_media_storage' || definition.id === 'observability'
+        : definition.blocking ?? false;
+    const requiredEnv = requiredEnvNames(definition);
+    const optionalEnv = definition.optionalEnv ?? [];
+    const configuredEnv = [...requiredEnv, ...optionalEnv].filter((name) => hasEnv(env, name));
+    const anySatisfied = definition.requiredAny?.some((group) => group.every((name) => hasEnv(env, name)));
+    const missingEnv = definition.requiredAny && anySatisfied
+        ? []
+        : requiredEnv.filter((name) => !hasEnv(env, name));
+    let status;
+    if (definition.completionMarkerEnv) {
+        const missingCredentials = definition.requiredAny
+            ? !anySatisfied
+            : (definition.requiredEnv ?? []).some((name) => !hasEnv(env, name));
+        status = missingCredentials
+            ? 'missing'
+            : env(definition.completionMarkerEnv) === 'true'
+                ? 'ready'
+                : 'manual_required';
+    }
+    else if (definition.requiredAny) {
+        status = anySatisfied
+            ? 'ready'
+            : !blocking
+                ? 'optional'
+                : 'missing';
+    }
+    else if (missingEnv.length === 0) {
+        status = definition.validate?.(env) === false ? 'missing' : 'ready';
+    }
+    else {
+        status = !blocking ? 'optional' : 'missing';
+    }
+    return {
+        id: definition.id,
+        area: definition.area,
+        title: definition.title,
+        status,
+        blocking,
+        requiredEnv,
+        optionalEnv,
+        configuredEnv,
+        missingEnv,
+        manualChecks: definition.manualChecks ?? [],
+        note: definition.note,
+    };
+}
+function requiredEnvNames(definition) {
+    const required = definition.requiredEnv ?? [];
+    const any = definition.requiredAny?.flat() ?? [];
+    const marker = definition.completionMarkerEnv ? [definition.completionMarkerEnv] : [];
+    return [...new Set([...required, ...any, ...marker])];
+}
+function hasEnv(env, name) {
+    const value = env(name);
+    return typeof value === 'string' && value.trim().length > 0;
+}
+//# sourceMappingURL=external-readiness.js.map

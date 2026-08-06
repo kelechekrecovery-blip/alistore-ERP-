@@ -1125,9 +1125,29 @@ model Seller {
   updatedAt DateTime @updatedAt
 
   products Product[]
-  staff    StaffUser[]
+  users    SellerUser[]
 
   @@index([active, name])
+}
+
+/// Пользователь стороннего магазина в AliStore Business.
+///
+/// Намеренно НЕ `StaffUser`: партнёр не имеет отношения к ERP, POS и кассе.
+/// Общая таблица означала бы общий контур прав, где одна забытая проверка роли
+/// открывает партнёру склад и деньги AliStore. Отдельная личность делает такую
+/// ошибку невозможной по построению: у этого токена другой `typ`, и ни один
+/// staff-эндпоинт его не принимает.
+model SellerUser {
+  id           String   @id @default(cuid())
+  sellerId     String
+  seller       Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  username     String   @unique
+  passwordHash String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([sellerId, active])
 }
 
 model StorefrontBlock {
@@ -3511,7 +3531,6 @@ model TelegramAgentMessage {
   createdAt      DateTime               @default(now())
   expiresAt      DateTime
 
-  @@unique([botId, externalKey])
   @@index([identityId, createdAt])
   @@index([telegramUserId, createdAt])
   @@index([status, createdAt])
@@ -3733,9 +3752,6 @@ model StaffUser {
   // Store point the account works at. References StorePoint.inventoryLocation
   // (@unique), the value `point` has always carried — a typo can no longer detach
   // an employee from every point-scoped report.
-  /// Сотрудник стороннего магазина. `null` — сотрудник AliStore.
-  sellerId                String?
-  seller                  Seller?                 @relation(fields: [sellerId], references: [id])
   point                   String
   storePoint              StorePoint              @relation(fields: [point], references: [inventoryLocation], onDelete: Restrict, onUpdate: Cascade)
   active                  Boolean                 @default(true)

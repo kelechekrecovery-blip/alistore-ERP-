@@ -1,0 +1,80 @@
+import { Prisma } from '@prisma/client';
+import { AuditInput } from '../audit/audit.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { CampaignFunnelDto, OrderAttributionDto } from './attribution.dto';
+type Tx = Prisma.TransactionClient;
+type PrismaLike = PrismaService | Tx;
+export declare class CampaignAttributionService {
+    private readonly prisma;
+    constructor(prisma: PrismaService);
+    trackPublic(input: CampaignFunnelDto): Promise<{
+        accepted: boolean;
+        recorded: boolean;
+    }>;
+    prepareForOrder(tx: PrismaLike, customerId: string, input?: OrderAttributionDto, promotionCode?: string | null): Promise<{
+        campaignId: string | null;
+        data: {
+            campaignId: string | null;
+            journeyHash: string | null;
+            firstSource: string;
+            firstMedium: string | null;
+            firstCampaign: string | null;
+            firstContent: string | null;
+            firstTerm: string | null;
+            firstLanding: string | null;
+            lastSource: string;
+            lastMedium: string | null;
+            lastCampaign: string | null;
+            lastContent: string | null;
+            lastTerm: string | null;
+            lastLanding: string | null;
+            capturedAt: Date;
+        };
+        customerId: string;
+        trackingCode: string | null;
+    } | null>;
+    attachForBackfill(tx: Tx, campaignId: string, orderId: string): Promise<void>;
+    convertPaidOrderOnTx(tx: Tx, orderId: string, actor: string, events: AuditInput[]): Promise<{
+        campaign: {
+            promotionCode: string | null;
+            id: string;
+            name: string;
+            createdBy: string;
+            status: import(".prisma/client").$Enums.CampaignLifecycleStatus;
+            createdAt: Date;
+            updatedAt: Date;
+            revenue: number;
+            source: string;
+            channel: string;
+            orders: number;
+            template: string;
+            updatedBy: string;
+            medium: string;
+            trackingCode: string;
+            approvalId: string | null;
+            segment: string;
+            budget: number;
+            creativeType: import(".prisma/client").$Enums.CampaignCreativeType;
+            creativeHeadline: string;
+            creativeBody: string | null;
+            creativeAssetUrl: string | null;
+            creativeCtaLabel: string | null;
+            destinationUrl: string;
+            rejectionReason: string | null;
+            approvedBy: string | null;
+            reviewedAt: Date | null;
+            approvedAt: Date | null;
+            activatedAt: Date | null;
+            pausedAt: Date | null;
+            completedAt: Date | null;
+            grossProfit: number;
+        };
+        revenue: number;
+        grossProfit: number;
+    } | null>;
+    recordCheckoutOnTx(tx: Tx, campaignId: string, journeyHash: string | null, orderId: string): Promise<boolean>;
+    private recordStageOnTx;
+    private hashJourney;
+    private touch;
+}
+export {};

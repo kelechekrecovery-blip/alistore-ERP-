@@ -1,0 +1,357 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.INVENTORY_VARIANCE_ACCOUNT = exports.COGS_ACCOUNT = exports.INVENTORY_ASSET_ACCOUNT = void 0;
+exports.adjustQuantityValuationOnTx = adjustQuantityValuationOnTx;
+exports.transferQuantityValuationOnTx = transferQuantityValuationOnTx;
+exports.postCogsOnTx = postCogsOnTx;
+exports.consumeQuantityValuationOnTx = consumeQuantityValuationOnTx;
+exports.reverseInventoryCostOnTx = reverseInventoryCostOnTx;
+exports.reverseQuantityCostOnTx = reverseQuantityCostOnTx;
+const accounting_journal_1 = require("../finance/accounting-journal");
+const errors_1 = require("../common/errors");
+exports.INVENTORY_ASSET_ACCOUNT = '1200';
+exports.COGS_ACCOUNT = '5000';
+exports.INVENTORY_VARIANCE_ACCOUNT = '6900';
+async function adjustQuantityValuationOnTx(tx, input) {
+    const occurredAt = new Date();
+    if (input.quantityDelta > 0) {
+        const unitCost = input.unitCost ?? 0;
+        const totalValue = input.quantityDelta * unitCost;
+        await tx.inventoryValuationLayer.create({
+            data: {
+                productId: input.productId,
+                balanceId: input.balanceId,
+                location: input.location,
+                sourceType: input.sourceType,
+                sourceRef: input.movementId,
+                unitCost,
+                quantityReceived: input.quantityDelta,
+                quantityRemaining: input.quantityDelta,
+                createdAt: occurredAt,
+            },
+        });
+        if (totalValue > 0) {
+            await tx.inventoryBalance.update({
+                where: { id: input.balanceId },
+                data: { inventoryValue: { increment: totalValue } },
+            });
+        }
+        const entry = totalValue > 0
+            ? await postInventoryVarianceOnTx(tx, { ...input, occurredAt }, totalValue, true)
+            : null;
+        return { totalValue, unitCost, entry, complete: true };
+    }
+    const quantity = Math.abs(input.quantityDelta);
+    const layers = await tx.inventoryValuationLayer.findMany({
+        where: { balanceId: input.balanceId, quantityRemaining: { gt: 0 } },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+    if (layers.length === 0) {
+        const balance = await tx.inventoryBalance.findUniqueOrThrow({
+            where: { id: input.balanceId },
+            select: { inventoryValue: true },
+        });
+        if (balance.inventoryValue === 0) {
+            return { totalValue: 0, unitCost: null, entry: null, complete: false };
+        }
+    }
+    let remaining = quantity;
+    let totalValue = 0;
+    const unitCosts = new Set();
+    for (const layer of layers) {
+        if (remaining === 0)
+            break;
+        const consumed = Math.min(remaining, layer.quantityRemaining);
+        const claimed = await tx.inventoryValuationLayer.updateMany({
+            where: { id: layer.id, quantityRemaining: { gte: consumed } },
+            data: { quantityRemaining: { decrement: consumed } },
+        });
+        if (claimed.count !== 1) {
+            throw new errors_1.ConflictError('valuation_layer_race', `Слой себестоимости ${layer.id} уже изменён`);
+        }
+        await tx.inventoryValuationIssue.create({
+            data: {
+                productId: input.productId,
+                layerId: layer.id,
+                sourceType: input.sourceType,
+                sourceRef: `${input.movementId}:${layer.id}`,
+                location: input.location,
+                quantity: consumed,
+                unitCost: layer.unitCost,
+                totalCost: consumed * layer.unitCost,
+                createdAt: occurredAt,
+            },
+        });
+        remaining -= consumed;
+        totalValue += consumed * layer.unitCost;
+        unitCosts.add(layer.unitCost);
+    }
+    if (remaining > 0) {
+        throw new errors_1.ConflictError('inventory_valuation_missing', `Для движения ${input.movementId} не найдено достаточно слоёв себестоимости`);
+    }
+    const updated = await tx.inventoryBalance.updateMany({
+        where: { id: input.balanceId, inventoryValue: { gte: totalValue } },
+        data: { inventoryValue: { decrement: totalValue } },
+    });
+    if (updated.count !== 1) {
+        throw new errors_1.ConflictError('inventory_value_mismatch', 'Стоимость остатка меньше стоимости складского движения');
+    }
+    const entry = totalValue > 0
+        ? await postInventoryVarianceOnTx(tx, { ...input, occurredAt }, totalValue, false)
+        : null;
+    return { totalValue, unitCost: unitCosts.size === 1 ? [...unitCosts][0] : null, entry, complete: true };
+}
+async function postInventoryVarianceOnTx(tx, input, totalValue, increase) {
+    return (0, accounting_journal_1.postAccountingEntryOnTx)(tx, {
+        idempotencyKey: `accounting:${input.sourceType}:${input.movementId}`,
+        sourceType: input.sourceType,
+        sourceRef: input.movementId,
+        description: `${increase ? 'Оприходование' : 'Списание'} запасов по движению ${input.movementId}`,
+        occurredAt: input.occurredAt,
+        createdBy: input.actor,
+        lines: increase
+            ? [
+                { accountCode: exports.INVENTORY_ASSET_ACCOUNT, debit: totalValue, memo: 'Увеличение стоимости запасов' },
+                { accountCode: exports.INVENTORY_VARIANCE_ACCOUNT, credit: totalValue, memo: 'Излишек по складской корректировке' },
+            ]
+            : [
+                { accountCode: input.debitAccount ?? exports.INVENTORY_VARIANCE_ACCOUNT, debit: totalValue, memo: input.sourceType === 'service.consumed' ? 'Запчасти, использованные в ремонте' : 'Недостача или списание запасов' },
+                { accountCode: exports.INVENTORY_ASSET_ACCOUNT, credit: totalValue, memo: 'Уменьшение стоимости запасов' },
+            ],
+    });
+}
+async function transferQuantityValuationOnTx(tx, input) {
+    if (input.quantity === 0)
+        return { totalValue: 0, unitCost: null };
+    const layers = await tx.inventoryValuationLayer.findMany({
+        where: { balanceId: input.sourceBalanceId, quantityRemaining: { gt: 0 } },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+    let remaining = input.quantity;
+    let totalValue = 0;
+    const unitCosts = new Set();
+    for (const layer of layers) {
+        if (remaining === 0)
+            break;
+        const quantity = Math.min(remaining, layer.quantityRemaining);
+        const claimed = await tx.inventoryValuationLayer.updateMany({
+            where: { id: layer.id, quantityRemaining: { gte: quantity } },
+            data: { quantityRemaining: { decrement: quantity } },
+        });
+        if (claimed.count !== 1) {
+            throw new errors_1.ConflictError('valuation_layer_race', `Слой себестоимости ${layer.id} уже изменён`);
+        }
+        await tx.inventoryValuationLayer.create({
+            data: {
+                productId: input.productId,
+                balanceId: input.destinationBalanceId,
+                location: input.destination,
+                sourceType: 'inventory.transfer',
+                sourceRef: `${input.movementId}:${layer.id}`,
+                unitCost: layer.unitCost,
+                quantityReceived: quantity,
+                quantityRemaining: quantity,
+            },
+        });
+        remaining -= quantity;
+        totalValue += quantity * layer.unitCost;
+        unitCosts.add(layer.unitCost);
+    }
+    if (remaining > 0) {
+        throw new errors_1.ConflictError('inventory_valuation_missing', `Для перемещения ${input.movementId} не найдено достаточно слоёв себестоимости`);
+    }
+    const sourceValue = await tx.inventoryBalance.updateMany({
+        where: { id: input.sourceBalanceId, inventoryValue: { gte: totalValue } },
+        data: { inventoryValue: { decrement: totalValue } },
+    });
+    if (sourceValue.count !== 1) {
+        throw new errors_1.ConflictError('inventory_value_mismatch', 'Стоимость исходного остатка меньше стоимости перемещения');
+    }
+    await tx.inventoryBalance.update({
+        where: { id: input.destinationBalanceId },
+        data: { inventoryValue: { increment: totalValue } },
+    });
+    return { totalValue, unitCost: unitCosts.size === 1 ? [...unitCosts][0] : null };
+}
+async function postCogsOnTx(tx, input) {
+    const totalCost = input.quantity * input.unitCost;
+    const occurredAt = input.occurredAt ?? new Date();
+    const issue = await tx.inventoryValuationIssue.upsert({
+        where: { sourceType_sourceRef: { sourceType: 'sale', sourceRef: input.sourceRef } },
+        create: {
+            productId: input.productId,
+            orderId: input.orderId,
+            imei: input.imei,
+            layerId: input.layerId,
+            sourceType: 'sale',
+            sourceRef: input.sourceRef,
+            location: input.location,
+            quantity: input.quantity,
+            unitCost: input.unitCost,
+            totalCost,
+            createdAt: occurredAt,
+        },
+        update: {},
+    });
+    const entry = totalCost > 0
+        ? await (0, accounting_journal_1.postAccountingEntryOnTx)(tx, {
+            idempotencyKey: `accounting:inventory.cogs:${issue.id}`,
+            sourceType: 'inventory.cogs',
+            sourceRef: issue.id,
+            description: `Себестоимость продажи ${input.orderId}`,
+            occurredAt,
+            createdBy: input.actor,
+            lines: [
+                { accountCode: exports.COGS_ACCOUNT, debit: totalCost, memo: 'Себестоимость проданного товара' },
+                { accountCode: exports.INVENTORY_ASSET_ACCOUNT, credit: totalCost, memo: 'Выбытие товарного запаса' },
+            ],
+        })
+        : null;
+    return { issue, entry };
+}
+async function consumeQuantityValuationOnTx(tx, input) {
+    const layers = await tx.inventoryValuationLayer.findMany({
+        where: { balanceId: input.balanceId, quantityRemaining: { gt: 0 } },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+    let remaining = input.quantity;
+    let totalCost = 0;
+    for (const layer of layers) {
+        if (remaining === 0)
+            break;
+        const quantity = Math.min(remaining, layer.quantityRemaining);
+        const updatedLayer = await tx.inventoryValuationLayer.updateMany({
+            where: { id: layer.id, quantityRemaining: { gte: quantity } },
+            data: { quantityRemaining: { decrement: quantity } },
+        });
+        if (updatedLayer.count !== 1)
+            throw new errors_1.ConflictError('valuation_layer_race', `Слой себестоимости ${layer.id} уже изменён`);
+        const issue = await postCogsOnTx(tx, {
+            productId: input.productId,
+            orderId: input.orderId,
+            sourceRef: `${input.orderId}:${input.allocationId}:${layer.id}`,
+            layerId: layer.id,
+            quantity,
+            unitCost: layer.unitCost,
+            actor: input.actor,
+            location: layer.location,
+        });
+        totalCost += issue.issue.totalCost;
+        remaining -= quantity;
+    }
+    if (remaining > 0)
+        throw new errors_1.ConflictError('inventory_valuation_missing', `Для резерва ${input.allocationId} не найдено достаточно слоёв себестоимости`);
+    return totalCost;
+}
+async function reverseInventoryCostOnTx(tx, input) {
+    const issue = await tx.inventoryValuationIssue.findUniqueOrThrow({ where: { id: input.issueId } });
+    const available = issue.quantity - issue.reversedQty;
+    if (input.quantity <= 0 || input.quantity > available) {
+        throw new errors_1.ConflictError('valuation_return_exceeded', `Возврат превышает неразвёрнутую себестоимость ${issue.id}`);
+    }
+    const sourceRef = `${input.returnId}:${issue.id}:${issue.reversedQty + input.quantity}`;
+    const updated = await tx.inventoryValuationIssue.updateMany({
+        where: { id: issue.id, reversedQty: issue.reversedQty },
+        data: { reversedQty: { increment: input.quantity } },
+    });
+    if (updated.count !== 1)
+        throw new errors_1.ConflictError('valuation_return_race', `Себестоимость ${issue.id} изменена параллельно`);
+    const total = input.quantity * issue.unitCost;
+    const occurredAt = input.occurredAt ?? new Date();
+    const reversal = await tx.inventoryValuationReversal.create({
+        data: {
+            issueId: issue.id,
+            productId: issue.productId,
+            returnId: input.returnId,
+            sourceType: 'inventory.return',
+            sourceRef,
+            location: input.location,
+            quantity: input.quantity,
+            unitCost: issue.unitCost,
+            totalCost: total,
+            createdAt: occurredAt,
+        },
+    });
+    const entry = total > 0
+        ? await (0, accounting_journal_1.postAccountingEntryOnTx)(tx, {
+            idempotencyKey: `accounting:inventory.return:${sourceRef}`,
+            sourceType: 'inventory.return',
+            sourceRef,
+            description: `Восстановление себестоимости возврата ${input.returnId}`,
+            occurredAt,
+            createdBy: input.actor,
+            lines: [
+                { accountCode: exports.INVENTORY_ASSET_ACCOUNT, debit: total, memo: 'Возврат товара на склад' },
+                { accountCode: exports.COGS_ACCOUNT, credit: total, memo: 'Сторно себестоимости продаж' },
+            ],
+        })
+        : null;
+    return { issue, reversal, quantity: input.quantity, unitCost: issue.unitCost, totalCost: total, entry };
+}
+async function reverseQuantityCostOnTx(tx, input) {
+    const issues = await tx.inventoryValuationIssue.findMany({
+        where: {
+            orderId: input.orderId,
+            productId: input.productId,
+            OR: [
+                {
+                    sourceType: 'sale',
+                    sourceRef: { startsWith: `${input.orderId}:${input.allocationId}:` },
+                },
+                {
+                    sourceType: 'supply-quantity.sale',
+                    sourceRef: input.allocationId,
+                },
+            ],
+        },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+    let remaining = input.quantity;
+    let totalCost = 0;
+    const entries = [];
+    const location = (await tx.inventoryBalance.findUniqueOrThrow({
+        where: { id: input.balanceId },
+        select: { location: true },
+    })).location;
+    for (const issue of issues) {
+        if (remaining === 0)
+            break;
+        const quantity = Math.min(remaining, issue.quantity - issue.reversedQty);
+        if (quantity <= 0)
+            continue;
+        const reversed = await reverseInventoryCostOnTx(tx, {
+            issueId: issue.id,
+            quantity,
+            returnId: input.returnId,
+            actor: input.actor,
+            location,
+        });
+        await tx.inventoryValuationLayer.create({
+            data: {
+                productId: input.productId,
+                balanceId: input.balanceId,
+                location,
+                sourceType: 'inventory.return',
+                sourceRef: `${input.returnId}:${issue.id}:${quantity}`,
+                unitCost: reversed.unitCost,
+                quantityReceived: quantity,
+                quantityRemaining: quantity,
+            },
+        });
+        remaining -= quantity;
+        totalCost += reversed.totalCost;
+        if (reversed.entry) {
+            entries.push({
+                id: reversed.entry.id,
+                issueId: issue.id,
+                quantity,
+                totalCost: reversed.totalCost,
+            });
+        }
+    }
+    if (remaining > 0 && issues.length > 0) {
+        throw new errors_1.ConflictError('valuation_return_missing', `Для возврата ${input.returnId} не найдена полная себестоимость`);
+    }
+    return { quantity: input.quantity - remaining, totalCost, entries };
+}
+//# sourceMappingURL=inventory-valuation.js.map

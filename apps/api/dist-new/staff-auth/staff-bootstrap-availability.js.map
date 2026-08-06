@@ -1,0 +1,1 @@
+{"version":3,"file":"staff-bootstrap-availability.js","sourceRoot":"","sources":["../../src/staff-auth/staff-bootstrap-availability.ts"],"names":[],"mappings":";;AAmBA,8DAGC;AAHD,SAAgB,yBAAyB,CAAC,GAAuB;IAC/D,IAAI,GAAG,CAAC,UAAU,CAAC,KAAK,YAAY;QAAE,OAAO,IAAI,CAAC;IAClD,OAAO,GAAG,CAAC,yBAAyB,CAAC,EAAE,IAAI,EAAE,CAAC,WAAW,EAAE,KAAK,MAAM,CAAC;AACzE,CAAC"}
