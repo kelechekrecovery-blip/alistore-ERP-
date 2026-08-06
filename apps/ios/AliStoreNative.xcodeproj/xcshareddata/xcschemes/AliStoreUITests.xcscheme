@@ -80,6 +80,16 @@
       </MacroExpansion>
       <Testables>
          <TestableReference
+         skipped = "NO">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "BD21F76168637D79959BA6FB"
+            BuildableName = "AliStoreCoreTests.xctest"
+            BlueprintName = "AliStoreCoreTests"
+            ReferencedContainer = "container:AliStoreNative.xcodeproj">
+         </BuildableReference>
+      </TestableReference>
+      <TestableReference
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
