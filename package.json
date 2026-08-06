@@ -64,6 +64,8 @@
     "ios:store-metadata:apply": "node scripts/apply-ios-store-metadata.mjs --apply",
     "ios:store-metadata:test": "node --test scripts/__tests__/apply-ios-store-metadata.test.mjs",
     "ios:store-preflight": "bash apps/ios/scripts/store-preflight.sh",
+    "ios:privacy-contract": "node scripts/validate-ios-privacy-contract.mjs",
+    "ios:privacy-contract:test": "node --test scripts/__tests__/validate-ios-privacy-contract.test.mjs",
     "ios:archive": "bash apps/ios/scripts/archive.sh",
     "ios:export": "bash apps/ios/scripts/export-archives.sh",
     "android:build": "cd apps/android && JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:assembleDebug :staff:assembleDebug :courier:assembleDebug :pos:assembleDebug",
@@ -138,7 +140,9 @@
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.61.1",
     "@stryker-mutator/core": "^9.6.1",
+    "@xmldom/xmldom": "^0.9.10",
     "fast-check": "^4.9.0",
+    "plist": "^3.1.1",
     "postcss": "^8.5.24",
     "testcontainers": "^12.0.4"
   },

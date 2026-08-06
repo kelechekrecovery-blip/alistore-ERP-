@@ -66,6 +66,8 @@ struct StaffInventoryView: View {
                     .font(.caption)
                     .foregroundStyle(Design3.textMuted)
 
+                modeSwitcher
+
                 if isLoadingCatalog && products.isEmpty {
                     ProgressView("Загружаем каталог…").tint(Design3.lime)
                 } else if let catalogError, products.isEmpty {
@@ -73,13 +75,16 @@ struct StaffInventoryView: View {
                     Button("Повторить") { Task { await loadCatalog() } }
                         .buttonStyle(.bordered)
                 } else {
-                    modeSwitcher
                     productPicker
-                    locationField
-                    countedField
-                    if mode == .writeOff { reasonField }
-                    submitButton
                 }
+
+                // Точка и количество не зависят от загрузки каталога. Оставляем
+                // форму доступной при медленной сети и при ошибке каталога; запись
+                // всё равно заблокирована, пока пользователь не выбрал товар.
+                locationField
+                countedField
+                if mode == .writeOff { reasonField }
+                submitButton
 
                 if mode == .count, let result = store.lastResult {
                     resultCard(result)
