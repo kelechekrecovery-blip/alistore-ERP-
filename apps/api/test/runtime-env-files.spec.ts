@@ -1,5 +1,6 @@
 import {
   preloadRuntimeEnvFiles,
+  resolveProductionPreflightEnvFiles,
   resolveRuntimeEnvFiles,
 } from '../src/config/runtime-env-files';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -11,6 +12,16 @@ describe('Runtime environment files', () => {
     expect(resolveRuntimeEnvFiles('production')).toEqual([
       '.env.production.local',
       '.env.production',
+    ]);
+  });
+
+  it('gives production preflight the same local-first file precedence as runtime', () => {
+    expect(resolveProductionPreflightEnvFiles('/srv/api/.env.production')).toEqual([
+      '/srv/api/.env.production.local',
+      '/srv/api/.env.production',
+    ]);
+    expect(resolveProductionPreflightEnvFiles('/tmp/rehearsal.env')).toEqual([
+      '/tmp/rehearsal.env',
     ]);
   });
 

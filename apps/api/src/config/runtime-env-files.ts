@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { existsSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 
 export function resolveRuntimeEnvFiles(
   nodeEnv: string | undefined,
@@ -12,6 +13,16 @@ export function resolveRuntimeEnvFiles(
     return ['.env.test.local', '.env.test', '.env'];
   }
   return ['.env.local', '.env'];
+}
+
+/**
+ * Keep the standalone production preflight aligned with the API/worker runtime.
+ * Explicit non-production-shaped files remain single-file fixtures for CI and
+ * local diagnostics.
+ */
+export function resolveProductionPreflightEnvFiles(envFile: string): string[] {
+  if (basename(envFile) !== '.env.production') return [envFile];
+  return [join(dirname(envFile), '.env.production.local'), envFile];
 }
 
 type RuntimeEnvFileLoader = {
