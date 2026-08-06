@@ -80,6 +80,17 @@ export class BusinessProductsService {
    *
    * Изменение пишется в Event Ledger вместе с прежней ценой: «кто и когда
    * уронил цену» — тот вопрос, который этой таблице зададут позже.
+   *
+   * Правки одной позиции сериализуются advisory-локом. Без него `update` всё
+   * равно берёт блокировку строки, и итоговая цена выходит верной — ломается
+   * не она, а леджер: чтение прежней цены не защищено, поэтому несколько
+   * правок читают одно и то же значение и все пишут его в `previousPrice`.
+   * Замерено восемью параллельными правками: событие заявляло переход с 9500,
+   * когда реальная предыдущая цена была 8500. Цепочку «с какой на какую» по
+   * такому леджеру не собрать — а он ведётся ровно ради этого.
+   *
+   * Лок по товару, не по магазину: две разные позиции одного партнёра не имеют
+   * причин ждать друг друга.
    */
   async updatePrice(principal: AuthPrincipal, productId: string, price: number) {
     const sellerId = this.scopeOf(principal);
@@ -87,6 +98,7 @@ export class BusinessProductsService {
       throw new ValidationError('price_invalid', 'Цена должна быть целым числом от 1 сома');
     }
     return this.audit.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'business-product-price:' + productId}))::text AS locked`;
       const product = await tx.product.findFirst({ where: { id: productId, sellerId } });
       if (!product) throw new NotFoundException(`Товар ${productId} не найден`);
       // `sellerId` в `where` вместе с `id`: инвариант владения держится самим
