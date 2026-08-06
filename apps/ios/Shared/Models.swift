@@ -495,20 +495,41 @@ public enum CustomerAuthMethodsState: Sendable, Equatable {
     case unavailable
 }
 
+/// Decodes Apple's opaque, one-time authorization code without ever logging or
+/// persisting it. Keeping the `Data?` boundary here makes the fail-closed paths
+/// from `ASAuthorizationAppleIDCredential` directly testable without fabricating
+/// an AuthenticationServices credential in unit tests.
+public enum AppleAuthorizationCode {
+    public static func decode(_ data: Data?) -> String? {
+        guard
+            let data,
+            !data.isEmpty,
+            let value = String(data: data, encoding: .utf8),
+            !value.isEmpty
+        else { return nil }
+        return value
+    }
+}
+
 /// Тело `POST auth/v2/social/apple`.
 ///
 /// `nonce` — ровно та строка, которую клиент положил в `ASAuthorizationAppleIDRequest.nonce`:
 /// Apple кладёт её же в claim токена, а сервер сравнивает их напрямую
 /// (`social-login.ts` → «Apple identity token nonce mismatch»).
+/// `authorizationCode` сервер обменивает на refresh token, чтобы отозвать
+/// доступ Apple при удалении аккаунта. Код одноразовый, поэтому нативный клиент
+/// обязан передать его вместе с identity token в первом же запросе.
 /// `name` Apple отдаёт только при первом входе, поэтому он необязателен —
 /// пустую строку слать нельзя, сервер склеит из неё displayName.
 public struct AppleSocialLogin: Encodable, Sendable {
     public let identityToken: String
+    public let authorizationCode: String
     public let nonce: String
     public let name: String?
 
-    public init(identityToken: String, nonce: String, name: String?) {
+    public init(identityToken: String, authorizationCode: String, nonce: String, name: String?) {
         self.identityToken = identityToken
+        self.authorizationCode = authorizationCode
         self.nonce = nonce
         self.name = name
     }

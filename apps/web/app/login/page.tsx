@@ -33,7 +33,7 @@ declare global {
           nonce: string;
         }) => void;
         signIn: () => Promise<{
-          authorization: { id_token: string; state?: string };
+          authorization: { code?: string; id_token: string; state?: string };
           user?: { name?: { firstName?: string; lastName?: string }; email?: string };
         }>;
       };
@@ -157,7 +157,11 @@ function LoginForm() {
   const [methods, setMethods] = useState<AuthMethodsView | null>(null);
   const emailLoginEnabled = methods?.email.enabled ?? false;
   const appleClientId = methods?.apple.clientId ?? null;
-  const appleEnabled = methods !== null && methods.apple.enabled && appleClientId !== null;
+  const appleRedirectUri = methods?.apple.redirectUri ?? null;
+  const appleEnabled = methods !== null
+    && methods.apple.enabled
+    && appleClientId !== null
+    && appleRedirectUri !== null;
   const googleClientId = methods?.google?.clientId ?? null;
   const googleEnabled = Boolean(methods?.google?.enabled) && googleClientId !== null;
   const telegramEnabled = Boolean(methods?.telegram.enabled) && telegramInitData.length > 0;
@@ -286,7 +290,11 @@ function LoginForm() {
 
   const baseCopy = locale === 'ru'
     ? {
-        title: socialEnrollmentActive ? 'Подтвердите номер телефона' : 'Войти или создать аккаунт',
+        title: socialEnrollmentActive
+          ? 'Подтвердите номер телефона'
+          : methods !== null && !methods.registrationAvailable
+            ? 'Войти в аккаунт'
+            : 'Войти или создать аккаунт',
         phoneSubtitle: socialEnrollmentActive
           ? `${socialProviderLabel} подтверждён. Введите номер телефона — мы привяжем ${socialProviderLabel} только после проверки SMS-кода.`
           : 'Если номер ещё не зарегистрирован, после проверки кода мы создадим аккаунт.',
@@ -299,7 +307,11 @@ function LoginForm() {
         sent: `Код отправлен на ${identity}`,
       }
     : {
-        title: socialEnrollmentActive ? 'Телефон номерин ырастаңыз' : 'Кирүү же аккаунт түзүү',
+        title: socialEnrollmentActive
+          ? 'Телефон номерин ырастаңыз'
+          : methods !== null && !methods.registrationAvailable
+            ? 'Аккаунтка кирүү'
+            : 'Кирүү же аккаунт түзүү',
         phoneSubtitle: socialEnrollmentActive
           ? `${socialProviderLabel} ырасталды. Телефон номерин киргизиңиз — SMS код текшерилгенден кийин гана ${socialProviderLabel} байланыштырылат.`
           : 'Эгер номер каттала элек болсо, код текшерилгенден кийин аккаунт түзөбүз.',
@@ -436,7 +448,7 @@ function LoginForm() {
       window.AppleID.auth.init({
         clientId: appleClientId,
         scope: 'name email',
-        redirectURI: window.location.origin + '/login',
+        redirectURI: appleRedirectUri,
         usePopup: true,
         nonce,
       });
@@ -444,7 +456,15 @@ function LoginForm() {
       const name = response.user?.name
         ? [response.user.name.firstName, response.user.name.lastName].filter(Boolean).join(' ')
         : undefined;
-      const result = await appleLogin(response.authorization.id_token, { nonce, name });
+      const authorizationCode = response.authorization.code?.trim();
+      if (!authorizationCode) {
+        throw new Error('Apple не вернул код авторизации. Повторите вход.');
+      }
+      const result = await appleLogin(response.authorization.id_token, {
+        nonce,
+        authorizationCode,
+        name,
+      });
       if (result.status === 'authenticated') {
         setSocialEnrollmentToken(null);
         router.push(next);
@@ -677,7 +697,7 @@ function LoginForm() {
                     ? t('login.cta.recovery')
                     : t('login.cta.sms')}
             </button>
-            {channel === 'phone' && (telegramEnabled || appleEnabled) && !socialEnrollmentActive && (
+            {(telegramEnabled || appleEnabled) && !socialEnrollmentActive && (
               <div className="mt-3 flex gap-2.5">
                 {telegramEnabled && (
                   <button
@@ -701,11 +721,11 @@ function LoginForm() {
                 )}
               </div>
             )}
-            {channel === 'phone' && telegramWidgetEnabled && !socialEnrollmentActive && (
+            {telegramWidgetEnabled && !socialEnrollmentActive && (
               // Виджет рисует Telegram своим скриптом — своей кнопки здесь нет.
               <div ref={telegramWidgetSlot} className="mt-3 flex justify-center" />
             )}
-            {channel === 'phone' && googleEnabled && !socialEnrollmentActive && (
+            {googleEnabled && !socialEnrollmentActive && (
               <div ref={googleWidgetSlot} className="mt-3 flex min-h-10 justify-center" aria-label="Войти через Google" />
             )}
             {socialEnrollmentActive && (

@@ -15,7 +15,7 @@ final class CustomerSocialLoginTests: XCTestCase {
         SocialLoginMockURLProtocol.reset()
     }
 
-    func testAppleLoginPostsIdentityTokenNonceAndName() async {
+    func testAppleLoginPostsIdentityTokenAuthorizationCodeNonceAndName() async {
         SocialLoginMockURLProtocol.stub(path: "/api/auth/v2/social/apple", status: 200, body: """
         {"status":"authenticated","accessToken":"access-1","refreshToken":"refresh-1","tokenType":"Bearer","expiresIn":"15m"}
         """)
@@ -24,18 +24,34 @@ final class CustomerSocialLoginTests: XCTestCase {
         """)
         let store = makeStore()
 
-        await store.signInWithApple(identityToken: "eyJ.header.sig", nonce: "hashed-nonce", name: "Нурбек")
+        await store.signInWithApple(
+            identityToken: "eyJ.header.sig",
+            authorizationCode: "apple-one-time-code",
+            nonce: "hashed-nonce",
+            name: "Нурбек"
+        )
 
         let request = SocialLoginMockURLProtocol.request(for: "/api/auth/v2/social/apple")
         XCTAssertEqual(request?.httpMethod, "POST")
         let body = SocialLoginMockURLProtocol.jsonBody(for: "/api/auth/v2/social/apple")
         XCTAssertEqual(body?["identityToken"], "eyJ.header.sig")
+        XCTAssertEqual(body?["authorizationCode"], "apple-one-time-code")
         // Ровно та строка, которую клиент поставил в `request.nonce`: сервер
         // сравнивает её с `claims.nonce`, куда Apple кладёт то же значение.
         XCTAssertEqual(body?["nonce"], "hashed-nonce")
         XCTAssertEqual(body?["name"], "Нурбек")
         XCTAssertEqual(store.session?.accessToken, "access-1")
         XCTAssertFalse(store.requiresApplePhoneEnrollment)
+    }
+
+    func testAppleAuthorizationCodeDecoderAcceptsValidUTF8() {
+        XCTAssertEqual(AppleAuthorizationCode.decode(Data("apple-code".utf8)), "apple-code")
+    }
+
+    func testAppleAuthorizationCodeDecoderRejectsMissingEmptyAndInvalidUTF8() {
+        XCTAssertNil(AppleAuthorizationCode.decode(nil))
+        XCTAssertNil(AppleAuthorizationCode.decode(Data()))
+        XCTAssertNil(AppleAuthorizationCode.decode(Data([0xFF, 0xFE])))
     }
 
     func testAppleLoginOmitsEmptyOptionalFields() async {
@@ -49,7 +65,7 @@ final class CustomerSocialLoginTests: XCTestCase {
 
         // Apple отдаёт имя только при первом входе. Слать пустую строку нельзя:
         // сервер склеит из неё displayName и запишет мусор в CustomerIdentity.
-        await store.signInWithApple(identityToken: "token", nonce: "n", name: nil)
+        await store.signInWithApple(identityToken: "token", authorizationCode: "code", nonce: "n", name: nil)
 
         let body = SocialLoginMockURLProtocol.jsonBody(for: "/api/auth/v2/social/apple")
         XCTAssertNil(body?["name"])
@@ -61,7 +77,7 @@ final class CustomerSocialLoginTests: XCTestCase {
         """)
         let store = makeStore()
 
-        await store.signInWithApple(identityToken: "token", nonce: "n", name: nil)
+        await store.signInWithApple(identityToken: "token", authorizationCode: "code", nonce: "n", name: nil)
 
         XCTAssertNotNil(store.errorMessage)
         XCTAssertNil(store.session)
@@ -82,7 +98,12 @@ final class CustomerSocialLoginTests: XCTestCase {
         """)
         let store = makeStore()
 
-        await store.signInWithApple(identityToken: "apple-token", nonce: "hashed-nonce", name: "Айжан")
+        await store.signInWithApple(
+            identityToken: "apple-token",
+            authorizationCode: "apple-code",
+            nonce: "hashed-nonce",
+            name: "Айжан"
+        )
         XCTAssertTrue(store.requiresApplePhoneEnrollment)
         XCTAssertNil(store.session)
 
@@ -111,7 +132,12 @@ final class CustomerSocialLoginTests: XCTestCase {
         """)
         let store = makeStore()
 
-        await store.signInWithApple(identityToken: "apple-token", nonce: "hashed-nonce", name: nil)
+        await store.signInWithApple(
+            identityToken: "apple-token",
+            authorizationCode: "apple-code",
+            nonce: "hashed-nonce",
+            name: nil
+        )
         _ = await store.requestOTP(phone: "+996700123456")
         await store.completeAppleEnrollment(phone: "+996700123456", code: "000000")
         XCTAssertTrue(store.requiresApplePhoneEnrollment)
@@ -137,7 +163,12 @@ final class CustomerSocialLoginTests: XCTestCase {
         XCTAssertFalse(store.requiresApplePhoneEnrollment)
 
         let cancelStore = makeStore()
-        await cancelStore.signInWithApple(identityToken: "apple-token-2", nonce: "hashed-nonce-2", name: nil)
+        await cancelStore.signInWithApple(
+            identityToken: "apple-token-2",
+            authorizationCode: "apple-code-2",
+            nonce: "hashed-nonce-2",
+            name: nil
+        )
         XCTAssertTrue(cancelStore.requiresApplePhoneEnrollment)
         cancelStore.cancelAppleEnrollment()
         XCTAssertFalse(cancelStore.requiresApplePhoneEnrollment)
@@ -149,7 +180,16 @@ final class CustomerSocialLoginTests: XCTestCase {
     func testAppleV2RequiresNonceBeforeNetworkRequest() async {
         let store = makeStore()
 
-        await store.signInWithApple(identityToken: "token", nonce: "", name: nil)
+        await store.signInWithApple(identityToken: "token", authorizationCode: "code", nonce: "", name: nil)
+
+        XCTAssertEqual(SocialLoginMockURLProtocol.requestCount(for: "/api/auth/v2/social/apple"), 0)
+        XCTAssertNotNil(store.errorMessage)
+    }
+
+    func testAppleV2RequiresAuthorizationCodeBeforeNetworkRequest() async {
+        let store = makeStore()
+
+        await store.signInWithApple(identityToken: "token", authorizationCode: "", nonce: "nonce", name: nil)
 
         XCTAssertEqual(SocialLoginMockURLProtocol.requestCount(for: "/api/auth/v2/social/apple"), 0)
         XCTAssertNotNil(store.errorMessage)
@@ -261,7 +301,12 @@ final class CustomerSocialLoginTests: XCTestCase {
         """)
         let store = makeStore()
 
-        await store.signInWithApple(identityToken: "apple-token", nonce: "apple-nonce", name: nil)
+        await store.signInWithApple(
+            identityToken: "apple-token",
+            authorizationCode: "apple-authorization-code",
+            nonce: "apple-nonce",
+            name: nil
+        )
         XCTAssertEqual(store.socialEnrollmentProvider, .apple)
         await store.signInWithGoogle(identityToken: "google-token", nonce: "google-nonce")
 
@@ -380,7 +425,12 @@ final class CustomerSocialLoginTests: XCTestCase {
         let store = makeStore()
 
         await store.loadAuthMethods()
-        await store.signInWithApple(identityToken: "new-apple-token", nonce: "apple-nonce", name: nil)
+        await store.signInWithApple(
+            identityToken: "new-apple-token",
+            authorizationCode: "new-apple-authorization-code",
+            nonce: "apple-nonce",
+            name: nil
+        )
 
         XCTAssertFalse(store.requiresSocialPhoneEnrollment)
         XCTAssertNil(store.session)

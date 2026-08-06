@@ -223,8 +223,21 @@ describe('describeAuthMethods: что реально пустит человек
         SMS_PROVIDER: 'android_gateway',
         APPLE_CLIENT_ID: 'kg.alistore.client,kg.alistore.web',
         APPLE_WEB_CLIENT_ID: 'kg.alistore.web',
+        APPLE_REDIRECT_URI: 'https://ali.kg/login',
       }));
       expect(methods.apple.clientId).toBe('kg.alistore.web');
+      expect(methods.apple.redirectUri).toBe('https://ali.kg/login');
+    });
+
+    it('не придумывает redirect URI из host браузера', () => {
+      const methods = describeAuthMethods(env({
+        NODE_ENV: 'production',
+        SMS_PROVIDER: 'android_gateway',
+        APPLE_CLIENT_ID: 'kg.alistore.client,kg.alistore.web',
+        APPLE_WEB_CLIENT_ID: 'kg.alistore.web',
+      }));
+      expect(methods.apple.clientId).toBe('kg.alistore.web');
+      expect(methods.apple.redirectUri).toBeNull();
     });
 
     it('не показывает Apple в вебе, если Services ID не входит в accepted audiences', () => {

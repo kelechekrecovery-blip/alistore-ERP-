@@ -1,4 +1,5 @@
 import { assertProductionRuntimeReady, buildProductionPreflightReport } from '../src/health/production-preflight';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 
 describe('Production preflight report', () => {
   it('blocks the production example until real core settings are filled', () => {
@@ -80,6 +81,44 @@ describe('Production preflight report', () => {
     ).toBe('ready');
   });
 
+  it('requires complete Apple revocation credentials when Apple login is enabled', () => {
+    const appleCheck = (values: Record<string, string>) =>
+      buildProductionPreflightReport((name) => values[name]).checks.find(
+        (check) => check.id === 'apple_oauth_revocation',
+      );
+
+    expect(appleCheck({})?.status).toBe('ready');
+    expect(appleCheck({ APPLE_CLIENT_ID: 'kg.alistore.client' })?.status).toBe('missing');
+    const privateKey = generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
+      .privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+    const configured = {
+      APPLE_CLIENT_ID: 'kg.alistore.web,kg.alistore.client',
+      APPLE_WEB_CLIENT_ID: 'kg.alistore.web',
+      APPLE_REDIRECT_URI: 'https://ali.kg/login',
+      APPLE_TEAM_ID: 'ZYU3F8W56P',
+      APPLE_KEY_ID: 'ALISTORE01',
+      APPLE_PRIVATE_KEY: privateKey,
+      APPLE_TOKEN_ENCRYPTION_KEYS_JSON: JSON.stringify({
+        primary: randomBytes(32).toString('base64'),
+      }),
+      APPLE_TOKEN_ENCRYPTION_ACTIVE_KEY_ID: 'primary',
+    };
+    expect(appleCheck({ ...configured, PROCESS_ROLE: 'api' })?.status).toBe('ready');
+    expect(appleCheck({ ...configured, APPLE_PRIVATE_KEY: 'not-a-key' })?.status).toBe('unsafe');
+    expect(appleCheck({
+      ...configured,
+      APPLE_TOKEN_ENCRYPTION_KEYS_JSON: JSON.stringify({
+        primary: randomBytes(32).toString('base64'),
+        'bad.key': 'not-a-key',
+      }),
+    })?.status).toBe('unsafe');
+    expect(appleCheck({ ...configured, PROCESS_ROLE: 'worker' })?.status).toBe('unsafe');
+    expect(appleCheck({
+      ...configured,
+      PROCESS_ROLE: 'worker',
+      APPLE_REVOCATION_RELAY_ENABLED: 'true',
+    })?.status).toBe('ready');
+  });
   it('keeps live production blocked while the refund adapter is not implemented', () => {
     const strongSecret = '0123456789abcdef0123456789abcdef';
     const report = buildProductionPreflightReport((name) =>

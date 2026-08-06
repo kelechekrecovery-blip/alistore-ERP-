@@ -126,15 +126,25 @@ public final class CustomerAuthStore {
         errorMessage = message
     }
 
-    /// Вход через Apple: обменивает identityToken на сессию.
+    /// Вход через Apple: обменивает identityToken и одноразовый authorizationCode
+    /// на сессию. Сервер использует код для получения revocable refresh token.
     ///
     /// `nonce` передаётся ровно тем, что было положено в
     /// `ASAuthorizationAppleIDRequest.nonce` — Apple кладёт эту же строку в claim
     /// токена, а сервер сравнивает их напрямую. Любое преобразование здесь даёт
     /// «nonce mismatch», который на устройстве выглядит как молчаливый отказ входа.
-    public func signInWithApple(identityToken: String, nonce: String, name: String?) async {
+    public func signInWithApple(
+        identityToken: String,
+        authorizationCode: String,
+        nonce: String,
+        name: String?
+    ) async {
         guard validSocialCredentials(identityToken: identityToken, nonce: nonce) else {
             errorMessage = "Не удалось подтвердить безопасный вход Apple. Попробуйте ещё раз."
+            return
+        }
+        guard !authorizationCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = "Apple не вернула код авторизации. Попробуйте ещё раз."
             return
         }
         beginSocialRequest()
@@ -146,6 +156,7 @@ public final class CustomerAuthStore {
                 "auth/v2/social/apple",
                 body: AppleSocialLogin(
                     identityToken: identityToken,
+                    authorizationCode: authorizationCode,
                     nonce: nonce,
                     // Пустое имя хуже отсутствующего: сервер склеит из него displayName.
                     name: (trimmedName?.isEmpty ?? true) ? nil : trimmedName

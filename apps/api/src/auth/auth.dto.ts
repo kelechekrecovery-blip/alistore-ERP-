@@ -66,6 +66,10 @@ export class AppleSocialLoginDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @IsString()
+  @Length(1, 4096)
+  authorizationCode?: string;
 }
 
 export class GoogleSocialLoginDto {

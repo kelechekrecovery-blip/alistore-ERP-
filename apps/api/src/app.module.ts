@@ -60,6 +60,7 @@ import { RefundsModule } from './refunds/refunds.module';
 import { StoreOperationsModule } from './store-operations/store-operations.module';
 import { CameraGatewayModule } from './camera-gateway/camera-gateway.module';
 import { resolveRuntimeEnvFiles } from './config/runtime-env-files';
+import { AppleIdentityModule } from './apple-identity';
 
 @Module({
   imports: [
@@ -126,6 +127,7 @@ import { resolveRuntimeEnvFiles } from './config/runtime-env-files';
     RefundsModule,
     StoreOperationsModule,
     CameraGatewayModule,
+    AppleIdentityModule,
   ],
 })
 export class AppModule {}

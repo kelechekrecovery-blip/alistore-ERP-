@@ -14,6 +14,7 @@ import {
 } from './auth.dto';
 import {
   SocialProfile,
+  VerifiedAppleProfile,
   VerifiedTelegramProfile,
   verifyAppleIdentityToken,
   verifyGoogleIdentityToken,
@@ -29,6 +30,12 @@ import {
 } from './email-otp.sender';
 import type { AuthPrincipal, JwtPayload } from './jwt.strategy';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
+import {
+  AppleOAuthClient,
+  AppleOAuthError,
+  AppleTokenCrypto,
+  AppleTokenCryptoError,
+} from '../apple-identity';
 
 export interface AuthTokens {
   accessToken: string;
@@ -59,6 +66,12 @@ const REVIEW_LOGIN_MAX_SUCCESSES = 20;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type PhoneOtpPurpose = 'login' | 'recovery';
 type ClaimedOtp = { id: string; codeHash: string };
+type AppleGrantMaterial = {
+  clientId: string;
+  subject: string;
+  refreshToken: string;
+  refreshTokenEnvelope: string;
+};
 
 /**
  * Сравнение без утечки по времени.
@@ -729,7 +742,7 @@ export class AuthService implements OnModuleInit {
         'Обновите приложение и подтвердите номер телефона для входа',
       );
     }
-    await this.reserveConsumedSocialAssertion(profile, profile.replayIdentity);
+    await this.reserveConsumedSocialAssertion(profile, profile.replayIdentity, customer.id);
     return this.issueTokens(customer.id, customer.phone);
   }
 
@@ -775,7 +788,21 @@ export class AuthService implements OnModuleInit {
         'Обновите приложение и подтвердите номер телефона для входа',
       );
     }
-    await this.reserveConsumedSocialAssertion(profile, dto.identityToken);
+    const grant = await this.exchangeAppleGrant(
+      profile,
+      this.requiredAppleAuthorizationCode(dto.authorizationCode),
+    );
+    try {
+      await this.reserveConsumedSocialAssertion(
+        profile,
+        dto.identityToken,
+        customer.id,
+        grant,
+      );
+    } catch (error) {
+      await this.revokeFailedAppleGrant(grant);
+      throw error;
+    }
     return this.issueTokens(customer.id, customer.phone);
   }
 
@@ -784,7 +811,16 @@ export class AuthService implements OnModuleInit {
       throw new ValidationError('apple_nonce_required', 'Apple nonce is required');
     }
     const profile = await this.verifyAppleProfile(dto);
-    return this.resolveSocialV2(profile, dto.identityToken);
+    const grant = await this.exchangeAppleGrant(
+      profile,
+      this.requiredAppleAuthorizationCode(dto.authorizationCode),
+    );
+    try {
+      return await this.resolveSocialV2(profile, dto.identityToken, grant);
+    } catch (error) {
+      await this.revokeFailedAppleGrant(grant);
+      throw error;
+    }
   }
 
   async loginWithGoogleV2(dto: GoogleSocialLoginDto): Promise<SocialAuthResult> {
@@ -803,7 +839,18 @@ export class AuthService implements OnModuleInit {
     return this.resolveSocialV2(profile, dto.identityToken);
   }
 
-  private async verifyAppleProfile(dto: AppleSocialLoginDto): Promise<SocialProfile> {
+  private requiredAppleAuthorizationCode(value: string | undefined): string {
+    const code = value?.trim();
+    if (!code) {
+      throw new ValidationError(
+        'apple_authorization_code_required',
+        'Apple authorization code is required',
+      );
+    }
+    return code;
+  }
+
+  private async verifyAppleProfile(dto: AppleSocialLoginDto): Promise<VerifiedAppleProfile> {
     const clientId = this.config.get<string>('APPLE_CLIENT_ID');
     if (!clientId) {
       throw new ValidationError(
@@ -823,10 +870,16 @@ export class AuthService implements OnModuleInit {
   private async resolveSocialV2(
     profile: SocialProfile,
     providerAssertion: string,
+    appleGrant?: AppleGrantMaterial,
   ): Promise<SocialAuthResult> {
     const customer = await this.existingCustomerForSocialProfile(profile);
     if (customer) {
-      await this.reserveConsumedSocialAssertion(profile, providerAssertion);
+      await this.reserveConsumedSocialAssertion(
+        profile,
+        providerAssertion,
+        customer.id,
+        appleGrant,
+      );
       return {
         status: 'authenticated',
         ...(await this.issueTokens(customer.id, customer.phone)),
@@ -837,18 +890,58 @@ export class AuthService implements OnModuleInit {
     const enrollmentToken = randomBytes(32).toString('base64url');
     try {
       await this.deleteExpiredSocialAssertions();
-      await this.prisma.socialEnrollment.create({
-        data: {
-          tokenHash: this.hashToken(enrollmentToken),
-          assertionHash: this.hashToken(providerAssertion),
-          provider: profile.provider,
-          subject: profile.subject,
-          email: profile.email,
-          displayName: profile.displayName,
-          avatarUrl: profile.avatarUrl,
-          expiresAt: new Date(Date.now() + expiresIn * 1000),
-        },
+      const adoptedCustomer = await this.prisma.$transaction(async (tx) => {
+        let appleGrantId: string | undefined;
+        let adoptedCustomerId: string | null = null;
+        if (profile.provider === 'apple' && appleGrant) {
+          const replacement = await this.replaceAppleGrantOnTx(tx, {
+            customerId: null,
+            subject: profile.subject,
+            status: 'enrollment',
+            clientId: appleGrant.clientId,
+            refreshTokenEnvelope: appleGrant.refreshTokenEnvelope,
+          });
+          appleGrantId = replacement.id;
+          adoptedCustomerId = replacement.customerId;
+        }
+        if (adoptedCustomerId) {
+          const adopted = await tx.customer.findUnique({ where: { id: adoptedCustomerId } });
+          if (!adopted) throw new ValidationError('customer_not_found', 'Customer not found');
+          await tx.socialEnrollment.create({
+            data: {
+              tokenHash: this.hashToken(enrollmentToken),
+              assertionHash: this.hashToken(providerAssertion),
+              provider: profile.provider,
+              subject: profile.subject,
+              customerId: adopted.id,
+              expiresAt: new Date(Date.now() + SOCIAL_ASSERTION_RETENTION_SECONDS * 1000),
+              consumedAt: new Date(),
+            },
+          });
+          return adopted;
+        }
+        await tx.socialEnrollment.create({
+          data: {
+            tokenHash: this.hashToken(enrollmentToken),
+            assertionHash: this.hashToken(providerAssertion),
+            provider: profile.provider,
+            subject: profile.subject,
+            email: profile.email,
+            displayName: profile.displayName,
+            avatarUrl: profile.avatarUrl,
+            appleClientId: appleGrant?.clientId,
+            appleGrantId,
+            expiresAt: new Date(Date.now() + expiresIn * 1000),
+          },
+        });
+        return null;
       });
+      if (adoptedCustomer) {
+        return {
+          status: 'authenticated',
+          ...(await this.issueTokens(adoptedCustomer.id, adoptedCustomer.phone)),
+        };
+      }
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new ValidationError(
@@ -859,6 +952,123 @@ export class AuthService implements OnModuleInit {
       throw error;
     }
     return { status: 'enrollment_required', enrollmentToken, expiresIn };
+  }
+
+  private async exchangeAppleGrant(
+    profile: VerifiedAppleProfile,
+    authorizationCode: string,
+  ): Promise<AppleGrantMaterial> {
+    const webClientId = this.config.get<string>('APPLE_WEB_CLIENT_ID')?.trim();
+    const redirectUri = profile.clientId === webClientId
+      ? this.config.get<string>('APPLE_REDIRECT_URI')?.trim()
+      : undefined;
+    if (profile.clientId === webClientId && !redirectUri) {
+      throw new ValidationError(
+        'apple_oauth_config_invalid',
+        'Apple web redirect URI is not configured',
+      );
+    }
+    let exchange: { refreshToken: string; identityToken: string };
+    try {
+      exchange = await new AppleOAuthClient(this.config).exchangeAuthorizationCode({
+        authorizationCode,
+        clientId: profile.clientId,
+        redirectUri,
+      });
+    } catch (error) {
+      if (error instanceof AppleOAuthError) {
+        throw new ValidationError(error.code, 'Apple authorization could not be completed');
+      }
+      throw error;
+    }
+    let refreshTokenEnvelope: string | undefined;
+    try {
+      refreshTokenEnvelope = new AppleTokenCrypto(this.config).encrypt(
+        exchange.refreshToken,
+        `${profile.clientId}:${profile.subject}`,
+      );
+      const exchangedProfile = await verifyAppleIdentityToken({
+        identityToken: exchange.identityToken,
+        clientId: profile.clientId,
+        jwksUrl: this.config.get<string>('APPLE_JWKS_URL'),
+      });
+      if (exchangedProfile.subject !== profile.subject) {
+        throw new ValidationError(
+          'apple_token_exchange_failed',
+          'Apple authorization code does not match the signed identity',
+        );
+      }
+      return {
+        clientId: profile.clientId,
+        subject: profile.subject,
+        refreshToken: exchange.refreshToken,
+        refreshTokenEnvelope,
+      };
+    } catch (error) {
+      if (refreshTokenEnvelope) {
+        await this.revokeFailedAppleGrant({
+          clientId: profile.clientId,
+          subject: profile.subject,
+          refreshToken: exchange.refreshToken,
+          refreshTokenEnvelope,
+        });
+      } else {
+        await this.bestEffortRevokeAppleToken(exchange.refreshToken, profile.clientId);
+      }
+      if (error instanceof AppleTokenCryptoError) {
+        throw new ValidationError(
+          'apple_oauth_config_invalid',
+          'Apple credential storage is not configured',
+        );
+      }
+      throw error;
+    }
+  }
+
+  private async revokeFailedAppleGrant(grant: AppleGrantMaterial): Promise<void> {
+    let jobId: string | undefined;
+    try {
+      jobId = await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`
+          SELECT pg_advisory_xact_lock(hashtext(${'apple-grant:' + grant.clientId + ':' + grant.subject}))::text AS locked
+        `;
+        const job = await tx.appleRevocationJob.create({
+          data: {
+            subject: grant.subject,
+            clientId: grant.clientId,
+            refreshTokenEnvelope: grant.refreshTokenEnvelope,
+          },
+        });
+        await tx.appleOAuthGrant.deleteMany({
+          where: {
+            clientId: grant.clientId,
+            subject: grant.subject,
+            refreshTokenEnvelope: grant.refreshTokenEnvelope,
+          },
+        });
+        return job.id;
+      });
+    } catch {
+      // A database outage cannot be made durable; still attempt provider-side
+      // revocation below while preserving the original login error.
+    }
+    const revoked = await this.bestEffortRevokeAppleToken(grant.refreshToken, grant.clientId);
+    if (revoked && jobId) {
+      await this.prisma.appleRevocationJob.deleteMany({
+        where: { id: jobId, status: 'pending' },
+      }).catch(() => undefined);
+    }
+  }
+
+  private async bestEffortRevokeAppleToken(refreshToken: string, clientId: string): Promise<boolean> {
+    try {
+      await new AppleOAuthClient(this.config).revokeRefreshToken({ refreshToken, clientId });
+      return true;
+    } catch {
+      // The original login error remains authoritative. No token value or Apple
+      // response is logged; a successfully persisted token uses the durable job.
+      return false;
+    }
   }
 
   async completeSocialEnrollment(
@@ -877,10 +1087,13 @@ export class AuthService implements OnModuleInit {
           email: string | null;
           displayName: string | null;
           avatarUrl: string | null;
+          appleClientId: string | null;
+          appleGrantId: string | null;
           expiresAt: Date;
           consumedAt: Date | null;
         }>>`
           SELECT id, provider, subject, email, "displayName", "avatarUrl",
+                 "appleClientId", "appleGrantId",
                  "expiresAt", "consumedAt"
           FROM "SocialEnrollment"
           WHERE "tokenHash" = ${tokenHash}
@@ -896,6 +1109,11 @@ export class AuthService implements OnModuleInit {
             'social_enrollment_invalid',
             'Enrollment token недействителен, истёк или уже использован',
           );
+        }
+        if (enrollment.provider === 'apple' && enrollment.appleClientId) {
+          await tx.$queryRaw`
+            SELECT pg_advisory_xact_lock(hashtext(${'apple-grant:' + enrollment.appleClientId + ':' + enrollment.subject}))::text AS locked
+          `;
         }
 
         const pinnedId = dto.challengeId ?? null;
@@ -957,6 +1175,26 @@ export class AuthService implements OnModuleInit {
             avatarUrl: enrollment.avatarUrl,
           },
         });
+        if (
+          enrollment.provider === 'apple'
+          && enrollment.appleClientId
+          && enrollment.appleGrantId
+        ) {
+          const attached = await tx.appleOAuthGrant.updateMany({
+            where: {
+              id: enrollment.appleGrantId,
+              clientId: enrollment.appleClientId,
+              status: 'enrollment',
+            },
+            data: { customerId: customer.id, status: 'active' },
+          });
+          if (attached.count !== 1) {
+            throw new ValidationError(
+              'apple_grant_missing',
+              'Apple credential is missing or already consumed',
+            );
+          }
+        }
         if (!customer.name && enrollment.displayName) {
           await tx.customer.update({
             where: { id: customer.id },
@@ -972,6 +1210,12 @@ export class AuthService implements OnModuleInit {
           data: {
             consumedAt: new Date(),
             expiresAt: new Date(Date.now() + SOCIAL_ASSERTION_RETENTION_SECONDS * 1000),
+            customerId: customer.id,
+            email: null,
+            displayName: null,
+            avatarUrl: null,
+            appleClientId: null,
+            appleGrantId: null,
           },
         });
         const consumedChallenge = await tx.otpChallenge.updateMany({
@@ -1027,23 +1271,39 @@ export class AuthService implements OnModuleInit {
   private async reserveConsumedSocialAssertion(
     profile: SocialProfile,
     providerAssertion: string,
+    customerId: string,
+    appleGrant?: AppleGrantMaterial,
   ): Promise<void> {
     const now = new Date();
     await this.deleteExpiredSocialAssertions(now);
     const internalMarker = randomBytes(32).toString('base64url');
     try {
-      await this.prisma.socialEnrollment.create({
-        data: {
-          tokenHash: this.hashToken(internalMarker),
-          assertionHash: this.hashToken(providerAssertion),
-          provider: profile.provider,
-          subject: profile.subject,
-          email: profile.email,
-          displayName: profile.displayName,
-          avatarUrl: profile.avatarUrl,
-          expiresAt: new Date(now.getTime() + SOCIAL_ASSERTION_RETENTION_SECONDS * 1000),
-          consumedAt: now,
-        },
+      await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${customerId} FOR UPDATE`;
+        const activeCustomer = await tx.customer.findUnique({ where: { id: customerId } });
+        if (!activeCustomer || activeCustomer.phone.startsWith('deleted:')) {
+          throw new ValidationError('customer_session_revoked', 'Сессия клиента отозвана');
+        }
+        await tx.socialEnrollment.create({
+          data: {
+            tokenHash: this.hashToken(internalMarker),
+            assertionHash: this.hashToken(providerAssertion),
+            provider: profile.provider,
+            subject: profile.subject,
+            customerId,
+            expiresAt: new Date(now.getTime() + SOCIAL_ASSERTION_RETENTION_SECONDS * 1000),
+            consumedAt: now,
+          },
+        });
+        if (profile.provider === 'apple' && appleGrant) {
+          await this.replaceAppleGrantOnTx(tx, {
+            customerId,
+            subject: profile.subject,
+            status: 'active',
+            clientId: appleGrant.clientId,
+            refreshTokenEnvelope: appleGrant.refreshTokenEnvelope,
+          });
+        }
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -1056,23 +1316,94 @@ export class AuthService implements OnModuleInit {
     }
   }
 
+  private async replaceAppleGrantOnTx(
+    tx: Prisma.TransactionClient,
+    grant: {
+      customerId: string | null;
+      subject: string;
+      clientId: string;
+      refreshTokenEnvelope: string;
+      status: 'active' | 'enrollment';
+    },
+  ): Promise<{ id: string; customerId: string | null }> {
+    await tx.$queryRaw`
+      SELECT pg_advisory_xact_lock(hashtext(${'apple-grant:' + grant.clientId + ':' + grant.subject}))::text AS locked
+    `;
+    const previous = await tx.appleOAuthGrant.findMany({
+      where: { clientId: grant.clientId, subject: grant.subject },
+    });
+    const activeCustomerId = previous.find(
+      (entry) => entry.status === 'active' && entry.customerId,
+    )?.customerId ?? null;
+    if (previous.length > 0) {
+      await tx.appleRevocationJob.createMany({
+        data: previous.map((entry) => ({
+          subject: entry.subject,
+          clientId: entry.clientId,
+          refreshTokenEnvelope: entry.refreshTokenEnvelope,
+        })),
+      });
+      await tx.appleOAuthGrant.deleteMany({
+        where: { id: { in: previous.map((entry) => entry.id) } },
+      });
+    }
+    const created = await tx.appleOAuthGrant.create({
+      data: {
+        ...grant,
+        customerId: activeCustomerId ?? grant.customerId,
+        status: activeCustomerId ? 'active' : grant.status,
+      },
+    });
+    return { id: created.id, customerId: created.customerId };
+  }
+
   private async deleteExpiredSocialAssertions(now = new Date()): Promise<void> {
     const cleanupBeforeUtc = now.toISOString();
-    // Select and delete in one statement. Under PostgreSQL READ COMMITTED, if
-    // completion concurrently extends an expired enrollment while DELETE waits
-    // for its row lock, the final expiresAt predicate is rechecked against the
-    // updated row and preserves the fresh anti-replay marker.
-    await this.prisma.$executeRaw`
-      DELETE FROM "SocialEnrollment"
-      WHERE id IN (
-        SELECT id
+    await this.prisma.$transaction(async (tx) => {
+      const expired = await tx.$queryRaw<Array<{
+        id: string;
+        provider: string;
+        subject: string;
+        appleClientId: string | null;
+        appleGrantId: string | null;
+        consumedAt: Date | null;
+      }>>`
+        SELECT id, provider, subject, "appleClientId", "appleGrantId", "consumedAt"
         FROM "SocialEnrollment"
         WHERE "expiresAt" < CAST(${cleanupBeforeUtc} AS TIMESTAMP)
         ORDER BY "expiresAt" ASC
         LIMIT ${SOCIAL_ASSERTION_CLEANUP_BATCH_SIZE}
-      )
-      AND "expiresAt" < CAST(${cleanupBeforeUtc} AS TIMESTAMP)
-    `;
+        FOR UPDATE SKIP LOCKED
+      `;
+      for (const enrollment of expired) {
+        if (
+          enrollment.provider !== 'apple'
+          || enrollment.consumedAt
+          || !enrollment.appleClientId
+          || !enrollment.appleGrantId
+        ) continue;
+        await tx.$queryRaw`
+          SELECT pg_advisory_xact_lock(hashtext(${'apple-grant:' + enrollment.appleClientId + ':' + enrollment.subject}))::text AS locked
+        `;
+        const grant = await tx.appleOAuthGrant.findUnique({
+          where: { id: enrollment.appleGrantId },
+        });
+        if (grant?.status !== 'enrollment') continue;
+        await tx.appleRevocationJob.create({
+          data: {
+            subject: grant.subject,
+            clientId: grant.clientId,
+            refreshTokenEnvelope: grant.refreshTokenEnvelope,
+          },
+        });
+        await tx.appleOAuthGrant.delete({ where: { id: grant.id } });
+      }
+      if (expired.length > 0) {
+        await tx.socialEnrollment.deleteMany({
+          where: { id: { in: expired.map((entry) => entry.id) } },
+        });
+      }
+    });
   }
 
   /**

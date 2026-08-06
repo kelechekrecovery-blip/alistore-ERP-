@@ -45,7 +45,7 @@
     "mobile:typecheck": "node scripts/legacy-expo-retired.mjs typecheck",
     "mobile:store-preflight": "node scripts/legacy-expo-retired.mjs store:preflight",
     "ios:generate": "cd apps/ios && xcodegen generate",
-    "ios:build": "cd apps/ios && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project AliStoreNative.xcodeproj -alltargets -sdk iphonesimulator -configuration Debug -arch arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build",
+    "ios:build": "cd apps/ios && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project AliStoreNative.xcodeproj -alltargets -sdk iphonesimulator -configuration Debug -arch arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO SYMROOT=\"$PWD/build/Products\" OBJROOT=\"$PWD/build/Intermediates.noindex\" build",
     "ios:test": "cd apps/ios && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project AliStoreNative.xcodeproj -scheme AliStoreClient -destination 'platform=iOS Simulator,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO",
     "ios:ui": "cd apps/ios && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -project AliStoreNative.xcodeproj -scheme AliStoreUITests -destination 'platform=iOS Simulator,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO",
     "ios:lint": "cd apps/ios && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swiftlint lint --quiet",

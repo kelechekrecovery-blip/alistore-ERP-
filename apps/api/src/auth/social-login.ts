@@ -20,6 +20,12 @@ export interface SocialProfile {
   avatarUrl?: string;
 }
 
+export interface VerifiedAppleProfile extends SocialProfile {
+  provider: 'apple';
+  /** Audience selected from the signed token, never from client input. */
+  clientId: string;
+}
+
 export interface VerifiedTelegramProfile extends SocialProfile {
   /**
    * Canonical, verifier-produced replay identity. It is derived only after the
@@ -143,7 +149,7 @@ export function verifyTelegramLogin(
 
 export async function verifyAppleIdentityToken(
   input: AppleLoginInput,
-): Promise<SocialProfile> {
+): Promise<VerifiedAppleProfile> {
   const parts = input.identityToken.split('.');
   if (parts.length !== 3) {
     throw new ValidationError('apple_token_invalid', 'Apple identity token is malformed');
@@ -171,7 +177,8 @@ export async function verifyAppleIdentityToken(
   if (claims.iss !== APPLE_ISSUER) {
     throw new ValidationError('apple_token_invalid', 'Apple identity token issuer is invalid');
   }
-  if (!audienceMatches(claims.aud, input.clientId)) {
+  const matchedClientId = matchingAudience(claims.aud, input.clientId);
+  if (!matchedClientId) {
     throw new ValidationError('apple_token_invalid', 'Apple identity token audience is invalid');
   }
   if (!claims.exp || claims.exp <= nowSeconds) {
@@ -187,6 +194,7 @@ export async function verifyAppleIdentityToken(
   return {
     provider: 'apple',
     subject: claims.sub,
+    clientId: matchedClientId,
     email: claims.email,
     displayName: displayName([input.name, claims.email]),
   };
@@ -305,14 +313,18 @@ function safeEqualHex(left: string, right: string): boolean {
  * Пустые элементы отбрасываются: `APPLE_CLIENT_ID="a,,b"` не должен случайно
  * начать принимать токен с пустой аудиторией.
  */
-function audienceMatches(audience: string | string[] | undefined, clientId: string): boolean {
+function matchingAudience(
+  audience: string | string[] | undefined,
+  clientId: string,
+): string | undefined {
   const allowed = clientId
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
-  if (allowed.length === 0) return false;
+  if (allowed.length === 0) return undefined;
   const claimed = Array.isArray(audience) ? audience : [audience];
-  return claimed.some((value) => typeof value === 'string' && allowed.includes(value));
+  return claimed.find((value): value is string =>
+    typeof value === 'string' && allowed.includes(value));
 }
 
 function displayName(values: Array<string | undefined>): string | undefined {

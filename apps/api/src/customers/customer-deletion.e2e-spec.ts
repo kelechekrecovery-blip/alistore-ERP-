@@ -68,6 +68,25 @@ describe('Customer account deletion and export', () => {
     await prisma.customerIdentity.create({
       data: { customerId: owner.id, provider: 'apple', subject: `sub-${run}` },
     });
+    const consumedEnrollment = await prisma.socialEnrollment.create({
+      data: {
+        tokenHash: `consumed-token-${run}`,
+        assertionHash: `consumed-assertion-${run}`,
+        provider: 'apple',
+        subject: `sub-${run}`,
+        customerId: owner.id,
+        consumedAt: new Date(),
+        expiresAt: new Date(Date.now() + 86_400_000),
+      },
+    });
+    const appleGrant = await prisma.appleOAuthGrant.create({
+      data: {
+        customerId: owner.id,
+        subject: `sub-${run}`,
+        clientId: 'kg.alistore.client',
+        refreshTokenEnvelope: 'v1.test.iv.tag.ciphertext',
+      },
+    });
     const telegramIdentity = await prisma.telegramAgentIdentity.create({
       data: {
         customerId: owner.id,
@@ -121,7 +140,25 @@ describe('Customer account deletion and export', () => {
       consent: false,
     });
     expect(await prisma.customerAddress.count({ where: { customerId: owner.id } })).toBe(0);
+    expect(await prisma.socialEnrollment.count({ where: { customerId: owner.id } })).toBe(0);
+    const enrollmentTombstone = await prisma.socialEnrollment.findUniqueOrThrow({
+      where: { assertionHash: `consumed-assertion-${run}` },
+    });
+    expect(enrollmentTombstone).toMatchObject({
+      customerId: null,
+      subject: `deleted:${consumedEnrollment.id}`,
+      email: null,
+      displayName: null,
+      avatarUrl: null,
+      appleClientId: null,
+      appleGrantId: null,
+    });
+    expect(JSON.stringify(enrollmentTombstone)).not.toContain(owner.id);
     expect(await prisma.customerIdentity.count({ where: { customerId: owner.id } })).toBe(0);
+    expect(await prisma.appleOAuthGrant.findUnique({ where: { id: appleGrant.id } })).toBeNull();
+    expect(await prisma.appleRevocationJob.findFirst({
+      where: { clientId: appleGrant.clientId, subject: appleGrant.subject },
+    })).toMatchObject({ status: 'pending', attempts: 0, lastErrorCode: null });
     expect(await prisma.telegramAgentIdentity.count({ where: { customerId: owner.id } })).toBe(0);
     expect(await prisma.telegramAgentMessage.count({
       where: { telegramUserId: telegramIdentity.telegramUserId },

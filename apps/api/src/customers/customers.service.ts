@@ -349,6 +349,43 @@ export class CustomersService {
         },
       });
       await tx.customerAddress.deleteMany({ where: { customerId } });
+      // Unlink PII before removing the social identity. The worker can now
+      // revoke Apple grants with bounded retries even if Apple is unavailable;
+      // local account deletion is never held hostage by an external service.
+      const appleGrants = await tx.appleOAuthGrant.findMany({ where: { customerId } });
+      if (appleGrants.length > 0) {
+        await tx.appleRevocationJob.createMany({
+          data: appleGrants.map((grant) => ({
+            subject: grant.subject,
+            clientId: grant.clientId,
+            refreshTokenEnvelope: grant.refreshTokenEnvelope,
+          })),
+        });
+        await tx.appleOAuthGrant.deleteMany({ where: { customerId } });
+      }
+      // Keep only the short-lived assertion/token fingerprints until expiry so
+      // a still-valid Google/Telegram assertion cannot be replayed immediately
+      // after account deletion. Everything that identifies the customer or the
+      // provider account is unlinked/redacted now; normal expiry cleanup later
+      // removes the tombstone itself.
+      const consumedEnrollments = await tx.socialEnrollment.findMany({
+        where: { customerId },
+        select: { id: true },
+      });
+      for (const enrollment of consumedEnrollments) {
+        await tx.socialEnrollment.update({
+          where: { id: enrollment.id },
+          data: {
+            customerId: null,
+            subject: `deleted:${enrollment.id}`,
+            email: null,
+            displayName: null,
+            avatarUrl: null,
+            appleClientId: null,
+            appleGrantId: null,
+          },
+        });
+      }
       await tx.customerIdentity.deleteMany({ where: { customerId } });
       await tx.pushToken.deleteMany({ where: { customerId } });
       await tx.customerNotification.deleteMany({ where: { customerId } });
