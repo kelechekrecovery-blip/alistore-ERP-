@@ -34,6 +34,8 @@ export interface StaffTokens {
 }
 
 const STAFF_REFRESH_PREFIX = 'staff:';
+const STAFF_OWNER_INVARIANT_LOCK_KEY = 'staff-owner-invariant';
+
 /**
  * Сутки, а не месяц — сознательное расхождение с покупателем (`auth.service.ts`).
  *
@@ -86,14 +88,46 @@ export class StaffAuthService {
   }
 
   async bootstrapOwner(username: string, password: string, point?: string) {
-    const count = await this.prisma.staffUser.count();
-    if (count > 0) {
+    // Preserve the cheap rejection path once bootstrap is complete. This is
+    // only a fast preflight; the locked count below is the authoritative gate.
+    if ((await this.prisma.staffUser.count()) > 0) {
       throw new ValidationError(
         'staff_already_bootstrapped',
         'Персонал уже создан — войдите владельцем и добавляйте через /staff-auth/staff',
       );
     }
-    return this.createStaff(username, password, 'owner', point);
+    // Resolve the point and pay the Argon2 cost before taking the global
+    // bootstrap lock. Only the short count-and-insert critical section needs
+    // serialization; concurrent attempts must not hold a DB connection while
+    // hashing a password.
+    const requestedPoint = point?.trim()
+      || (process.env.NODE_ENV === 'test' ? 'BISHKEK-1' : undefined);
+    const [storePoint, passwordHash] = await Promise.all([
+      resolveActiveStorePoint(
+        this.prisma,
+        requestedPoint,
+        `Точка продаж «${requestedPoint ?? ''}» не найдена или отключена`,
+      ),
+      argon2.hash(password),
+    ]);
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockStaffOwnerInvariant(tx);
+      const count = await tx.staffUser.count();
+      if (count > 0) {
+        throw new ValidationError(
+          'staff_already_bootstrapped',
+          'Персонал уже создан — войдите владельцем и добавляйте через /staff-auth/staff',
+        );
+      }
+      return tx.staffUser.create({
+        data: {
+          username,
+          passwordHash,
+          role: 'owner',
+          point: storePoint.inventoryLocation,
+        },
+      });
+    });
   }
 
   /** Staff login → JWT carrying the role (server-authoritative authorization). */
@@ -332,6 +366,17 @@ export class StaffAuthService {
     `;
   }
 
+  /** Serialize every mutation which can remove an active owner. */
+  private async lockStaffOwnerInvariant(
+    tx: Pick<Prisma.TransactionClient, '$queryRaw'>,
+  ): Promise<void> {
+    await tx.$queryRaw`
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(${STAFF_OWNER_INVARIANT_LOCK_KEY}, 0)
+      )::text AS locked
+    `;
+  }
+
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
   }
@@ -493,6 +538,7 @@ export class StaffAuthService {
    */
   async deactivateStaff(actorId: string, targetStaffId: string) {
     const updated = await this.auditLedger().transaction(async (tx) => {
+      await this.lockStaffOwnerInvariant(tx);
       await this.lockStaffSessions(tx, `${STAFF_REFRESH_PREFIX}${targetStaffId}`);
       await tx.$queryRaw`SELECT id FROM "StaffUser" WHERE id = ${targetStaffId} FOR UPDATE`;
       const target = await tx.staffUser.findUnique({ where: { id: targetStaffId } });
@@ -511,6 +557,17 @@ export class StaffAuthService {
           'staff_deactivated',
         );
         return { result: target, events: [] };
+      }
+      if (target.role === 'owner') {
+        const otherActiveOwners = await tx.staffUser.count({
+          where: { role: 'owner', active: true, id: { not: target.id } },
+        });
+        if (otherActiveOwners === 0) {
+          throw new ConflictError(
+            'last_owner_protected',
+            'Нельзя отключить последнего активного владельца',
+          );
+        }
       }
       const [openShift, activeDeliveries] = await Promise.all([
         tx.cashShift.findFirst({
@@ -574,6 +631,7 @@ export class StaffAuthService {
    */
   async changeRole(actorId: string, targetStaffId: string, role: Role) {
     const updated = await this.auditLedger().transaction(async (tx) => {
+      await this.lockStaffOwnerInvariant(tx);
       await this.lockStaffSessions(tx, `${STAFF_REFRESH_PREFIX}${targetStaffId}`);
       await tx.$queryRaw`SELECT id FROM "StaffUser" WHERE id = ${targetStaffId} FOR UPDATE`;
       const target = await tx.staffUser.findUnique({ where: { id: targetStaffId } });
@@ -588,7 +646,7 @@ export class StaffAuthService {
         }
         return { result: target, events: [] };
       }
-      if (target.role === 'owner') {
+      if (target.role === 'owner' && target.active) {
         const owners = await tx.staffUser.count({ where: { role: 'owner', active: true, id: { not: target.id } } });
         if (owners === 0) {
           throw new ConflictError('last_owner_protected', 'Нельзя снять роль у последнего активного владельца');
