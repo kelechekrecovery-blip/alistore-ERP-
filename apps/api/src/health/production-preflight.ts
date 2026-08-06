@@ -1,4 +1,5 @@
 import { resolveAllowedHosts, resolveCorsOptions } from '../config/runtime-security';
+import { createPrivateKey } from 'node:crypto';
 
 export type ProductionPreflightStatus = 'ready' | 'missing' | 'unsafe';
 
@@ -126,6 +127,37 @@ const CHECKS: CheckDefinition[] = [
     title: 'Email verification delivery',
     requiredEnv: ['SMTP_HOST', 'SMTP_FROM'],
     note: 'Configure a transactional SMTP host and a verified AliStore sender before exposing email verification in production.',
+  },
+  {
+    id: 'apple_oauth_revocation',
+    area: 'identity',
+    title: 'Sign in with Apple token revocation configured',
+    requiredEnv: [],
+    note: 'When Apple login is enabled, configure AliStore native/web client IDs, Apple signing credentials, redirect URI, AES-GCM token keys and enable the worker revocation relay.',
+    evaluate: (env) => {
+      const audiences = env('APPLE_CLIENT_ID')
+        ?.split(',')
+        .map((value) => value.trim())
+        .filter(Boolean) ?? [];
+      if (audiences.length === 0) return 'ready';
+      const webClientId = env('APPLE_WEB_CLIENT_ID')?.trim();
+      const required = [
+        'APPLE_TEAM_ID',
+        'APPLE_KEY_ID',
+        'APPLE_PRIVATE_KEY',
+        'APPLE_TOKEN_ENCRYPTION_KEYS_JSON',
+        'APPLE_TOKEN_ENCRYPTION_ACTIVE_KEY_ID',
+      ];
+      if (!required.every((name) => Boolean(env(name)?.trim()))) return 'missing';
+      if (!appleCredentialMaterialReady(env)) return 'unsafe';
+      if (webClientId && (!audiences.includes(webClientId) || !env('APPLE_REDIRECT_URI')?.trim())) {
+        return 'unsafe';
+      }
+      if (env('PROCESS_ROLE') === 'worker') {
+        return env('APPLE_REVOCATION_RELAY_ENABLED') === 'true' ? 'ready' : 'unsafe';
+      }
+      return 'ready';
+    },
   },
   {
     id: 'reservation_sweep',
@@ -340,6 +372,32 @@ export function buildProductionPreflightReport(
       .filter((check) => check.status !== 'ready')
       .map((check) => `${check.title}: ${check.note}`),
   };
+}
+
+function appleCredentialMaterialReady(env: EnvReader): boolean {
+  if (!/^[A-Z0-9]{10}$/u.test(env('APPLE_TEAM_ID')?.trim() ?? '')) return false;
+  if (!/^[A-Z0-9]{10}$/u.test(env('APPLE_KEY_ID')?.trim() ?? '')) return false;
+  try {
+    const key = createPrivateKey((env('APPLE_PRIVATE_KEY') ?? '').replace(/\\n/gu, '\n'));
+    if (key.asymmetricKeyType !== 'ec') return false;
+    const details = key.asymmetricKeyDetails as { namedCurve?: string } | undefined;
+    if (!['prime256v1', 'P-256'].includes(details?.namedCurve ?? '')) return false;
+    const parsed: unknown = JSON.parse(env('APPLE_TOKEN_ENCRYPTION_KEYS_JSON') ?? '');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+    const active = env('APPLE_TOKEN_ENCRYPTION_ACTIVE_KEY_ID')?.trim() ?? '';
+    if (!/^[A-Za-z0-9_-]{1,64}$/u.test(active)) return false;
+    const entries = Object.entries(parsed as Record<string, unknown>);
+    if (entries.length === 0 || !(active in parsed)) return false;
+    return entries.every(([keyId, encoded]) => {
+      if (!/^[A-Za-z0-9_-]{1,64}$/u.test(keyId) || typeof encoded !== 'string') {
+        return false;
+      }
+      const bytes = Buffer.from(encoded, 'base64');
+      return bytes.length === 32 && bytes.toString('base64') === encoded;
+    });
+  } catch {
+    return false;
+  }
 }
 
 export function assertProductionRuntimeReady(env: EnvReader): void {

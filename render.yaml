@@ -19,6 +19,8 @@ services:
       - fromGroup: alistore-prod-common
       - key: PROCESS_ROLE
         value: api
+      - key: APPLE_REVOCATION_RELAY_ENABLED
+        value: "false"
       # Expand/switch auth rollout: leave false while the previous API revision
       # drains after the additive enum migration, then enable explicitly.
       - key: AUTH_RECOVERY_OTP_ENABLED
@@ -104,6 +106,8 @@ services:
       - fromGroup: alistore-prod-common
       - key: PROCESS_ROLE
         value: worker
+      - key: APPLE_REVOCATION_RELAY_ENABLED
+        value: "true"
       # Провайдерских возвратов при оплате наличными не существует физически:
       # деньги приходят курьеру или на кассу, возврат идёт через домен refunds.
       # При PAYMENT_PROVIDER=none preflight считает включённый релей unsafe.
@@ -279,6 +283,18 @@ envVarGroups:
       - key: APPLE_CLIENT_ID
         sync: false
       - key: APPLE_WEB_CLIENT_ID
+        sync: false
+      - key: APPLE_REDIRECT_URI
+        sync: false
+      - key: APPLE_TEAM_ID
+        sync: false
+      - key: APPLE_KEY_ID
+        sync: false
+      - key: APPLE_PRIVATE_KEY
+        sync: false
+      - key: APPLE_TOKEN_ENCRYPTION_KEYS_JSON
+        sync: false
+      - key: APPLE_TOKEN_ENCRYPTION_ACTIVE_KEY_ID
         sync: false
       # Вход через Telegram. Это НЕ ALERT_TELEGRAM_BOT_TOKEN выше: тот канал
       # дежурного, этим проверяется подпись initData.

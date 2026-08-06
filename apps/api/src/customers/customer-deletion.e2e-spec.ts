@@ -160,6 +160,14 @@ describe('Customer account deletion and export', () => {
     await prisma.customerIdentity.create({
       data: { customerId: owner.id, provider: 'apple', subject: `sub-${run}` },
     });
+    const appleGrant = await prisma.appleOAuthGrant.create({
+      data: {
+        customerId: owner.id,
+        subject: `sub-${run}`,
+        clientId: 'kg.alistore.client',
+        refreshTokenEnvelope: 'v1.test.iv.tag.ciphertext',
+      },
+    });
     const telegramIdentity = await prisma.telegramAgentIdentity.create({
       data: {
         customerId: owner.id,
@@ -296,6 +304,10 @@ describe('Customer account deletion and export', () => {
     });
     expect(await prisma.customerAddress.count({ where: { customerId: owner.id } })).toBe(0);
     expect(await prisma.customerIdentity.count({ where: { customerId: owner.id } })).toBe(0);
+    expect(await prisma.appleOAuthGrant.findUnique({ where: { id: appleGrant.id } })).toBeNull();
+    expect(await prisma.appleRevocationJob.findFirst({
+      where: { clientId: appleGrant.clientId, subject: appleGrant.subject },
+    })).toMatchObject({ status: 'pending', attempts: 0, lastErrorCode: null });
     expect(await prisma.telegramAgentIdentity.count({ where: { customerId: owner.id } })).toBe(0);
     expect(await prisma.telegramAgentMessage.count({
       where: { telegramUserId: telegramIdentity.telegramUserId },

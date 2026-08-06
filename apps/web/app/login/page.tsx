@@ -32,7 +32,7 @@ declare global {
           nonce: string;
         }) => void;
         signIn: () => Promise<{
-          authorization: { id_token: string; state?: string };
+          authorization: { code?: string; id_token: string; state?: string };
           user?: { name?: { firstName?: string; lastName?: string }; email?: string };
         }>;
       };
@@ -370,7 +370,15 @@ function LoginForm() {
       const name = response.user?.name
         ? [response.user.name.firstName, response.user.name.lastName].filter(Boolean).join(' ')
         : undefined;
-      const result = await appleLogin(response.authorization.id_token, { nonce, name });
+      const authorizationCode = response.authorization.code?.trim();
+      if (!authorizationCode) {
+        throw new Error('Apple не вернул код авторизации. Повторите вход.');
+      }
+      const result = await appleLogin(response.authorization.id_token, {
+        nonce,
+        authorizationCode,
+        name,
+      });
       if (result.status === 'authenticated') {
         setSocialEnrollmentToken(null);
         router.push(next);

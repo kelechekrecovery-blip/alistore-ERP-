@@ -483,6 +483,20 @@ export class CustomersService {
         },
       });
       await tx.customerAddress.deleteMany({ where: { customerId } });
+      // Unlink PII before removing the social identity. The worker can now
+      // revoke Apple grants with bounded retries even if Apple is unavailable;
+      // local account deletion is never held hostage by an external service.
+      const appleGrants = await tx.appleOAuthGrant.findMany({ where: { customerId } });
+      if (appleGrants.length > 0) {
+        await tx.appleRevocationJob.createMany({
+          data: appleGrants.map((grant) => ({
+            subject: grant.subject,
+            clientId: grant.clientId,
+            refreshTokenEnvelope: grant.refreshTokenEnvelope,
+          })),
+        });
+        await tx.appleOAuthGrant.deleteMany({ where: { customerId } });
+      }
       await tx.customerIdentity.deleteMany({ where: { customerId } });
       await tx.socialEnrollment.deleteMany({ where: { customerId } });
       await tx.pushToken.deleteMany({ where: { customerId } });

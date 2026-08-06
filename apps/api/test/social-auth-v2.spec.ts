@@ -164,7 +164,7 @@ describe('Auth: social enrollment v2', () => {
     });
   });
 
-  it('preserves a replay marker extended while expired cleanup waits on its row lock', async () => {
+  it('preserves a replay marker while expired cleanup skips its locked row', async () => {
     const capturedNow = new Date();
     const marker = await prisma.socialEnrollment.create({
       data: {
@@ -175,9 +175,6 @@ describe('Auth: social enrollment v2', () => {
         expiresAt: new Date(capturedNow.getTime() - 60_000),
       },
     });
-    let cleanupPromise: Promise<void> | undefined;
-    let observedBlockedDelete = false;
-
     await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`
         SELECT id
@@ -185,26 +182,9 @@ describe('Auth: social enrollment v2', () => {
         WHERE id = ${marker.id}
         FOR UPDATE
       `;
-      cleanupPromise = (
+      await (
         auth as unknown as { deleteExpiredSocialAssertions(now: Date): Promise<void> }
       ).deleteExpiredSocialAssertions(capturedNow);
-
-      for (let attempt = 0; attempt < 100; attempt += 1) {
-        const [activity] = await tx.$queryRaw<Array<{ blocked: boolean }>>`
-          SELECT EXISTS (
-            SELECT 1
-            FROM pg_stat_activity
-            WHERE pid <> pg_backend_pid()
-              AND query LIKE '%DELETE FROM "SocialEnrollment"%'
-              AND "wait_event_type" = 'Lock'
-          ) AS blocked
-        `;
-        if (activity?.blocked) {
-          observedBlockedDelete = true;
-          break;
-        }
-        await new Promise<void>((resolve) => setTimeout(resolve, 10));
-      }
 
       await tx.socialEnrollment.update({
         where: { id: marker.id },
@@ -215,8 +195,6 @@ describe('Auth: social enrollment v2', () => {
       });
     }, { timeout: 10_000 });
 
-    expect(observedBlockedDelete).toBe(true);
-    await cleanupPromise;
     await expect(prisma.socialEnrollment.findUnique({
       where: { id: marker.id },
     })).resolves.toMatchObject({

@@ -187,7 +187,11 @@ describe('Apple sign-in fetcher', () => {
     });
 
     await expect(
-      authAppleLogin('apple-identity-token', { nonce: 'abc123', name: 'Аида' }),
+      authAppleLogin('apple-identity-token', {
+        nonce: 'abc123',
+        authorizationCode: 'apple-authorization-code',
+        name: 'Аида',
+      }),
     ).resolves.toEqual({
       status: 'enrollment_required',
       enrollmentToken: 'opaque-enrollment-token',
@@ -197,13 +201,17 @@ describe('Apple sign-in fetcher', () => {
     expect(calls[0].url).not.toMatch(/\/auth\/social\/apple$/);
   });
 
-  /** Без nonce сервер отвечает `apple_nonce_required` — он обязан уходить. */
-  it('передаёт nonce в теле запроса', async () => {
+  /** Без nonce сервер отвечает `apple_nonce_required`; code нужен для отзыва доступа. */
+  it('передаёт nonce и authorization code в теле запроса', async () => {
     const calls = stubFetch({ status: 'authenticated', accessToken: 'a', tokenType: 'Bearer', expiresIn: '15m' });
-    await authAppleLogin('apple-identity-token', { nonce: 'abc123' });
+    await authAppleLogin('apple-identity-token', {
+      nonce: 'abc123',
+      authorizationCode: 'apple-authorization-code',
+    });
     expect(JSON.parse(calls[0].init.body as string)).toEqual({
       identityToken: 'apple-identity-token',
       nonce: 'abc123',
+      authorizationCode: 'apple-authorization-code',
     });
     expect(calls[0].init.credentials).toBe('include');
   });

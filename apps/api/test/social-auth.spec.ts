@@ -2,9 +2,11 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import {
   createHmac,
+  createHash,
   createSign,
   generateKeyPairSync,
   KeyObject,
+  randomBytes,
 } from 'node:crypto';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthService } from '../src/auth/auth.service';
@@ -12,6 +14,9 @@ import { ValidationError } from '../src/common/errors';
 
 describe('Auth: social provider login', () => {
   const originalFetch = global.fetch;
+  const appleOauthPrivateKey = generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
+    .privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+  const appleEncryptionKey = randomBytes(32).toString('base64');
   let prisma: PrismaService;
   let jwt: JwtService;
 
@@ -33,6 +38,8 @@ describe('Auth: social provider login', () => {
   beforeEach(async () => {
     await prisma.refreshToken.deleteMany();
     await prisma.socialEnrollment.deleteMany();
+    await prisma.appleOAuthGrant.deleteMany();
+    await prisma.appleRevocationJob.deleteMany();
     await prisma.customerIdentity.deleteMany();
     await prisma.customer.deleteMany({ where: { phone: { startsWith: '+999' } } });
   });
@@ -122,15 +129,6 @@ describe('Auth: social provider login', () => {
       alg: 'RS256',
       use: 'sig',
     };
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ keys: [jwk] }),
-    }) as unknown as typeof fetch;
-
-    const auth = service({
-      APPLE_CLIENT_ID: 'kg.alistore.web',
-      APPLE_JWKS_URL: 'https://apple.test/keys',
-    });
     await linkedIdentity('apple', 'apple-sub-1', '+9990000000002');
     const token = signedJwt(
       { alg: 'RS256', kid: 'apple-key-1' },
@@ -145,10 +143,18 @@ describe('Auth: social provider login', () => {
       },
       privateKey,
     );
+    mockAppleFlow(jwk, { 'apple-code-1': token });
+    const auth = service(appleConfig({
+      APPLE_CLIENT_ID: 'kg.alistore.web',
+      APPLE_WEB_CLIENT_ID: 'kg.alistore.web',
+      APPLE_REDIRECT_URI: 'https://ali.kg/login',
+      APPLE_JWKS_URL: 'https://apple.test/keys',
+    }));
 
     const tokens = await auth.loginWithApple({
       identityToken: token,
       nonce: 'nonce-1',
+      authorizationCode: 'apple-code-1',
       name: 'Apple Buyer',
     });
 
@@ -177,15 +183,6 @@ describe('Auth: social provider login', () => {
       alg: 'RS256',
       use: 'sig',
     };
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ keys: [jwk] }),
-    }) as unknown as typeof fetch;
-
-    const auth = service({
-      APPLE_CLIENT_ID: 'kg.alistore.web,kg.alistore.client',
-      APPLE_JWKS_URL: 'https://apple.test/keys',
-    });
     await linkedIdentity('apple', 'apple-native-1', '+9990000000003');
     await linkedIdentity('apple', 'apple-web-1', '+9990000000004');
 
@@ -204,15 +201,30 @@ describe('Auth: social provider login', () => {
         privateKey,
       );
 
+    const nativeIdentityToken = nativeToken('apple-native-1', 'kg.alistore.client');
+    const webIdentityToken = nativeToken('apple-web-1', 'kg.alistore.web');
+    mockAppleFlow(jwk, {
+      'native-code': nativeIdentityToken,
+      'web-code': webIdentityToken,
+    });
+    const auth = service(appleConfig({
+      APPLE_CLIENT_ID: 'kg.alistore.web,kg.alistore.client',
+      APPLE_WEB_CLIENT_ID: 'kg.alistore.web',
+      APPLE_REDIRECT_URI: 'https://ali.kg/login',
+      APPLE_JWKS_URL: 'https://apple.test/keys',
+    }));
+
     const native = await auth.loginWithApple({
-      identityToken: nativeToken('apple-native-1', 'kg.alistore.client'),
+      identityToken: nativeIdentityToken,
       nonce: 'nonce-apple-native-1',
+      authorizationCode: 'native-code',
     });
     expect(native.accessToken.split('.')).toHaveLength(3);
 
     const web = await auth.loginWithApple({
-      identityToken: nativeToken('apple-web-1', 'kg.alistore.web'),
+      identityToken: webIdentityToken,
       nonce: 'nonce-apple-web-1',
+      authorizationCode: 'web-code',
     });
     expect(web.accessToken.split('.')).toHaveLength(3);
 
@@ -226,6 +238,176 @@ describe('Auth: social provider login', () => {
       .catch((error) => error);
     expect(foreign).toBeInstanceOf(ValidationError);
     expect((foreign as ValidationError).code).toBe('apple_token_invalid');
+  });
+
+  it('exchanges the Apple code against the signed audience and persists only an encrypted grant', async () => {
+    const rsa = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const appleSigningKey = generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
+      .privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+    const jwk = {
+      ...rsa.publicKey.export({ format: 'jwk' }),
+      kid: 'apple-key-grant',
+      alg: 'RS256',
+      use: 'sig',
+    };
+    const identityToken = signedJwt(
+      { alg: 'RS256', kid: 'apple-key-grant' },
+      {
+        iss: 'https://appleid.apple.com',
+        aud: 'kg.alistore.client',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        sub: 'apple-grant-1',
+        nonce: 'nonce-apple-grant-1',
+      },
+      rsa.privateKey,
+    );
+    global.fetch = jest.fn(async (url: string | URL | Request) => {
+      if (String(url).endsWith('/auth/token')) {
+        return {
+          ok: true,
+          json: async () => ({
+            refresh_token: 'never-store-this-refresh-token',
+            id_token: identityToken,
+          }),
+        } as Response;
+      }
+      return { ok: true, json: async () => ({ keys: [jwk] }) } as Response;
+    }) as unknown as typeof fetch;
+    await linkedIdentity('apple', 'apple-grant-1', '+9990000000006');
+    const auth = service({
+      APPLE_CLIENT_ID: 'kg.alistore.web,kg.alistore.client',
+      APPLE_JWKS_URL: 'https://apple.test/keys',
+      APPLE_TEAM_ID: 'ZYU3F8W56P',
+      APPLE_KEY_ID: 'ALISTORE01',
+      APPLE_PRIVATE_KEY: appleSigningKey,
+      APPLE_TOKEN_ENCRYPTION_KEYS_JSON: JSON.stringify({
+        primary: randomBytes(32).toString('base64'),
+      }),
+      APPLE_TOKEN_ENCRYPTION_ACTIVE_KEY_ID: 'primary',
+    });
+
+    await expect(auth.loginWithAppleV2({
+      identityToken,
+      nonce: 'nonce-apple-grant-1',
+      authorizationCode: 'never-store-this-authorization-code',
+    })).resolves.toMatchObject({ status: 'authenticated' });
+
+    const grant = await prisma.appleOAuthGrant.findFirstOrThrow({
+      where: { clientId: 'kg.alistore.client', subject: 'apple-grant-1' },
+    });
+    expect(grant.customerId).toBeTruthy();
+    expect(grant.refreshTokenEnvelope).toMatch(/^v1\.primary\./u);
+    expect(JSON.stringify(grant)).not.toContain('never-store-this');
+  });
+
+  it('durably queues revocation when an Apple phone enrollment expires', async () => {
+    const rsa = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const jwk = {
+      ...rsa.publicKey.export({ format: 'jwk' }),
+      kid: 'apple-key-abandoned',
+      alg: 'RS256',
+      use: 'sig',
+    };
+    const identityToken = signedJwt(
+      { alg: 'RS256', kid: 'apple-key-abandoned' },
+      {
+        iss: 'https://appleid.apple.com',
+        aud: 'kg.alistore.client',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        sub: 'apple-abandoned-1',
+        nonce: 'nonce-apple-abandoned-1',
+      },
+      rsa.privateKey,
+    );
+    mockAppleFlow(jwk, { 'abandoned-code': identityToken });
+    const auth = service(appleConfig({
+      APPLE_CLIENT_ID: 'kg.alistore.client',
+      APPLE_JWKS_URL: 'https://apple.test/keys',
+    }));
+
+    await expect(auth.loginWithAppleV2({
+      identityToken,
+      nonce: 'nonce-apple-abandoned-1',
+      authorizationCode: 'abandoned-code',
+    })).resolves.toMatchObject({ status: 'enrollment_required' });
+    const enrollment = await prisma.socialEnrollment.findFirstOrThrow({
+      where: { provider: 'apple', subject: 'apple-abandoned-1' },
+    });
+    await prisma.socialEnrollment.update({
+      where: { id: enrollment.id },
+      data: { expiresAt: new Date(Date.now() - 1_000) },
+    });
+    await (
+      auth as unknown as { deleteExpiredSocialAssertions(now: Date): Promise<void> }
+    ).deleteExpiredSocialAssertions(new Date());
+
+    expect(await prisma.appleOAuthGrant.findFirst({
+      where: { subject: 'apple-abandoned-1' },
+    })).toBeNull();
+    expect(await prisma.appleRevocationJob.findFirst({
+      where: { subject: 'apple-abandoned-1' },
+    })).toMatchObject({ status: 'pending' });
+  });
+
+  it('binds overlapping Apple enrollments to exact grant generations', async () => {
+    const rsa = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const jwk = {
+      ...rsa.publicKey.export({ format: 'jwk' }),
+      kid: 'apple-key-generations',
+      alg: 'RS256',
+      use: 'sig',
+    };
+    const tokenFor = (nonce: string) => signedJwt(
+      { alg: 'RS256', kid: 'apple-key-generations' },
+      {
+        iss: 'https://appleid.apple.com',
+        aud: 'kg.alistore.client',
+        exp: Math.floor(Date.now() / 1000) + 300,
+        sub: 'apple-generations-1',
+        nonce,
+      },
+      rsa.privateKey,
+    );
+    const firstToken = tokenFor('nonce-generation-1');
+    const secondToken = tokenFor('nonce-generation-2');
+    mockAppleFlow(jwk, { 'code-generation-1': firstToken, 'code-generation-2': secondToken });
+    const auth = service(appleConfig({
+      APPLE_CLIENT_ID: 'kg.alistore.client',
+      APPLE_JWKS_URL: 'https://apple.test/keys',
+    }));
+
+    await auth.loginWithAppleV2({
+      identityToken: firstToken,
+      nonce: 'nonce-generation-1',
+      authorizationCode: 'code-generation-1',
+    });
+    const firstEnrollment = await prisma.socialEnrollment.findFirstOrThrow({
+      where: { assertionHash: createHash('sha256').update(firstToken).digest('hex') },
+    });
+    await auth.loginWithAppleV2({
+      identityToken: secondToken,
+      nonce: 'nonce-generation-2',
+      authorizationCode: 'code-generation-2',
+    });
+    const secondEnrollment = await prisma.socialEnrollment.findFirstOrThrow({
+      where: { assertionHash: createHash('sha256').update(secondToken).digest('hex') },
+    });
+    expect(secondEnrollment.appleGrantId).toBeTruthy();
+    expect(secondEnrollment.appleGrantId).not.toBe(firstEnrollment.appleGrantId);
+    expect(await prisma.appleRevocationJob.count({
+      where: { subject: 'apple-generations-1' },
+    })).toBe(1);
+
+    await prisma.socialEnrollment.update({
+      where: { id: firstEnrollment.id },
+      data: { expiresAt: new Date(Date.now() - 1_000) },
+    });
+    await (
+      auth as unknown as { deleteExpiredSocialAssertions(now: Date): Promise<void> }
+    ).deleteExpiredSocialAssertions(new Date());
+    await expect(prisma.appleOAuthGrant.findUnique({
+      where: { id: secondEnrollment.appleGrantId! },
+    })).resolves.toMatchObject({ status: 'enrollment' });
   });
 
   it('fails closed when a social provider is not configured', async () => {
@@ -242,6 +424,36 @@ describe('Auth: social provider login', () => {
     return new AuthService(prisma, jwt, {
       get: (key: string) => values[key],
     } as unknown as ConfigService);
+  }
+
+  function appleConfig(values: Record<string, string>): Record<string, string> {
+    return {
+      APPLE_TEAM_ID: 'ZYU3F8W56P',
+      APPLE_KEY_ID: 'ALISTORE01',
+      APPLE_PRIVATE_KEY: appleOauthPrivateKey,
+      APPLE_TOKEN_ENCRYPTION_KEYS_JSON: JSON.stringify({ primary: appleEncryptionKey }),
+      APPLE_TOKEN_ENCRYPTION_ACTIVE_KEY_ID: 'primary',
+      ...values,
+    };
+  }
+
+  function mockAppleFlow(
+    jwk: Record<string, unknown>,
+    identityTokensByCode: Record<string, string>,
+  ): void {
+    global.fetch = jest.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).endsWith('/auth/token')) {
+        const code = (init?.body as URLSearchParams).get('code') ?? '';
+        return {
+          ok: true,
+          json: async () => ({
+            refresh_token: `refresh-for-${code}`,
+            id_token: identityTokensByCode[code],
+          }),
+        } as Response;
+      }
+      return { ok: true, json: async () => ({ keys: [jwk] }) } as Response;
+    }) as unknown as typeof fetch;
   }
 
   async function linkedIdentity(

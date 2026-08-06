@@ -536,11 +536,16 @@ private struct ClientLoginView: View {
                 auth.reportSignInFailure("Apple не вернула токен входа")
                 return
             }
+            guard let authorizationCode = AppleAuthorizationCode.decode(credential.authorizationCode) else {
+                auth.reportSignInFailure("Apple не вернула корректный код авторизации")
+                return
+            }
             let fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
                 .compactMap { $0 }
                 .joined(separator: " ")
             await auth.signInWithApple(
                 identityToken: identityToken,
+                authorizationCode: authorizationCode,
                 nonce: AppleSignInNonce.hashed(appleRawNonce),
                 name: fullName
             )

@@ -148,10 +148,13 @@ export function authCompleteSocialEnrollment(
  * В вебе Apple кладёт в claim `nonce` ту же строку, что передана в
  * `AppleID.auth.init` — поэтому сюда идёт она же, без хэширования (в отличие от
  * нативного iOS, где в токен попадает SHA-256).
+ * `authorizationCode` — одноразовый код из того же ответа Apple SDK. Сервер
+ * обменивает его на refresh token, чтобы при удалении аккаунта отозвать доступ
+ * у Apple, а не только удалить локальную запись.
  */
 export function authAppleLogin(
   identityToken: string,
-  options: { nonce: string; name?: string },
+  options: { nonce: string; authorizationCode: string; name?: string },
 ): Promise<SocialAuthResult> {
   return postJson('/auth/v2/social/apple', { identityToken, ...options }, { 'x-alistore-web': '1' }, true);
 }
