@@ -84,7 +84,7 @@ test('production-like login exposes email, Apple and Google without promising re
   await expect(page.getByLabel('Email — привязанная почта', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Apple', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Continue with Google/i })).toBeVisible();
-  await page.getByTestId('login-channel-phone').click();
+  await page.getByRole('button', { name: 'Телефон', exact: true }).click();
   await expect(page.getByRole('status')).toContainText(/SMS сейчас не отправляется/i);
   await expect(page.getByRole('button', { name: 'Apple', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Continue with Google/i })).toBeVisible();
