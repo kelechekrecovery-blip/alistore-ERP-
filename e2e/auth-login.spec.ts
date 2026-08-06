@@ -48,7 +48,49 @@ test('browser-unusable social configuration shows the unavailable state', async 
   await expect(page.getByRole('button', { name: /Получить код/i })).toHaveCount(0);
 });
 
-test('Google sign-in starts phone confirmation for a new account', async ({ page }) => {
+test('production-like login exposes email, Apple and Google without promising registration', async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as unknown as { google: unknown }).google = {
+      accounts: {
+        id: {
+          initialize: () => undefined,
+          renderButton: (slot: HTMLElement) => {
+            const button = document.createElement('button');
+            button.textContent = 'Continue with Google';
+            slot.appendChild(button);
+          },
+        },
+      },
+    };
+  });
+  await page.route('**/auth/methods', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      phone: { enabled: false, registers: false },
+      email: { enabled: true, registers: false },
+      telegram: { enabled: false, registers: false, botUsername: null },
+      apple: { enabled: true, registers: false, clientId: 'kg.alistore.web' },
+      google: { enabled: true, registers: false, clientId: 'web.apps.googleusercontent.com' },
+      recovery: { enabled: false },
+      anyLoginAvailable: true,
+      registrationAvailable: false,
+    }),
+  }));
+
+  await page.goto('/login');
+
+  await expect(page.getByRole('heading', { name: 'Войти в аккаунт', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Email — привязанная почта', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Apple', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Continue with Google/i })).toBeVisible();
+  await page.getByTestId('login-channel-phone').click();
+  await expect(page.getByRole('status')).toContainText(/SMS сейчас не отправляется/i);
+  await expect(page.getByRole('button', { name: 'Apple', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Continue with Google/i })).toBeVisible();
+});
+
+test('social sign-in stays visible across code channels and starts phone confirmation', async ({ page }) => {
   await page.addInitScript(() => {
     let callback: ((response: { credential: string }) => void) | undefined;
     (window as unknown as { google: unknown }).google = {
@@ -72,7 +114,7 @@ test('Google sign-in starts phone confirmation for a new account', async ({ page
       phone: { enabled: true, registers: true },
       email: { enabled: true, registers: false },
       telegram: { enabled: false, registers: false, botUsername: null },
-      apple: { enabled: false, registers: false, clientId: null },
+      apple: { enabled: true, registers: true, clientId: 'kg.alistore.web' },
       google: { enabled: true, registers: true, clientId: 'web.apps.googleusercontent.com' },
       recovery: { enabled: true },
       anyLoginAvailable: true,
@@ -91,8 +133,10 @@ test('Google sign-in starts phone confirmation for a new account', async ({ page
 
   await page.goto('/login');
   await expect(page.getByRole('button', { name: /Continue with Google/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Apple', exact: true })).toBeVisible();
   await page.getByTestId('login-channel-email').click();
-  await expect(page.getByRole('button', { name: /Continue with Google/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Continue with Google/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Apple', exact: true })).toBeVisible();
   await page.getByTestId('login-channel-phone').click();
   await expect(page.getByRole('button', { name: /Continue with Google/i })).toBeVisible();
   await page.getByRole('button', { name: /Continue with Google/i }).click();
