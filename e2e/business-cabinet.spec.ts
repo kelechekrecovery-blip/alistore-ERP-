@@ -38,11 +38,16 @@ test('партнёр входит, видит только свои позици
   await page.getByRole('button', { name: 'Войти' }).click();
 
   await expect(page.getByRole('heading', { name: 'Альфа' })).toBeVisible();
-  await expect(page.getByText(mine.product.sku)).toBeVisible();
+  // Кабинет открывается на «Обзоре» — список живёт во вкладке «Ассортимент».
+  await page.getByRole('button', { name: 'Ассортимент' }).first().click();
+  // Артикул в DOM дважды — десктопная таблица и мобильная карточка, одна из
+  // них скрыта через CSS. Берём первую видимую, а не «единственную».
+  await expect(page.getByText(mine.product.sku).first()).toBeVisible();
   // Чужая позиция не должна появиться даже строкой: список — это граница.
   await expect(page.getByText(foreign.product.sku)).toHaveCount(0);
 
-  await page.getByLabel(`Новая цена: ${mine.product.name}`).fill('17500');
+  // Та же причина: поле цены существует и в таблице, и в мобильной карточке.
+  await page.getByLabel(`Новая цена: ${mine.product.name}`).first().fill('17500');
   await page.getByRole('button', { name: 'Сохранить' }).first().click();
   await expect(page.getByText('цена сохранена')).toBeVisible();
 
