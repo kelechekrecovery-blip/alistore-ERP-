@@ -74,10 +74,13 @@ export class BusinessProductsService {
         events: [
           {
             type: EventType.PriceChanged,
-            entityType: 'product',
-            entityId: productId,
             actor: `seller:${sellerId}`,
-            payload: { previousPrice: product.price, price, sellerId },
+            // Ссылка на товар живёт в `refs` — это единственное поле, по
+            // которому леджер ищется. `entityId` здесь молча отбрасывался
+            // (`AuditInput` его не знает), и «кто уронил цену на эту позицию»
+            // не отвечалось запросом вовсе. Поймано e2e-тестом.
+            refs: [productId, sellerId],
+            payload: { productId, sellerId, previousPrice: product.price, price },
           },
         ],
       };
