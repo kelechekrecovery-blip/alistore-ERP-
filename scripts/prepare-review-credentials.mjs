@@ -117,7 +117,9 @@ export function buildCredentialBundle({
   const suffix = randomBytes(3).toString('hex');
   const reviewPhone = `+996700${String(randomInt(1_000_000)).padStart(6, '0')}`;
   const reviewOtp = String(randomInt(1_000_000)).padStart(6, '0');
-  const until = new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString();
+  // Keep the generated login comfortably inside the API's seven-day maximum.
+  // App Review credentials can be regenerated if the review starts later.
+  const until = new Date(now + 3 * 24 * 60 * 60 * 1000).toISOString();
   const staff = [
     {
       app: 'Staff',

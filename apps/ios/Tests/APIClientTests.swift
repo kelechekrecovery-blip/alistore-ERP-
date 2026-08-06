@@ -6,6 +6,79 @@ import SwiftData
 import XCTest
 
 final class APIClientTests: XCTestCase {
+    @MainActor
+    func testStaffRefreshIsSingleflightForConcurrentUnauthorizedRequests() async throws {
+        let started = expectation(description: "staff refresh started")
+        started.assertForOverFulfill = false
+        StaffAuthTestURLProtocol.reset(refreshStarted: started)
+        let store = makeStaffAuthStore()
+        store.useTestSession(staffFixture())
+
+        let first = Task { await store.renewAccessToken(failedAccessToken: "expired-access") }
+        let second = Task { await store.renewAccessToken(failedAccessToken: "expired-access") }
+        await fulfillment(of: [started], timeout: 2)
+        StaffAuthTestURLProtocol.releaseRefresh.signal()
+
+        let firstToken = await first.value
+        let secondToken = await second.value
+        XCTAssertEqual(firstToken, "fresh-access")
+        XCTAssertEqual(secondToken, "fresh-access")
+        XCTAssertEqual(StaffAuthTestURLProtocol.refreshCount, 1)
+        XCTAssertEqual(store.session?.refreshToken, "fresh-refresh")
+    }
+
+    @MainActor
+    func testStaffLogoutDuringSuspendedRefreshCannotResurrectAndRevokesRemotely() async throws {
+        let started = expectation(description: "staff refresh suspended")
+        StaffAuthTestURLProtocol.reset(refreshStarted: started)
+        let store = makeStaffAuthStore()
+        store.useTestSession(staffFixture())
+
+        let refresh = Task { await store.renewAccessToken(failedAccessToken: "expired-access") }
+        await fulfillment(of: [started], timeout: 2)
+        let logout = Task { await store.logout() }
+        for _ in 0..<20 where store.session != nil { await Task.yield() }
+
+        XCTAssertNil(store.session, "local logout must complete before refresh can return")
+        StaffAuthTestURLProtocol.releaseRefresh.signal()
+        await logout.value
+        XCTAssertEqual(StaffAuthTestURLProtocol.logoutCount, 1)
+        let lateToken = await refresh.value
+        XCTAssertNil(lateToken)
+        XCTAssertNil(store.session, "late refresh response must not resurrect logout")
+    }
+
+    @MainActor
+    func testStaffRestoreKeepsSessionOnTransientRefreshFailure() async throws {
+        let started = expectation(description: "transient refresh attempted")
+        StaffAuthTestURLProtocol.reset(
+            refreshStarted: started,
+            suspendRefresh: false,
+            refreshStatus: 503,
+            refreshBody: #"{"message":"temporarily unavailable"}"#
+        )
+        let store = makeStaffAuthStore()
+        let fixture = staffFixture()
+
+        await store.restoreTestSession(fixture)
+        await fulfillment(of: [started], timeout: 2)
+
+        XCTAssertEqual(store.session?.accessToken, fixture.accessToken)
+        XCTAssertEqual(store.session?.refreshToken, fixture.refreshToken)
+    }
+
+    func testStaffLoginContractCarriesOptionalTOTP() throws {
+        let withoutTOTP = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(StaffLogin(username: "seller", password: "secret"))
+        ) as? [String: String]
+        let withTOTP = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(StaffLogin(username: "seller", password: "secret", totp: "123456"))
+        ) as? [String: String]
+
+        XCTAssertEqual(withoutTOTP, ["username": "seller", "password": "secret"])
+        XCTAssertEqual(withTOTP?["totp"], "123456")
+    }
+
     func testOrderCancellationMutationContract() async throws {
         let session = makeSession(status: 201, body: """
         {"id":"cancel-1","orderId":"order-1","status":"requested","policySnapshot":"standard","purchaseOrderSentSnapshot":false,"depositPaidSnapshot":0,"requestedRefundAmount":0,"approvedRefundAmount":null,"customerReason":"Передумал","ownerReason":null,"refundId":null,"createdAt":"2026-07-30T12:00:00Z","resolvedAt":null,"completedAt":null}
@@ -844,9 +917,104 @@ final class APIClientTests: XCTestCase {
         return URLSession(configuration: configuration)
     }
 
+    @MainActor
+    private func makeStaffAuthStore() -> StaffAuthStore {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StaffAuthTestURLProtocol.self]
+        return StaffAuthStore(
+            environment: AppEnvironment(apiBaseURL: URL(string: "https://api.example.test/api")!),
+            keychainService: "kg.alistore.tests.staff-auth",
+            restoresStoredSession: false,
+            isPinConfigured: { false },
+            session: URLSession(configuration: configuration)
+        )
+    }
+
+    private func staffFixture() -> StaffSession {
+        StaffSession(
+            accessToken: "expired-access",
+            refreshToken: "refresh-1",
+            staffId: "staff-1",
+            username: "seller",
+            role: "seller"
+        )
+    }
+
     private func requestJSON() throws -> [String: AnyHashable] {
         let data = try XCTUnwrap(MockURLProtocol.lastRequestBody)
         return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: AnyHashable])
+    }
+}
+
+private final class StaffAuthTestURLProtocol: URLProtocol, @unchecked Sendable {
+    nonisolated(unsafe) static var refreshStarted: XCTestExpectation?
+    nonisolated(unsafe) static var releaseRefresh = DispatchSemaphore(value: 0)
+    nonisolated(unsafe) static var refreshCount = 0
+    nonisolated(unsafe) static var logoutCount = 0
+    nonisolated(unsafe) static var suspendRefresh = true
+    nonisolated(unsafe) static var refreshStatus = 201
+    nonisolated(unsafe) static var refreshBody = """
+    {"accessToken":"fresh-access","refreshToken":"fresh-refresh","staffId":"staff-1","username":"seller","role":"seller","totpEnabled":false,"point":null,"capabilities":[]}
+    """
+    private static let lock = NSLock()
+
+    static func reset(
+        refreshStarted: XCTestExpectation,
+        suspendRefresh: Bool = true,
+        refreshStatus: Int = 201,
+        refreshBody: String = """
+        {"accessToken":"fresh-access","refreshToken":"fresh-refresh","staffId":"staff-1","username":"seller","role":"seller","totpEnabled":false,"point":null,"capabilities":[]}
+        """
+    ) {
+        lock.lock()
+        self.refreshStarted = refreshStarted
+        releaseRefresh = DispatchSemaphore(value: 0)
+        refreshCount = 0
+        logoutCount = 0
+        self.suspendRefresh = suspendRefresh
+        self.refreshStatus = refreshStatus
+        self.refreshBody = refreshBody
+        lock.unlock()
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let path = request.url?.path ?? ""
+        if path.hasSuffix("/staff-auth/refresh") {
+            Self.lock.lock()
+            Self.refreshCount += 1
+            let started = Self.refreshStarted
+            Self.lock.unlock()
+            started?.fulfill()
+            if Self.suspendRefresh { Self.releaseRefresh.wait() }
+            respond(status: Self.refreshStatus, body: Self.refreshBody)
+        } else if path.hasSuffix("/staff-auth/me") {
+            respond(status: 401, body: #"{"message":"expired"}"#)
+        } else if path.hasSuffix("/staff-auth/logout") {
+            Self.lock.lock()
+            Self.logoutCount += 1
+            Self.lock.unlock()
+            respond(status: 204, body: "")
+        } else {
+            respond(status: 404, body: #"{"message":"not found"}"#)
+        }
+    }
+
+    override func stopLoading() {}
+
+    private func respond(status: Int, body: String) {
+        guard let url = request.url else { return }
+        let response = HTTPURLResponse(
+            url: url,
+            statusCode: status,
+            httpVersion: nil,
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        if !body.isEmpty { client?.urlProtocol(self, didLoad: Data(body.utf8)) }
+        client?.urlProtocolDidFinishLoading(self)
     }
 }
 

@@ -46,4 +46,13 @@ class ApiClientTest {
     assertEquals("123456", payload.getString("code"))
     assertEquals("challenge-1", payload.getString("challengeId"))
   }
+
+  @Test
+  fun staffLoginPayloadOmitsBlankTotpAndCarriesAuthenticatorCode() {
+    val withoutTotp = staffLoginPayload("seller", "secret", "  ")
+    val withTotp = staffLoginPayload("seller", "secret", " 123456 ")
+
+    assertFalse(withoutTotp.has("totp"))
+    assertEquals("123456", withTotp.getString("totp"))
+  }
 }

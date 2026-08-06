@@ -61,6 +61,8 @@ const STEPS = ['Получение', 'Контакты', 'Оплата', 'Под
  * по своему настоящему заказу. Оплату в бою подтверждает вебхук провайдера.
  */
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+const PAYMENT_METHOD_DISCOVERY_TIMEOUT_MS = 5_000;
+const SAFE_PAYMENT_FALLBACK: ServerPaymentMethods = { online: false, methods: ['cash'] };
 type DoneState = {
   order: CreatedOrder;
   intent?: PaymentIntent;
@@ -193,7 +195,33 @@ export default function CheckoutPage() {
     if (user?.phone) setPhone((p) => (p && p !== PHONE_PREFIX ? p : user.phone));
   }, [user]);
   useEffect(() => {
-    void fetchPaymentMethods().then((result) => { setServerPayment(result); setPaymentProbed(true); });
+    let active = true;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let finishTimeout: (() => void) | undefined;
+    const timeout = new Promise<null>((resolve) => {
+      finishTimeout = () => resolve(null);
+      timeoutId = setTimeout(finishTimeout, PAYMENT_METHOD_DISCOVERY_TIMEOUT_MS);
+    });
+
+    // Fail closed on a rejected or stalled discovery request. A null result is
+    // deliberately reconciled to COD only; keeping the initial `card` state
+    // would let a method the server never confirmed reach createPaymentIntent.
+    void Promise.race([
+      fetchPaymentMethods().catch(() => null),
+      timeout,
+    ]).then((result) => {
+      if (!active) return;
+      setServerPayment(result ?? SAFE_PAYMENT_FALLBACK);
+      setPaymentProbed(true);
+    }).finally(() => {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    });
+
+    return () => {
+      active = false;
+      finishTimeout?.();
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    };
   }, []);
 
   const paymentOptions = resolveCheckoutPaymentOptions({
@@ -201,6 +229,13 @@ export default function CheckoutPage() {
     online: serverPayment?.online ?? false,
     cashAllowed,
   });
+  // This is the single payment value used by the confirmation and submit
+  // paths. React effects reconcile the radio state for the next render, while
+  // this derived value prevents even a same-tick stale card selection from
+  // being displayed or submitted after discovery falls back to cash.
+  const effectivePayment = paymentOptions.options.includes(payment)
+    ? payment
+    : paymentOptions.options[0] ?? null;
 
   useEffect(() => {
     if (!paymentProbed) return;
@@ -330,7 +365,8 @@ export default function CheckoutPage() {
   // равно пропускал дальше, и в подтверждении стояло «Картой»: способ, который
   // покупатель не выбирал и которого сервер не предлагал. Заказные строки сюда
   // не относятся — там оплаты на этом шаге нет вообще, задаток вносят в магазине.
-  const paymentUnavailable = !hasToOrderLine && paymentOptions.blocked;
+  const paymentUnavailable = !hasToOrderLine
+    && (!paymentProbed || paymentOptions.blocked || effectivePayment === null);
 
   async function applyGiftCard() {
     const code = giftCode.trim();
@@ -359,6 +395,11 @@ export default function CheckoutPage() {
       setError('Оформление товаров под заказ временно отключено.');
       return;
     }
+    const submittedPayment = hasToOrderLine ? payment : effectivePayment;
+    if (!hasToOrderLine && (!paymentProbed || submittedPayment === null)) {
+      setError('Не удалось подтвердить доступный способ оплаты. Вернитесь к шагу оплаты и попробуйте снова.');
+      return;
+    }
     setBusy(true); setError(null); setStrandedOrder(null);
     // Заказ создаётся первым, а деньги проводятся следующими вызовами. Держим
     // созданный заказ вне try: в catch иначе не видно, дошло ли дело до сервера.
@@ -367,7 +408,7 @@ export default function CheckoutPage() {
       const orderInput = {
         channel: 'web',
         fulfillmentType: delivery as 'pickup' | 'courier' | 'express',
-        paymentMode: payment === 'cash' && cashAllowed ? 'cod' as const : 'prepaid' as const,
+        paymentMode: submittedPayment === 'cash' && cashAllowed ? 'cod' as const : 'prepaid' as const,
         storePointId: pickupPoint,
         deliveryAddress: delivery !== 'pickup' ? deliveryAddress.trim() : undefined,
         deliverySlot: delivery === 'pickup'
@@ -398,13 +439,17 @@ export default function CheckoutPage() {
       let order: CreatedOrder;
       if (user) {
         order = await authed((token) => createMyOrder(orderInput, token, orderKey));
+        placedOrder = order;
       } else {
         const customer = await createCustomer({ phone: phone.trim(), name: name.trim() || undefined });
         guestCapability = customer.guestCapability;
         order = await createOrder({ ...orderInput, customerId: customer.id }, guestCapability, orderKey);
+        // From this line on the order exists on the server. Retain it before
+        // any optional browser persistence so SecurityError/quota failures can
+        // never turn a successful createOrder into a generic checkout error.
+        placedOrder = order;
         if (order.guestAccess) saveGuestOrderAccess(order.id, order.guestAccess.capability, order.guestAccess.expiresIn);
       }
-      placedOrder = order;
       if (hasToOrderLine) {
         setDone({
           order,
@@ -441,7 +486,7 @@ export default function CheckoutPage() {
         rotateCheckoutAttempt();
         return;
       }
-      if (payment === 'cash') {
+      if (submittedPayment === 'cash') {
         setDone({ order: currentOrder });
         clear();
         rotateCheckoutAttempt();
@@ -449,10 +494,10 @@ export default function CheckoutPage() {
       }
       const intentInput = {
         orderId: order.id,
-        method: payment,
+        method: submittedPayment,
         amount: serverDue,
       } as const;
-      const intentKey = paymentIntentKey(order.id, payment, serverDue);
+      const intentKey = paymentIntentKey(order.id, submittedPayment, serverDue);
       const intent = user
         ? await authed((token) => createMyPaymentIntent(intentInput, token, intentKey))
         : await createPaymentIntent({ ...intentInput, actor: 'web_checkout' }, guestCapability!, intentKey);
@@ -702,7 +747,12 @@ export default function CheckoutPage() {
               </p>
             ) : (
               <>
-                {paymentOptions.notice && (
+                {!paymentProbed && (
+                  <p role="status" className="mb-3 rounded-[11px] border border-surface-3 p-3 text-sm text-subtle">
+                    Проверяем доступные способы оплаты…
+                  </p>
+                )}
+                {paymentProbed && paymentOptions.notice && (
                   <p
                     role={paymentOptions.blocked ? 'alert' : undefined}
                     className={`mb-3 rounded-[11px] border p-3 text-sm ${paymentOptions.blocked ? 'border-warn text-warn' : 'border-surface-3 text-subtle'}`}
@@ -710,7 +760,7 @@ export default function CheckoutPage() {
                     {paymentOptions.notice}
                   </p>
                 )}
-                {PAYMENT.filter((p) => paymentOptions.options.includes(p.id)).map((p) => (
+                {paymentProbed && PAYMENT.filter((p) => paymentOptions.options.includes(p.id)).map((p) => (
                   <button key={p.id} type="button" aria-pressed={payment === p.id} onClick={() => setPayment(p.id)} className={`checkout-surface mb-2.5 flex w-full items-center gap-3 rounded-[13px] border bg-surface-2 p-3.5 text-left ${payment === p.id ? 'border-lime' : 'border-surface-3'}`}>
                     <p.icon size={20} className="text-ink" />
                     <span className="flex-1 text-sm">{p.name}</span>
@@ -753,7 +803,7 @@ export default function CheckoutPage() {
               {delivery !== 'pickup' && <Row k="Адрес" v={deliveryAddress || 'не указан'} />}
               {delivery === 'courier' && selectedDeliveryZone && <Row k="Зона" v={selectedDeliveryZone.name} />}
               {delivery === 'courier' && selectedDeliverySlot && <Row k="Интервал" v={slotLabel(selectedDeliverySlot)} />}
-              <Row k="Оплата" v={hasToOrderLine ? 'Задаток в магазине · наличные / карта / QR' : PAYMENT.find((p) => p.id === payment)?.name ?? ''} />
+              <Row k="Оплата" v={hasToOrderLine ? 'Задаток в магазине · наличные / карта / QR' : PAYMENT.find((p) => p.id === effectivePayment)?.name ?? ''} />
               <Row k="Телефон" v={phone} />
               <Row k="Товаров" v={String(items.reduce((s, i) => s + i.qty, 0))} />
               <div className="my-2 border-t border-surface-3" />

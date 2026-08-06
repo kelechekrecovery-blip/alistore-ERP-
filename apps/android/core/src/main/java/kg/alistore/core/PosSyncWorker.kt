@@ -10,24 +10,28 @@ class PosSyncWorker(appContext: Context, params: WorkerParameters) : CoroutineWo
   override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
     val apiBaseUrl = inputData.getString("apiBaseUrl") ?: return@withContext Result.failure()
     val tokenStore = SecureTokenStore(applicationContext, "alistore-pos-session")
-    val session = tokenStore.readSessionSnapshot("staff") ?: return@withContext Result.failure()
+    var session = tokenStore.readSessionSnapshot("staff") ?: return@withContext Result.failure()
     val queue = OfflineQueueDb(applicationContext, POS_QUEUE_DB, session.queueOwner)
     val client = ApiClient(apiBaseUrl)
+    StaffSessionManager(client, tokenStore)
     var retry = false
     try {
       queue.recoverStaleSyncing(System.currentTimeMillis() - OFFLINE_CLAIM_TIMEOUT_MS)
       while (true) {
         val mutation = queue.claimNext() ?: break
         try {
-        if (!tokenStore.isCurrent(session)) {
-          queue.markClaimState(mutation, "queued", "Authenticated session changed before replay")
+        val current = currentWorkerSession(tokenStore, session)
+        if (current == null) {
+          queue.markClaimState(mutation, "queued", "Authenticated session ended before replay")
           return@withContext Result.success()
         }
+        session = current
         if (!mutation.hasValidPayloadFingerprint()) {
           queue.markClaimState(mutation, "quarantined", "Offline command payload fingerprint mismatch")
           continue
         }
         val response = client.sendResponse(mutation, session.accessToken)
+        currentWorkerSession(tokenStore, session)?.let { session = it }
         when (val decision = posReplayDecision(response)) {
           PosReplayDecision.Sent -> queue.markContinuationSent(mutation)
           is PosReplayDecision.Conflict -> queue.markClaimState(mutation, "conflict", decision.message)

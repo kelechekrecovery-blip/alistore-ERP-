@@ -286,10 +286,13 @@ public struct StaffPrincipal: Decodable, Sendable {
 public struct StaffLogin: Encodable, Sendable {
     public let username: String
     public let password: String
+    /// Optional RFC 6238 code. Omitted for staff accounts without 2FA.
+    public let totp: String?
 
-    public init(username: String, password: String) {
+    public init(username: String, password: String, totp: String? = nil) {
         self.username = username
         self.password = password
+        self.totp = totp
     }
 }
 
@@ -431,6 +434,65 @@ public struct OTPVerification: Encodable, Sendable {
 public struct OTPChallenge: Decodable, Sendable {
     public let challengeId: String
     public let devCode: String?
+}
+
+/// Server-authoritative availability of one customer authentication method.
+///
+/// `enabled` means an existing customer can sign in now; `registers` means an
+/// unknown identity can also create/link a customer account. Keeping these
+/// separate prevents Apple/Google from promising registration while the phone
+/// confirmation channel required by social enrollment is unavailable.
+public struct CustomerAuthMethodAvailability: Decodable, Sendable, Equatable {
+    public let enabled: Bool
+    public let registers: Bool
+
+    public init(enabled: Bool, registers: Bool) {
+        self.enabled = enabled
+        self.registers = registers
+    }
+}
+
+public struct CustomerSocialAuthMethodAvailability: Decodable, Sendable, Equatable {
+    public let enabled: Bool
+    public let registers: Bool
+    public let clientId: String?
+
+    public init(enabled: Bool, registers: Bool, clientId: String? = nil) {
+        self.enabled = enabled
+        self.registers = registers
+        self.clientId = clientId
+    }
+}
+
+/// Response from `GET /auth/methods`. Native iOS deliberately decodes the full
+/// shared contract even though Telegram and web client IDs are not rendered:
+/// contract drift should fail loudly in tests instead of making the login UI
+/// independently guess which production services are live.
+public struct CustomerAuthMethods: Decodable, Sendable, Equatable {
+    public struct Telegram: Decodable, Sendable, Equatable {
+        public let enabled: Bool
+        public let registers: Bool
+        public let botUsername: String?
+    }
+
+    public struct Recovery: Decodable, Sendable, Equatable {
+        public let enabled: Bool
+    }
+
+    public let phone: CustomerAuthMethodAvailability
+    public let email: CustomerAuthMethodAvailability
+    public let telegram: Telegram
+    public let apple: CustomerSocialAuthMethodAvailability
+    public let google: CustomerSocialAuthMethodAvailability
+    public let recovery: Recovery
+    public let anyLoginAvailable: Bool
+    public let registrationAvailable: Bool
+}
+
+public enum CustomerAuthMethodsState: Sendable, Equatable {
+    case loading
+    case available(CustomerAuthMethods)
+    case unavailable
 }
 
 /// Тело `POST auth/v2/social/apple`.

@@ -10,24 +10,28 @@ class StaffSyncWorker(appContext: Context, params: WorkerParameters) : Coroutine
   override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
     val apiBaseUrl = inputData.getString("apiBaseUrl") ?: return@withContext Result.failure()
     val tokenStore = SecureTokenStore(applicationContext, "alistore-staff-session")
-    val session = tokenStore.readSessionSnapshot("staff") ?: return@withContext Result.failure()
+    var session = tokenStore.readSessionSnapshot("staff") ?: return@withContext Result.failure()
     val queue = OfflineQueueDb(applicationContext, STAFF_QUEUE_DB, session.queueOwner)
     val client = ApiClient(apiBaseUrl)
+    StaffSessionManager(client, tokenStore)
     var retryRequired = false
     try {
       queue.recoverStaleSyncing(System.currentTimeMillis() - OFFLINE_CLAIM_TIMEOUT_MS)
       while (true) {
         val mutation = queue.claimNext() ?: break
         try {
-        if (!tokenStore.isCurrent(session)) {
-          queue.markClaimState(mutation, "queued", "Authenticated session changed before replay")
+        val current = currentWorkerSession(tokenStore, session)
+        if (current == null) {
+          queue.markClaimState(mutation, "queued", "Authenticated session ended before replay")
           return@withContext Result.success()
         }
+        session = current
         if (!mutation.hasValidPayloadFingerprint()) {
           queue.markClaimState(mutation, "quarantined", "Offline command payload fingerprint mismatch")
           continue
         }
         val status = client.send(mutation, session.accessToken)
+        currentWorkerSession(tokenStore, session)?.let { session = it }
         when {
           status in 200..299 -> queue.markClaimSent(mutation)
           status == 409 || status == 422 -> queue.markClaimState(mutation, "conflict", "HTTP $status")
@@ -55,3 +59,24 @@ class StaffSyncWorker(appContext: Context, params: WorkerParameters) : Coroutine
 }
 
 internal const val STAFF_QUEUE_DB = "alistore-staff-offline.db"
+
+internal fun currentWorkerSession(
+  store: SecureTokenStore,
+  previous: SecureSessionSnapshot,
+): SecureSessionSnapshot? {
+  return selectWorkerSession(
+    previous,
+    previousStillCurrent = store.isCurrent(previous),
+    persisted = store.readSessionSnapshot("staff"),
+  )
+}
+
+internal fun selectWorkerSession(
+  previous: SecureSessionSnapshot,
+  previousStillCurrent: Boolean,
+  persisted: SecureSessionSnapshot?,
+): SecureSessionSnapshot? = if (previousStillCurrent) {
+  previous
+} else {
+  persisted?.takeIf { it.queueOwner == previous.queueOwner }
+}

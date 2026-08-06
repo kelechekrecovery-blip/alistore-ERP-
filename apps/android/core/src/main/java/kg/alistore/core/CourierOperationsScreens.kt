@@ -145,9 +145,24 @@ fun CourierApp(
   val api = remember(apiBaseUrl) { ApiClient(apiBaseUrl) }
   val manager = remember(apiBaseUrl) { StaffSessionManager(api, SecureTokenStore(context, "alistore-courier-session")) }
   val quickUnlock = remember { QuickUnlockStore(context, "courier") }
+  val authScope = rememberCoroutineScope()
   var state by remember { mutableStateOf<StaffAuthState>(StaffAuthState.Restoring) }
-  LaunchedEffect(manager) { state = manager.restore() }
-  val logout: () -> Unit = { quickUnlock.clear(); state = manager.logout() }
+  LaunchedEffect(manager) {
+    launch { manager.monitorExternalSessionChanges() }
+    state = manager.restore()
+  }
+  LaunchedEffect(manager.sessionInvalidated) {
+    if (manager.sessionInvalidated) {
+      quickUnlock.clear()
+      state = StaffAuthState.SignedOut
+    }
+  }
+  val logout: () -> Unit = {
+    val session = (state as? StaffAuthState.SignedIn)?.session
+    quickUnlock.clear()
+    state = manager.beginLogout()
+    authScope.launch { manager.finishLogout(session) }
+  }
   Design3Theme {
     when (val current = state) {
       StaffAuthState.Restoring -> CourierLoading()
@@ -167,6 +182,7 @@ fun CourierApp(
 private fun CourierLogin(manager: StaffSessionManager, initialError: String? = null, onState: (StaffAuthState) -> Unit) {
   var username by rememberSaveable { mutableStateOf("") }
   var password by rememberSaveable { mutableStateOf("") }
+  var totp by rememberSaveable { mutableStateOf("") }
   var error by remember { mutableStateOf(initialError) }
   var busy by remember { mutableStateOf(false) }
   val scope = rememberCoroutineScope()
@@ -182,17 +198,29 @@ private fun CourierLogin(manager: StaffSessionManager, initialError: String? = n
       visualTransformation = PasswordVisualTransformation(),
       modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("courier-password"),
     )
+    if (manager.requiresTotp) {
+      OutlinedTextField(
+        totp,
+        { totp = it.filter(Char::isDigit).take(6) },
+        label = { Text("Код 2FA") },
+        supportingText = { Text("6 цифр из приложения-аутентификатора") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+        visualTransformation = PasswordVisualTransformation(),
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("courier-totp"),
+      )
+    }
     error?.let { Text(it, color = CourierCoral, modifier = Modifier.padding(top = 10.dp)) }
     Button(
       onClick = {
         busy = true
         scope.launch {
-          val result = manager.login(username, password)
+          val result = manager.login(username, password, totp)
           if (result is StaffAuthState.Failed) error = result.message else onState(result)
           busy = false
         }
       },
-      enabled = !busy && username.isNotBlank() && password.isNotBlank(),
+      enabled = !busy && username.isNotBlank() && password.isNotBlank() && (!manager.requiresTotp || totp.length == 6),
       colors = ButtonDefaults.buttonColors(containerColor = CourierLime, contentColor = CourierInk),
       modifier = Modifier.fillMaxWidth().height(58.dp).padding(top = 12.dp).testTag("courier-login"),
     ) { if (busy) CircularProgressIndicator(Modifier.size(20.dp)) else Text("Войти", fontWeight = FontWeight.Bold) }

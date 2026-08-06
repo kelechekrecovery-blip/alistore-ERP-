@@ -10,6 +10,9 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import org.json.JSONObject
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 
 data class SecureSessionSnapshot(
   val accessToken: String,
@@ -20,12 +23,11 @@ data class SecureSessionSnapshot(
 
 class SecureTokenStore(context: Context, private val alias: String) : SessionStore, StaffSessionStore {
   private val preferences = context.getSharedPreferences("secure-session", Context.MODE_PRIVATE)
+  override val sessionChanges: Flow<Unit> = changesFor(alias)
 
   fun save(token: String) {
     saveEncrypted(token)
   }
-
-  override fun saveToken(token: String) = save(token)
 
   override fun saveSession(tokens: AuthTokens) {
     saveEncrypted(JSONObject().put("accessToken", tokens.accessToken).put("refreshToken", tokens.refreshToken).toString())
@@ -38,9 +40,6 @@ class SecureTokenStore(context: Context, private val alias: String) : SessionSto
     )
   }
 
-  override fun saveAuthenticatedToken(token: String, principalId: String) =
-    saveAuthenticated(token, principalId)
-
   private fun saveEncrypted(value: String) {
     synchronized(sessionLock) {
       val encrypted = encrypt(value)
@@ -50,6 +49,7 @@ class SecureTokenStore(context: Context, private val alias: String) : SessionSto
         .remove(PRINCIPAL_ID)
         .putLong(GENERATION, nextGeneration())
         .commit()
+      notifyChanged()
     }
   }
 
@@ -67,6 +67,7 @@ class SecureTokenStore(context: Context, private val alias: String) : SessionSto
         .putString(PRINCIPAL_ID, owner.storageKey)
         .putLong(GENERATION, nextGeneration())
         .commit()
+      notifyChanged()
     }
   }
 
@@ -83,8 +84,6 @@ class SecureTokenStore(context: Context, private val alias: String) : SessionSto
     return runCatching { JSONObject(value).getString("accessToken") }.getOrDefault(value)
   }
 
-  override fun readToken(): String? = read()
-
   override fun readSession(): AuthTokens? {
     val value = readEncrypted() ?: return null
     return runCatching {
@@ -95,6 +94,13 @@ class SecureTokenStore(context: Context, private val alias: String) : SessionSto
       null
     }
   }
+
+  override fun readStaffSessionSnapshot(): SecureSessionSnapshot? = readSessionSnapshot("staff")
+
+  override fun replaceStaffSession(
+    snapshot: SecureSessionSnapshot,
+    tokens: AuthTokens,
+  ): SecureSessionSnapshot? = replaceSession(snapshot, tokens)
 
   fun readSessionSnapshot(expectedNamespace: String): SecureSessionSnapshot? = synchronized(sessionLock) {
     val values = preferences.all
@@ -120,7 +126,7 @@ class SecureTokenStore(context: Context, private val alias: String) : SessionSto
     SecureSessionSnapshot(tokens.first, tokens.second, owner, values.generation())
   }
 
-  fun isCurrent(snapshot: SecureSessionSnapshot): Boolean = synchronized(sessionLock) {
+  override fun isCurrent(snapshot: SecureSessionSnapshot): Boolean = synchronized(sessionLock) {
     val values = preferences.all
     values.generation() == snapshot.generation &&
       values[PRINCIPAL_ID] == snapshot.queueOwner.storageKey
@@ -170,10 +176,13 @@ class SecureTokenStore(context: Context, private val alias: String) : SessionSto
     synchronized(sessionLock) {
       val generation = nextGeneration()
       preferences.edit().clear().putLong(GENERATION, generation).commit()
+      notifyChanged()
     }
   }
 
   private fun nextGeneration(): Long = preferences.getLong(GENERATION, 0L) + 1L
+
+  private fun notifyChanged() { changesFor(alias).tryEmit(Unit) }
 
   private fun Map<String, *>.generation(): Long = (get(GENERATION) as? Long) ?: 0L
 
@@ -194,5 +203,8 @@ class SecureTokenStore(context: Context, private val alias: String) : SessionSto
     const val SESSION_VALUE = "session_value"
     const val SESSION_PRINCIPAL_ID = "session_principal_id"
     val sessionLock = Any()
+    val sessionChanges = ConcurrentHashMap<String, MutableSharedFlow<Unit>>()
+    fun changesFor(alias: String): MutableSharedFlow<Unit> =
+      sessionChanges.getOrPut(alias) { MutableSharedFlow(extraBufferCapacity = 16) }
   }
 }

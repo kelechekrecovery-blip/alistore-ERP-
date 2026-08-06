@@ -58,7 +58,7 @@ public actor UnauthorizedRegistry {
 public actor APIClient {
     /// Обновляет протухший доступ и возвращает новый токен, либо `nil`, если
     /// сессию восстановить нельзя.
-    public typealias UnauthorizedHandler = @Sendable () async -> String?
+    public typealias UnauthorizedHandler = @Sendable (_ failedAccessToken: String) async -> String?
 
     private let baseURL: URL
     private let session: URLSession
@@ -255,10 +255,10 @@ public actor APIClient {
             // refresh-токен тоже мёртв, и сессию надо гасить, а не крутить цикл.
             // Идемпотентный ключ переносим в повтор — иначе сервер увидит
             // повтор как новую операцию.
-            if http.statusCode == 401, !isRetry, token != nil {
+            if http.statusCode == 401, !isRetry, let failedToken = token {
                 var handler = onUnauthorized
                 if handler == nil { handler = await UnauthorizedRegistry.shared.current() }
-                if let handler, let renewed = await handler() {
+                if let handler, let renewed = await handler(failedToken) {
                     return try await self.request(
                         path,
                         method: method,

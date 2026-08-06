@@ -53,6 +53,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -119,9 +121,24 @@ fun PosApp(apiBaseUrl: String) {
   val api = remember(apiBaseUrl) { ApiClient(apiBaseUrl) }
   val auth = remember(apiBaseUrl) { StaffSessionManager(api, SecureTokenStore(context, "alistore-pos-session")) }
   val quickUnlock = remember { QuickUnlockStore(context, "pos") }
+  val authScope = rememberCoroutineScope()
   var state by remember { mutableStateOf<StaffAuthState>(StaffAuthState.Restoring) }
-  LaunchedEffect(auth) { state = auth.restore() }
-  val logout: () -> Unit = { quickUnlock.clear(); state = auth.logout() }
+  LaunchedEffect(auth) {
+    launch { auth.monitorExternalSessionChanges() }
+    state = auth.restore()
+  }
+  LaunchedEffect(auth.sessionInvalidated) {
+    if (auth.sessionInvalidated) {
+      quickUnlock.clear()
+      state = StaffAuthState.SignedOut
+    }
+  }
+  val logout: () -> Unit = {
+    val session = (state as? StaffAuthState.SignedIn)?.session
+    quickUnlock.clear()
+    state = auth.beginLogout()
+    authScope.launch { auth.finishLogout(session) }
+  }
   Design3Theme {
     when (val current = state) {
       StaffAuthState.Restoring -> PosLoading()
@@ -139,6 +156,7 @@ fun PosApp(apiBaseUrl: String) {
 private fun PosLogin(manager: StaffSessionManager, initialError: String? = null, onState: (StaffAuthState) -> Unit) {
   var username by rememberSaveable { mutableStateOf("") }
   var password by rememberSaveable { mutableStateOf("") }
+  var totp by rememberSaveable { mutableStateOf("") }
   var error by remember { mutableStateOf(initialError) }
   var busy by remember { mutableStateOf(false) }
   val scope = rememberCoroutineScope()
@@ -147,10 +165,21 @@ private fun PosLogin(manager: StaffSessionManager, initialError: String? = null,
     Text("Нативная касса", color = PosMuted, modifier = Modifier.padding(bottom = 22.dp))
     OutlinedTextField(username, { username = it }, label = { Text("Логин") }, modifier = Modifier.fillMaxWidth().testTag("pos-username"))
     OutlinedTextField(password, { password = it }, label = { Text("Пароль") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("pos-password"))
+    if (manager.requiresTotp) {
+      OutlinedTextField(
+        totp,
+        { totp = it.filter(Char::isDigit).take(6) },
+        label = { Text("Код 2FA") },
+        supportingText = { Text("6 цифр из приложения-аутентификатора") },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+        visualTransformation = PasswordVisualTransformation(),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("pos-totp"),
+      )
+    }
     error?.let { Text(it, color = PosCoral, modifier = Modifier.padding(top = 8.dp)) }
     Button(
-      onClick = { busy = true; scope.launch { val result = manager.login(username, password); if (result is StaffAuthState.Failed) error = result.message else onState(result); busy = false } },
-      enabled = !busy && username.isNotBlank() && password.isNotBlank(),
+      onClick = { busy = true; scope.launch { val result = manager.login(username, password, totp); if (result is StaffAuthState.Failed) error = result.message else onState(result); busy = false } },
+      enabled = !busy && username.isNotBlank() && password.isNotBlank() && (!manager.requiresTotp || totp.length == 6),
       colors = ButtonDefaults.buttonColors(containerColor = PosLime, contentColor = PosInk),
       modifier = Modifier.fillMaxWidth().height(54.dp).padding(top = 10.dp).testTag("pos-login"),
     ) { if (busy) CircularProgressIndicator(Modifier.size(20.dp)) else Text("Открыть кассу", fontWeight = FontWeight.Bold) }

@@ -13,8 +13,17 @@ function readMap(): StoredAccessMap {
   }
 }
 
-function writeMap(value: StoredAccessMap) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+function writeMap(value: StoredAccessMap): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+    return true;
+  } catch {
+    // Guest capability persistence is a convenience, not part of creating the
+    // order. Safari private mode, storage policy, and quota exhaustion must not
+    // throw after the server has already accepted the order.
+    return false;
+  }
 }
 
 function tokenExpiry(capability: string): number | null {
@@ -29,12 +38,12 @@ function tokenExpiry(capability: string): number | null {
   }
 }
 
-export function saveGuestOrderAccess(orderId: string, capability: string, expiresInSeconds?: number) {
-  if (typeof window === 'undefined' || !orderId || !capability) return;
+export function saveGuestOrderAccess(orderId: string, capability: string, expiresInSeconds?: number): boolean {
+  if (typeof window === 'undefined' || !orderId || !capability) return false;
   const expiresAt = tokenExpiry(capability) ?? Date.now() + Math.max(60, expiresInSeconds ?? 0) * 1000;
   const map = readMap();
   map[orderId] = { capability, expiresAt };
-  writeMap(map);
+  return writeMap(map);
 }
 
 export function readGuestOrderAccess(orderId: string): string | null {
@@ -55,8 +64,12 @@ export function captureGuestOrderAccess(orderId: string): string | null {
   const fragment = new URLSearchParams(window.location.hash.slice(1));
   const capability = fragment.get('access');
   if (capability) {
-    saveGuestOrderAccess(orderId, capability);
-    window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`);
+    // Only remove the capability from the URL after it has a durable browser
+    // home. If storage is blocked, retaining the fragment is what lets reloads
+    // keep accessing an order the guest has already created.
+    if (saveGuestOrderAccess(orderId, capability)) {
+      window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`);
+    }
     return capability;
   }
   return readGuestOrderAccess(orderId);

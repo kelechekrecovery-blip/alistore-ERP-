@@ -21,6 +21,7 @@ public final class CustomerAuthStore {
     public private(set) var emailAttachChallengeId: String?
     public private(set) var socialEnrollmentProvider: CustomerSocialProvider?
     public private(set) var socialEnrollmentExpiresAt: Date?
+    public private(set) var authMethodsState: CustomerAuthMethodsState = .loading
     public var requiresSocialPhoneEnrollment: Bool { socialEnrollmentProvider != nil }
     /// Compatibility for the existing Apple-only UI while it migrates to the
     /// provider-neutral enrollment state.
@@ -76,6 +77,30 @@ public final class CustomerAuthStore {
             requiresQuickUnlock = true
         } catch {
             await refresh(stored)
+        }
+    }
+
+    /// Loads the same production capability view used by the web login screen.
+    /// On failure the state becomes `.unavailable`: callers must keep the guest
+    /// path open, but must not advertise an authentication method the server has
+    /// not confirmed as operational.
+    public func loadAuthMethods(force: Bool = false) async {
+        if !force, case .available = authMethodsState { return }
+        #if DEBUG
+        // UI tests intentionally run without an API process. Their explicit
+        // signed-out launch mode gets a deterministic capability fixture; a
+        // regular Debug or Release build still consumes the live endpoint.
+        if UITestBootstrap.disablesSessionRestore {
+            useUITestAuthMethods()
+            return
+        }
+        #endif
+        authMethodsState = .loading
+        do {
+            let methods: CustomerAuthMethods = try await api.get("auth/methods")
+            authMethodsState = .available(methods)
+        } catch {
+            authMethodsState = .unavailable
         }
     }
 
@@ -414,7 +439,7 @@ public final class CustomerAuthStore {
     /// `refreshFlight` уже коалесцирует параллельные вызовы, поэтому пачка
     /// одновременных 401 обменяет ротируемый refresh-токен ровно один раз.
     public func installUnauthorizedHandler() async {
-        await UnauthorizedRegistry.shared.set { [weak self] in
+        await UnauthorizedRegistry.shared.set { [weak self] _ in
             await self?.renewAccessToken()
         }
     }
@@ -462,6 +487,19 @@ public final class CustomerAuthStore {
         socialEnrollmentProvider = provider
         isRestoring = false
         errorMessage = nil
+    }
+
+    public func useUITestAuthMethods() {
+        authMethodsState = .available(CustomerAuthMethods(
+            phone: CustomerAuthMethodAvailability(enabled: true, registers: true),
+            email: CustomerAuthMethodAvailability(enabled: true, registers: false),
+            telegram: CustomerAuthMethods.Telegram(enabled: false, registers: false, botUsername: nil),
+            apple: CustomerSocialAuthMethodAvailability(enabled: true, registers: true),
+            google: CustomerSocialAuthMethodAvailability(enabled: false, registers: false),
+            recovery: CustomerAuthMethods.Recovery(enabled: true),
+            anyLoginAvailable: true,
+            registrationAvailable: true
+        ))
     }
     #endif
 
@@ -519,6 +557,12 @@ public final class CustomerAuthStore {
         case .authenticated(let auth):
             try await finishAuthentication(auth, fallbackPhone: "")
         case .enrollmentRequired(let enrollmentToken, let expiresIn):
+            if case .available(let methods) = authMethodsState {
+                let canRegister = provider == .apple ? methods.apple.registers : methods.google.registers
+                guard canRegister else {
+                    throw CustomerSocialEnrollmentUnavailable(provider: provider)
+                }
+            }
             socialEnrollmentToken = enrollmentToken
             socialEnrollmentExpiresAt = Date().addingTimeInterval(TimeInterval(expiresIn))
             socialEnrollmentProvider = provider
@@ -551,5 +595,14 @@ public final class CustomerAuthStore {
     private func readSession() throws -> CustomerSession? {
         guard let value = try tokens.read(account: "customer-session"), let data = value.data(using: .utf8) else { return nil }
         return try JSONDecoder().decode(CustomerSession.self, from: data)
+    }
+}
+
+private struct CustomerSocialEnrollmentUnavailable: LocalizedError {
+    let provider: CustomerSocialProvider
+
+    var errorDescription: String? {
+        let name = provider == .apple ? "Apple" : "Google"
+        return "Этот аккаунт \(name) ещё не связан с AliStore. Регистрация сейчас недоступна — продолжите как гость или попробуйте позже."
     }
 }

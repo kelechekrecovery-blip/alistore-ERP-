@@ -80,9 +80,9 @@ struct AliStorePOSApp: App {
             ProgressView("Восстанавливаем кассу…")
         } else if let session = auth.session {
             if auth.requiresQuickUnlock {
-                QuickUnlockView(title: "AliStore POS", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: auth.logout)
+                QuickUnlockView(title: "AliStore POS", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: { Task { await auth.logout() } })
             } else if ["cashier", "admin", "owner"].contains(session.role) {
-                POSRootView(session: session, logout: auth.logout)
+                POSRootView(session: session, logout: { Task { await auth.logout() } })
                     .preferredColorScheme(.dark)
             } else {
                 ContentUnavailableView(
@@ -91,7 +91,7 @@ struct AliStorePOSApp: App {
                     description: Text("Роль \(session.role) не может выполнять POS-операции")
                 )
                 .overlay(alignment: .bottom) {
-                    Button("Выйти", role: .destructive, action: auth.logout)
+                    Button("Выйти", role: .destructive) { Task { await auth.logout() } }
                         .padding(24)
                 }
             }
@@ -106,6 +106,7 @@ private struct POSLoginView: View {
     @Bindable var auth: StaffAuthStore
     @State private var username = ""
     @State private var password = ""
+    @State private var totp = ""
 
     var body: some View {
         ZStack {
@@ -122,6 +123,13 @@ private struct POSLoginView: View {
                         .textFieldStyle(.roundedBorder)
                     SecureField("Пароль", text: $password)
                         .textFieldStyle(.roundedBorder)
+                    SecureField("Код 2FA (если включён)", text: $totp)
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                        .textFieldStyle(.roundedBorder)
+                        .onChange(of: totp) { _, value in
+                            totp = String(value.filter(\.isNumber).prefix(6))
+                        }
                 }
                 .padding(.top, 8)
                 if let error = auth.errorMessage {
@@ -129,7 +137,13 @@ private struct POSLoginView: View {
                         .font(.caption).foregroundStyle(POSPalette.coral)
                 }
                 Button {
-                    Task { await auth.login(username: username.trimmingCharacters(in: .whitespaces), password: password) }
+                    Task {
+                        await auth.login(
+                            username: username.trimmingCharacters(in: .whitespaces),
+                            password: password,
+                            totp: totp
+                        )
+                    }
                 } label: {
                     if auth.isLoading { ProgressView().frame(maxWidth: .infinity) } else { Label("Открыть кассу", systemImage: "lock.open.fill").frame(maxWidth: .infinity) }
                 }

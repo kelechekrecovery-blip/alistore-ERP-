@@ -98,9 +98,24 @@ fun StaffApp(
     StaffSessionManager(api, SecureTokenStore(context, "alistore-staff-session"))
   }
   val quickUnlock = remember { QuickUnlockStore(context, "staff") }
+  val authScope = rememberCoroutineScope()
   var state by remember { mutableStateOf<StaffAuthState>(StaffAuthState.Restoring) }
-  LaunchedEffect(manager) { state = manager.restore() }
-  val logout: () -> Unit = { quickUnlock.clear(); state = manager.logout() }
+  LaunchedEffect(manager) {
+    launch { manager.monitorExternalSessionChanges() }
+    state = manager.restore()
+  }
+  LaunchedEffect(manager.sessionInvalidated) {
+    if (manager.sessionInvalidated) {
+      quickUnlock.clear()
+      state = StaffAuthState.SignedOut
+    }
+  }
+  val logout: () -> Unit = {
+    val session = (state as? StaffAuthState.SignedIn)?.session
+    quickUnlock.clear()
+    state = manager.beginLogout()
+    authScope.launch { manager.finishLogout(session) }
+  }
 
   Design3Theme {
     when (val current = state) {
@@ -124,6 +139,7 @@ fun StaffLoginScreen(
 ) {
   var username by rememberSaveable { mutableStateOf("") }
   var password by rememberSaveable { mutableStateOf("") }
+  var totp by rememberSaveable { mutableStateOf("") }
   var error by remember { mutableStateOf(initialError) }
   var busy by remember { mutableStateOf(false) }
   val scope = rememberCoroutineScope()
@@ -145,13 +161,25 @@ fun StaffLoginScreen(
       visualTransformation = PasswordVisualTransformation(),
       modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("staff-password"),
     )
+    if (manager.requiresTotp) {
+      OutlinedTextField(
+        totp,
+        { totp = it.filter(Char::isDigit).take(6) },
+        label = { Text("Код 2FA") },
+        supportingText = { Text("6 цифр из приложения-аутентификатора") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+        visualTransformation = PasswordVisualTransformation(),
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("staff-totp"),
+      )
+    }
     error?.let { Text(it, color = StaffCoral, modifier = Modifier.padding(top = 12.dp).testTag("staff-login-error")) }
     Button(
       onClick = {
         busy = true
         error = null
         scope.launch {
-          when (val result = manager.login(username, password)) {
+          when (val result = manager.login(username, password, totp)) {
             is StaffAuthState.SignedIn -> onState(result)
             is StaffAuthState.Failed -> error = result.message
             else -> Unit
@@ -159,7 +187,7 @@ fun StaffLoginScreen(
           busy = false
         }
       },
-      enabled = !busy && username.isNotBlank() && password.isNotBlank(),
+      enabled = !busy && username.isNotBlank() && password.isNotBlank() && (!manager.requiresTotp || totp.length == 6),
       colors = ButtonDefaults.buttonColors(containerColor = StaffLime, contentColor = StaffInk),
       modifier = Modifier.fillMaxWidth().padding(top = 18.dp).height(50.dp).testTag("staff-login"),
     ) { if (busy) CircularProgressIndicator(Modifier.size(20.dp)) else Text("Войти", fontWeight = FontWeight.Bold) }

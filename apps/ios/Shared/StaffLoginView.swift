@@ -5,6 +5,7 @@ public struct StaffLoginView: View {
     private let title: String
     @State private var username = ""
     @State private var password = ""
+    @State private var totp = ""
 
     public init(auth: StaffAuthStore, title: String) {
         self.auth = auth
@@ -25,13 +26,26 @@ public struct StaffLoginView: View {
                         .textFieldStyle(.roundedBorder)
                     SecureField("Пароль", text: $password)
                         .textFieldStyle(.roundedBorder)
+                    SecureField("Код 2FA (если включён)", text: $totp)
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                        .textFieldStyle(.roundedBorder)
+                        .onChange(of: totp) { _, value in
+                            totp = String(value.filter(\.isNumber).prefix(6))
+                        }
                 }
                 .padding(.top, 14)
                 if let errorMessage = auth.errorMessage {
                     Label(errorMessage, systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(.red)
                 }
                 Button {
-                    Task { await auth.login(username: username.trimmingCharacters(in: .whitespaces), password: password) }
+                    Task {
+                        await auth.login(
+                            username: username.trimmingCharacters(in: .whitespaces),
+                            password: password,
+                            totp: totp
+                        )
+                    }
                 } label: {
                     if auth.isLoading { ProgressView().frame(maxWidth: .infinity) } else { Label("Войти в рабочее место", systemImage: "arrow.right.circle.fill").frame(maxWidth: .infinity) }
                 }

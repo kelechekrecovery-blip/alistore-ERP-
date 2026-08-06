@@ -79,9 +79,9 @@ struct AliStoreCourierApp: App {
             ProgressView("Восстанавливаем рабочее место…")
         } else if let session = auth.session {
             if auth.requiresQuickUnlock {
-                QuickUnlockView(title: "AliStore Courier", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: auth.logout)
+                QuickUnlockView(title: "AliStore Courier", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: { Task { await auth.logout() } })
             } else if session.role == "courier" {
-                CourierRootView(session: session, logout: auth.logout)
+                CourierRootView(session: session, logout: { Task { await auth.logout() } })
             } else {
                 ContentUnavailableView(
                     "Нет доступа курьера",
@@ -89,7 +89,7 @@ struct AliStoreCourierApp: App {
                     description: Text("Войдите под активной учётной записью с ролью courier.")
                 )
                 .safeAreaInset(edge: .bottom) {
-                    Button("Выйти", role: .destructive, action: auth.logout).padding()
+                    Button("Выйти", role: .destructive) { Task { await auth.logout() } }.padding()
                 }
             }
         } else {

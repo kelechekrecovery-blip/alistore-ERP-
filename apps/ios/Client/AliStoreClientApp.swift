@@ -346,7 +346,7 @@ private struct ClientLoginView: View {
                         .frame(width: 60, height: 60)
                         .background(ClientTheme.coral, in: RoundedRectangle(cornerRadius: 17))
                         .padding(.bottom, 24)
-                    Text(auth.requiresSocialPhoneEnrollment ? "Подтвердите номер телефона" : "Войти или создать аккаунт")
+                    Text(loginTitle)
                         .font(ClientTheme.display(30, weight: .black))
                         .foregroundStyle(.white)
                     Text(subtitle)
@@ -355,16 +355,21 @@ private struct ClientLoginView: View {
                         .lineSpacing(4)
                         .padding(.top, 10)
                     if !auth.requiresSocialPhoneEnrollment {
+                        authAvailabilityPanel
+                            .padding(.top, 16)
+                    }
+                    if !auth.requiresSocialPhoneEnrollment && authControlsReady && !availableLoginChannels.isEmpty {
                         channelSwitcher
                             .padding(.top, 22)
-                    } else {
+                    }
+                    if auth.requiresSocialPhoneEnrollment {
                         Text("\(socialProviderName) подтвердил вашу личность. Телефон нужен как основной номер аккаунта для заказов, доставки и восстановления доступа.")
                             .font(ClientTheme.body(13))
                             .foregroundStyle(ClientTheme.muted)
                             .lineSpacing(3)
                             .padding(.top, 18)
                     }
-                    if channel == .phone {
+                    if (auth.requiresSocialPhoneEnrollment || authControlsReady) && channel == .phone && phoneEnabled {
                         TextField("+996 700 12 34 56", text: $phone)
                             .keyboardType(.phonePad)
                             .textContentType(.telephoneNumber)
@@ -376,7 +381,7 @@ private struct ClientLoginView: View {
                             .padding(.top, 12)
                             .accessibilityIdentifier("client-phone")
                             .disabled(requested || auth.isLoading)
-                    } else {
+                    } else if authControlsReady && channel == .email && emailEnabled {
                         TextField("you@example.com", text: $email)
                             .keyboardType(.emailAddress)
                             .textContentType(.emailAddress)
@@ -391,7 +396,7 @@ private struct ClientLoginView: View {
                             .accessibilityIdentifier("client-email")
                             .disabled(requested || auth.isLoading)
                     }
-                    if requested {
+                    if requested && (auth.requiresSocialPhoneEnrollment || selectedChannelEnabled) {
                         TextField("6-значный код", text: $code)
                             .keyboardType(.numberPad)
                             .textContentType(.oneTimeCode)
@@ -410,41 +415,43 @@ private struct ClientLoginView: View {
                                 .padding(.top, 8)
                         }
                     }
-                    Button {
-                        Task {
-                            if auth.requiresSocialPhoneEnrollment {
-                                if requested {
-                                    await auth.completeSocialEnrollment(
-                                        phone: normalizedPhone,
-                                        code: code.filter(\.isNumber)
-                                    )
+                    if auth.requiresSocialPhoneEnrollment || selectedChannelEnabled {
+                        Button {
+                            Task {
+                                if auth.requiresSocialPhoneEnrollment {
+                                    if requested {
+                                        await auth.completeSocialEnrollment(
+                                            phone: normalizedPhone,
+                                            code: code.filter(\.isNumber)
+                                        )
+                                    } else {
+                                        await requestCode()
+                                    }
                                 } else {
-                                    await requestCode()
-                                }
-                            } else {
-                                switch (channel, requested) {
-                                case (.phone, true):
-                                    await auth.verify(phone: normalizedPhone, code: code.filter(\.isNumber))
-                                case (.phone, false):
-                                    await requestCode()
-                                case (.email, true):
-                                    await auth.verifyEmail(email: email, code: code.filter(\.isNumber))
-                                case (.email, false):
-                                    await requestCode()
+                                    switch (channel, requested) {
+                                    case (.phone, true):
+                                        await auth.verify(phone: normalizedPhone, code: code.filter(\.isNumber))
+                                    case (.phone, false):
+                                        await requestCode()
+                                    case (.email, true):
+                                        await auth.verifyEmail(email: email, code: code.filter(\.isNumber))
+                                    case (.email, false):
+                                        await requestCode()
+                                    }
                                 }
                             }
+                        } label: {
+                            HStack { Spacer(); if auth.isLoading { ProgressView().tint(.black) } else { Text(actionTitle) }; Spacer() }
+                                .font(ClientTheme.body(15, weight: .bold))
+                                .foregroundStyle(.black)
+                                .frame(height: 50)
+                                .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
                         }
-                    } label: {
-                        HStack { Spacer(); if auth.isLoading { ProgressView().tint(.black) } else { Text(actionTitle) }; Spacer() }
-                            .font(ClientTheme.body(15, weight: .bold))
-                            .foregroundStyle(.black)
-                            .frame(height: 50)
-                            .background(ClientTheme.lime, in: RoundedRectangle(cornerRadius: 13))
+                        .disabled(auth.isLoading || !canSubmit)
+                        .padding(.top, 12)
+                        .accessibilityIdentifier(requested ? "client-verify" : "client-request-otp")
                     }
-                    .disabled(auth.isLoading || !canSubmit)
-                    .padding(.top, 12)
-                    .accessibilityIdentifier(requested ? "client-verify" : "client-request-otp")
-                    if requested {
+                    if requested && (auth.requiresSocialPhoneEnrollment || selectedChannelEnabled) {
                         Button(resendSeconds > 0 ? "Отправить ещё раз через \(resendSeconds) сек." : "Отправить код ещё раз") {
                             Task { await requestCode() }
                         }
@@ -466,7 +473,7 @@ private struct ClientLoginView: View {
                         .padding(.top, 8)
                         .accessibilityIdentifier("client-change-identifier")
                     }
-                    if channel == .email && !requested {
+                    if authControlsReady && channel == .email && emailEnabled && !requested {
                         // Честное предупреждение вместо «письмо отправлено» в пустоту:
                         // сервер отвечает одинаково на любой адрес, чтобы не выдавать,
                         // у кого есть аккаунт, поэтому объяснить это должен клиент.
@@ -494,23 +501,25 @@ private struct ClientLoginView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.top, 14)
                         .accessibilityIdentifier("client-social-enrollment-cancel")
-                    } else {
-                        SignInWithAppleButton(.signIn) { request in
-                            let raw = AppleSignInNonce.random()
-                            appleRawNonce = raw
-                            request.requestedScopes = [.fullName, .email]
-                            // На сервер уйдёт эта же строка: Apple кладёт её в claim токена.
-                            request.nonce = AppleSignInNonce.hashed(raw)
-                        } onCompletion: { result in
-                            Task { await handleApple(result) }
+                    } else if authControlsReady {
+                        if appleEnabled {
+                            SignInWithAppleButton(.signIn) { request in
+                                let raw = AppleSignInNonce.random()
+                                appleRawNonce = raw
+                                request.requestedScopes = [.fullName, .email]
+                                // На сервер уйдёт эта же строка: Apple кладёт её в claim токена.
+                                request.nonce = AppleSignInNonce.hashed(raw)
+                            } onCompletion: { result in
+                                Task { await handleApple(result) }
+                            }
+                            .signInWithAppleButtonStyle(.white)
+                            .frame(height: 50)
+                            .clipShape(RoundedRectangle(cornerRadius: 13))
+                            .padding(.top, 12)
+                            .accessibilityIdentifier("client-apple-signin")
                         }
-                        .signInWithAppleButtonStyle(.white)
-                        .frame(height: 50)
-                        .clipShape(RoundedRectangle(cornerRadius: 13))
-                        .padding(.top, 12)
-                        .accessibilityIdentifier("client-apple-signin")
 
-                        if googleSignInConfigured {
+                        if googleEnabled {
                             GoogleSignInButton(
                                 scheme: .dark,
                                 style: .wide,
@@ -532,6 +541,7 @@ private struct ClientLoginView: View {
                         .foregroundStyle(ClientTheme.muted)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 22)
+                        .accessibilityIdentifier("client-continue-as-guest")
                     if let error = auth.errorMessage {
                         Text(error).font(ClientTheme.body(12)).foregroundStyle(.red).padding(.top, 12)
                     }
@@ -552,6 +562,10 @@ private struct ClientLoginView: View {
                 if remaining == 0 { break }
                 try? await Task.sleep(for: .seconds(1))
             }
+        }
+        .task {
+            await auth.loadAuthMethods()
+            selectFirstAvailableChannel()
         }
     }
 
@@ -672,6 +686,100 @@ private struct ClientLoginView: View {
         }
     }
 
+    private var methods: CustomerAuthMethods? {
+        guard case .available(let methods) = auth.authMethodsState else { return nil }
+        return methods
+    }
+
+    private var authControlsReady: Bool { methods != nil }
+    private var phoneEnabled: Bool {
+        auth.requiresSocialPhoneEnrollment || methods?.phone.enabled == true
+    }
+    private var emailEnabled: Bool { methods?.email.enabled == true }
+    private var appleEnabled: Bool { methods?.apple.enabled == true }
+    private var googleEnabled: Bool { methods?.google.enabled == true && googleSignInConfigured }
+    private var selectedChannelEnabled: Bool {
+        channel == .phone ? phoneEnabled : emailEnabled
+    }
+    private var availableLoginChannels: [LoginChannel] {
+        LoginChannel.allCases.filter { $0 == .phone ? phoneEnabled : emailEnabled }
+    }
+    private var nativeLoginAvailable: Bool {
+        phoneEnabled || emailEnabled || appleEnabled || googleEnabled
+    }
+    private var nativeRegistrationAvailable: Bool {
+        guard let methods else { return false }
+        return methods.phone.registers
+            || (appleEnabled && methods.apple.registers)
+            || (googleEnabled && methods.google.registers)
+    }
+
+    @ViewBuilder
+    private var authAvailabilityPanel: some View {
+        switch auth.authMethodsState {
+        case .loading:
+            HStack(spacing: 10) {
+                ProgressView().tint(ClientTheme.lime)
+                Text("Проверяем доступные способы входа…")
+            }
+            .font(ClientTheme.body(13))
+            .foregroundStyle(ClientTheme.muted)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("client-auth-methods-loading")
+        case .unavailable:
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Не удалось проверить способы входа. Мы скрыли их, чтобы не отправлять код или OAuth-запрос в неработающий канал. Магазином можно пользоваться как гость.")
+                    .font(ClientTheme.body(13))
+                    .foregroundStyle(ClientTheme.muted)
+                    .lineSpacing(3)
+                Button("Проверить ещё раз") {
+                    Task {
+                        await auth.loadAuthMethods(force: true)
+                        selectFirstAvailableChannel()
+                    }
+                }
+                .font(ClientTheme.body(13, weight: .semibold))
+                .foregroundStyle(ClientTheme.lime)
+                .accessibilityIdentifier("client-auth-methods-retry")
+            }
+            .padding(14)
+            .glass(radius: 13)
+            .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+            .accessibilityIdentifier("client-auth-methods-unavailable")
+        case .available(let methods):
+            if !nativeLoginAvailable {
+                Text("Вход в личный кабинет сейчас недоступен: ни один способ подтверждения для iPhone не подключён. Заказы можно оформлять без аккаунта.")
+                    .font(ClientTheme.body(13))
+                    .foregroundStyle(ClientTheme.muted)
+                    .lineSpacing(3)
+                    .padding(14)
+                    .glass(radius: 13)
+                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(ClientTheme.line))
+                    .accessibilityIdentifier("client-auth-methods-none")
+            } else if !nativeRegistrationAvailable {
+                Text("Сейчас доступен только вход в уже существующий аккаунт. Создание нового аккаунта временно недоступно; покупки можно продолжить как гость.")
+                    .font(ClientTheme.body(12))
+                    .foregroundStyle(ClientTheme.muted)
+                    .lineSpacing(3)
+                    .accessibilityIdentifier("client-registration-unavailable")
+            } else if !methods.phone.enabled {
+                Text("Код по SMS сейчас не отправляется. Выберите другой доступный способ входа.")
+                    .font(ClientTheme.body(12))
+                    .foregroundStyle(ClientTheme.muted)
+                    .lineSpacing(3)
+                    .accessibilityIdentifier("client-phone-unavailable")
+            }
+        }
+    }
+
+    private func selectFirstAvailableChannel() {
+        guard !selectedChannelEnabled, let first = availableLoginChannels.first else { return }
+        channel = first
+        requested = false
+        code = ""
+        resendAvailableAt = nil
+    }
+
     private var socialProviderName: String {
         switch auth.socialEnrollmentProvider {
         case .apple: return "Apple"
@@ -682,7 +790,7 @@ private struct ClientLoginView: View {
 
     private var channelSwitcher: some View {
         HStack(spacing: 6) {
-            ForEach(LoginChannel.allCases, id: \.self) { option in
+            ForEach(availableLoginChannels, id: \.self) { option in
                 Button {
                     guard channel != option else { return }
                     channel = option
@@ -717,9 +825,32 @@ private struct ClientLoginView: View {
                 ? "Введите код из SMS, чтобы завершить создание или привязку аккаунта."
                 : "Введите основной номер телефона. Мы отправим код подтверждения."
         }
+        switch auth.authMethodsState {
+        case .loading:
+            return "Проверяем, какие способы подтверждения сейчас работают."
+        case .unavailable:
+            return "Способы входа временно скрыты, но магазин и гостевое оформление заказа доступны."
+        case .available where !nativeRegistrationAvailable:
+            return "Выберите способ входа, который уже связан с вашим аккаунтом AliStore."
+        case .available:
+            break
+        }
         return channel == .phone
             ? "Введите телефон и код из SMS. Если аккаунта ещё нет, мы создадим его автоматически."
             : "Почта — дополнительный вход в тот же аккаунт. Код придёт только на ранее привязанный адрес."
+    }
+
+    private var loginTitle: String {
+        if auth.requiresSocialPhoneEnrollment { return "Подтвердите номер телефона" }
+        switch auth.authMethodsState {
+        case .unavailable:
+            return "Войти в аккаунт"
+        case .available where !nativeRegistrationAvailable:
+            return "Войти в аккаунт"
+        case .loading, .available:
+            break
+        }
+        return "Войти или создать аккаунт"
     }
 
     private var actionTitle: String {

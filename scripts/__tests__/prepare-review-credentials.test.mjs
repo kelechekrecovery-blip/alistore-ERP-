@@ -77,7 +77,7 @@ test('credential bundle is deterministic under injected randomness and includes 
   assert.equal(first.staff.length, 3);
   assert.match(first.bundle, /"point":"REVIEW-POINT"/u);
   assert.equal((first.bundle.match(/"point":"REVIEW-POINT"/gu) ?? []).length, 3);
-  assert.match(first.bundle, /AUTH_REVIEW_UNTIL=2026-08-29T00:00:00.000Z/u);
+  assert.match(first.bundle, /AUTH_REVIEW_UNTIL=2026-08-02T00:00:00.000Z/u);
   assert.doesNotMatch(first.bundle, /undefined|null/u);
 });
 

@@ -271,6 +271,122 @@ final class CustomerSocialLoginTests: XCTestCase {
         XCTAssertNotNil(store.googleEnrollmentExpiresAt)
     }
 
+    func testAuthMethodsLoadsServerAuthoritativeMixedAvailability() async {
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/methods", status: 200, body: """
+        {
+          "phone":{"enabled":false,"registers":false},
+          "email":{"enabled":true,"registers":false},
+          "telegram":{"enabled":false,"registers":false,"botUsername":null},
+          "apple":{"enabled":true,"registers":false,"clientId":null},
+          "google":{"enabled":false,"registers":false,"clientId":null},
+          "recovery":{"enabled":false},
+          "anyLoginAvailable":true,
+          "registrationAvailable":false
+        }
+        """)
+        let store = makeStore()
+
+        await store.loadAuthMethods()
+
+        guard case .available(let methods) = store.authMethodsState else {
+            return XCTFail("Expected the decoded server capability view")
+        }
+        XCTAssertFalse(methods.phone.enabled)
+        XCTAssertTrue(methods.email.enabled)
+        XCTAssertTrue(methods.apple.enabled)
+        XCTAssertFalse(methods.apple.registers)
+        XCTAssertFalse(methods.google.enabled)
+        XCTAssertTrue(methods.anyLoginAvailable)
+        XCTAssertFalse(methods.registrationAvailable)
+        XCTAssertEqual(SocialLoginMockURLProtocol.request(for: "/api/auth/methods")?.httpMethod, "GET")
+    }
+
+    func testAuthMethodsSupportsFullyUnavailableCombination() async {
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/methods", status: 200, body: """
+        {
+          "phone":{"enabled":false,"registers":false},
+          "email":{"enabled":false,"registers":false},
+          "telegram":{"enabled":false,"registers":false,"botUsername":null},
+          "apple":{"enabled":false,"registers":false,"clientId":null},
+          "google":{"enabled":false,"registers":false,"clientId":null},
+          "recovery":{"enabled":false},
+          "anyLoginAvailable":false,
+          "registrationAvailable":false
+        }
+        """)
+        let store = makeStore()
+
+        await store.loadAuthMethods()
+
+        guard case .available(let methods) = store.authMethodsState else {
+            return XCTFail("Expected the decoded unavailable capability view")
+        }
+        XCTAssertFalse(methods.anyLoginAvailable)
+        XCTAssertFalse(methods.registrationAvailable)
+        XCTAssertFalse(methods.phone.enabled)
+        XCTAssertFalse(methods.email.enabled)
+        XCTAssertFalse(methods.apple.enabled)
+        XCTAssertFalse(methods.google.enabled)
+    }
+
+    func testAuthMethodsFailureFallsBackToSafeUnavailableState() async {
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/methods", status: 503, body: """
+        {"message":"capability service unavailable"}
+        """)
+        let store = makeStore()
+
+        await store.loadAuthMethods()
+
+        XCTAssertEqual(store.authMethodsState, .unavailable)
+        XCTAssertNil(store.errorMessage, "Capability failure has its own degraded UI and must not replace a sign-in error")
+
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/methods", status: 200, body: """
+        {
+          "phone":{"enabled":true,"registers":true},
+          "email":{"enabled":false,"registers":false},
+          "telegram":{"enabled":false,"registers":false,"botUsername":null},
+          "apple":{"enabled":false,"registers":false,"clientId":null},
+          "google":{"enabled":false,"registers":false,"clientId":null},
+          "recovery":{"enabled":true},
+          "anyLoginAvailable":true,
+          "registrationAvailable":true
+        }
+        """)
+        await store.loadAuthMethods(force: true)
+
+        guard case .available(let recovered) = store.authMethodsState else {
+            return XCTFail("Retry must recover from the degraded state")
+        }
+        XCTAssertTrue(recovered.phone.enabled)
+        XCTAssertEqual(SocialLoginMockURLProtocol.requestCount(for: "/api/auth/methods"), 2)
+    }
+
+    func testServerDisablesUnfinishableSocialEnrollmentWhenRegistrationIsUnavailable() async {
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/methods", status: 200, body: """
+        {
+          "phone":{"enabled":false,"registers":false},
+          "email":{"enabled":true,"registers":false},
+          "telegram":{"enabled":false,"registers":false,"botUsername":null},
+          "apple":{"enabled":true,"registers":false,"clientId":null},
+          "google":{"enabled":true,"registers":false,"clientId":null},
+          "recovery":{"enabled":false},
+          "anyLoginAvailable":true,
+          "registrationAvailable":false
+        }
+        """)
+        SocialLoginMockURLProtocol.stub(path: "/api/auth/v2/social/apple", status: 200, body: """
+        {"status":"enrollment_required","enrollmentToken":"unusable-enrollment-token-1234567890","expiresIn":600}
+        """)
+        let store = makeStore()
+
+        await store.loadAuthMethods()
+        await store.signInWithApple(identityToken: "new-apple-token", nonce: "apple-nonce", name: nil)
+
+        XCTAssertFalse(store.requiresSocialPhoneEnrollment)
+        XCTAssertNil(store.session)
+        XCTAssertTrue(store.errorMessage?.contains("Регистрация сейчас недоступна") == true)
+    }
+
     private func makeStore() -> CustomerAuthStore {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [SocialLoginMockURLProtocol.self]

@@ -22,7 +22,9 @@ function prepareIsolatedDatabase() {
   }
 
   const prismaBin = join(process.cwd(), 'node_modules', '.bin', 'prisma');
-  execFileSync(prismaBin, ['db', 'push', '--skip-generate'], {
+  // Rebuild the isolated schema from migration history so stale triggers and
+  // other objects that `db push` cannot remove never leak between E2E runs.
+  execFileSync(prismaBin, ['migrate', 'reset', '--force', '--skip-seed', '--skip-generate'], {
     cwd: join(process.cwd(), 'apps', 'api'),
     env: { ...process.env, DATABASE_URL: databaseUrl },
     stdio: 'inherit',

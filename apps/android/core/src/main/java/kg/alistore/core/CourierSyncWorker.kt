@@ -10,25 +10,29 @@ class CourierSyncWorker(appContext: Context, params: WorkerParameters) : Corouti
   override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
     val apiBaseUrl = inputData.getString("apiBaseUrl") ?: return@withContext Result.failure()
     val tokenStore = SecureTokenStore(applicationContext, "alistore-courier-session")
-    val session = tokenStore.readSessionSnapshot("staff") ?: return@withContext Result.failure()
+    var session = tokenStore.readSessionSnapshot("staff") ?: return@withContext Result.failure()
     val queue = OfflineQueueDb(applicationContext, COURIER_QUEUE_DB, session.queueOwner)
     val intentStore = StableCommandIntentStore(applicationContext, session.queueOwner)
     val client = ApiClient(apiBaseUrl)
+    StaffSessionManager(client, tokenStore)
     var retryRequired = false
     try {
       queue.recoverStaleSyncing(System.currentTimeMillis() - OFFLINE_CLAIM_TIMEOUT_MS)
       while (true) {
         val mutation = queue.claimNext() ?: break
         try {
-        if (!tokenStore.isCurrent(session)) {
-          queue.markClaimState(mutation, "queued", "Authenticated session changed before replay")
+        val current = currentWorkerSession(tokenStore, session)
+        if (current == null) {
+          queue.markClaimState(mutation, "queued", "Authenticated session ended before replay")
           return@withContext Result.success()
         }
+        session = current
         if (!mutation.hasValidPayloadFingerprint()) {
           queue.markClaimState(mutation, "quarantined", "Offline command payload fingerprint mismatch")
           continue
         }
         val status = client.send(mutation, session.accessToken)
+        currentWorkerSession(tokenStore, session)?.let { session = it }
         when {
           status in 200..299 -> {
             // Close durably before deleting the queue record. If the process dies

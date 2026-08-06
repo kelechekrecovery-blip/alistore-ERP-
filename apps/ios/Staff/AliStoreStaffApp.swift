@@ -82,9 +82,9 @@ struct AliStoreStaffApp: App {
             ProgressView("Восстанавливаем рабочее место…")
         } else if let session = auth.session {
             if auth.requiresQuickUnlock {
-                QuickUnlockView(title: "AliStore Staff", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: auth.logout)
+                QuickUnlockView(title: "AliStore Staff", username: session.username, pinService: auth.quickUnlockService, onUnlocked: auth.unlock, onLogout: { Task { await auth.logout() } })
             } else {
-                StaffRootView(session: session, logout: auth.logout)
+                StaffRootView(session: session, logout: { Task { await auth.logout() } })
             }
         } else {
             StaffLoginView(auth: auth, title: "AliStore Staff")

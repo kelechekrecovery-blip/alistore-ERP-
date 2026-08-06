@@ -167,6 +167,8 @@ data class StaffSession(
   val totpEnabled: Boolean,
   val point: String? = null,
   val capabilities: Set<String> = emptySet(),
+  /** Opaque rotating credential returned to native staff clients only. */
+  val refreshToken: String? = null,
 )
 
 data class StaffPrincipal(

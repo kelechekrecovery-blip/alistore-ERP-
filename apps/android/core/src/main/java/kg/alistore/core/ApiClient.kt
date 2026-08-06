@@ -11,6 +11,9 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
   CustomerSupportGateway, CustomerReturnsGateway, CustomerTradeInsGateway, CustomerEvidenceGateway, CustomerAccountGateway,
   StaffAuthGateway, StaffOperationsGateway, StaffEvidenceGateway, StaffCustomerGateway, StaffTaskGateway,
   PushRegistrationGateway, CourierGateway, PosGateway, SupplyParityGateway {
+  @Volatile private var staffUnauthorizedHandler: (suspend (String) -> String?)? = null
+  @Volatile private var currentStaffAccessToken: String? = null
+
   init { require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) { "A valid API_BASE_URL is required" } }
 
   suspend fun catalog(): List<Product> = withContext(Dispatchers.IO) {
@@ -208,12 +211,35 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     request("customers/me", "DELETE", token = token)
   }
 
-  override suspend fun staffLogin(username: String, password: String): StaffSession = request(
-    "staff-auth/login", "POST", JSONObject().put("username", username).put("password", password),
-  ).staffSession()
+  override suspend fun staffLogin(username: String, password: String, totp: String?): StaffSession =
+    request("staff-auth/login", "POST", staffLoginPayload(username, password, totp))
+      .staffSession()
+      .also { currentStaffAccessToken = it.accessToken }
 
   override suspend fun staffMe(accessToken: String): StaffPrincipal =
     request("staff-auth/me", "GET", token = accessToken).staffPrincipal()
+
+  override suspend fun staffRefresh(refreshToken: String): StaffSession =
+    request("staff-auth/refresh", "POST", JSONObject().put("refreshToken", refreshToken))
+      .staffSession()
+      .also { currentStaffAccessToken = it.accessToken }
+
+  override suspend fun staffLogout(refreshToken: String) {
+    try {
+      request(
+        "staff-auth/logout",
+        "POST",
+        JSONObject().put("refreshToken", refreshToken),
+        allowEmpty = true,
+      )
+    } finally {
+      currentStaffAccessToken = null
+    }
+  }
+
+  override fun installStaffUnauthorizedHandler(handler: suspend (failedAccessToken: String) -> String?) {
+    staffUnauthorizedHandler = handler
+  }
 
   override suspend fun cancellationPreview(orderId: String, token: String): OrderCancellationPreview =
     request("orders/mine/$orderId/cancellation-preview", "GET", token = token).orderCancellationPreview()
@@ -584,53 +610,46 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     idempotencyKey: String = UUID.randomUUID().toString(),
   ): EvidenceAttachment = withContext(Dispatchers.IO) {
     val boundary = "AliStore-${UUID.randomUUID()}"
-    val connection = open("evidence/images", "POST")
-    try {
-      connection.doOutput = true
-      connection.setRequestProperty("Authorization", "Bearer $token")
-      connection.setRequestProperty("Idempotency-Key", idempotencyKey)
-      connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-      connection.outputStream.buffered().use { output ->
-        fun field(name: String, value: String) {
-          output.write("--$boundary\r\nContent-Disposition: form-data; name=\"$name\"\r\n\r\n$value\r\n".toByteArray())
+    val response = executeWithStaffAuthRetry(token) { effectiveToken ->
+      val connection = open("evidence/images", "POST")
+      try {
+        connection.doOutput = true
+        connection.setRequestProperty("Authorization", "Bearer $effectiveToken")
+        connection.setRequestProperty("Idempotency-Key", idempotencyKey)
+        connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+        connection.outputStream.buffered().use { output ->
+          fun field(name: String, value: String) {
+            output.write("--$boundary\r\nContent-Disposition: form-data; name=\"$name\"\r\n\r\n$value\r\n".toByteArray())
+          }
+          field("entityType", entityType)
+          field("entityId", entityId)
+          field("label", label)
+          output.write("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"$fileName\"\r\nContent-Type: $mimeType\r\n\r\n".toByteArray())
+          output.write(bytes)
+          output.write("\r\n--$boundary--\r\n".toByteArray())
         }
-        field("entityType", entityType)
-        field("entityId", entityId)
-        field("label", label)
-        output.write("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"$fileName\"\r\nContent-Type: $mimeType\r\n\r\n".toByteArray())
-        output.write(bytes)
-        output.write("\r\n--$boundary--\r\n".toByteArray())
+        connection.rawResponse()
+      } finally {
+        connection.disconnect()
       }
-      val status = connection.responseCode
-      val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-      val payload = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-      if (status !in 200..299) {
-        val message = runCatching { JSONObject(payload).optString("message") }.getOrNull().orEmpty()
-        throw ApiException(status, message.ifBlank { "Ошибка загрузки $status" })
-      }
-      JSONObject(payload).getJSONObject("asset").let { EvidenceAttachment(it.getString("key"), it.getString("url")) }
-    } finally {
-      connection.disconnect()
     }
+    if (response.status !in 200..299) throw response.apiException("Ошибка загрузки ${response.status}")
+    JSONObject(response.body).getJSONObject("asset").let { EvidenceAttachment(it.getString("key"), it.getString("url")) }
   }
 
-  fun send(mutation: PendingMutation, token: String?): Int {
+  suspend fun send(mutation: PendingMutation, token: String?): Int {
     return sendResponse(mutation, token).status
   }
 
-  fun sendResponse(mutation: PendingMutation, token: String?): RawApiResponse {
-    val connection = open(mutation.endpoint, mutation.method)
-    return try {
-      connection.doOutput = mutation.body.isNotEmpty()
-      connection.setRequestProperty("Content-Type", "application/json")
-      connection.setRequestProperty("Idempotency-Key", mutation.idempotencyKey)
-      if (!token.isNullOrBlank()) connection.setRequestProperty("Authorization", "Bearer $token")
-      if (mutation.body.isNotEmpty()) connection.outputStream.use { it.write(mutation.body.toByteArray()) }
-      val status = connection.responseCode
-      val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-      RawApiResponse(status, stream?.bufferedReader()?.use { it.readText() }.orEmpty())
-    } finally {
-      connection.disconnect()
+  suspend fun sendResponse(mutation: PendingMutation, token: String?): RawApiResponse = withContext(Dispatchers.IO) {
+    executeWithStaffAuthRetry(token) { effectiveToken ->
+      rawJsonRequest(
+        mutation.endpoint,
+        mutation.method,
+        mutation.body.takeIf(String::isNotEmpty),
+        effectiveToken,
+        mutation.idempotencyKey,
+      )
     }
   }
 
@@ -641,7 +660,54 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
     token: String? = null,
     allowEmpty: Boolean = false,
     idempotencyKey: String? = null,
+    retryStaffAuth: Boolean = true,
   ): JSONObject = withContext(Dispatchers.IO) {
+    val response = executeWithStaffAuthRetry(token, retryStaffAuth) { effectiveToken ->
+      rawJsonRequest(path, method, body?.toString(), effectiveToken, idempotencyKey)
+    }
+    if (response.status !in 200..299) throw response.apiException("Ошибка сервера ${response.status}")
+    if (response.body.isBlank() && allowEmpty) JSONObject() else JSONObject(response.body)
+  }
+
+  private suspend fun requestArray(path: String, token: String) = withContext(Dispatchers.IO) {
+    val response = executeWithStaffAuthRetry(token) { effectiveToken ->
+      rawJsonRequest(path, "GET", token = effectiveToken)
+    }
+    if (response.status !in 200..299) throw response.apiException("Ошибка сервера ${response.status}")
+    org.json.JSONArray(response.body)
+  }
+
+  private suspend fun requestObjectOrNull(path: String, token: String): JSONObject? = withContext(Dispatchers.IO) {
+    val response = executeWithStaffAuthRetry(token) { effectiveToken ->
+      rawJsonRequest(path, "GET", token = effectiveToken)
+    }
+    if (response.status !in 200..299) throw response.apiException("Ошибка сервера ${response.status}")
+    if (response.body.isBlank() || response.body == "null") null else JSONObject(response.body)
+  }
+
+  private suspend fun executeWithStaffAuthRetry(
+    token: String?,
+    retryStaffAuth: Boolean = true,
+    attempt: (effectiveToken: String?) -> RawApiResponse,
+  ): RawApiResponse {
+    val effectiveToken = if (!token.isNullOrBlank() && staffUnauthorizedHandler != null) {
+      currentStaffAccessToken ?: token
+    } else token
+    val response = attempt(effectiveToken)
+    if (response.status != 401 || !retryStaffAuth || effectiveToken.isNullOrBlank()) return response
+    val renewed = staffUnauthorizedHandler?.invoke(effectiveToken)
+    if (renewed.isNullOrBlank() || renewed == effectiveToken) return response
+    currentStaffAccessToken = renewed
+    return attempt(renewed)
+  }
+
+  private fun rawJsonRequest(
+    path: String,
+    method: String,
+    body: String? = null,
+    token: String? = null,
+    idempotencyKey: String? = null,
+  ): RawApiResponse {
     val connection = open(path, method)
     try {
       connection.setRequestProperty("Content-Type", "application/json")
@@ -649,51 +715,9 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
       if (!idempotencyKey.isNullOrBlank()) connection.setRequestProperty("Idempotency-Key", idempotencyKey)
       if (body != null) {
         connection.doOutput = true
-        connection.outputStream.use { it.write(body.toString().toByteArray()) }
+        connection.outputStream.use { it.write(body.toByteArray()) }
       }
-      val status = connection.responseCode
-      val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-      val payload = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-      if (status !in 200..299) {
-        val error = runCatching { JSONObject(payload) }.getOrNull()
-        val message = error?.optString("message").orEmpty()
-        throw ApiException(status, message.ifBlank { "Ошибка сервера $status" }, error?.optString("code")?.takeIf(String::isNotBlank))
-      }
-      if (payload.isBlank() && allowEmpty) JSONObject() else JSONObject(payload)
-    } finally {
-      connection.disconnect()
-    }
-  }
-
-  private suspend fun requestArray(path: String, token: String) = withContext(Dispatchers.IO) {
-    val connection = open(path, "GET")
-    try {
-      connection.setRequestProperty("Authorization", "Bearer $token")
-      val status = connection.responseCode
-      val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-      val payload = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-      if (status !in 200..299) {
-        val message = runCatching { JSONObject(payload).optString("message") }.getOrNull().orEmpty()
-        throw ApiException(status, message.ifBlank { "Ошибка сервера $status" })
-      }
-      org.json.JSONArray(payload)
-    } finally {
-      connection.disconnect()
-    }
-  }
-
-  private suspend fun requestObjectOrNull(path: String, token: String): JSONObject? = withContext(Dispatchers.IO) {
-    val connection = open(path, "GET")
-    try {
-      connection.setRequestProperty("Authorization", "Bearer $token")
-      val status = connection.responseCode
-      val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-      val payload = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-      if (status !in 200..299) {
-        val message = runCatching { JSONObject(payload).optString("message") }.getOrNull().orEmpty()
-        throw ApiException(status, message.ifBlank { "Ошибка сервера $status" })
-      }
-      if (payload.isBlank() || payload == "null") null else JSONObject(payload)
+      return connection.rawResponse()
     } finally {
       connection.disconnect()
     }
@@ -711,6 +735,22 @@ class ApiClient(private val baseUrl: String) : AuthGateway, PurchaseGateway, Cus
 }
 
 data class RawApiResponse(val status: Int, val body: String)
+
+private fun HttpURLConnection.rawResponse(): RawApiResponse {
+  val status = responseCode
+  val stream = if (status in 200..299) inputStream else errorStream
+  return RawApiResponse(status, stream?.bufferedReader()?.use { it.readText() }.orEmpty())
+}
+
+private fun RawApiResponse.apiException(fallback: String): ApiException {
+  val error = runCatching { JSONObject(body) }.getOrNull()
+  val message = error?.optString("message").orEmpty()
+  return ApiException(
+    status,
+    message.ifBlank { fallback },
+    error?.optString("code")?.takeIf(String::isNotBlank),
+  )
+}
 
 internal fun JSONObject.checkoutOptions() = CheckoutOptions(
   pickupPoints = getJSONArray("pickupPoints").let { points ->
@@ -786,6 +826,12 @@ internal fun socialEnrollmentPayload(
   .put("phone", phone)
   .put("code", code)
   .putOptional("challengeId", challengeId)
+
+internal fun staffLoginPayload(username: String, password: String, totp: String?): JSONObject =
+  JSONObject()
+    .put("username", username)
+    .put("password", password)
+    .putOptional("totp", totp?.trim()?.takeIf(String::isNotBlank))
 
 internal fun emailOtpVerificationPayload(email: String, code: String, challengeId: String?): JSONObject =
   JSONObject().put("email", email).put("code", code).putOptional("challengeId", challengeId)
@@ -886,6 +932,7 @@ private fun JSONObject.staffSession() = StaffSession(
   accessToken = getString("accessToken"), staffId = getString("staffId"), username = getString("username"),
   role = getString("role"), totpEnabled = optBoolean("totpEnabled"),
   point = nullableString("point"), capabilities = stringSet("capabilities"),
+  refreshToken = nullableString("refreshToken"),
 )
 
 private fun JSONObject.staffPrincipal() = StaffPrincipal(

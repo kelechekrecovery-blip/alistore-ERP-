@@ -40,8 +40,14 @@ test('owner opens and closes store operations checklists and resolves an inciden
     await openingItems.nth(index).click();
     await closingItems.nth(index).click();
   }
-  await view.getByRole('button', { name: 'Завершить чек-лист' }).first().click();
-  await view.getByRole('button', { name: 'Завершить чек-лист' }).first().click();
+  await view
+    .locator('section[aria-labelledby="store-opening-title"]')
+    .getByRole('button', { name: 'Завершить чек-лист' })
+    .click();
+  await view
+    .locator('section[aria-labelledby="store-closing-title"]')
+    .getByRole('button', { name: 'Завершить чек-лист' })
+    .click();
   await expect(view.getByText('Завершён').first()).toBeVisible();
   await expect(view.getByText('Завершён').last()).toBeVisible();
 
