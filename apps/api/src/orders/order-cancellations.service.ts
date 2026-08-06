@@ -1,5 +1,4 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import {
   OrderCancellationPolicy,
   OrderCancellationStatus,
@@ -13,6 +12,8 @@ import { isUniqueConstraintViolation } from '../common/prisma-errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { enqueueSupplyCustomerNotice } from '../outbox/customer-notifications';
 import { OutboxService } from '../outbox/outbox.service';
+import { FeatureFlagKey } from '../feature-flags/feature-flags.registry';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 
 const ACTIVE_STATUSES: OrderCancellationStatus[] = [
   'requested',
@@ -62,7 +63,7 @@ export class OrderCancellationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly config: ConfigService,
+    private readonly featureFlags: FeatureFlagsService,
     @Optional() private readonly outbox?: OutboxService,
   ) {}
 
@@ -70,11 +71,14 @@ export class OrderCancellationsService {
     const order = await this.readSource(this.prisma, orderId, customerId);
     if (!order) return null;
     const preview = cancellationPreview(order);
+    const [cancellationEnabled, autoRefundEnabled] = await Promise.all([
+      this.featureFlags.isEnabled(FeatureFlagKey.Cancellation),
+      this.featureFlags.isEnabled(FeatureFlagKey.AutoRefund),
+    ]);
     return {
       ...preview,
-      requestEnabled: this.cancellationEnabled()
-        && (preview.ownerReviewRequired || this.autoRefundEnabled()),
-      automaticRefundEnabled: this.autoRefundEnabled(),
+      requestEnabled: cancellationEnabled && (preview.ownerReviewRequired || autoRefundEnabled),
+      automaticRefundEnabled: autoRefundEnabled,
     };
   }
 
@@ -92,7 +96,7 @@ export class OrderCancellationsService {
     reason: string,
     idempotencyKey: string,
   ) {
-    if (!this.cancellationEnabled()) {
+    if (!await this.featureFlags.isEnabled(FeatureFlagKey.Cancellation)) {
       throw new ConflictError(
         'supply_cancellation_disabled',
         'Отмена заказных товаров пока не включена',
@@ -142,7 +146,8 @@ export class OrderCancellationsService {
             cancellationBlockedMessage(preview.blockedReason),
           );
         }
-        if (preview.policy === 'automatic_full' && !this.autoRefundEnabled()) {
+        if (preview.policy === 'automatic_full'
+          && !await this.featureFlags.isEnabled(FeatureFlagKey.AutoRefund)) {
           throw new ConflictError(
             'supply_auto_refund_disabled',
             'Автоматический возврат задатка пока не включён',
@@ -264,14 +269,6 @@ export class OrderCancellationsService {
         'По заказу уже рассматривается отмена',
       );
     }
-  }
-
-  private cancellationEnabled() {
-    return this.config.get<string>('SUPPLY_CANCELLATION_ENABLED')?.trim().toLowerCase() === 'true';
-  }
-
-  private autoRefundEnabled() {
-    return this.config.get<string>('SUPPLY_AUTO_REFUND_ENABLED')?.trim().toLowerCase() === 'true';
   }
 
   private readSource(

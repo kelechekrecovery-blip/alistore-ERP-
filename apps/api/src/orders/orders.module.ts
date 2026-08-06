@@ -17,9 +17,10 @@ import { OrderCancellationsService } from './order-cancellations.service';
 import { OrderCancellationResolutionService } from './order-cancellation-resolution.service';
 import { OrderItemHandoverService } from './order-item-handover.service';
 import { OrderItemReservationService } from './order-item-reservation.service';
+import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
 
 @Module({
-  imports: [SettingsModule, UnitsModule, StaffAuthModule, AuthzModule, RateLimitModule, OutboxModule, LogisticsModule, ReceiptsModule, PromotionsModule, CampaignsModule, ObservabilityModule],
+  imports: [SettingsModule, UnitsModule, StaffAuthModule, AuthzModule, RateLimitModule, OutboxModule, LogisticsModule, ReceiptsModule, PromotionsModule, CampaignsModule, ObservabilityModule, FeatureFlagsModule],
   providers: [
     OrdersService,
     OrderCancellationsService,

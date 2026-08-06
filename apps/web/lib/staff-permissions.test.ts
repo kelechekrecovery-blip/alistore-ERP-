@@ -73,7 +73,7 @@ describe('erpRouteAllowed (sidebar filter)', () => {
   const ALL_ROUTES: ErpRoute[] = [
     'dash', 'admin', 'stock', 'finance', 'hr', 'logistics', 'operations',
     'service', 'kpi', 'crm', 'ai', 'pricing', 'reorder', 'campaigns',
-    'storefront', 'risks', 'readiness', 'ledger',
+    'storefront', 'risks', 'readiness', 'feature_flags', 'ledger',
   ];
 
   it('covers every route the ERP shell renders', () => {
@@ -114,6 +114,14 @@ describe('erpRouteAllowed (sidebar filter)', () => {
     for (const role of ['warehouse', 'marketer', 'cashier', 'seller', 'courier', 'service'] as const) {
       expect(erpRouteAllowed(role, 'readiness')).toBe(false);
     }
+  });
+
+  it('feature flags are owner/admin readable but owner-only mutable', () => {
+    expect(erpRouteAllowed('owner', 'feature_flags')).toBe(true);
+    expect(erpRouteAllowed('admin', 'feature_flags')).toBe(true);
+    expect(staffCan('owner', 'settings', 'manage')).toBe(true);
+    expect(staffCan('admin', 'settings', 'manage')).toBe(false);
+    expect(erpRouteAllowed('warehouse', 'feature_flags')).toBe(false);
   });
 
   it('courier keeps point operations but loses service center and finance', () => {

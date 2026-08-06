@@ -2,6 +2,7 @@ import { AuditService } from '../src/audit/audit.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SupplyQuarantineService } from '../src/procurement/supply-quarantine.service';
 import { ConfigService } from '@nestjs/config';
+import { FeatureFlagsService } from '../src/feature-flags/feature-flags.service';
 
 describe('Supply quarantine resolution', () => {
   const prefix = `SQ-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -12,11 +13,13 @@ describe('Supply quarantine resolution', () => {
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
-    service = new SupplyQuarantineService(
+    const audit = new AuditService(prisma);
+    const flags = new FeatureFlagsService(
       prisma,
-      new AuditService(prisma),
       new ConfigService({ SUPPLY_QUARANTINE_CONVERSION_ENABLED: 'true' }),
+      audit,
     );
+    service = new SupplyQuarantineService(prisma, audit, flags);
   });
 
   beforeEach(() => clean());

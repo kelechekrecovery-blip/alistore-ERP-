@@ -1,4 +1,5 @@
-import { ConfigService } from '@nestjs/config';
+import { FeatureFlagKey } from '../feature-flags/feature-flags.registry';
+import type { FeatureFlagsService, FeatureFlagState } from '../feature-flags/feature-flags.service';
 import { SupplyOperationsService } from './supply-operations.service';
 
 describe('SupplyOperationsService', () => {
@@ -51,7 +52,7 @@ describe('SupplyOperationsService', () => {
     });
     const service = new SupplyOperationsService(
       prisma as never,
-      new ConfigService({ SUPPLY_CANCELLATION_ENABLED: 'true' }),
+      flagsService({ [FeatureFlagKey.Cancellation]: true }),
     );
 
     const result = await service.list('admin', date());
@@ -70,12 +71,10 @@ describe('SupplyOperationsService', () => {
       financialQueuesVisible: true,
       ownerResolutionAvailable: false,
     });
-    expect(result.flags).toEqual({
-      checkoutEnabled: false,
-      cancellationEnabled: true,
-      autoRefundEnabled: false,
-      ownerResolutionEnabled: false,
-    });
+    expect(result.flags[FeatureFlagKey.ToOrderCheckout]).toMatchObject({ enabled: false, source: 'default' });
+    expect(result.flags[FeatureFlagKey.Cancellation]).toMatchObject({ enabled: true, source: 'default' });
+    expect(result.flags[FeatureFlagKey.AutoRefund]).toMatchObject({ enabled: false, source: 'default' });
+    expect(result.flags[FeatureFlagKey.OwnerResolution]).toMatchObject({ enabled: false, source: 'default' });
   });
 
   it('does not query or return cancellation/refund finance queues to warehouse staff', async () => {
@@ -95,7 +94,7 @@ describe('SupplyOperationsService', () => {
       supplyBatches: [[], [], []],
       cancellations: [],
     });
-    const service = new SupplyOperationsService(prisma as never, new ConfigService({}));
+    const service = new SupplyOperationsService(prisma as never, flagsService({}));
 
     const result = await service.list('warehouse', date());
 
@@ -105,7 +104,53 @@ describe('SupplyOperationsService', () => {
     expect(result.queues.cancellation_awaiting_owner).toEqual([]);
     expect(result.queues.refund_failed).toEqual([]);
   });
+
+  it('reports registry state and observes override/reset changes without a restart', async () => {
+    const prisma = prismaMock({
+      orderReceivables: [],
+      draftPurchaseOrders: [],
+      supplyBatches: [[], [], []],
+      cancellations: [],
+    });
+    let source: FeatureFlagState['source'] = 'environment';
+    let enabled = true;
+    const flags = flagsService({}, () => ({ enabled, source }));
+    const service = new SupplyOperationsService(prisma as never, flags);
+
+    const deployState = await service.list('owner', date());
+    expect(deployState.flags[FeatureFlagKey.ToOrderCheckout]).toMatchObject({ enabled: true, source: 'environment' });
+
+    enabled = false;
+    source = 'database';
+    const overrideState = await service.list('owner', date());
+    expect(overrideState.flags[FeatureFlagKey.ToOrderCheckout]).toMatchObject({ enabled: false, source: 'database' });
+
+    enabled = true;
+    source = 'environment';
+    const resetState = await service.list('owner', date());
+    expect(resetState.flags[FeatureFlagKey.ToOrderCheckout]).toMatchObject({ enabled: true, source: 'environment' });
+    expect(flags.list).toHaveBeenCalledTimes(3);
+  });
 });
+
+function flagsService(
+  values: Partial<Record<FeatureFlagKey, boolean>>,
+  state?: () => Pick<FeatureFlagState, 'enabled' | 'source'>,
+): jest.Mocked<FeatureFlagsService> {
+  const definitions = Object.values(FeatureFlagKey).map((key) => ({
+    key,
+    description: key,
+    owner: 'supply',
+    defaultEnabled: false as const,
+    legacyEnv: key,
+    enabled: values[key] ?? false,
+    source: 'default' as const,
+  }));
+  return {
+    isEnabled: jest.fn(async (key: FeatureFlagKey | string) => values[key as FeatureFlagKey] ?? false),
+    list: jest.fn(async () => definitions.map((definition) => ({ ...definition, ...(state?.() ?? {}) }))),
+  } as unknown as jest.Mocked<FeatureFlagsService>;
+}
 
 function date() {
   return new Date('2026-07-29T12:00:00.000Z');
@@ -132,19 +177,22 @@ function prismaMock(input: {
   supplyBatches: unknown[][];
   cancellations: unknown[][];
 }) {
+  let orderLineSupplyCall = 0;
+  let cancellationCall = 0;
   return {
     orderReceivable: { findMany: jest.fn().mockResolvedValue(input.orderReceivables) },
     purchaseOrder: { findMany: jest.fn().mockResolvedValue(input.draftPurchaseOrders) },
     orderLineSupply: {
-      findMany: jest.fn()
-        .mockResolvedValueOnce(input.supplyBatches[0])
-        .mockResolvedValueOnce(input.supplyBatches[1])
-        .mockResolvedValueOnce(input.supplyBatches[2]),
+      findMany: jest.fn().mockImplementation((..._args: unknown[]) => {
+        const call = orderLineSupplyCall++ % 3;
+        return Promise.resolve(input.supplyBatches[call]);
+      }),
     },
     orderCancellation: {
-      findMany: jest.fn()
-        .mockResolvedValueOnce(input.cancellations[0] ?? [])
-        .mockResolvedValueOnce(input.cancellations[1] ?? []),
+      findMany: jest.fn().mockImplementation((..._args: unknown[]) => {
+        const call = cancellationCall++ % 2;
+        return Promise.resolve(input.cancellations[call] ?? []);
+      }),
     },
   };
 }

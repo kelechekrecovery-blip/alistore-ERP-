@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable, Optional } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable } from '@nestjs/common';
 import { OrderLineSupplyStatus, Prisma } from '@prisma/client';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType, EventTypeValue } from '../audit/event-types';
@@ -11,6 +10,8 @@ import { assertTransition } from './order-line-supply-state';
 import { UnitsService } from '../units/units.service';
 import { handOverReadyOrderItemOnTx } from '../orders/order-item-handover-on-tx';
 import { deriveOrderStatusFromLineFulfillment } from '../orders/order-state-machine';
+import { FeatureFlagKey } from '../feature-flags/feature-flags.registry';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const DEFAULT_LEAD_DAYS = 14;
@@ -41,7 +42,7 @@ export class OrderLineSupplyService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly units: UnitsService,
-    @Optional() private readonly config?: ConfigService,
+    private readonly featureFlags: FeatureFlagsService,
   ) {}
 
   private async lockOrderForItem(tx: Prisma.TransactionClient, orderItemId: string): Promise<string> {
@@ -153,8 +154,8 @@ export class OrderLineSupplyService {
     return this.transition(orderItemId, 'ready', actor, EventType.OrderLineSupplyReady);
   }
 
-  markHandedOver(orderItemId: string, actor: string) {
-    if (this.config?.get<string>('SUPPLY_PARTIAL_HANDOVER_ENABLED')?.trim().toLowerCase() !== 'true') {
+  async markHandedOver(orderItemId: string, actor: string) {
+    if (!await this.featureFlags.isEnabled(FeatureFlagKey.PartialHandover)) {
       throw new ConflictError('supply_partial_handover_disabled', 'Построчная выдача пока не включена');
     }
     return this.transition(orderItemId, 'handed_over', actor, EventType.OrderLineSupplyHandedOver);

@@ -19,6 +19,7 @@ import { authenticator } from 'otplib';
 import { ReturnsService } from '../src/returns/returns.service';
 import { SupplyOperationsService } from '../src/procurement/supply-operations.service';
 import { MAX_REFUND_ATTEMPTS } from '../src/refunds/refunds.constants';
+import { FeatureFlagsService } from '../src/feature-flags/feature-flags.service';
 
 /**
  * Slice 2 of docs/SUPPLY-TO-ORDER-PLAN.md — a `to_order` product becomes
@@ -40,18 +41,36 @@ describe('Order supply mode: to_order request (slice 2)', () => {
   let returns: ReturnsService;
   let seq = 0;
 
+  function flagService(values: Record<string, string>): FeatureFlagsService {
+    const audit = new AuditService(prisma);
+    return new FeatureFlagsService(prisma, new ConfigService(values), audit);
+  }
+
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
     const audit = new AuditService(prisma);
     const units = new UnitsService(prisma);
     const approvals = new ApprovalsService(prisma, audit);
+    const config = new ConfigService({
+      TO_ORDER_CHECKOUT_ENABLED: 'true',
+      SUPPLY_PARTIAL_HANDOVER_ENABLED: 'true',
+      SUPPLY_CANCELLATION_ENABLED: 'true',
+      SUPPLY_AUTO_REFUND_ENABLED: 'true',
+      SUPPLY_OWNER_RESOLUTION_ENABLED: 'true',
+    });
+    const flags = new FeatureFlagsService(prisma, config, audit);
     orders = new OrdersService(
       prisma,
       audit,
       units,
       undefined,
-      new ConfigService({ TO_ORDER_CHECKOUT_ENABLED: 'true' }),
+      config,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      flags,
     );
     payments = new PaymentsService(prisma, audit, units, approvals);
     inventory = new InventoryService(prisma, audit, approvals);
@@ -60,16 +79,13 @@ describe('Order supply mode: to_order request (slice 2)', () => {
       prisma,
       audit,
       units,
-      new ConfigService({ SUPPLY_PARTIAL_HANDOVER_ENABLED: 'true' }),
+      flags,
     );
     returns = new ReturnsService(prisma, audit);
     cancellations = new OrderCancellationsService(
       prisma,
       audit,
-      new ConfigService({
-        SUPPLY_CANCELLATION_ENABLED: 'true',
-        SUPPLY_AUTO_REFUND_ENABLED: 'true',
-      }),
+      flags,
     );
     const staffAuth = new StaffAuthService(
       prisma,
@@ -81,10 +97,7 @@ describe('Order supply mode: to_order request (slice 2)', () => {
       prisma,
       audit,
       staffAuth,
-      new ConfigService({
-        SUPPLY_CANCELLATION_ENABLED: 'true',
-        SUPPLY_OWNER_RESOLUTION_ENABLED: 'true',
-      }),
+      flags,
     );
     const gateway = {
       name: 'production',
@@ -525,7 +538,7 @@ describe('Order supply mode: to_order request (slice 2)', () => {
     const cancellationDisabled = new OrderCancellationsService(
       prisma,
       new AuditService(prisma),
-      new ConfigService({
+      flagService({
         SUPPLY_CANCELLATION_ENABLED: 'false',
         SUPPLY_AUTO_REFUND_ENABLED: 'false',
       }),
@@ -545,7 +558,7 @@ describe('Order supply mode: to_order request (slice 2)', () => {
     const automaticRefundDisabled = new OrderCancellationsService(
       prisma,
       new AuditService(prisma),
-      new ConfigService({
+      flagService({
         SUPPLY_CANCELLATION_ENABLED: 'true',
         SUPPLY_AUTO_REFUND_ENABLED: 'false',
       }),
@@ -890,7 +903,7 @@ describe('Order supply mode: to_order request (slice 2)', () => {
 
     const operations = await new SupplyOperationsService(
       prisma,
-      new ConfigService({ SUPPLY_CANCELLATION_ENABLED: 'true' }),
+      flagService({ SUPPLY_CANCELLATION_ENABLED: 'true' }),
     ).list('admin');
     expect(operations.queues.refund_failed).toEqual(expect.arrayContaining([
       expect.objectContaining({

@@ -1,12 +1,13 @@
 import { createHash } from 'node:crypto';
-import { Injectable, Optional } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { ConflictError, ForbiddenError, ValidationError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProposeSupplyQuarantineDto, ResolveSupplyQuarantineDto } from './supply-quarantine.dto';
+import { FeatureFlagKey } from '../feature-flags/feature-flags.registry';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 
 const PUBLIC_SELECT = {
   id: true,
@@ -45,7 +46,7 @@ export class SupplyQuarantineService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    @Optional() private readonly config?: ConfigService,
+    private readonly featureFlags: FeatureFlagsService,
   ) {}
 
   async propose(
@@ -54,7 +55,7 @@ export class SupplyQuarantineService {
     actor: string,
     idempotencyKey: string,
   ): Promise<PublicResolution & { idempotent: boolean }> {
-    this.assertEnabled();
+    await this.assertEnabled();
     const reason = normalizeReason(dto.reason);
     const evidence = normalizeEvidence(dto.evidence);
     const imeis = normalizeImeis(dto.imeis);
@@ -232,7 +233,7 @@ export class SupplyQuarantineService {
     role: string | undefined,
     idempotencyKey: string,
   ): Promise<PublicResolution & { idempotent: boolean }> {
-    this.assertEnabled();
+    await this.assertEnabled();
     if (role !== 'owner' && role !== 'admin') {
       throw new ForbiddenError(
         'supply_quarantine_owner_required',
@@ -353,8 +354,8 @@ export class SupplyQuarantineService {
     });
   }
 
-  private assertEnabled() {
-    if (this.config?.get<string>('SUPPLY_QUARANTINE_CONVERSION_ENABLED')?.trim().toLowerCase() !== 'true') {
+  private async assertEnabled() {
+    if (!await this.featureFlags.isEnabled(FeatureFlagKey.QuarantineConversion)) {
       throw new ConflictError('supply_quarantine_conversion_disabled', 'Quarantine-конверсия пока не включена');
     }
   }

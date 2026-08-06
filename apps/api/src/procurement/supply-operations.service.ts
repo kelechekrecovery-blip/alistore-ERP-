@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { OrderLineSupplyStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { FeatureFlagKey } from '../feature-flags/feature-flags.registry';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 
 export const SUPPLY_OPERATION_QUEUE_KEYS = [
   'awaiting_deposit',
@@ -57,7 +58,7 @@ const SUPPLY_SELECT = {
 export class SupplyOperationsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
+    private readonly featureFlags: FeatureFlagsService,
   ) {}
 
   async list(role: string | undefined, now = new Date()) {
@@ -70,6 +71,7 @@ export class SupplyOperationsService {
       readySupplies,
       cancellations,
       failedRefunds,
+      featureFlagStates,
     ] = await Promise.all([
       this.prisma.orderReceivable.findMany({
         where: {
@@ -166,6 +168,7 @@ export class SupplyOperationsService {
             take: 100,
           })
         : Promise.resolve([]),
+      this.featureFlags.list(),
     ]);
 
     const queues: Record<SupplyOperationQueueKey, SupplyOperationRow[]> = {
@@ -238,15 +241,15 @@ export class SupplyOperationsService {
 
     return {
       generatedAt: now,
-      flags: {
-        checkoutEnabled: enabled(this.config, 'TO_ORDER_CHECKOUT_ENABLED'),
-        cancellationEnabled: enabled(this.config, 'SUPPLY_CANCELLATION_ENABLED'),
-        autoRefundEnabled: enabled(this.config, 'SUPPLY_AUTO_REFUND_ENABLED'),
-        ownerResolutionEnabled: enabled(this.config, 'SUPPLY_OWNER_RESOLUTION_ENABLED'),
-      },
+      flags: Object.fromEntries(
+        featureFlagStates.map((state) => [state.key, state]),
+      ) as Record<FeatureFlagKey, typeof featureFlagStates[number]>,
       capabilities: {
         financialQueuesVisible,
-        ownerResolutionAvailable: role === 'owner' && enabled(this.config, 'SUPPLY_OWNER_RESOLUTION_ENABLED'),
+        ownerResolutionAvailable: role === 'owner'
+          && featureFlagStates.some((state) => (
+            state.key === FeatureFlagKey.OwnerResolution && state.enabled
+          )),
       },
       counts: Object.fromEntries(
         SUPPLY_OPERATION_QUEUE_KEYS.map((key) => [key, queues[key].length]),
@@ -278,10 +281,6 @@ function supplyRow(
       ? purchaseOrderDetailHref(purchaseOrder.id)
       : orderDetailHref(supply.orderItem.orderId),
   };
-}
-
-function enabled(config: ConfigService, key: string): boolean {
-  return config.get<string>(key)?.trim().toLowerCase() === 'true';
 }
 
 function orderDetailHref(orderId: string): string {

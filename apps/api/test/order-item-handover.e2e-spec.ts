@@ -6,6 +6,7 @@ import { OrderItemReservationService } from '../src/orders/order-item-reservatio
 import { OutboxService } from '../src/outbox/outbox.service';
 import { ReservationsService } from '../src/reservations/reservations.service';
 import { ConfigService } from '@nestjs/config';
+import { FeatureFlagsService } from '../src/feature-flags/feature-flags.service';
 
 describe('OrderItemHandoverService', () => {
   const run = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -23,13 +24,14 @@ describe('OrderItemHandoverService', () => {
     const units = new UnitsService(prisma);
     const outbox = new OutboxService(prisma, { deliver: async () => undefined });
     const config = new ConfigService({ SUPPLY_PARTIAL_HANDOVER_ENABLED: 'true' });
+    const flags = new FeatureFlagsService(prisma, config, audit);
     service = new OrderItemHandoverService(
       prisma,
       audit,
       units,
-      config,
+      flags,
     );
-    reservationService = new OrderItemReservationService(prisma, audit, units, outbox, config);
+    reservationService = new OrderItemReservationService(prisma, audit, units, outbox, flags);
     expiryService = new ReservationsService(prisma, audit, units, outbox);
   });
 

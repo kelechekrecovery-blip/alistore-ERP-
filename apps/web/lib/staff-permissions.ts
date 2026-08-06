@@ -74,7 +74,7 @@ export const canPrintReceipts = (role: string) => staffCan(role, 'receipts', 'pr
 export type ErpRoute =
   | 'dash' | 'admin' | 'ai' | 'pricing' | 'reorder' | 'finance' | 'stock' | 'hr'
   | 'logistics' | 'operations' | 'service' | 'kpi' | 'crm' | 'campaigns'
-  | 'storefront' | 'risks' | 'readiness' | 'settings' | 'ledger' | 'tasks';
+  | 'storefront' | 'risks' | 'readiness' | 'feature_flags' | 'settings' | 'ledger' | 'tasks';
 
 export const ERP_ROUTE_PERMISSION: Record<ErpRoute, StaffPermission | null> = {
   dash: { obj: 'reports', act: 'read' },
@@ -94,6 +94,7 @@ export const ERP_ROUTE_PERMISSION: Record<ErpRoute, StaffPermission | null> = {
   storefront: { obj: 'storefront', act: 'read' },
   risks: { obj: 'reports', act: 'read' },
   readiness: { obj: 'reports', act: 'read' }, // lists unconfigured integrations — owner/admin only
+  feature_flags: { obj: 'reports', act: 'read' }, // admin observes; owner settings:manage mutates
   settings: { obj: 'reports', act: 'read' }, // read for owner/admin; writing needs settings:manage (owner)
   ledger: { obj: 'reports', act: 'read' },
   tasks: null,

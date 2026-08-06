@@ -9,6 +9,7 @@ import { InventoryService } from '../src/inventory/inventory.service';
 import { CourierService } from '../src/courier/courier.service';
 import { OutboxService } from '../src/outbox/outbox.service';
 import { OrderLineSupplyService } from '../src/procurement/order-line-supply.service';
+import { FeatureFlagsService } from '../src/feature-flags/feature-flags.service';
 
 /**
  * Slice 3 of docs/SUPPLY-TO-ORDER-PLAN.md — the supplier purchase order behind
@@ -32,12 +33,22 @@ describe('Order-line supply (slice 3)', () => {
     const audit = new AuditService(prisma);
     const units = new UnitsService(prisma);
     const approvals = new ApprovalsService(prisma, audit);
+    const config = new ConfigService({
+      TO_ORDER_CHECKOUT_ENABLED: 'true',
+      SUPPLY_PARTIAL_HANDOVER_ENABLED: 'true',
+    });
+    const flags = new FeatureFlagsService(prisma, config, audit);
     orders = new OrdersService(
       prisma,
       audit,
       units,
       undefined,
-      new ConfigService({ TO_ORDER_CHECKOUT_ENABLED: 'true' }),
+      config,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      flags,
     );
     payments = new PaymentsService(prisma, audit, units, approvals);
     inventory = new InventoryService(prisma, audit, approvals);
@@ -47,7 +58,7 @@ describe('Order-line supply (slice 3)', () => {
       prisma,
       audit,
       units,
-      new ConfigService({ SUPPLY_PARTIAL_HANDOVER_ENABLED: 'true' }),
+      flags,
     );
   });
 

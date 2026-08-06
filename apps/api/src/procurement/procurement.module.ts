@@ -12,9 +12,10 @@ import { SupplyOperationsController } from './supply-operations.controller';
 import { SupplyOperationsService } from './supply-operations.service';
 import { SupplyQuarantineController } from './supply-quarantine.controller';
 import { SupplyQuarantineService } from './supply-quarantine.service';
+import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
 
 @Module({
-  imports: [StaffAuthModule, AuthzModule, UnitsModule],
+  imports: [StaffAuthModule, AuthzModule, UnitsModule, FeatureFlagsModule],
   controllers: [ProcurementController, SupplierInvoiceController, SupplierCreditNoteController, SupplierAdvanceController, SupplierStatementController, LandedCostController, OrderLineSupplyController, SupplierOffersController, SupplyIntegrityController, SupplyOperationsController, SupplyQuarantineController],
   providers: [ProcurementService, OrderLineSupplyService, SupplierOffersService, SupplyOperationsService, SupplyQuarantineService],
   exports: [ProcurementService, OrderLineSupplyService, SupplierOffersService, SupplyOperationsService, SupplyQuarantineService],

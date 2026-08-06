@@ -23,6 +23,7 @@ export * from './api/staff-auth';
 export * from './api/campaigns';
 export * from './api/products-admin';
 export * from './api/readiness';
+export * from './api/feature-flags';
 export * from './api/b2b';
 export * from './api/protection';
 export * from './api/procurement';

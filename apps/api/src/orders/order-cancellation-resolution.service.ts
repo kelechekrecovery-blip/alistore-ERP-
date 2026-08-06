@@ -1,5 +1,4 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import {
   OrderCancellationFaultParty,
   OrderCancellationResolutionAction,
@@ -15,6 +14,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { enqueueSupplyCustomerNotice } from '../outbox/customer-notifications';
 import { OutboxService } from '../outbox/outbox.service';
+import { FeatureFlagKey } from '../feature-flags/feature-flags.registry';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 
 export interface ResolveOrderCancellationInput {
   action: OrderCancellationResolutionAction;
@@ -60,7 +61,7 @@ export class OrderCancellationResolutionService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly staffAuth: StaffAuthService,
-    private readonly config: ConfigService,
+    private readonly featureFlags: FeatureFlagsService,
     @Optional() private readonly outbox?: OutboxService,
   ) {}
 
@@ -81,9 +82,10 @@ export class OrderCancellationResolutionService {
       },
     });
     if (!cancellation) return null;
+    const enabled = await this.enabled();
     return {
       ...cancellation,
-      canResolve: this.enabled()
+      canResolve: enabled
         && cancellation.policySnapshot === 'owner_resolution'
         && cancellation.purchaseOrderSentSnapshot
         && cancellation.status === 'awaiting_owner',
@@ -106,7 +108,7 @@ export class OrderCancellationResolutionService {
     totpToken: string,
   ) {
     this.assertOwnerRole(role);
-    if (!this.enabled()) {
+    if (!await this.enabled()) {
       throw new ConflictError(
         'supply_cancellation_disabled',
         'Контур отмен заказных товаров пока не включён',
@@ -361,9 +363,12 @@ export class OrderCancellationResolutionService {
     }
   }
 
-  private enabled() {
-    return this.config.get<string>('SUPPLY_CANCELLATION_ENABLED')?.trim().toLowerCase() === 'true'
-      && this.config.get<string>('SUPPLY_OWNER_RESOLUTION_ENABLED')?.trim().toLowerCase() === 'true';
+  private async enabled() {
+    const [cancellationEnabled, ownerResolutionEnabled] = await Promise.all([
+      this.featureFlags.isEnabled(FeatureFlagKey.Cancellation),
+      this.featureFlags.isEnabled(FeatureFlagKey.OwnerResolution),
+    ]);
+    return cancellationEnabled && ownerResolutionEnabled;
   }
 
   private assertOwnerRole(role: string): asserts role is Role {

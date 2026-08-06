@@ -5,6 +5,8 @@ import { ForbiddenError, ValidationError } from '../common/errors';
 import { bestInstallmentOffer, type InstallmentPlan } from './installments';
 import { SettingsService } from '../settings/settings.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { FeatureFlagKey } from '../feature-flags/feature-flags.registry';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 import {
   CatalogDeltaQueryDto,
   CatalogDeltaResponseDto,
@@ -104,6 +106,7 @@ export class CatalogService {
     // (узкие тестовые сборки). Без него рассрочка просто не показывается —
     // отсутствие условия честнее выдуманного.
     @Optional() private readonly settings?: SettingsService,
+    @Optional() private readonly featureFlags?: FeatureFlagsService,
   ) {}
 
   async search(query: CatalogSearchQueryDto): Promise<CatalogSearchResponseDto> {
@@ -148,11 +151,12 @@ export class CatalogService {
     const removed = window
       .filter((product) => product.archived)
       .map((product) => product.id);
+    const toOrderCheckoutEnabled = await this.toOrderCheckoutEnabled();
 
     return {
       cursor: new Date().toISOString(),
       since: query.since?.trim() || undefined,
-      changed: active.map((product) => this.toCatalogProduct(product)),
+      changed: active.map((product) => this.toCatalogProduct(product, toOrderCheckoutEnabled)),
       removed,
       totalChanged: active.length,
       totalRemoved: removed.length,
@@ -182,7 +186,8 @@ export class CatalogService {
         orderBy: [{ name: 'asc' }], take: 12, include: this.stockCountInclude(),
       }),
     ]);
-    const enriched = await this.enrichInstallments(await this.enrichReviews([product, ...variants, ...related].map((item) => this.toCatalogProduct(item))));
+    const toOrderCheckoutEnabled = await this.toOrderCheckoutEnabled();
+    const enriched = await this.enrichInstallments(await this.enrichReviews([product, ...variants, ...related].map((item) => this.toCatalogProduct(item, toOrderCheckoutEnabled))));
     const [main, ...rest] = enriched;
     return { product: main, variants: rest.slice(0, variants.length), related: rest.slice(variants.length) };
   }
@@ -193,7 +198,8 @@ export class CatalogService {
       where: { id: { in: ids }, archived: false },
       include: this.stockCountInclude(),
     });
-    const byId = new Map(products.map((product) => [product.id, this.toCatalogProduct(product)]));
+    const toOrderCheckoutEnabled = await this.toOrderCheckoutEnabled();
+    const byId = new Map(products.map((product) => [product.id, this.toCatalogProduct(product, toOrderCheckoutEnabled)]));
     const ordered = ids
       .map((id) => byId.get(id))
       .filter((product): product is CatalogProductDto => Boolean(product));
@@ -211,8 +217,9 @@ export class CatalogService {
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
       include: this.stockCountInclude(),
     });
+    const toOrderCheckoutEnabled = await this.toOrderCheckoutEnabled();
     const documents = products.map((product) => ({
-      ...this.toCatalogProduct(product),
+      ...this.toCatalogProduct(product, toOrderCheckoutEnabled),
       archived: product.archived,
     }));
 
@@ -273,7 +280,8 @@ export class CatalogService {
       },
       include: this.stockCountInclude(),
     });
-    const byId = new Map(products.map((product) => [product.id, this.toCatalogProduct(product)]));
+    const toOrderCheckoutEnabled = await this.toOrderCheckoutEnabled();
+    const byId = new Map(products.map((product) => [product.id, this.toCatalogProduct(product, toOrderCheckoutEnabled)]));
     const ordered = ids
       .map((id) => byId.get(id))
       .filter((product): product is CatalogProductDto => Boolean(product));
@@ -293,6 +301,7 @@ export class CatalogService {
     warning?: string,
   ): Promise<CatalogSearchResponseDto> {
     const where = this.sourceOfTruthWhere(query);
+    const toOrderCheckoutEnabled = await this.toOrderCheckoutEnabled();
     if (query.stockOnly || query.sort === 'stock_desc') {
       const candidates = await this.prisma.product.findMany({
         where,
@@ -300,7 +309,7 @@ export class CatalogService {
         include: this.stockCountInclude(),
       });
       const sorted = candidates
-        .map((product) => this.toCatalogProduct(product))
+        .map((product) => this.toCatalogProduct(product, toOrderCheckoutEnabled))
         .filter((product) => !query.stockOnly || product.availableUnits > 0)
         .sort((a, b) => this.compareProducts(a, b, query.sort));
       return {
@@ -329,7 +338,7 @@ export class CatalogService {
       total,
       limit: query.limit,
       offset: query.offset,
-      items: await this.enrichInstallments(await this.enrichReviews(products.map((product) => this.toCatalogProduct(product)))),
+      items: await this.enrichInstallments(await this.enrichReviews(products.map((product) => this.toCatalogProduct(product, toOrderCheckoutEnabled)))),
     };
   }
 
@@ -367,15 +376,13 @@ export class CatalogService {
     };
   }
 
-  private toCatalogProduct(product: ProductWithStockCount): CatalogProductDto {
+  private toCatalogProduct(product: ProductWithStockCount, toOrderCheckoutEnabled: boolean): CatalogProductDto {
     const availableUnits = product.bundleComponents.length > 0
       ? Math.min(...product.bundleComponents.map((component) =>
           Math.floor(this.directAvailability(component.componentProduct) / component.qty),
         ))
       : this.directAvailability(product);
     const offer = product.supplierOffers.find((candidate) => candidate.active);
-    const toOrderCheckoutEnabled =
-      this.config.get<string>('TO_ORDER_CHECKOUT_ENABLED')?.trim().toLowerCase() === 'true';
     const marginBps = offer && product.price > 0
       ? Math.floor(((product.price - offer.unitCost) * 10_000) / product.price)
       : -10_000;
@@ -423,6 +430,10 @@ export class CatalogService {
       avgRating: null,
       updatedAt: product.updatedAt.toISOString(),
     };
+  }
+
+  private toOrderCheckoutEnabled(): Promise<boolean> {
+    return this.featureFlags?.isEnabled(FeatureFlagKey.ToOrderCheckout) ?? Promise.resolve(false);
   }
 
   /**

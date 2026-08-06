@@ -168,8 +168,8 @@ export function SupplyOperationsQueue({ accessToken }: { accessToken: string }) 
 
       {report && (
         <div className="border-t border-surface-3 px-4 py-3 text-[11px] text-subtle">
-          {!report.flags.checkoutEnabled && <span className="mr-3">Новый checkout выключен</span>}
-          {!report.flags.cancellationEnabled && <span className="mr-3">Отмены выключены</span>}
+          {!report.flags['supply.to_order_checkout'].enabled && <span className="mr-3">Новый checkout выключен</span>}
+          {!report.flags['supply.cancellation'].enabled && <span className="mr-3">Отмены выключены</span>}
           {report.capabilities.financialQueuesVisible && !report.capabilities.ownerResolutionAvailable && (
             <span>Решение владельца пока доступно только для просмотра; команда включается отдельным release-флагом.</span>
           )}

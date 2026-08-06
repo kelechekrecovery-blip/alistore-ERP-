@@ -31,6 +31,8 @@ import {
 } from '../inventory/order-inventory-sale';
 import { isUniqueConstraintViolation } from '../common/prisma-errors';
 import { resolveActiveStorePoint } from '../common/store-point-identity';
+import { FeatureFlagKey } from '../feature-flags/feature-flags.registry';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 
 /** Reservation lifetime — every reservation must have expiresAt (invariant #7). */
 const RESERVATION_TTL_MS = 30 * 60 * 1000; // 30 минут
@@ -157,6 +159,7 @@ export class OrdersService {
     @Optional() private readonly promotions?: PromotionsService,
     @Optional() private readonly campaignAttribution?: CampaignAttributionService,
     @Optional() private readonly settings?: SettingsService,
+    @Optional() private readonly featureFlags?: FeatureFlagsService,
   ) {}
 
   get(id: string) {
@@ -537,8 +540,9 @@ export class OrdersService {
     // одной to_order-линией и одной own_stock-линией был бы покрыт частично —
     // это всплыло бы поздно, на резерве или на оплате, а не здесь.
     const toOrderSkus = skus.filter((sku) => bySku.get(sku)?.supplyMode === 'to_order');
-    const toOrderCheckoutEnabled =
-      this.config?.get<string>('TO_ORDER_CHECKOUT_ENABLED')?.trim().toLowerCase() === 'true';
+    const toOrderCheckoutEnabled = await (
+      this.featureFlags?.isEnabled(FeatureFlagKey.ToOrderCheckout) ?? Promise.resolve(false)
+    );
     if (toOrderSkus.length > 0 && !toOrderCheckoutEnabled) {
       throw new ConflictError(
         'to_order_checkout_disabled',

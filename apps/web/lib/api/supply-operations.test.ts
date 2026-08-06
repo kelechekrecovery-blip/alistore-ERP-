@@ -55,12 +55,22 @@ function report(): SupplyOperationsReport {
   } satisfies SupplyOperationsReport['queues'];
   return {
     generatedAt: '2026-07-29T12:00:00.000Z',
-    flags: {
-      checkoutEnabled: false,
-      cancellationEnabled: false,
-      autoRefundEnabled: false,
-      ownerResolutionEnabled: false,
-    },
+    flags: Object.fromEntries([
+      'supply.to_order_checkout',
+      'supply.cancellation',
+      'supply.auto_refund',
+      'supply.owner_resolution',
+      'supply.partial_handover',
+      'supply.quarantine_conversion',
+    ].map((key) => [key, {
+      key,
+      description: key,
+      owner: 'supply',
+      defaultEnabled: false,
+      legacyEnv: key,
+      enabled: false,
+      source: 'default',
+    }])) as SupplyOperationsReport['flags'],
     capabilities: { financialQueuesVisible: true, ownerResolutionAvailable: false },
     counts: {
       awaiting_deposit: 0,

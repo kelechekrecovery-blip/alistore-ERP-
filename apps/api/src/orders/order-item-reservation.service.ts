@@ -1,5 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
@@ -11,6 +10,8 @@ import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UnitsService } from '../units/units.service';
 import { deriveOrderStatusFromLineFulfillment } from './order-state-machine';
+import { FeatureFlagKey } from '../feature-flags/feature-flags.registry';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 
 const READY_RESERVATION_TTL_MS = 72 * 60 * 60 * 1000;
 
@@ -21,11 +22,11 @@ export class OrderItemReservationService {
     private readonly audit: AuditService,
     private readonly units: UnitsService,
     private readonly outbox: OutboxService,
-    @Optional() private readonly config?: ConfigService,
+    private readonly featureFlags: FeatureFlagsService,
   ) {}
 
-  reserve(orderId: string, orderItemId: string, actor: string, key: string) {
-    this.assertEnabled();
+  async reserve(orderId: string, orderItemId: string, actor: string, key: string) {
+    await this.assertEnabled();
     return this.command(orderId, orderItemId, actor, key, 'reserve', async (tx, order, item, events) => {
       if (item.fulfillmentStatus === 'reserved' || item.fulfillmentStatus === 'ready') {
         return item;
@@ -116,8 +117,8 @@ export class OrderItemReservationService {
     });
   }
 
-  ready(orderId: string, orderItemId: string, actor: string, key: string) {
-    this.assertEnabled();
+  async ready(orderId: string, orderItemId: string, actor: string, key: string) {
+    await this.assertEnabled();
     return this.command(orderId, orderItemId, actor, key, 'ready', async (tx, order, item, events) => {
       if (item.fulfillmentStatus === 'ready') return item;
       if (item.fulfillmentStatus !== 'reserved') {
@@ -173,8 +174,8 @@ export class OrderItemReservationService {
     });
   }
 
-  private assertEnabled() {
-    if (this.config?.get<string>('SUPPLY_PARTIAL_HANDOVER_ENABLED')?.trim().toLowerCase() !== 'true') {
+  private async assertEnabled() {
+    if (!await this.featureFlags.isEnabled(FeatureFlagKey.PartialHandover)) {
       throw new ConflictError('supply_partial_handover_disabled', 'Построчная выдача пока не включена');
     }
   }

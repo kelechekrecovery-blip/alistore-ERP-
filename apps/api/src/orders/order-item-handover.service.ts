@@ -1,5 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditInput, AuditService } from '../audit/audit.service';
 import { ConflictError, ValidationError } from '../common/errors';
@@ -7,6 +6,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UnitsService } from '../units/units.service';
 import { handOverReadyOrderItemOnTx } from './order-item-handover-on-tx';
 import { deriveOrderStatusFromLineFulfillment } from './order-state-machine';
+import { FeatureFlagKey } from '../feature-flags/feature-flags.registry';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 
 type OrderItemHandoverResult = {
   orderId: string;
@@ -23,7 +24,7 @@ export class OrderItemHandoverService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly units: UnitsService,
-    @Optional() private readonly config?: ConfigService,
+    private readonly featureFlags: FeatureFlagsService,
   ) {}
 
   async handOver(
@@ -32,7 +33,7 @@ export class OrderItemHandoverService {
     actor: string,
     idempotencyKey: string,
   ): Promise<OrderItemHandoverResult> {
-    if (this.config?.get<string>('SUPPLY_PARTIAL_HANDOVER_ENABLED')?.trim().toLowerCase() !== 'true') {
+    if (!await this.featureFlags.isEnabled(FeatureFlagKey.PartialHandover)) {
       throw new ConflictError('supply_partial_handover_disabled', 'Построчная выдача пока не включена');
     }
     const key = idempotencyKey.trim();
