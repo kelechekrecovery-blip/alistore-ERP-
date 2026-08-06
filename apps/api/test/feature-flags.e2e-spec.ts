@@ -35,6 +35,16 @@ const STATE_KEYS = [
   'source',
 ].sort();
 
+type LedgerState = { enabled: boolean; source: 'database' | 'environment' | 'default' };
+type FeatureFlagEventPayload = {
+  key: string;
+  reason: string;
+  before: LedgerState;
+  after: LedgerState;
+};
+
+const featureFlagLockName = (key: string) => `feature-flag-override:${key}`;
+
 describe('Feature flags (integration)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -195,6 +205,42 @@ describe('Feature flags (integration)', () => {
     });
   });
 
+  it('serializes concurrent set/set mutations into a truthful ledger chain', async () => {
+    const key = FeatureFlagKey.QuarantineConversion;
+    const { settledWhileHeld } = await runBehindHeldFeatureFlagLock(key, [
+      () => flags.set(key, true, 'Concurrent enable', 'owner-enable'),
+      () => flags.set(key, false, 'Concurrent disable', 'owner-disable'),
+    ]);
+    expect(settledWhileHeld).toBe(0);
+
+    const finalState = (await flags.list()).find((state) => state.key === key)!;
+    const payloads = await featureFlagEventPayloads(key);
+    assertTruthfulChain(payloads, { enabled: false, source: 'default' }, {
+      enabled: finalState.enabled,
+      source: finalState.source,
+    });
+  });
+
+  it('serializes concurrent set/reset mutations into a truthful ledger chain', async () => {
+    const key = FeatureFlagKey.OwnerResolution;
+    await prisma.featureFlagOverride.create({
+      data: { key, enabled: true, reason: 'Initial override', updatedBy: 'owner-initial' },
+    });
+
+    const { settledWhileHeld } = await runBehindHeldFeatureFlagLock(key, [
+      () => flags.set(key, false, 'Concurrent set', 'owner-set'),
+      () => flags.reset(key, 'Concurrent reset', 'owner-reset'),
+    ]);
+    expect(settledWhileHeld).toBe(0);
+
+    const finalState = (await flags.list()).find((state) => state.key === key)!;
+    const payloads = await featureFlagEventPayloads(key);
+    assertTruthfulChain(payloads, { enabled: true, source: 'database' }, {
+      enabled: finalState.enabled,
+      source: finalState.source,
+    });
+  });
+
   it('rejects unknown keys and a missing or whitespace-only reason without persisting', async () => {
     await request(app.getHttpServer())
       .patch('/feature-flags/unknown.flag')
@@ -237,4 +283,62 @@ describe('Feature flags (integration)', () => {
       .expect(403);
     await request(app.getHttpServer()).get('/feature-flags').expect(401);
   });
+
+  async function runBehindHeldFeatureFlagLock<T>(
+    key: string,
+    operations: Array<() => Promise<T>>,
+  ): Promise<{ results: T[]; settledWhileHeld: number }> {
+    let signalAcquired!: () => void;
+    let releaseLock!: () => void;
+    const acquired = new Promise<void>((resolve) => { signalAcquired = resolve; });
+    const release = new Promise<void>((resolve) => { releaseLock = resolve; });
+    const holder = prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ locked: number }>>`
+        SELECT 1 AS "locked"
+        FROM pg_advisory_xact_lock(hashtextextended(${featureFlagLockName(key)}, 0))
+      `;
+      signalAcquired();
+      await release;
+    });
+    await acquired;
+
+    let settled = 0;
+    const pending = operations.map((operation) => {
+      const promise = operation();
+      void promise.then(
+        () => { settled += 1; },
+        () => { settled += 1; },
+      );
+      return promise;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 75));
+    const settledWhileHeld = settled;
+    releaseLock();
+    await holder;
+    return { results: await Promise.all(pending), settledWhileHeld };
+  }
+
+  async function featureFlagEventPayloads(key: string): Promise<FeatureFlagEventPayload[]> {
+    const events = await prisma.auditEvent.findMany({
+      where: { type: 'feature_flag.changed', refs: { has: key } },
+    });
+    return events.map((event) => event.payload as unknown as FeatureFlagEventPayload);
+  }
+
+  function assertTruthfulChain(
+    payloads: FeatureFlagEventPayload[],
+    initial: LedgerState,
+    final: LedgerState,
+  ): void {
+    expect(payloads).toHaveLength(2);
+    const first = payloads.find((payload) => statesEqual(payload.before, initial));
+    expect(first).toBeDefined();
+    const second = payloads.find((payload) => payload !== first && statesEqual(payload.before, first!.after));
+    expect(second).toBeDefined();
+    expect(second!.after).toEqual(final);
+  }
+
+  function statesEqual(left: LedgerState, right: LedgerState): boolean {
+    return left.enabled === right.enabled && left.source === right.source;
+  }
 });

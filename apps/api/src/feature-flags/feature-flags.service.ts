@@ -1,5 +1,6 @@
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { EventType } from '../audit/event-types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -28,6 +29,8 @@ interface EvaluatedValue {
   enabled: boolean;
   source: FeatureFlagSource;
 }
+
+const featureFlagLockName = (key: FeatureFlagKey) => `feature-flag-override:${key}`;
 
 @Injectable()
 export class FeatureFlagsService {
@@ -59,6 +62,7 @@ export class FeatureFlagsService {
     const normalizedReason = this.requireReason(reason);
 
     return this.audit.transaction(async (tx) => {
+      await this.lockOverride(tx, definition.key);
       const existing = await tx.featureFlagOverride.findUnique({ where: { key: definition.key } });
       const before = this.evaluate(definition, existing);
       await tx.featureFlagOverride.upsert({
@@ -88,6 +92,7 @@ export class FeatureFlagsService {
     const normalizedReason = this.requireReason(reason);
 
     return this.audit.transaction(async (tx) => {
+      await this.lockOverride(tx, definition.key);
       const existing = await tx.featureFlagOverride.findUnique({ where: { key: definition.key } });
       const before = this.evaluate(definition, existing);
       await tx.featureFlagOverride.deleteMany({ where: { key: definition.key } });
@@ -119,6 +124,14 @@ export class FeatureFlagsService {
     const normalized = typeof reason === 'string' ? reason.trim() : '';
     if (!normalized) throw new UnprocessableEntityException('A non-empty reason is required');
     return normalized;
+  }
+
+  /** Serialize one flag's read/mutate/event chain until its transaction commits. */
+  private async lockOverride(tx: Prisma.TransactionClient, key: FeatureFlagKey): Promise<void> {
+    await tx.$queryRaw<Array<{ locked: number }>>`
+      SELECT 1 AS "locked"
+      FROM pg_advisory_xact_lock(hashtextextended(${featureFlagLockName(key)}, 0))
+    `;
   }
 
   private changedEvent(
