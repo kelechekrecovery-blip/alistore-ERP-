@@ -191,6 +191,59 @@ export async function seedStaffCredentials(role: Role = 'owner', prefix = 'e2e')
   };
 }
 
+interface BrowserStaffSession {
+  accessToken: string;
+  staffId: string;
+  username: string;
+  role: Role;
+  point: string;
+  storePoint: {
+    id: string;
+    code: string;
+    name: string;
+    inventoryLocation: string;
+  };
+  totpEnabled: boolean;
+}
+
+/**
+ * Seed a staff account, then establish the same cookie-backed session that the
+ * browser login form creates. The API response intentionally omits the refresh
+ * token; it remains only in the HttpOnly cookie managed by the browser context.
+ */
+export async function seedAuthenticatedStaffSession(
+  page: Page,
+  role: Role = 'owner',
+  prefix = 'e2e',
+): Promise<BrowserStaffSession> {
+  const credentials = await seedStaffCredentials(role, prefix);
+  const response = await page.request.post(`${API_BASE}/staff-auth/login`, {
+    data: { username: credentials.username, password: credentials.password },
+    headers: { 'x-alistore-staff-web': '1' },
+  });
+  expect(response.ok(), `staff-auth/login returned ${response.status()}`).toBeTruthy();
+
+  const session = await response.json() as BrowserStaffSession & { refreshToken?: unknown };
+  expect(session.staffId).toBe(credentials.staffId);
+  expect(session.role).toBe(role);
+  expect(typeof session.accessToken).toBe('string');
+  expect(session.accessToken.length).toBeGreaterThan(0);
+  expect(Object.prototype.hasOwnProperty.call(session, 'refreshToken')).toBe(false);
+
+  const cookies = await page.context().cookies(API_BASE);
+  const cookieContract = Object.fromEntries(cookies.map((cookie) => [cookie.name, cookie.httpOnly]));
+  expect(cookieContract).toMatchObject({
+    alistore_staff_access: true,
+    alistore_staff_refresh: true,
+    alistore_staff_session_hint: false,
+  });
+
+  await page.addInitScript(({ storageKey, safeSession }) => {
+    localStorage.setItem(storageKey, JSON.stringify(safeSession));
+  }, { storageKey: 'alistore.staff.auth.v1', safeSession: session });
+  return session;
+}
+
 export async function selectOperationalPoint(
   page: Page,
   label: string,

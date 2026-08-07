@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { prisma, resetDb, seedStaffCredentials } from './helpers';
+import { prisma, resetDb, seedAuthenticatedStaffSession } from './helpers';
 
 test('Staff app follows the canonical four-section mobile shell', async ({ page }) => {
   await resetDb();
-  const session = await seedStaffCredentials('owner', 'e2e-staff-ui');
+  const session = await seedAuthenticatedStaffSession(page, 'owner', 'e2e-staff-ui');
   const { staffId } = session;
   const task = await prisma.staffTask.create({
     data: {
@@ -16,9 +16,6 @@ test('Staff app follows the canonical four-section mobile shell', async ({ page 
   });
 
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.addInitScript((auth) => {
-    localStorage.setItem('alistore.staff.auth.v1', JSON.stringify(auth));
-  }, { accessToken: session.accessToken, staffId: session.staffId, username: session.username, role: 'owner', totpEnabled: false });
   await page.goto('/staff');
 
   const app = page.getByTestId('staff-app');
@@ -47,7 +44,7 @@ test('Staff app follows the canonical four-section mobile shell', async ({ page 
 
 test('cashier closes a shift with a blind physical count before seeing the variance', async ({ page }) => {
   await resetDb();
-  const session = await seedStaffCredentials('cashier', 'e2e-staff-blind-count');
+  const session = await seedAuthenticatedStaffSession(page, 'cashier', 'e2e-staff-blind-count');
   const shift = await prisma.cashShift.create({
     data: { staffId: session.staffId, point: 'BISHKEK-1', openCash: 5_000 },
   });
@@ -55,15 +52,6 @@ test('cashier closes a shift with a blind physical count before seeing the varia
     data: { shiftId: shift.id, amount: 10_000, method: 'cash', status: 'received' },
   });
 
-  await page.addInitScript((auth) => {
-    localStorage.setItem('alistore.staff.auth.v1', JSON.stringify(auth));
-  }, {
-    accessToken: session.accessToken,
-    staffId: session.staffId,
-    username: session.username,
-    role: 'cashier',
-    totpEnabled: false,
-  });
   await page.goto('/staff');
 
   await expect(page.getByText('Ожидаемая сумма скрыта до отправки. Пересчитайте наличные самостоятельно.')).toBeVisible();
