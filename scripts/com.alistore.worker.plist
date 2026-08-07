@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Production background worker. Activate only through:
+    npm run launch:activate:worker
+
+  Secrets stay in a hashed, mode-0600 runtime snapshot outside this plist.
+  This file contains only public process controls, paths, and hashes.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.alistore.worker</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__NODE_PATH__</string>
+    <string>__WORKER_RELEASE_ROOT__/apps/api/dist/worker.js</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>__WORKER_RELEASE_ROOT__/apps/api</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>NODE_ENV</key>
+    <string>production</string>
+    <key>NODE_PATH</key>
+    <string>__WORKER_MODULE_PATH__</string>
+    <key>ALISTORE_LAUNCHD_MANAGED</key>
+    <string>true</string>
+    <key>PROCESS_ROLE</key>
+    <string>worker</string>
+    <key>APPLE_REVOCATION_RELAY_ENABLED</key>
+    <string>true</string>
+    <key>REFUND_RELAY_ENABLED</key>
+    <string>false</string>
+    <key>RENDER_GIT_COMMIT</key>
+    <string>__GIT_REVISION__</string>
+    <!-- Public, per-activation liveness proof. This is an opaque identifier,
+         not an authentication credential or secret. -->
+    <key>ALISTORE_WORKER_INSTANCE_ID</key>
+    <string>__WORKER_INSTANCE_ID__</string>
+    <key>ALISTORE_WORKER_ENV_SNAPSHOT_PATH</key>
+    <string>__WORKER_ENV_SNAPSHOT_PATH__</string>
+    <key>ALISTORE_WORKER_ENV_SNAPSHOT_SHA256</key>
+    <string>__WORKER_ENV_SNAPSHOT_SHA256__</string>
+    <key>PATH</key>
+    <string>__WORKER_PATH__</string>
+  </dict>
+
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/alistore-worker-prod.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/alistore-worker-prod.err.log</string>
+</dict>
+</plist>

@@ -59,7 +59,7 @@ import { StorefrontBlocksModule } from './storefront-blocks/storefront-blocks.mo
 import { RefundsModule } from './refunds/refunds.module';
 import { StoreOperationsModule } from './store-operations/store-operations.module';
 import { CameraGatewayModule } from './camera-gateway/camera-gateway.module';
-import { resolveRuntimeEnvFiles } from './config/runtime-env-files';
+import { isLaunchdManagedWorker, resolveRuntimeEnvFiles } from './config/runtime-env-files';
 import { AppleIdentityModule } from './apple-identity';
 
 @Module({
@@ -67,6 +67,7 @@ import { AppleIdentityModule } from './apple-identity';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: resolveRuntimeEnvFiles(process.env.NODE_ENV),
+      ignoreEnvFile: isLaunchdManagedWorker(process.env),
     }),
     PrismaModule,
     AuditModule,

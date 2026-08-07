@@ -60,17 +60,18 @@ export class HealthController {
     return this.publicStatus(response);
   }
 
-  /** Minimal, revision-bound liveness proof for the separate worker service. */
+  /** Minimal, revision-and-instance-bound liveness proof for the worker. */
   @Get('worker')
   async worker(@Res({ passthrough: true }) response: Response) {
     const heartbeat = await this.prisma.workerHeartbeat.findUnique({
       where: { id: WORKER_RUNTIME_HEARTBEAT_ID },
     });
-    const revision = this.workerRevision(heartbeat?.meta);
+    const identity = this.workerIdentity(heartbeat?.meta);
     const fresh = heartbeat
       && Date.now() - heartbeat.lastSeenAt.getTime() <= WORKER_RUNTIME_STALE_AFTER_MS;
-    if (!fresh || !revision) throw new ServiceUnavailableException();
-    response.setHeader('X-AliStore-Revision', revision);
+    if (!fresh || !identity) throw new ServiceUnavailableException();
+    response.setHeader('X-AliStore-Revision', identity.revision);
+    response.setHeader('X-AliStore-Worker-Instance', identity.instanceId);
     return { status: 'ok' as const };
   }
 
@@ -80,10 +81,13 @@ export class HealthController {
     return { status: 'ok' as const };
   }
 
-  private workerRevision(meta: unknown): string | null {
+  private workerIdentity(meta: unknown): { revision: string; instanceId: string } | null {
     if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
     const revision = (meta as Record<string, unknown>).revision;
-    return typeof revision === 'string' && revision.trim() ? revision.trim() : null;
+    const instanceId = (meta as Record<string, unknown>).instanceId;
+    if (typeof revision !== 'string' || !revision.trim()) return null;
+    if (typeof instanceId !== 'string' || !instanceId.trim()) return null;
+    return { revision: revision.trim(), instanceId: instanceId.trim() };
   }
 
   /**

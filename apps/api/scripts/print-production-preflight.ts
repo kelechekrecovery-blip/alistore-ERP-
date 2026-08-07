@@ -2,30 +2,38 @@ import { config } from 'dotenv';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { resolveProductionPreflightEnvFiles } from '../src/config/runtime-env-files';
+import { loadLaunchdWorkerEnvironmentSnapshot } from '../src/config/runtime-env-files';
 import { buildProductionPreflightReport } from '../src/health/production-preflight';
 
 interface Args {
   envFile?: string;
+  environmentSnapshot?: string;
+  environmentSnapshotSha256?: string;
   json: boolean;
   strict: boolean;
 }
 
 const args = parseArgs(process.argv.slice(2));
-const envFile = args.envFile
-  ? resolve(process.cwd(), args.envFile)
-  : resolve(__dirname, '../.env.production');
-
-if (!existsSync(envFile)) {
-  console.error(`Production preflight env file not found: ${envFile}`);
-  process.exit(1);
-}
-
-const envFiles = resolveProductionPreflightEnvFiles(envFile);
-for (const candidate of envFiles) {
-  if (!existsSync(candidate)) continue;
-  // Runtime-injected variables win. The local file is loaded first so its
-  // operator-only secrets and overrides win over committed production values.
-  config({ path: candidate, override: false });
+let envFiles: string[];
+if (args.environmentSnapshot) {
+  const snapshotPath = resolve(process.cwd(), args.environmentSnapshot);
+  process.env.ALISTORE_WORKER_ENV_SNAPSHOT_PATH = snapshotPath;
+  process.env.ALISTORE_WORKER_ENV_SNAPSHOT_SHA256 = args.environmentSnapshotSha256;
+  loadLaunchdWorkerEnvironmentSnapshot(process.env);
+  envFiles = [snapshotPath];
+} else {
+  const envFile = args.envFile
+    ? resolve(process.cwd(), args.envFile)
+    : resolve(__dirname, '../.env.production');
+  if (!existsSync(envFile)) {
+    console.error(`Production preflight env file not found: ${envFile}`);
+    process.exit(1);
+  }
+  envFiles = resolveProductionPreflightEnvFiles(envFile);
+  for (const candidate of envFiles) {
+    if (!existsSync(candidate)) continue;
+    config({ path: candidate, override: false });
+  }
 }
 const report = buildProductionPreflightReport((name) => process.env[name]);
 
@@ -58,6 +66,16 @@ function parseArgs(argv: string[]): Args {
       }
       parsed.envFile = value;
       i += 1;
+    } else if (arg === '--environment-snapshot') {
+      const value = argv[i + 1];
+      const hash = argv[i + 2];
+      if (!value || !hash) {
+        console.error('--environment-snapshot requires a path and SHA-256 hash');
+        process.exit(1);
+      }
+      parsed.environmentSnapshot = value;
+      parsed.environmentSnapshotSha256 = hash;
+      i += 2;
     }
   }
   return parsed;

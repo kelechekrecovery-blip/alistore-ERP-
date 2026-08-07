@@ -76,6 +76,7 @@
     "android:ui:all": "npm run android:ui",
     "launch:check": "npm run launch:preflight:strict && npm run launch:readiness:strict",
     "launch:activate:api": "node scripts/activate-production-api.mjs",
+    "launch:activate:worker": "node scripts/activate-production-worker.mjs",
     "backup:production": "node scripts/production-postgres-backup.mjs",
     "backup:production:check": "node scripts/production-postgres-backup.mjs --check",
     "backup:production:restore-drill": "node scripts/production-postgres-backup.mjs --restore-drill",
