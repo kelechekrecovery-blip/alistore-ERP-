@@ -309,6 +309,49 @@ POS:
 For all four: no localhost, dev OTP, sandbox payment URL, test-only credential,
 or demo-only state may be reachable in the Release build.
 
+## 8. Current production blockers (2026-08-07) — do this before App Store resubmit
+
+This is the authoritative live status before final release:
+
+- API health is green:  
+  `GET https://api.ali.kg/api/health/live` → `{"status":"ok"}`  
+  `GET https://api.ali.kg/api/health/ready` → `{"status":"ok"}`
+- `GET /api/auth/methods` currently returns `registrationAvailable=false`.
+- Mandatory smoke with `REQUIRE_CUSTOMER_AUTH_CONFIGURATION=true` fails with:
+  `phone login/registration`, `account recovery`, `Apple login/registration`,
+  `Apple redirect URI`, `Google login/registration`, and `registrationAvailable`.
+- `GET /api/health/worker` and `GET /api/auth/apple/status` are still absent (`404`)
+  on current live deployment.
+- Production worker dry-run preflight reports a production environment block list
+  (see [PRODUCTION-LAUNCH-BLOCKERS-2026-08-07.md](docs/PRODUCTION-LAUNCH-BLOCKERS-2026-08-07.md)).
+
+Run this in order and stop at first hard fail:
+
+1. Apply production runtime secrets:
+   - `NODE_ENV`, `DATABASE_URL`, `CORS_ORIGINS`, `ALLOWED_HOSTS`,
+     `JWT_SECRET`, `AUTH_OTP_DEV_ECHO=false`.
+2. Enable auth/review readiness:
+   - `AUTH_SOCIAL_FIRST_SIGNUP_ENABLED=true`,
+   - set review phone/otp config only for review window,
+   - confirm `AUTH_REVIEW_*` behavior after rotation.
+3. Enable outbound and operations runtime:
+   - `OUTBOX_RELAY_ENABLED=true`, `NOTIFICATION_TRANSPORT`,  
+   - `RESERVATION_SWEEP_ENABLED=true`, `DEBT_REMINDERS_ENABLED=true`,
+   - `JOB_BACKEND=bullmq`, `REDIS_URL`.
+4. Configure storage/alerts/media and provider safety:
+   - `MEDIA_STORAGE=s3`, `S3_ENDPOINT`, `MINIO_BUCKET`,
+     `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`,
+   - `ALERT_TELEGRAM_BOT_TOKEN`, `ALERT_TELEGRAM_CHAT_ID`,
+   - `SMS_PROVIDER` and working SMS adapter mode.
+5. Configure payment provider contract:
+   - `PAYMENT_PROVIDER`, `PAYMENT_PROVIDER_CERTIFIED`, `PUBLIC_DEMO_MODE`,
+   - keep refund relay matching production worker policy.
+6. Run:
+   - `WEB_BASE_URL=https://ali.kg API_BASE_URL=https://api.ali.kg REQUIRE_CUSTOMER_AUTH_CONFIGURATION=true node scripts/deployment-smoke.mjs`
+   - `npm run ios:store-preflight -- --env-file apps/ios/.env.production --strict-asc --strict-signing`
+7. Perform physical SIWA login test on Release build.
+8. Update/re-submit in App Store (Client only) after blockers are all green.
+
 Local App Store provisioning profiles for all four apps and a verified App Store
 Connect issuer/team configuration are a precondition for archiving: prove them
 with `--strict-asc --strict-signing` above. If preflight reports a missing
