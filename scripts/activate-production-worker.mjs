@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFile as execFileCallback, spawn } from 'node:child_process';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, createPublicKey, randomUUID } from 'node:crypto';
 import {
   access,
   chmod,
@@ -440,7 +440,9 @@ export async function archiveGitRevision(projectRoot, revision, destination) {
       || ['.npmrc', 'id_rsa', 'id_ed25519', 'credentials'].includes(name)
       || /(?:^|[-_.])(?:service[-_.]?account|private[-_.]?key)(?:[-_.]|$)/u.test(name)
       || /\.(?:p8|pem|key)$/u.test(name);
-    if (forbidden) throw new Error(`Git revision contains a forbidden secret path: ${path}`);
+    if (forbidden && !await isApprovedSupplyReleaseIssuerKeyRevision(projectRoot, revision, path)) {
+      throw new Error(`Git revision contains a forbidden secret path: ${path}`);
+    }
   }
   await mkdir(destination, { recursive: true, mode: 0o700 });
   await new Promise((resolvePromise, reject) => {
@@ -468,7 +470,7 @@ export async function archiveGitRevision(projectRoot, revision, destination) {
 
 export async function assertArchivedReleaseHasNoSecrets(
   releaseRoot,
-  { list = readdir, skipNodeModules = false } = {},
+  { list = readdir, read = readFile, skipNodeModules = false } = {},
 ) {
   const visit = async (directory, relativeDirectory = '') => {
     for (const name of await list(directory, { withFileTypes: true })) {
@@ -479,13 +481,58 @@ export async function assertArchivedReleaseHasNoSecrets(
         || ['.npmrc', 'id_rsa', 'id_ed25519', 'credentials'].includes(lowerName)
         || /(?:^|[-_.])(?:service[-_.]?account|private[-_.]?key)(?:[-_.]|$)/u.test(lowerName)
         || /\.(?:p8|pem|key)$/u.test(lowerName);
-      if (forbidden) {
+      const approvedPublicKey = forbidden
+        && name.isFile()
+        && relativePath === supplyReleaseIssuerPublicKeyPath
+        && isEd25519PublicKeyPem(await read(join(directory, name.name)));
+      if (forbidden && !approvedPublicKey) {
         throw new Error(`Archived release contains a forbidden secret path: ${relativePath}`);
       }
       if (name.isDirectory()) await visit(join(directory, name.name), relativePath);
     }
   };
   await visit(releaseRoot);
+}
+
+const supplyReleaseIssuerPublicKeyPath = 'config/supply-release-cert-issuer.pem';
+
+function isEd25519PublicKeyPem(encoded) {
+  const bytes = Buffer.isBuffer(encoded) ? encoded : Buffer.from(encoded);
+  if (bytes.length === 0 || bytes.length > 1024) return false;
+  const lines = bytes.toString('utf8').split('\n');
+  if (lines.at(-1) === '') lines.pop();
+  if (lines.length < 3
+    || lines[0] !== '-----BEGIN PUBLIC KEY-----'
+    || lines.at(-1) !== '-----END PUBLIC KEY-----'
+    || lines.slice(1, -1).some((line) => line.length > 64 || !/^[A-Za-z0-9+/]+={0,2}$/u.test(line))) {
+    return false;
+  }
+  const encodedBody = lines.slice(1, -1).join('');
+  const der = Buffer.from(encodedBody, 'base64');
+  if (der.toString('base64') !== encodedBody) return false;
+  try {
+    const key = createPublicKey({ key: der, format: 'der', type: 'spki' });
+    const canonicalDer = key.export({ format: 'der', type: 'spki' });
+    return key.type === 'public'
+      && key.asymmetricKeyType === 'ed25519'
+      && der.equals(canonicalDer);
+  } catch {
+    return false;
+  }
+}
+
+async function isApprovedSupplyReleaseIssuerKeyRevision(projectRoot, revision, path) {
+  if (path !== supplyReleaseIssuerPublicKeyPath) return false;
+  try {
+    const { stdout } = await execFile(
+      'git',
+      ['cat-file', 'blob', `${revision}:${path}`],
+      { cwd: projectRoot, encoding: null, maxBuffer: 1024 },
+    );
+    return isEd25519PublicKeyPem(stdout);
+  } catch {
+    return false;
+  }
 }
 
 const workerReleaseManifestName = 'worker-release-manifest.json';
