@@ -21,8 +21,8 @@
       "artifacts": [
         {
           "kind": "result",
-          "path": "docs/acceptance/artifacts/ios-app-ui-c9f600a411bd92462c92e32bbf811782f4b05656e684be593355cef637cde9d9.json",
-          "sha256": "c9f600a411bd92462c92e32bbf811782f4b05656e684be593355cef637cde9d9"
+          "path": "docs/acceptance/artifacts/ios-app-ui-00cf9eb1487fdeb4ab60260537039ae237c6dd671ace894dc8c77deb22f2a7de.json",
+          "sha256": "00cf9eb1487fdeb4ab60260537039ae237c6dd671ace894dc8c77deb22f2a7de"
         }
       ]
     },
