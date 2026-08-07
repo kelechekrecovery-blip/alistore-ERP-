@@ -48,9 +48,8 @@ export function StaffSessionLogin({
     const point = String(values.get('point') ?? '');
     try {
       const session = needsBootstrap
-        ? await staffBootstrapOwner(username, password, point)
-        : await staffLogin(username, password, totp);
-      saveStaffSession(session);
+        ? await staffBootstrapOwner(username, password, point, saveStaffSession)
+        : await staffLogin(username, password, totp, saveStaffSession);
       onAuthenticated(session);
     } catch (err) {
       setError(err instanceof Error ? err.message : needsBootstrap ? 'Не удалось создать владельца' : 'Ошибка входа');
