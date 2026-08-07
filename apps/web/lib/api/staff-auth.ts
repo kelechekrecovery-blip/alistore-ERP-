@@ -1,4 +1,5 @@
 import { API_BASE, getJson, patchAuthJson, postAuthJson, postJson } from './http';
+import { type StaffAuthCookieLock, withStaffAuthCookieLock } from '../staff-auth-lock';
 
 export interface StaffLoginResult {
   accessToken: string;
@@ -32,13 +33,22 @@ export interface StaffTotpSetupResult {
   totpEnabled: boolean;
 }
 
-export function staffLogin(username: string, password: string, totp?: string): Promise<StaffLoginResult> {
-  return postJson(
-    '/staff-auth/login',
-    { username, password, ...(totp?.trim() ? { totp: totp.trim() } : {}) },
-    { 'x-alistore-staff-web': '1' },
-    true,
-  );
+export function staffLogin(
+  username: string,
+  password: string,
+  totp: string | undefined,
+  onAuthenticated: (session: StaffLoginResult) => void,
+): Promise<StaffLoginResult> {
+  return withStaffAuthCookieLock(async () => {
+    const session = await postJson<StaffLoginResult>(
+      '/staff-auth/login',
+      { username, password, ...(totp?.trim() ? { totp: totp.trim() } : {}) },
+      { 'x-alistore-staff-web': '1' },
+      true,
+    );
+    onAuthenticated(session);
+    return session;
+  });
 }
 
 /**
@@ -60,21 +70,27 @@ export async function staffBootstrapNeeded(): Promise<boolean> {
 }
 
 /** Создание первого владельца (только при пустой базе — сервер закрывает после). */
-export function staffBootstrapOwner(username: string, password: string, point: string): Promise<StaffLoginResult> {
-  return postJson('/staff-auth/bootstrap', { username, password, point }, { 'x-alistore-staff-web': '1' }, true);
+export function staffBootstrapOwner(
+  username: string,
+  password: string,
+  point: string,
+  onAuthenticated: (session: StaffLoginResult) => void,
+): Promise<StaffLoginResult> {
+  return withStaffAuthCookieLock(async () => {
+    const session = await postJson<StaffLoginResult>(
+      '/staff-auth/bootstrap',
+      { username, password, point },
+      { 'x-alistore-staff-web': '1' },
+      true,
+    );
+    onAuthenticated(session);
+    return session;
+  });
 }
 
-export function staffAuthRefresh(): Promise<StaffLoginResult> {
+/** Only for a caller that owns `withStaffAuthCookieLock`; the lock is non-reentrant. */
+export function staffAuthRefreshWithinLock(_lock: StaffAuthCookieLock): Promise<StaffLoginResult> {
   return postJson('/staff-auth/refresh', {}, { 'x-alistore-staff-web': '1' }, true);
-}
-
-export async function staffAuthLogout(): Promise<void> {
-  await fetch(`${API_BASE}/staff-auth/logout`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-alistore-staff-web': '1' },
-    credentials: 'include',
-    body: '{}',
-  }).catch(() => undefined);
 }
 
 export function staffAuthMe(accessToken: string): Promise<StaffPublicProfile> {

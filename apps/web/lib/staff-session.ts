@@ -1,5 +1,6 @@
-import { staffAuthMe, staffAuthRefresh, type StaffLoginResult } from './api/staff-auth';
-import { API_BASE, ApiError } from './api/http';
+import { staffAuthMe, staffAuthRefreshWithinLock, type StaffLoginResult } from './api/staff-auth';
+import { API_BASE, ApiError, configureStaffAccessTokenRecovery } from './api/http';
+import { withStaffAuthCookieLock } from './staff-auth-lock';
 
 export const STAFF_SESSION_KEY = 'alistore.staff.auth.v1';
 /**
@@ -64,6 +65,22 @@ export function isStaffSignedOut(
 export type StaffSession = StaffLoginResult;
 
 let memorySession: StaffSession | null = null;
+let memorySessionGeneration = 0;
+interface StaffSessionIdentity {
+  generation: number;
+  staffId: string;
+}
+
+let refreshSessionFlight: {
+  identity: StaffSessionIdentity;
+  marker: object;
+  promise: Promise<string>;
+} | null = null;
+let restoreSessionFlight: {
+  generation: number;
+  marker: object;
+  promise: Promise<StaffSession | null>;
+} | null = null;
 
 export function loadStaffSession(): StaffSession | null {
   if (typeof window === 'undefined') return null;
@@ -88,21 +105,154 @@ export function loadStaffSession(): StaffSession | null {
       },
       totpEnabled: Boolean(parsed.totpEnabled),
     };
+    memorySessionGeneration += 1;
     return memorySession;
   } catch {
     return null;
   }
 }
 
-export function saveStaffSession(session: StaffSession) {
+function persistStaffSession(session: StaffSession): void {
   if (typeof window === 'undefined') return;
-  memorySession = session;
   const storage = resolveStaffStorage(window);
   clearStaffSignedOut(storage, document);
   if (process.env.NODE_ENV !== 'production') {
     try { storage?.setItem(STAFF_SESSION_KEY, JSON.stringify(session)); } catch { /* memory session remains */ }
   }
 }
+
+export function saveStaffSession(session: StaffSession) {
+  if (typeof window === 'undefined') return;
+  memorySession = session;
+  memorySessionGeneration += 1;
+  persistStaffSession(session);
+}
+
+function discardStaffSessionLocally(): void {
+  memorySession = null;
+  memorySessionGeneration += 1;
+  if (typeof window === 'undefined') return;
+  const storage = resolveStaffStorage(window);
+  markStaffSignedOut(storage, document);
+  if (process.env.NODE_ENV !== 'production') {
+    try { storage?.removeItem(STAFF_SESSION_KEY); } catch { /* tombstone cookie remains */ }
+  }
+  expireStaffSessionHint();
+}
+
+function isTerminalRefreshFailure(error: unknown): boolean {
+  return error instanceof ApiError && (
+    error.code === 'staff_refresh_invalid'
+    || error.code === 'staff_refresh_reused'
+    || error.code === 'staff_inactive'
+  );
+}
+
+function sameStaffSessionIdentity(
+  identity: StaffSessionIdentity,
+  candidate: unknown,
+): boolean {
+  if (!candidate || typeof candidate !== 'object') return false;
+  const parsed = candidate as Partial<StaffSessionIdentity>;
+  return parsed.generation === identity.generation && parsed.staffId === identity.staffId;
+}
+
+async function refreshStaffAccessToken(
+  rejectedAccessToken: string,
+  sessionIdentity: unknown,
+): Promise<string> {
+  const expectedIdentity: StaffSessionIdentity = {
+    generation: memorySessionGeneration,
+    staffId: memorySession?.staffId ?? '',
+  };
+  if (!memorySession || !sameStaffSessionIdentity(expectedIdentity, sessionIdentity)) {
+    throw new ApiError(401, 'Staff-сессия была изменена');
+  }
+
+  // Another request may already have completed the rotation while this
+  // request's 401 was in flight. Reuse the new bearer without rotating twice.
+  if (memorySession.accessToken !== rejectedAccessToken) return memorySession.accessToken;
+  if (refreshSessionFlight) {
+    if (sameStaffSessionIdentity(refreshSessionFlight.identity, expectedIdentity)) {
+      return refreshSessionFlight.promise;
+    }
+    throw new ApiError(401, 'Staff-сессия была изменена');
+  }
+
+  const flightMarker = {};
+  const operationPromise = withStaffAuthCookieLock(async (lock) => {
+    try {
+      if (
+        !memorySession
+        || memorySessionGeneration !== expectedIdentity.generation
+        || memorySession.staffId !== expectedIdentity.staffId
+      ) {
+        throw new ApiError(401, 'Staff-сессия была изменена');
+      }
+      // This tab may have completed a same-session rotation while waiting for
+      // the origin-wide lock. Its current bearer is safe to reuse.
+      if (memorySession.accessToken !== rejectedAccessToken) return memorySession.accessToken;
+
+      const refreshed = await staffAuthRefreshWithinLock(lock);
+      if (!refreshed.accessToken) throw new ApiError(401, 'Staff refresh не вернул access token');
+
+      // A logout or a new login while refresh was in flight invalidates the
+      // originating request. Never replay an old mutation as the new principal.
+      if (
+        !memorySession
+        || memorySessionGeneration !== expectedIdentity.generation
+        || memorySession.staffId !== expectedIdentity.staffId
+      ) {
+        throw new ApiError(401, 'Staff-сессия была изменена');
+      }
+      if (refreshed.staffId !== expectedIdentity.staffId) {
+        discardStaffSessionLocally();
+        throw new ApiError(401, 'Staff refresh сменил пользователя', 'staff_refresh_principal_mismatch');
+      }
+      // Preserve object identity and generation: pages keep the StaffSession
+      // object in React state, and concurrent old-token requests belong to this
+      // same logical session after a successful rotation.
+      if (memorySession.accessToken === rejectedAccessToken) {
+        Object.assign(memorySession, refreshed);
+        persistStaffSession(memorySession);
+      }
+      return memorySession.accessToken;
+    } catch (error) {
+      if (
+        memorySessionGeneration === expectedIdentity.generation
+        && memorySession?.staffId === expectedIdentity.staffId
+        && memorySession?.accessToken === rejectedAccessToken
+        && isTerminalRefreshFailure(error)
+      ) {
+        discardStaffSessionLocally();
+      }
+      throw error;
+    }
+  });
+  const promise = operationPromise.finally(() => {
+    if (refreshSessionFlight?.marker === flightMarker) refreshSessionFlight = null;
+  });
+  refreshSessionFlight = { identity: expectedIdentity, marker: flightMarker, promise };
+
+  return promise;
+}
+
+configureStaffAccessTokenRecovery({
+  captureStaffSession: (accessToken) => (
+    memorySession?.accessToken === accessToken
+      ? { generation: memorySessionGeneration, staffId: memorySession.staffId }
+      : undefined
+  ),
+  refreshStaffAccessToken,
+  isStaffSessionCurrent: (accessToken, identity) => Boolean(
+    memorySession
+    && memorySession.accessToken === accessToken
+    && sameStaffSessionIdentity(
+      { generation: memorySessionGeneration, staffId: memorySession.staffId },
+      identity,
+    )
+  ),
+});
 
 /**
  * Best-effort clears a host-scoped copy. The production parent-domain hint can
@@ -115,9 +265,9 @@ function expireStaffSessionHint() {
 }
 
 /**
- * Отзыв сессии на сервере. Не `staffAuthLogout` и не `postJson`: первый глотает
- * и сетевой сбой, и не-2xx (по нему не отличить отозванный refresh от живого),
- * второй парсит тело, а эндпоинт отвечает 204 без тела.
+ * Строгий отзыв сессии на сервере. Не через `postJson`: тот парсит тело, а
+ * эндпоинт отвечает 204 без тела. Сетевой сбой и любой non-2xx пробрасываются,
+ * чтобы локальный UI не утверждал успешный выход при живом refresh cookie.
  */
 async function revokeStaffSessionOnServer(): Promise<void> {
   const res = await fetch(`${API_BASE}/staff-auth/logout`, {
@@ -136,14 +286,10 @@ async function revokeStaffSessionOnServer(): Promise<void> {
  */
 export async function clearStaffSession(): Promise<void> {
   if (typeof window === 'undefined') return;
-  memorySession = null;
-  const storage = resolveStaffStorage(window);
-  markStaffSignedOut(storage, document);
-  if (process.env.NODE_ENV !== 'production') {
-    try { storage?.removeItem(STAFF_SESSION_KEY); } catch { /* tombstone cookie remains */ }
-  }
-  expireStaffSessionHint();
-  await revokeStaffSessionOnServer();
+  await withStaffAuthCookieLock(async () => {
+    discardStaffSessionLocally();
+    await revokeStaffSessionOnServer();
+  });
 }
 
 export async function restoreStaffSession(): Promise<StaffSession | null> {
@@ -155,22 +301,43 @@ export async function restoreStaffSession(): Promise<StaffSession | null> {
   if (isStaffSignedOut(resolveStaffStorage(window), document)) return null;
   const hasHint = document.cookie.split(';').some((entry) => entry.trim().startsWith(`${STAFF_SESSION_HINT_COOKIE}=`));
   if (!hasHint) return process.env.NODE_ENV === 'production' ? null : loadStaffSession();
-  try {
-    const refreshed = await staffAuthRefresh();
-    const profile = await staffAuthMe(refreshed.accessToken);
-    const session: StaffSession = {
-      ...refreshed,
-      staffId: profile.id,
-      username: profile.username,
-      role: profile.role,
-      point: profile.point,
-      storePoint: profile.storePoint,
-      totpEnabled: profile.totpEnabled,
-    };
-    saveStaffSession(session);
-    return session;
-  } catch {
-    memorySession = null;
-    return null;
-  }
+  const expectedGeneration = memorySessionGeneration;
+  if (restoreSessionFlight?.generation === expectedGeneration) return restoreSessionFlight.promise;
+
+  const flightMarker = {};
+  const operationPromise = withStaffAuthCookieLock(async (lock): Promise<StaffSession | null> => {
+    if (memorySessionGeneration !== expectedGeneration || memorySession) return memorySession;
+    try {
+      const refreshed = await staffAuthRefreshWithinLock(lock);
+      // A successful login/logout owns the newer generation. Do not even look
+      // up the restored profile after that boundary, let alone overwrite it.
+      if (memorySessionGeneration !== expectedGeneration || memorySession) return memorySession;
+
+      const profile = await staffAuthMe(refreshed.accessToken);
+      if (memorySessionGeneration !== expectedGeneration || memorySession) return memorySession;
+      if (refreshed.staffId !== profile.id) return null;
+
+      const session: StaffSession = {
+        ...refreshed,
+        staffId: profile.id,
+        username: profile.username,
+        role: profile.role,
+        point: profile.point,
+        storePoint: profile.storePoint,
+        totpEnabled: profile.totpEnabled,
+      };
+      saveStaffSession(session);
+      return session;
+    } catch {
+      // A late failure from the old restore must not erase a session that was
+      // saved while its network calls were in flight.
+      if (memorySessionGeneration !== expectedGeneration || memorySession) return memorySession;
+      return null;
+    }
+  });
+  const promise = operationPromise.finally(() => {
+    if (restoreSessionFlight?.marker === flightMarker) restoreSessionFlight = null;
+  });
+  restoreSessionFlight = { generation: expectedGeneration, marker: flightMarker, promise };
+  return promise;
 }

@@ -23,7 +23,8 @@ beforeEach(() => vi.unstubAllGlobals());
 describe('staff login fetcher', () => {
   it('sends the optional TOTP code for MFA-enabled staff accounts', async () => {
     const calls = stubLogin();
-    await staffLogin('owner', 'password', ' 123456 ');
+    const onAuthenticated = vi.fn();
+    await staffLogin('owner', 'password', ' 123456 ', onAuthenticated);
 
     expect(calls[0].url).toMatch(/\/staff-auth\/login$/u);
     expect(JSON.parse(calls[0].init.body as string)).toEqual({
@@ -32,11 +33,12 @@ describe('staff login fetcher', () => {
       totp: '123456',
     });
     expect(calls[0].init.credentials).toBe('include');
+    expect(onAuthenticated).toHaveBeenCalledWith(expect.objectContaining({ staffId: 'staff-1' }));
   });
 
   it('keeps the password-only contract when no TOTP code is supplied', async () => {
     const calls = stubLogin();
-    await staffLogin('seller', 'password', '   ');
+    await staffLogin('seller', 'password', '   ', vi.fn());
 
     expect(JSON.parse(calls[0].init.body as string)).toEqual({
       username: 'seller',

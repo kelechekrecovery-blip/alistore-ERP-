@@ -35,6 +35,49 @@ export class ApiError extends Error {
   }
 }
 
+interface StaffAccessTokenRecovery {
+  captureStaffSession(accessToken: string): unknown | undefined;
+  refreshStaffAccessToken(rejectedAccessToken: string, sessionIdentity: unknown): Promise<string>;
+  isStaffSessionCurrent(accessToken: string, sessionIdentity: unknown): boolean;
+}
+
+let staffAccessTokenRecovery: StaffAccessTokenRecovery | undefined;
+
+/**
+ * Browser staff sessions install this hook from `lib/staff-session.ts`.
+ *
+ * The HTTP helpers are also used by customer auth, so a bare 401 is not enough
+ * to opt into staff-cookie refresh. The hook must identify the bearer as the
+ * live in-memory staff token before the first request is sent.
+ */
+export function configureStaffAccessTokenRecovery(recovery: StaffAccessTokenRecovery): void {
+  staffAccessTokenRecovery = recovery;
+}
+
+async function authenticatedFetch(
+  path: string,
+  accessToken: string,
+  init: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> },
+): Promise<Response> {
+  const recovery = staffAccessTokenRecovery;
+  const staffSessionIdentity = recovery?.captureStaffSession(accessToken);
+  const send = (token: string) => fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: { ...init.headers, authorization: `Bearer ${token}` },
+  });
+
+  const response = await send(accessToken);
+  if (response.status !== 401 || staffSessionIdentity === undefined || !recovery) return response;
+
+  // Deliberately retry only here. A second 401 is returned to the caller and
+  // can never start another refresh/retry loop.
+  const refreshedAccessToken = await recovery.refreshStaffAccessToken(accessToken, staffSessionIdentity);
+  if (!recovery.isStaffSessionCurrent(refreshedAccessToken, staffSessionIdentity)) {
+    throw new ApiError(401, 'Staff-сессия была изменена');
+  }
+  return send(refreshedAccessToken);
+}
+
 /**
  * True only when the caller genuinely lacks the permission for an optional
  * surface, so rendering it empty is the honest outcome.
@@ -82,11 +125,10 @@ export async function postAuthJson<T>(
   accessToken: string,
   headers?: Record<string, string>,
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await authenticatedFetch(path, accessToken, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      authorization: `Bearer ${accessToken}`,
       ...headers,
     },
     body: JSON.stringify(body),
@@ -106,11 +148,10 @@ export async function postAuthVoid(
   accessToken: string,
   headers?: Record<string, string>,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await authenticatedFetch(path, accessToken, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      authorization: `Bearer ${accessToken}`,
       ...headers,
     },
     body: JSON.stringify(body),
@@ -125,11 +166,10 @@ export async function patchAuthJson<T>(
   accessToken: string,
   headers?: Record<string, string>,
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await authenticatedFetch(path, accessToken, {
     method: 'PATCH',
     headers: {
       'content-type': 'application/json',
-      authorization: `Bearer ${accessToken}`,
       ...headers,
     },
     body: JSON.stringify(body),
@@ -144,11 +184,10 @@ export async function putAuthJson<T>(
   body: unknown,
   accessToken: string,
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await authenticatedFetch(path, accessToken, {
     method: 'PUT',
     headers: {
       'content-type': 'application/json',
-      authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify(body),
   });
@@ -162,11 +201,10 @@ export async function deleteAuthJson<T>(
   body: unknown,
   accessToken: string,
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await authenticatedFetch(path, accessToken, {
     method: 'DELETE',
     headers: {
       'content-type': 'application/json',
-      authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify(body),
   });
@@ -176,8 +214,7 @@ export async function deleteAuthJson<T>(
 
 /** Authenticated GET (Bearer token). Throws on non-2xx. */
 export async function getJson<T>(path: string, accessToken: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { authorization: `Bearer ${accessToken}` },
+  const res = await authenticatedFetch(path, accessToken, {
     cache: 'no-store',
   });
   if (!res.ok) throw await responseError(res);
@@ -196,8 +233,7 @@ export async function getPublicJson<T>(path: string): Promise<T> {
 
 /** Authenticated binary download for server-generated documents. */
 export async function getAuthBlob(path: string, accessToken: string): Promise<Blob> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { authorization: `Bearer ${accessToken}` },
+  const res = await authenticatedFetch(path, accessToken, {
     cache: 'no-store',
   });
   if (!res.ok) throw await responseError(res);
