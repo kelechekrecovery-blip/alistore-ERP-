@@ -25,7 +25,14 @@ import java.time.LocalDate
 class StaffOperationsScreenTest {
   @get:Rule val compose = createComposeRule()
 
-  private val session = StaffSession("staff-token", "staff-1", "seller", "seller", true)
+  private val session = StaffSession(
+    "staff-token",
+    "staff-1",
+    "seller",
+    "seller",
+    true,
+    point = "BISHKEK-1",
+  )
 
   @Test
   fun orderActionUsesServerTransitionAndReloadsQueue() {

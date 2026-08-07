@@ -608,7 +608,10 @@ private fun SignedInAccount(
     return attempt.getOrThrow()
   }
 
-  LazyColumn(modifier.fillMaxSize().background(AuthInk).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+  LazyColumn(
+    modifier.fillMaxSize().background(AuthInk).padding(18.dp).testTag("account-list"),
+    verticalArrangement = Arrangement.spacedBy(10.dp),
+  ) {
     item {
       Text("Кабинет", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black, modifier = Modifier.testTag("account-title"))
       Text(state.user.phone ?: "Профиль AliStore", color = AuthLime, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))

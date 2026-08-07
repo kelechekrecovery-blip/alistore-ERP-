@@ -10,12 +10,14 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import org.junit.Rule
 import org.junit.Test
@@ -160,6 +162,7 @@ class ClientAuthScreenTest {
     }
 
     compose.onNodeWithTag("account-title").assertIsDisplayed()
+    compose.onNodeWithTag("account-list").performScrollToNode(hasTestTag("auth-logout"))
     compose.onNodeWithTag("auth-logout").assertIsDisplayed().assertTextContains("Выйти").performClick()
     compose.waitUntil(5_000) { logoutRequest != null }
     assertEquals(state, logoutRequest)
