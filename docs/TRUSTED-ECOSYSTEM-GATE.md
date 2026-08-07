@@ -78,6 +78,16 @@ The visual gate compares deterministic fixed-data storefront desktop/mobile and 
 
 The committed bootstrap verifies its pinned Node runtime manifest with system `shasum` before Node starts, extracts the selected entrypoint and its transitive trust modules from `HEAD` into a private read-only runtime, clears the process environment, and then the recorder/audit verifies the selected worktree, toolchain and evidence contracts. Direct execution of worktree JavaScript, direct Node execution and `npm run` are not authoritative evidence entrypoints.
 
+## Concurrency trust boundary
+
+Run the gate with exclusive control of the selected checkout and every pinned user-owned
+toolchain root for the full command. The evidence lock serializes cooperating recorders, and the
+Android runner blocks transient project, user, and Gradle-distribution configuration from its
+process tree. The gate does not claim to resist a separate malicious process running as the same
+OS user that can replace and restore the SDK, Node, browser, Git, or repository bytes between
+integrity checks. Use a dedicated local account or isolated CI worker and stop unrelated
+same-user automation before recording authoritative evidence.
+
 ## Refreshing the toolchain lock
 
 Refresh `scripts/ecosystem-toolchain-lock.json` only as a reviewed toolchain change, never as

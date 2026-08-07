@@ -25,6 +25,7 @@ const gateScripts = new Map([
 ]);
 const evidencePath = path.join(root, 'docs', 'acceptance', 'ecosystem-evidence.json');
 const artifactDirectory = path.join(root, 'docs', 'acceptance', 'artifacts');
+const trustedAndroidSdkRoot = '/Users/alistore/Library/Android/sdk';
 verifyTrustedBootstrap(root);
 const npm = resolveTrustedNpm(root);
 const trustedGit = resolveTrustedGit(root);
@@ -136,7 +137,7 @@ const executionEnvironment = () => ({
           DEVELOPER_DIR: '/Applications/Xcode.app/Contents/Developer',
         })
       : gateId === 'android-app-ui'
-        ? commandOutput(path.join(process.env.ANDROID_HOME ?? `${process.env.HOME}/Library/Android/sdk`, 'platform-tools', 'adb'), ['version'])
+        ? commandOutput(path.join(trustedAndroidSdkRoot, 'platform-tools', 'adb'), ['version'])
         : commandOutput(process.execPath, ['--version']),
 });
 

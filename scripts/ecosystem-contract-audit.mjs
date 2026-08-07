@@ -241,11 +241,7 @@ const acceptedGate = (id, commandPattern) => {
               }).trim();
             }
             if (id === 'android-app-ui') {
-              const adb = path.join(
-                process.env.ANDROID_HOME ?? `${process.env.HOME}/Library/Android/sdk`,
-                'platform-tools',
-                'adb',
-              );
+              const adb = path.join(trustedAndroidSdkRoot, 'platform-tools', 'adb');
               return execFileSync(adb, ['version'], { encoding: 'utf8' }).trim();
             }
             return execFileSync(process.execPath, ['--version'], { encoding: 'utf8' }).trim();
@@ -324,6 +320,8 @@ const validRetirements = retirements.every(
 const retired = new Set(retirements.map((item) => normalize(item.file)));
 const unresolvedMissingFiles = missingLinkedFiles.filter((name) => !retired.has(name));
 const androidUi = scripts['android:ui'] ?? '';
+const androidUiRunner = read('scripts/run-trusted-android-ui.mjs');
+const trustedAndroidSdkRoot = '/Users/alistore/Library/Android/sdk';
 
 const checks = [
   {
@@ -380,9 +378,14 @@ const checks = [
   {
     id: 'android-app-ui-gate',
     pass:
+      androidUi === 'node scripts/run-trusted-android-ui.mjs' &&
       ['app', 'staff', 'courier', 'pos'].every((module) =>
-        androidUi.includes(`:${module}:connectedDebugAndroidTest`),
-      ) && acceptedGate('android-app-ui', /connectedDebugAndroidTest/u),
+        androidUiRunner.includes(`:${module}:connectedDebugAndroidTest`),
+      ) &&
+      androidUiRunner.includes(':core:connectedDebugAndroidTest') &&
+      androidUiRunner.includes('(deny file-read*') &&
+      androidUiRunner.includes('(deny file-write*') &&
+      acceptedGate('android-app-ui', /^node scripts\/run-trusted-android-ui\.mjs$/u),
     detail: 'All four packaged Android modules have connected-test evidence.',
   },
   {

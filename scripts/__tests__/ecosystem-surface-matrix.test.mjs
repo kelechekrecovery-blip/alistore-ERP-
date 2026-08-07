@@ -59,6 +59,43 @@ test('exports the exact contour and status allowlists', () => {
   ]);
 });
 
+test('connected Android UI evidence uses the fixed trusted SDK root', () => {
+  const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
+  assert.equal(packageJson.scripts['android:ui'], 'node scripts/run-trusted-android-ui.mjs');
+  const runner = fs.readFileSync(
+    path.join(projectRoot, 'scripts', 'run-trusted-android-ui.mjs'),
+    'utf8',
+  );
+  assert.match(runner, /export const TRUSTED_ANDROID_SDK_ROOT = '\/Users\/alistore\/Library\/Android\/sdk';/u);
+  assert.match(runner, /deny file-read\*/u);
+  assert.match(runner, /deny file-write\*/u);
+  assert.match(runner, /'--no-configuration-cache'/u);
+  for (const module of ['core', 'app', 'staff', 'courier', 'pos']) {
+    assert.match(runner, new RegExp(`:${module}:connectedDebugAndroidTest`, 'u'));
+  }
+  for (const sourcePath of [
+    'scripts/record-ecosystem-evidence.mjs',
+    'scripts/ecosystem-contract-audit.mjs',
+  ]) {
+    const source = fs.readFileSync(path.join(projectRoot, sourcePath), 'utf8');
+    assert.match(
+      source,
+      /const trustedAndroidSdkRoot = '\/Users\/alistore\/Library\/Android\/sdk';/u,
+      sourcePath,
+    );
+    assert.doesNotMatch(source, /process\.env\.ANDROID_HOME/u, sourcePath);
+  }
+  const audit = fs.readFileSync(
+    path.join(projectRoot, 'scripts', 'ecosystem-contract-audit.mjs'),
+    'utf8',
+  );
+  assert.match(audit, /const androidUiRunner = read\('scripts\/run-trusted-android-ui\.mjs'\);/u);
+  assert.match(
+    audit,
+    /acceptedGate\('android-app-ui', \/\^node scripts\\\/run-trusted-android-ui\\\.mjs\$\/u\)/u,
+  );
+});
+
 test('rejects duplicate IDs', () => {
   assert.ok(errorCodes(manifest(row(), row({ surface: 'web:/orders/[id]' }))).includes('duplicate-id'));
 });
