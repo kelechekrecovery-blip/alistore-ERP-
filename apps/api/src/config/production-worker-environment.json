@@ -1,0 +1,25 @@
+{
+  "launchdMarker": "ALISTORE_LAUNCHD_MANAGED",
+  "safeOsKeys": [
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "PATH",
+    "TMPDIR",
+    "TZ"
+  ],
+  "plistIdentityKeys": [
+    "NODE_PATH",
+    "RENDER_GIT_COMMIT",
+    "ALISTORE_WORKER_INSTANCE_ID",
+    "ALISTORE_WORKER_ENV_SNAPSHOT_PATH",
+    "ALISTORE_WORKER_ENV_SNAPSHOT_SHA256"
+  ],
+  "forcedEnvironment": {
+    "ALISTORE_LAUNCHD_MANAGED": "true",
+    "NODE_ENV": "production",
+    "PROCESS_ROLE": "worker",
+    "APPLE_REVOCATION_RELAY_ENABLED": "true",
+    "REFUND_RELAY_ENABLED": "false"
+  }
+}

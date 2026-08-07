@@ -37,10 +37,13 @@ export class WorkerRuntimeHeartbeatService implements OnApplicationBootstrap, On
 
   private async beat(): Promise<void> {
     const revision = this.config.get<string>('RENDER_GIT_COMMIT')?.trim() || 'local';
+    const instanceId = this.config.get<string>('ALISTORE_WORKER_INSTANCE_ID')?.trim()
+      || this.config.get<string>('RENDER_INSTANCE_ID')?.trim()
+      || `managed-${revision}`;
     await this.prisma.workerHeartbeat.upsert({
       where: { id: WORKER_RUNTIME_HEARTBEAT_ID },
-      create: { id: WORKER_RUNTIME_HEARTBEAT_ID, meta: { revision } },
-      update: { meta: { revision } },
+      create: { id: WORKER_RUNTIME_HEARTBEAT_ID, meta: { revision, instanceId } },
+      update: { meta: { revision, instanceId } },
     });
   }
 }

@@ -95,19 +95,24 @@ describe('Health — публичные пробы не раскрывают с�
   it('подтверждает отдельную revision worker через свежий heartbeat без внутренних деталей', async () => {
     await prisma.workerHeartbeat.upsert({
       where: { id: WORKER_RUNTIME_HEARTBEAT_ID },
-      create: { id: WORKER_RUNTIME_HEARTBEAT_ID, meta: { revision: 'worker-sha-123' } },
-      update: { meta: { revision: 'worker-sha-123' } },
+      create: {
+        id: WORKER_RUNTIME_HEARTBEAT_ID,
+        meta: { revision: 'worker-sha-123', instanceId: 'worker-instance-123' },
+      },
+      update: { meta: { revision: 'worker-sha-123', instanceId: 'worker-instance-123' } },
     });
 
     const res = await request(app.getHttpServer()).get('/health/worker').expect(200);
 
     expect(res.headers['x-alistore-revision']).toBe('worker-sha-123');
+    expect(res.headers['x-alistore-worker-instance']).toBe('worker-instance-123');
     expect(res.body).toEqual({ status: 'ok' });
   });
 
   it.each([
     ['missing', null],
     ['malformed', { wrong: 'shape' }],
+    ['revision-only legacy', { revision: 'worker-sha-without-instance' }],
   ])('worker health отвечает 503 для %s heartbeat', async (_label, meta) => {
     await prisma.workerHeartbeat.deleteMany({ where: { id: WORKER_RUNTIME_HEARTBEAT_ID } });
     if (meta) {
@@ -123,8 +128,11 @@ describe('Health — публичные пробы не раскрывают с�
   it('worker health отвечает 503 для stale heartbeat', async () => {
     await prisma.workerHeartbeat.upsert({
       where: { id: WORKER_RUNTIME_HEARTBEAT_ID },
-      create: { id: WORKER_RUNTIME_HEARTBEAT_ID, meta: { revision: 'old-worker-sha' } },
-      update: { meta: { revision: 'old-worker-sha' } },
+      create: {
+        id: WORKER_RUNTIME_HEARTBEAT_ID,
+        meta: { revision: 'old-worker-sha', instanceId: 'old-worker-instance' },
+      },
+      update: { meta: { revision: 'old-worker-sha', instanceId: 'old-worker-instance' } },
     });
     await prisma.workerHeartbeat.update({
       where: { id: WORKER_RUNTIME_HEARTBEAT_ID },

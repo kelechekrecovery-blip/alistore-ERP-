@@ -9,7 +9,7 @@ if (!databaseUrl) {
   throw new Error('DIRECT_DATABASE_URL or DATABASE_URL is required for database deployment');
 }
 
-run('npx', ['prisma', 'migrate', 'deploy']);
+run('npx', ['--no-install', 'prisma', 'migrate', 'deploy']);
 run('node', ['scripts/check-inventory-valuation-locations.mjs']);
 run('node', ['scripts/postdeploy-indexes.mjs']);
 // Справочники ставятся деплоем, а не миграцией и не тестами: до этого план
