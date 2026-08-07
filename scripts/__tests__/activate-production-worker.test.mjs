@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile as execFileCallback } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, generateKeyPairSync } from 'node:crypto';
 import { access, chmod, lstat, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -286,6 +286,98 @@ test('git archive refuses tracked secrets and excludes untracked workspace links
     assert.doesNotMatch(
       await readFile(join(destination, 'apps', 'api', 'safe.txt'), 'utf8'),
       /secret-bytes/u,
+    );
+  } finally {
+    await rm(fixture, { recursive: true, force: true });
+  }
+});
+
+test('git archive allowlists only the exact tracked Ed25519 public issuer key without exposing key bytes', async () => {
+  const fixture = await mkdtemp(join(tmpdir(), 'alistore-worker-public-key-fixture-'));
+  const destination = join(fixture, 'release');
+  const approvedPath = join(fixture, 'config', 'supply-release-cert-issuer.pem');
+  const otherPemPath = join(fixture, 'config', 'other-issuer.pem');
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+  const publicPem = publicKey.export({ format: 'pem', type: 'spki' });
+  const privatePem = privateKey.export({ format: 'pem', type: 'pkcs8' });
+  const privatePayloadMarker = privatePem.toString('utf8').split('\n')[1];
+  try {
+    await execFile('git', ['init', '-q'], { cwd: fixture });
+    await execFile('git', ['config', 'user.email', 'test@example.invalid'], { cwd: fixture });
+    await execFile('git', ['config', 'user.name', 'Test'], { cwd: fixture });
+    await mkdir(join(fixture, 'config'), { recursive: true });
+    await writeFile(join(fixture, 'package.json'), '{"private":true}\n');
+    await writeFile(approvedPath, publicPem);
+    await execFile('git', ['add', '.'], { cwd: fixture });
+    await execFile('git', ['commit', '-qm', 'approved public issuer'], { cwd: fixture });
+    const approvedRevision = (await execFile('git', ['rev-parse', 'HEAD'], { cwd: fixture })).stdout.trim();
+
+    await archiveGitRevision(fixture, approvedRevision, destination);
+    await assertArchivedReleaseHasNoSecrets(destination);
+
+    await writeFile(approvedPath, privatePem);
+    await execFile('git', ['commit', '-qam', 'reject private issuer'], { cwd: fixture });
+    const privateRevision = (await execFile('git', ['rev-parse', 'HEAD'], { cwd: fixture })).stdout.trim();
+    await assert.rejects(
+      archiveGitRevision(fixture, privateRevision, join(fixture, 'private-release')),
+      (error) => error.message.includes('config/supply-release-cert-issuer.pem')
+        && !error.message.includes(privatePayloadMarker),
+    );
+
+    await writeFile(approvedPath, publicPem);
+    await writeFile(otherPemPath, publicPem);
+    await execFile('git', ['add', '.'], { cwd: fixture });
+    await execFile('git', ['commit', '-qm', 'reject other pem'], { cwd: fixture });
+    const otherPemRevision = (await execFile('git', ['rev-parse', 'HEAD'], { cwd: fixture })).stdout.trim();
+    await assert.rejects(
+      archiveGitRevision(fixture, otherPemRevision, join(fixture, 'other-pem-release')),
+      (error) => error.message.includes('config/other-issuer.pem')
+        && !error.message.includes(privatePayloadMarker),
+    );
+  } finally {
+    await rm(fixture, { recursive: true, force: true });
+  }
+});
+
+test('public issuer allowlist rejects trailing private DER before and after archive without exposing payload', async () => {
+  const fixture = await mkdtemp(join(tmpdir(), 'alistore-worker-trailing-der-fixture-'));
+  const approvedRelativePath = 'config/supply-release-cert-issuer.pem';
+  const approvedPath = join(fixture, approvedRelativePath);
+  const extractedRoot = join(fixture, 'post-extract');
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+  const publicDer = publicKey.export({ format: 'der', type: 'spki' });
+  const privateDer = privateKey.export({ format: 'der', type: 'pkcs8' });
+  const trailingBody = Buffer.concat([publicDer, privateDer]).toString('base64');
+  const trailingPem = [
+    '-----BEGIN PUBLIC KEY-----',
+    ...(trailingBody.match(/.{1,64}/gu) ?? []),
+    '-----END PUBLIC KEY-----',
+    '',
+  ].join('\n');
+  const privatePayloadMarker = trailingBody.slice(-24);
+  try {
+    await execFile('git', ['init', '-q'], { cwd: fixture });
+    await execFile('git', ['config', 'user.email', 'test@example.invalid'], { cwd: fixture });
+    await execFile('git', ['config', 'user.name', 'Test'], { cwd: fixture });
+    await mkdir(join(fixture, 'config'), { recursive: true });
+    await writeFile(join(fixture, 'package.json'), '{"private":true}\n');
+    await writeFile(approvedPath, trailingPem);
+    await execFile('git', ['add', '.'], { cwd: fixture });
+    await execFile('git', ['commit', '-qm', 'trailing private der'], { cwd: fixture });
+    const maliciousRevision = (await execFile('git', ['rev-parse', 'HEAD'], { cwd: fixture })).stdout.trim();
+
+    await assert.rejects(
+      archiveGitRevision(fixture, maliciousRevision, join(fixture, 'release')),
+      (error) => error.message.includes(approvedRelativePath)
+        && !error.message.includes(privatePayloadMarker),
+    );
+
+    await mkdir(join(extractedRoot, 'config'), { recursive: true });
+    await writeFile(join(extractedRoot, approvedRelativePath), trailingPem);
+    await assert.rejects(
+      assertArchivedReleaseHasNoSecrets(extractedRoot),
+      (error) => error.message.includes(approvedRelativePath)
+        && !error.message.includes(privatePayloadMarker),
     );
   } finally {
     await rm(fixture, { recursive: true, force: true });
