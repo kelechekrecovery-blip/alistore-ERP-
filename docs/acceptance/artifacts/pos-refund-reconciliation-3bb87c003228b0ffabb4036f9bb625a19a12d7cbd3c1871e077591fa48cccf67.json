@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "gate": "pos-refund-reconciliation",
+  "command": "npm run ecosystem:pos-refund:e2e",
+  "executionCommand": "npm run ecosystem:pos-refund:e2e",
+  "exitCode": 0,
+  "packageCommandSha256": "5a882260dbeb00f3fa505b62860636b13c090fa0e08c85c74bc400132fd3aaa7",
+  "sourceTreeSha256": "425fdaa357435fbc158a925c75d7d73d7a10fa24ce2471406b134b22da6a41f6",
+  "sourceCommit": "7ac3cb43eede743eee5ea42672bf630a40216cac",
+  "executionEnvironment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v25.9.0",
+    "gitPath": "/usr/bin/git",
+    "gitSha256": "a961f78075d8e7621ef4f5d764c64ef8a41bf66c0a98ab5cb6ca39b85ce31c93",
+    "npmCliPath": "/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js",
+    "npmCliSha256": "8e5f6f3429f8cdbe693cdc29904e9d5a7b127a494bd15c804bd54c7403bfcbe7",
+    "npmTreeSha256": "de7b532ccb17a20c723cda23cb9280f8b41db87b0232340f6103b6465eceeb17",
+    "scriptShellPath": "/bin/sh",
+    "scriptShellSha256": "a3a314699fd6128c288842c9bbe3c8c82bd9dc22abfa7efad22ac4f6047d5d4f",
+    "nodePath": "/opt/homebrew/Cellar/node/25.9.0_3/bin/node",
+    "nodeSha256": "fba87e4402c55ea4fc7ca9b9838790c32534e3e77c9c7834c37073752d070678",
+    "nodeKegSha256": "0a759a231a65be90f6bfc5abfa3712fb9a644808efd455654f737ce140085d71",
+    "nodeRuntimeLibrariesSha256": "5d5af7f9b6ee9959fed1d84dd6c5e4e76631f109e56d8b65b1ea670e0608ef4d",
+    "browserPath": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "browserSha256": "a995a39f7997f5cf7ecbf514b87bf0c31aed607bf399ab0b723304dbba6f8576",
+    "browserAppTreeSha256": "13cdbae30e818793d68a2d05dacf9e77b8b9c13001268d8538a6aa6412f918ce",
+    "packageLockSha256": "fa99e785934cf73375844e58f7463926ad9e9a4ea43832b5510fce72809d366d",
+    "nodeModulesTreeSha256": "338d922b82543f57b311edd56a282c1701c6ac062da3ac6ac3fa55bea68c99e9",
+    "playwrightCliPath": "/private/tmp/alistore-schema3-strict.jJRRiO1X/node_modules/@playwright/test/cli.js",
+    "playwrightCliSha256": "79e23e6a249176295b8490567daa7717448a75866d6ea6f6b296ff3d23305c69",
+    "playwrightShim": {
+      "path": "/private/tmp/alistore-schema3-strict.jJRRiO1X/node_modules/.bin/playwright",
+      "target": "/private/tmp/alistore-schema3-strict.jJRRiO1X/node_modules/@playwright/test/cli.js",
+      "linkSha256": "9f09dcf8c128cb5828b07cd0290050ce16035f813a4fa1892bd4c591b5d01ece"
+    },
+    "jestCliPath": "/private/tmp/alistore-schema3-strict.jJRRiO1X/node_modules/jest/bin/jest.js",
+    "jestCliSha256": "2a9b435eab8a343bd09fe285b2e2043ff9ff89fae4e1d1f46ba3df28659d8a2c",
+    "jestShim": {
+      "path": "/private/tmp/alistore-schema3-strict.jJRRiO1X/node_modules/.bin/jest",
+      "target": "/private/tmp/alistore-schema3-strict.jJRRiO1X/node_modules/jest/bin/jest.js",
+      "linkSha256": "4347cb0072e26d934e530c501804a4e292e646e9bd7bcadab22dd636369c2f5a"
+    },
+    "acceptanceDatabaseIdentity": "postgresql://127.0.0.1:5432/alistore_evidence_gate0_f4758d7b_test",
+    "acceptanceDatabasePolicy": "postgresql://127.0.0.1:5432/alistore_test",
+    "toolchain": "v25.9.0"
+  },
+  "executionEnvironmentSha256": "17ec3cc1566eaec98015864e9f5d89a75376cace0a62ef4e208c8c9a5fdf2e78",
+  "completedAt": "2026-08-07T01:53:17.947Z"
+}
