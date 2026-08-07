@@ -19,10 +19,15 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   production_sms_provider_not_activated: 'SMS-вход временно недоступен. Войдите другим способом или оформите заказ как гость.',
 };
 
+export type AuthErrorCode = keyof typeof AUTH_ERROR_MESSAGES | 'social_provider_not_configured'
+  | 'social_nonce_required' | 'apple_nonce_required' | 'google_nonce_required' | 'social_token_expired'
+  | 'apple_token_expired' | 'google_token_invalid' | 'apple_token_invalid' | 'social_auth_replayed'
+  | 'social_identity_already_linked' | 'social_identity_not_found' | 'social_login_blocked';
+
 /** Human Russian copy for an auth error; `fallback` covers unknown codes and non-API failures. */
 export function describeAuthError(error: unknown, fallback: string): string {
   if (error instanceof ApiError && error.code) {
-    return AUTH_ERROR_MESSAGES[error.code] ?? fallback;
+    return AUTH_ERROR_MESSAGES[error.code as string] ?? fallback;
   }
   return fallback;
 }

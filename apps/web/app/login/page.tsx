@@ -8,7 +8,8 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { authMethods, type AuthMethodsView } from '@/lib/api/auth';
 import { telegramWidgetInitData } from '@/lib/telegram-widget';
-import { describeAuthError } from '@/lib/auth-errors';
+import { describeAuthError, type AuthErrorCode } from '@/lib/auth-errors';
+import { ApiError } from '@/lib/api/http';
 import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
 import { safeLoginNext } from '@/components/mobile/login-next';
@@ -60,6 +61,7 @@ declare global {
 }
 
 type Channel = 'phone' | 'email';
+type SocialLoginErrorCode = AuthErrorCode | 'social_flow_error';
 /**
  * `recover` — не второй способ входа, а отдельное намерение: подтвердив номер,
  * человек отзывает ВСЕ прежние refresh-сессии. Нужен тому, у кого угнали доступ.
@@ -77,6 +79,23 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * попадает хэш.) Сервер сравнивает claim с присланным значением и без него
  * отвечает `apple_nonce_required`.
  */
+function describeSocialAuthError(error: unknown, fallback: string): string {
+  if (error instanceof ApiError && error.code) {
+    const code = error.code as SocialLoginErrorCode;
+    if (code === 'social_provider_not_configured') return 'Социальный вход сейчас недоступен. Проверьте настройки авторизации.';
+    if (code === 'social_nonce_required' || code === 'apple_nonce_required' || code === 'google_nonce_required') {
+      return 'Проверка провайдера не удалась. Попробуйте еще раз.';
+    }
+    if (code === 'social_token_expired' || code === 'apple_token_expired' || code === 'google_token_invalid' || code === 'apple_token_invalid') {
+      return 'Срок сессии провайдера истек или данные неверны. Запустите вход повторно.';
+    }
+    if (code === 'social_auth_replayed') return 'Эта попытка входа уже использована. Попробуйте еще раз.';
+    if (code === 'social_identity_already_linked') return 'Этот провайдер уже привязан к другому аккаунту.';
+    if (code === 'social_identity_not_found' || code === 'social_login_blocked') return 'Не удалось найти профиль. Проверьте номер телефона или используйте другой способ входа.';
+  }
+  return fallback;
+}
+
 function createAppleNonce(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
@@ -419,8 +438,8 @@ function LoginForm() {
         return;
       }
       startSocialEnrollment('telegram', result.enrollmentToken);
-    } catch {
-      setError('Не удалось войти через Telegram.');
+    } catch (error) {
+      setError(describeSocialAuthError(error, 'Не удалось войти через Telegram.'));
     } finally {
       setBusy(false);
     }
@@ -438,8 +457,8 @@ function LoginForm() {
         return;
       }
       startSocialEnrollment('telegram', result.enrollmentToken);
-    } catch {
-      setError('Не удалось войти через Telegram.');
+    } catch (error) {
+      setError(describeSocialAuthError(error, 'Не удалось войти через Telegram.'));
     } finally {
       setBusy(false);
     }
@@ -471,8 +490,8 @@ function LoginForm() {
         return;
       }
       startSocialEnrollment('apple', result.enrollmentToken);
-    } catch {
-      setError('Не удалось войти через Apple.');
+    } catch (error) {
+      setError(describeSocialAuthError(error, 'Не удалось войти через Apple.'));
     } finally {
       setBusy(false);
     }
@@ -490,8 +509,8 @@ function LoginForm() {
         return;
       }
       startSocialEnrollment('google', result.enrollmentToken);
-    } catch {
-      setError('Не удалось войти через Google.');
+    } catch (error) {
+      setError(describeSocialAuthError(error, 'Не удалось войти через Google.'));
     } finally {
       setBusy(false);
     }
