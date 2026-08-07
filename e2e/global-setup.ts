@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 
-function prepareIsolatedDatabase() {
+export function prepareIsolatedDatabase() {
   if (process.env.E2E_AUTO_PREPARE_DB === 'false') return;
 
   const databaseUrl =
@@ -22,11 +22,19 @@ function prepareIsolatedDatabase() {
   }
 
   const prismaBin = join(process.cwd(), 'node_modules', '.bin', 'prisma');
-  execFileSync(prismaBin, ['db', 'push', '--skip-generate'], {
-    cwd: join(process.cwd(), 'apps', 'api'),
-    env: { ...process.env, DATABASE_URL: databaseUrl },
-    stdio: 'inherit',
-  });
+  try {
+    const output = execFileSync(prismaBin, ['db', 'push', '--skip-generate'], {
+      cwd: join(process.cwd(), 'apps', 'api'),
+      encoding: 'utf8',
+      env: { ...process.env, DATABASE_URL: databaseUrl },
+      stdio: ['ignore', 'pipe', 'inherit'],
+    });
+    if (output) process.stderr.write(output);
+  } catch (error) {
+    const output = (error as { stdout?: Buffer | string }).stdout;
+    if (output) process.stderr.write(output);
+    throw error;
+  }
 }
 
 export default function globalSetup() {
