@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useEffect, useState, type FormEvent } from 'react';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import {
@@ -26,8 +26,20 @@ const STATUS: Record<B2BQuote['status'], string> = {
   rejected: 'Отклонено',
 };
 
+function LoginGate() {
+  return (
+    <MobileAppFrame title="AliStore для бизнеса" subtitle="Войдите, чтобы отправить оптовый запрос." active="account" backHref="/account">
+      <div className="rounded-[14px] border border-surface-3 bg-surface-2 p-6 text-center">
+        <p className="text-sm text-subtle">Эта страница доступна только авторизованным.</p>
+        <Link href="/login?next=/b2b" className="mt-4 inline-flex rounded-[11px] bg-lime px-5 py-2.5 text-sm font-bold text-lime-ink">
+          Войти в аккаунт
+        </Link>
+      </div>
+    </MobileAppFrame>
+  );
+}
+
 export default function B2BPage() {
-  const router = useRouter();
   const { user, hydrated, authed } = useAuth();
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [quotes, setQuotes] = useState<B2BQuote[]>([]);
@@ -46,10 +58,6 @@ export default function B2BPage() {
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-
-  useEffect(() => {
-    if (hydrated && !user) router.replace('/login?next=/b2b');
-  }, [hydrated, router, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -127,7 +135,7 @@ export default function B2BPage() {
   }
 
   if (!hydrated || !user) {
-    return <div className="fixed inset-0 grid place-items-center bg-ink-dark font-mono text-sm text-subtle">Загрузка…</div>;
+    return <LoginGate />;
   }
 
   return (

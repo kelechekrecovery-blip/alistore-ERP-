@@ -836,5 +836,15 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
-  return <Suspense fallback={<div className="fixed inset-0 z-40 bg-ink-dark" />}><LoginForm /></Suspense>;
+  return (
+    <Suspense
+      fallback={
+        <div className="fixed inset-0 z-40 grid place-items-center bg-ink-dark px-6 text-center text-sm text-subtle">
+          <div>Подготавливаем экран входа…</div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
+  );
 }

@@ -90,7 +90,11 @@ export default function WarrantyConsolePage() {
   }
 
   if (!hydrated) {
-    return <div className="fixed inset-0 z-50 bg-night" />;
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center bg-night px-5 text-sm text-subtle">
+        Загружаем консоль обслуживания…
+      </div>
+    );
   }
 
   if (!session) {

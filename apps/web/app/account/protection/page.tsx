@@ -1,7 +1,7 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { LoadFailure } from '@/components/LoadFailure';
 import { MobileAppFrame } from '@/components/MobileAppFrame';
 import {
@@ -22,8 +22,23 @@ const PLANS: Array<{ id: ProtectionPlanType; label: string; detail: string }> = 
   { id: 'full_protection', label: 'Полная защита', detail: 'Повреждения и расширенная гарантия' },
 ];
 
+function LoginGate() {
+  return (
+    <MobileAppFrame
+      title="Защита устройства"
+      subtitle="Войдите, чтобы управлять своей защитой устройств."
+      active="account"
+      backHref="/account"
+    >
+      <div className="rounded-[14px] border border-surface-3 bg-surface-2 p-6 text-center">
+        <p className="text-sm text-subtle">Эта страница доступна только после входа.</p>
+        <Link href="/login?next=/account/protection" className="mt-4 inline-flex rounded-[11px] bg-lime px-5 py-2.5 text-sm font-bold text-lime-ink">Войти в аккаунт</Link>
+      </div>
+    </MobileAppFrame>
+  );
+}
+
 export default function ProtectionPage() {
-  const router = useRouter();
   const { user, hydrated, authed } = useAuth();
   const [devices, setDevices] = useState<MyDevice[]>([]);
   const [policies, setPolicies] = useState<DeviceProtectionPolicy[]>([]);
@@ -38,10 +53,6 @@ export default function ProtectionPage() {
   // null — отказа не было; строка (возможно пустая) — отказ с деталью или без.
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
-
-  useEffect(() => {
-    if (hydrated && !user) router.replace('/login?next=/account/protection');
-  }, [hydrated, router, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -90,7 +101,7 @@ export default function ProtectionPage() {
   }
 
   if (!hydrated || !user) {
-    return <div className="fixed inset-0 grid place-items-center bg-ink-dark font-mono text-sm text-subtle">Загрузка…</div>;
+    return <LoginGate />;
   }
 
   return (

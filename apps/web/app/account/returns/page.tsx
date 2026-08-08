@@ -21,6 +21,17 @@ const RETURN_STATUS: Record<string, string> = {
   reconciled: 'Сверено',
 };
 
+function LoginGate() {
+  return (
+    <div className="fixed inset-0 grid place-items-center bg-ink-dark px-5 py-8 font-sans text-sm text-subtle">
+      <div className="w-full max-w-[420px] rounded-[14px] border border-surface-3 bg-surface-2 p-6 text-center">
+        <p>Эта страница доступна только после входа в личный кабинет.</p>
+        <Link href="/login?next=/account/returns" className="mt-4 inline-flex rounded-[11px] bg-lime px-5 py-2.5 text-sm font-bold text-lime-ink">Войти в аккаунт</Link>
+      </div>
+    </div>
+  );
+}
+
 export default function ReturnsPage() {
   const router = useRouter();
   const { user, hydrated, authed } = useAuth();
@@ -37,7 +48,6 @@ export default function ReturnsPage() {
   const [done, setDone] = useState<{ ret: ReturnRequest; evidenceCount: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { if (hydrated && !user) router.replace('/login?next=/account/returns'); }, [hydrated, user, router]);
   useEffect(() => {
     if (!user) return;
     authed(fetchMyOrders).then((list) => {
@@ -97,7 +107,7 @@ export default function ReturnsPage() {
   }
 
   if (!hydrated || !user) {
-    return <div className="fixed inset-0 z-40 grid place-items-center bg-ink-dark font-mono text-sm text-subtle">Загрузка…</div>;
+    return <LoginGate />;
   }
 
   if (done) {
