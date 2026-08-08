@@ -2,105 +2,111 @@
 
 > Всё до кнопки «Submit» подготовлено и проверено кодом. Дальше — шаги, которые
 > может выполнить **только владелец** (платный аккаунт, подпись, публикация,
-> секреты). Этот файл превращает их в механический чек-лист. Снято 2026-07-24,
-> статус выгрузки обновлён 2026-07-26.
+> секреты). Этот файл — механический чек‑лист перед очередным resubmit.
+>
+> Обновление статуса: 2026-08-07.
 
-> **Выгрузка уже выполнена.** Все четыре приложения загружены в App Store Connect
-> сборкой **`1.0.0 (4)`**, она `VALID` и привязана к версии. Пересборка и повторная
-> выгрузка не нужны. Актуальное состояние и оставшиеся шаги владельца —
-> в [`apps/ios/store/SUBMISSION-STATUS.md`](../apps/ios/store/SUBMISSION-STATUS.md);
-> разделы ниже описывают, как этот пайплайн устроен.
+> **Выгрузка выполнена, но сейчас все 4 версии отклонены.** Все приложения сейчас
+> в App Store Connect на `1.0.0 (5)` и имеют статус `REJECTED` (см. деталь в
+> [`apps/ios/store/SUBMISSION-STATUS.md`](../apps/ios/store/SUBMISSION-STATUS.md)).
 
 ## Текущее состояние (проверено кодом)
 
 | Что | Результат |
 |---|---|
-| Сборка 4 приложений (`npm run ios:build`) | ✅ BUILD SUCCEEDED |
-| Юнит-тесты (AliStoreCore, `npm run ios:test`) | ✅ 112/112 |
-| Release-конфигурация (`store-preflight`, non-strict) | ✅ bundle ids `kg.alistore.{client,staff,courier,pos}`, AppIcon, prod APNs, метаданные + privacy manifest |
-| В App Store Connect | ✅ `1.0.0 (4)` загружена и привязана по всем четырём bundle id |
+| Сборка (`npm run ios:build`) | ✅ BUILD SUCCEEDED |
+| Юнит/контракт/локальные UI-гейты | ✅ зелёные на текущей ветке |
+| Release-конфигурация (`store-preflight`, non-strict) | ✅ bundle ids, AppIcon, prod APNs, метаданные + privacy manifest |
+| Подготовка в ASC | ✅ `1.0.0 (5)` привязана по всем четырём bundle id |
+| App Store статус | ⚠️ `REJECTED` для всех четырёх сборок |
 | Xcode | 26.6 |
 
-Приложения: **AliStoreClient** (клиент), **AliStoreStaff**, **AliStoreCourier**,
-**AliStorePOS**. Client — нативное приложение магазина: каталог, корзина и оформление
-заказа, «Мои заказы», подарочные карты, trade-in, поддержка, настройки.
+Приложения: **AliStoreClient**, **AliStoreStaff**, **AliStoreCourier**, **AliStorePOS**.
 
-> Здесь раньше перечислялись **рефералы и waitlist**. Их нет: плитки убраны из аккаунта,
-> потому что экраны рисовали `.sample`-фикстуры и вводили в заблуждение (Guideline 2.3),
-> а на сервере этих функций **не существует вовсе** (`grep waitlist apps/api/src` — 0
-> совпадений). Сами экраны достижимы только из UI-тестов под DEBUG-флагом
-> (`ClientDebugFeature`). См. комментарий в `apps/ios/Client/AliStoreClientApp.swift`.
-> Перечислять их в релизном документе — значит обещать Apple и владельцу то, чего нет.
+## Что должно сделать владелец перед новой подачей
 
-## Шаги владельца (по порядку)
+### 1) Доступы и подпись
 
-### 1. Аккаунты и деньги
-- Apple Developer Program — **$99/год**, требует D-U-N-S (получение может занять дни).
-- Доступ в App Store Connect.
+- Apple Developer Program (или подтверждённый аккаунт организации).
+- App Store Connect с правами App Manager/Account Holder.
+- Apple Distribution сертификат.
+- App Store Connect API key (`.p8`) + `Key ID` + `Issuer ID`.
+- Provisioning profiles (App Store) для всех 4 bundle id:
+  - `kg.alistore.client`
+  - `kg.alistore.staff`
+  - `kg.alistore.courier`
+  - `kg.alistore.pos`
 
-### 2. Подпись
-- Создать **Apple Distribution** сертификат.
-- Provisioning profiles (App Store) для всех 4 bundle id: `kg.alistore.client`,
-  `.staff`, `.courier`, `.pos`.
-- App Store Connect **API key** (`.p8`), запомнить `Key ID` и `Issuer ID`.
+### 2) Заполнить `apps/ios/.env.production` (файл владельца, в репозиторий не коммитить)
 
-### 3. Секреты в `apps/ios/.env.production` (файл владельца, в git не коммитить)
-```
-ASC_API_KEY_PATH=/путь/AuthKey_XXXXXXXXXX.p8
+```bash
+ASC_API_KEY_PATH=/путь/AuthKey_KEYID.p8
 ASC_KEY_ID=XXXXXXXXXX            # 10 символов
-ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx   # UUID из ASC
-# + переменные подписи (identity/team), как ждёт preflight
+ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+DEVELOPMENT_TEAM=ZYU3F8W56P      # 10 символов
+ALISTORE_API_BASE_URL=https://api.ali.kg/api
+IOS_ALLOW_PROVISIONING_UPDATE=false
 ```
 
-### 4. Проверка готовности (строгая)
+### 3) Жёсткий preflight
+
 ```bash
 bash apps/ios/scripts/store-preflight.sh --env-file apps/ios/.env.production --strict-signing --strict-asc
 ```
-Должен пройти без ошибок (проверит подпись + живой ASC-ключ против Apple API).
 
-### 5. Сборка релиза и выгрузка
+### 4) Подготовить reviewer-доступ и проверить live readiness
+
+```bash
+# Подготовка bundle-credential (выполнять на сервере/локально, вне репозитория)
+npm run ios:review-credentials -- --point <ACTIVE_BRANCH_CODE> --output /secure/location/review-creds.txt
+
+# Проверка соответствия демо-аккаунтов ASC и readiness API
+ALISTORE_REVIEW_POINT=<ACTIVE_BRANCH_CODE> npm run ios:review-readiness -- --env-file apps/ios/.env.production
+```
+
+В сгенерированном файле:
+- `AUTH_REVIEW_PHONE / AUTH_REVIEW_OTP / AUTH_REVIEW_UNTIL` для Client
+- 3 staff-учётки для Staff/Courier/POS.
+
+### 5) Данные для review-демо
+
+```bash
+# Проверка скриптового seed (без применения)
+npm run review:seed -- --api-base https://api.ali.kg/api --location <branch>
+
+# Применение на проде
+ALISTORE_SEED_TOKEN=<STAFF_TOKEN> npm run review:seed -- --api-base https://api.ali.kg/api --location <branch> --apply --yes-production
+```
+
+Также вручную добавить в живом проде:
+- Staff: активную задачу для профиля review staff;
+- Courier: назначенную доставку в статусе `courier_assigned / out_for_delivery`;
+- POS: открытую смену в `shifts/current`;
+- для всех 3 non-Client приложений проверить выключенный TOTP у reviewer-аккаунтов.
+
+### 6) Сборка + загрузка build 6 и submission
+
 ```bash
 bash apps/ios/scripts/archive.sh --env-file apps/ios/.env.production
 bash apps/ios/scripts/export-archives.sh --env-file apps/ios/.env.production
 ```
-Затем загрузить в App Store Connect и отправить на ревью (все 4 приложения).
 
-## Блокер ревью — вход ревьюера (нужно решение владельца)
+Далее в App Store Connect:
+1. Подменить build на `1.0.0 (6)`
+2. Добавить в каждую версию App Review notes и demo-account
+3. Для Staff/Courier/POS подтверждённо выбрать корректную схему дистрибуции
+   (Unlisted или Apple Business Manager Custom App), иначе возможно повторное `3.2`.
+4. **Client** — отправить после проверки Sign in with Apple на физическом устройстве.
+5. Отправить на review.
 
-Приложение требует вход по SMS-OTP, а в проде эхо кода выключено → **ревьюер Apple
-не сможет войти** и завернёт по Guideline 2.1. Метаданные уже помечены
-`demoAccountRequired: true` для Staff/Courier/POS. Варианты:
+## Блокеры по rejection — и конкретный след
 
-> **Охват: механизм ниже закрывает только Client.** Review-ветка живёт в
-> `verifyOtp`, требует заранее созданного Customer и выдаёт customer-scope токен. Staff, Courier и
-> POS входят через `staff-auth/login` логином и учётными данными сотрудника
-> (`apps/ios/Shared/StaffAuthStore.swift`), никакого OTP там нет. Для этих трёх
-> нужны три реальные учётки сотрудников из ERP — с **выключенным TOTP**, иначе
-> ревьюер не войдёт.
-
-1. **Review-учётка через env — РЕАЛИЗОВАНО ✅.** Один заранее заданный номер
-   принимает один фиксированный код, только когда заданы **все три** переменные;
-   без них механизм полностью инертен (никакого байпаса в проде). Чтобы включить
-   на время ревью, задайте в окружении API:
-   ```
-   AUTH_REVIEW_PHONE=+996XXXXXXXXX     # ОДНОРАЗОВЫЙ номер (не реальный клиент!), укажете в App Review Notes
-   AUTH_REVIEW_OTP=424242               # ровно 6 цифр: поле iOS использует numberPad
-   AUTH_REVIEW_UNTIL=YYYY-MM-DDTHH:mm:ssZ    # обязательно: будущее время не дальше 7 дней
-   ```
-   Ревьюер вводит этот номер и код в приложении. **После ревью уберите переменные.**
-   Защита: механизм инертен без любой из трёх переменных, при OTP не из ровно
-   шести цифр, при сроке в прошлом/неразборчивом виде или дальше семи дней
-   (fail-closed). API пишет WARN на старте при заданном `AUTH_REVIEW_PHONE`,
-   включая неполную конфигурацию, чтобы забытый env не остался незамеченным.
-   Номер должен принадлежать заранее созданной одноразовой review-учётке:
-   механизм никогда не регистрирует покупателя и не открывает recovery.
-   Реализовано в `apps/api/src/auth/auth.service.ts` и
-   `apps/api/src/auth/review-login-config.ts`, покрыто contract/E2E-тестами.
-2. Номер владельца (ревьюер звонит/пишет владельцу за кодом) — просто, но неудобно.
-3. Гостевой режим без входа — большой натив-объём, риск Guideline 2.1 иначе.
+- **AliStore KG**: `2.1(a)` — Reviewer не смог пройти Sign in with Apple на iPadOS 26.6. Нужно доказать физический SIWA и upload нового build 6.
+- **AliStore Staff / Courier / POS**: `3.2` — текущая публикация публичная для employee-only приложений. Нужна корректная стратегия дистрибуции.
 
 ## Почему это не сделал агент
 
-Выгрузка = трата денег владельца + внешняя публикация + использование секретов
-владельца (`.env.production`). Каркас, сборка, тесты и метаданные — подготовлены и
-зелёные; аккаунт, подпись, публикация и решение по входу ревьюера — за владельцем.
+Выполнить upload в App Store и реальную проверку на устройстве может только владелец.
+Код, скрипты, метаданные, privacy/снапшоты и проверки — уже подготовлены и закрыты
+в кодовой части. Остальное зависит от аккаунтов, сертификатов, live-устройств и
+решения по модели распространения.
